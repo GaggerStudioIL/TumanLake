@@ -8,6 +8,7 @@ extends Control
 @onready var spot_option_button: OptionButton = $SpotOptionButton
 @onready var fish_button: Button = $FishButton
 @onready var basket_button: Button = $BasketButton
+@onready var inventory_button: Button = $InventoryButton
 @onready var timer_label: Label = $TimerLabel
 @onready var tackle_label: Label = $TackleLabel
 @onready var result_label: Label = $ResultLabel
@@ -29,6 +30,21 @@ extends Control
 @onready var basket_contents_label: Label = $BasketPanel/BasketContentsLabel
 @onready var basket_sell_all_button: Button = $BasketPanel/BasketSellAllButton
 @onready var basket_close_button: Button = $BasketPanel/BasketCloseButton
+@onready var inventory_panel: ColorRect = $InventoryPanel
+@onready var inventory_title_label: Label = $InventoryPanel/InventoryTitleLabel
+@onready var category_all_button: Button = $InventoryPanel/CategoryAllButton
+@onready var category_rods_button: Button = $InventoryPanel/CategoryRodsButton
+@onready var category_lines_button: Button = $InventoryPanel/CategoryLinesButton
+@onready var category_floats_button: Button = $InventoryPanel/CategoryFloatsButton
+@onready var category_hooks_button: Button = $InventoryPanel/CategoryHooksButton
+@onready var category_baits_button: Button = $InventoryPanel/CategoryBaitsButton
+@onready var category_fish_button: Button = $InventoryPanel/CategoryFishButton
+@onready var category_misc_button: Button = $InventoryPanel/CategoryMiscButton
+@onready var inventory_item_list: ItemList = $InventoryPanel/InventoryItemList
+@onready var inventory_details_label: Label = $InventoryPanel/InventoryDetailsLabel
+@onready var inventory_tackle_label: Label = $InventoryPanel/InventoryTackleLabel
+@onready var inventory_equip_button: Button = $InventoryPanel/InventoryEquipButton
+@onready var inventory_close_button: Button = $InventoryPanel/InventoryCloseButton
 
 enum FishingUiState {
 	IDLE,
@@ -39,6 +55,9 @@ enum FishingUiState {
 }
 
 var _fishing_ui_state: int = FishingUiState.IDLE
+var _inventory_category: String = "all"
+var _visible_inventory_items: Array = []
+var _selected_inventory_item_id: String = ""
 
 var _last_reeling_state := {
 	"fish_name": "-",
@@ -96,11 +115,13 @@ func _setup_layout() -> void:
 		spot_option_button,
 		fish_button,
 		basket_button,
+		inventory_button,
 		timer_label,
 		tackle_label,
 		result_label,
 		reeling_panel,
-		basket_panel
+		basket_panel,
+		inventory_panel
 	]:
 		node.set_anchors_preset(Control.PRESET_TOP_LEFT)
 
@@ -116,7 +137,21 @@ func _setup_layout() -> void:
 		basket_title_label,
 		basket_contents_label,
 		basket_sell_all_button,
-		basket_close_button
+		basket_close_button,
+		inventory_title_label,
+		category_all_button,
+		category_rods_button,
+		category_lines_button,
+		category_floats_button,
+		category_hooks_button,
+		category_baits_button,
+		category_fish_button,
+		category_misc_button,
+		inventory_item_list,
+		inventory_details_label,
+		inventory_tackle_label,
+		inventory_equip_button,
+		inventory_close_button
 	]:
 		node.set_anchors_preset(Control.PRESET_TOP_LEFT)
 
@@ -150,8 +185,13 @@ func _setup_layout() -> void:
 
 	basket_button.text = "Садок"
 	basket_button.position = Vector2(margin, 332)
-	basket_button.size = Vector2(left_width, 48)
+	basket_button.size = Vector2((left_width - 12.0) * 0.5, 48)
 	basket_button.add_theme_font_size_override("font_size", 20)
+
+	inventory_button.text = "Инвентарь"
+	inventory_button.position = Vector2(margin + (left_width + 12.0) * 0.5, 332)
+	inventory_button.size = Vector2((left_width - 12.0) * 0.5, 48)
+	inventory_button.add_theme_font_size_override("font_size", 18)
 
 	timer_label.position = Vector2(margin, 396)
 	timer_label.size = Vector2(left_width, 34)
@@ -245,8 +285,87 @@ func _setup_layout() -> void:
 	basket_close_button.position = Vector2(basket_padding + (basket_inner_width + 16.0) * 0.5, basket_height - 62)
 	basket_close_button.size = Vector2((basket_inner_width - 16.0) * 0.5, 46)
 
+	var inventory_width: float = min(screen_size.x - margin * 2.0, 820.0)
+	var inventory_height: float = min(content_height + 16.0, 470.0)
+	var inventory_x: float = (screen_size.x - inventory_width) * 0.5
+	var inventory_y: float = (screen_size.y - inventory_height) * 0.5
+	var inventory_padding := 18.0
+	var category_gap := 6.0
+	var category_columns := 4
+	var category_button_width: float = (inventory_width - inventory_padding * 2.0 - category_gap * float(category_columns - 1)) / float(category_columns)
+	var list_width: float = inventory_width * 0.42
+	var right_panel_x: float = inventory_padding + list_width + 18.0
+	var right_panel_width: float = inventory_width - right_panel_x - inventory_padding
+	var inventory_body_y := 142.0
+	var inventory_action_y: float = inventory_height - 62.0
+	var inventory_body_height: float = max(inventory_action_y - inventory_body_y - 16.0, 96.0)
+	var details_height: float = min(132.0, max(inventory_body_height * 0.45, 70.0))
+
+	inventory_panel.position = Vector2(inventory_x, inventory_y)
+	inventory_panel.size = Vector2(inventory_width, inventory_height)
+	inventory_panel.z_index = 25
+
+	inventory_title_label.position = Vector2(inventory_padding, 12)
+	inventory_title_label.size = Vector2(inventory_width - inventory_padding * 2.0, 32)
+	inventory_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	inventory_title_label.add_theme_font_size_override("font_size", 26)
+
+	var category_buttons: Array = [
+		category_all_button,
+		category_rods_button,
+		category_lines_button,
+		category_floats_button,
+		category_hooks_button,
+		category_baits_button,
+		category_fish_button,
+		category_misc_button
+	]
+	var category_texts: Array = [
+		"Все",
+		"Удилища",
+		"Лески",
+		"Поплавки",
+		"Крючки",
+		"Наживки",
+		"Рыба / Садок",
+		"Разное"
+	]
+
+	for i in category_buttons.size():
+		var category_button: Button = category_buttons[i]
+		var category_column: int = i % category_columns
+		var category_row: int = int(i / category_columns)
+		category_button.text = category_texts[i]
+		category_button.position = Vector2(
+			inventory_padding + category_column * (category_button_width + category_gap),
+			56 + category_row * 40
+		)
+		category_button.size = Vector2(category_button_width, 34)
+		category_button.add_theme_font_size_override("font_size", 13)
+
+	inventory_item_list.position = Vector2(inventory_padding, inventory_body_y)
+	inventory_item_list.size = Vector2(list_width, inventory_body_height)
+
+	inventory_details_label.position = Vector2(right_panel_x, inventory_body_y)
+	inventory_details_label.size = Vector2(right_panel_width, details_height)
+	inventory_details_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	inventory_details_label.add_theme_font_size_override("font_size", 16)
+
+	var inventory_tackle_y: float = inventory_body_y + details_height + 14.0
+	inventory_tackle_label.position = Vector2(right_panel_x, inventory_tackle_y)
+	inventory_tackle_label.size = Vector2(right_panel_width, max(inventory_action_y - inventory_tackle_y - 12.0, 0.0))
+	inventory_tackle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	inventory_tackle_label.add_theme_font_size_override("font_size", 15)
+
+	inventory_equip_button.position = Vector2(right_panel_x, inventory_action_y)
+	inventory_equip_button.size = Vector2((right_panel_width - 16.0) * 0.5, 46)
+
+	inventory_close_button.position = Vector2(right_panel_x + (right_panel_width + 16.0) * 0.5, inventory_action_y)
+	inventory_close_button.size = Vector2((right_panel_width - 16.0) * 0.5, 46)
+
 	_update_reeling_ui(_last_reeling_state)
 	_update_basket_ui()
+	_update_inventory_ui()
 
 func _setup_spots() -> void:
 	spot_option_button.clear()
@@ -272,6 +391,18 @@ func _connect_signals() -> void:
 	basket_button.pressed.connect(_on_basket_button_pressed)
 	basket_sell_all_button.pressed.connect(_on_sell_all_button_pressed)
 	basket_close_button.pressed.connect(_on_basket_close_button_pressed)
+	inventory_button.pressed.connect(_on_inventory_button_pressed)
+	inventory_close_button.pressed.connect(_on_inventory_close_button_pressed)
+	inventory_equip_button.pressed.connect(_on_inventory_equip_button_pressed)
+	inventory_item_list.item_selected.connect(_on_inventory_item_selected)
+	category_all_button.pressed.connect(_set_inventory_category.bind("all"))
+	category_rods_button.pressed.connect(_set_inventory_category.bind("rod"))
+	category_lines_button.pressed.connect(_set_inventory_category.bind("line"))
+	category_floats_button.pressed.connect(_set_inventory_category.bind("float"))
+	category_hooks_button.pressed.connect(_set_inventory_category.bind("hook"))
+	category_baits_button.pressed.connect(_set_inventory_category.bind("bait"))
+	category_fish_button.pressed.connect(_set_inventory_category.bind("fish"))
+	category_misc_button.pressed.connect(_set_inventory_category.bind("misc"))
 
 	FishingManager.fishing_started.connect(_on_fishing_started)
 	FishingManager.fishing_tick.connect(_on_fishing_tick)
@@ -295,6 +426,10 @@ func _update_ui() -> void:
 	fish_button.disabled = _fishing_ui_state == FishingUiState.WAITING
 	spot_option_button.disabled = locked_for_result_or_fishing
 	basket_button.disabled = _fishing_ui_state == FishingUiState.WAITING or _fishing_ui_state == FishingUiState.FIGHTING
+	inventory_button.disabled = _fishing_ui_state == FishingUiState.WAITING or _fishing_ui_state == FishingUiState.FIGHTING
+
+	if inventory_button.disabled:
+		inventory_panel.visible = false
 
 	match _fishing_ui_state:
 		FishingUiState.WAITING:
@@ -313,6 +448,150 @@ func _update_basket_ui() -> void:
 	basket_button.text = "Садок (%d)" % fish_count
 	basket_contents_label.text = InventoryManager.get_inventory_text()
 	basket_sell_all_button.disabled = fish_count == 0 or _fishing_ui_state == FishingUiState.WAITING or _fishing_ui_state == FishingUiState.FIGHTING
+
+func _update_inventory_ui() -> void:
+	_visible_inventory_items = _get_visible_inventory_items()
+	inventory_title_label.text = "Инвентарь - %s" % _get_inventory_category_title(_inventory_category)
+	inventory_tackle_label.text = PlayerData.get_tackle_text()
+	inventory_item_list.clear()
+
+	var selected_index := -1
+	for i in _visible_inventory_items.size():
+		var item: Dictionary = _visible_inventory_items[i]
+		inventory_item_list.add_item(_get_inventory_item_display_text(item))
+
+		if str(item.get("id", "")) == _selected_inventory_item_id:
+			selected_index = i
+
+	if selected_index >= 0:
+		inventory_item_list.select(selected_index)
+	else:
+		_selected_inventory_item_id = ""
+
+	var selected_item := _get_selected_inventory_item()
+	if selected_item.is_empty():
+		if _visible_inventory_items.is_empty():
+			inventory_details_label.text = "В этой категории пока пусто."
+		else:
+			inventory_details_label.text = "Выбери предмет."
+	else:
+		inventory_details_label.text = _get_inventory_item_details_text(selected_item)
+
+	var can_equip := not selected_item.is_empty() and PlayerData.can_equip_item(selected_item)
+	inventory_equip_button.disabled = not can_equip or _fishing_ui_state != FishingUiState.IDLE
+	inventory_equip_button.visible = true
+
+func _get_visible_inventory_items() -> Array:
+	var items: Array = []
+
+	if _inventory_category == "all":
+		items.append_array(PlayerData.owned_items)
+	elif _inventory_category != "fish":
+		items.append_array(PlayerData.get_owned_items_for_category(_inventory_category))
+
+	if _inventory_category == "all" or _inventory_category == "fish":
+		for i in InventoryManager.inventory.size():
+			var fish: Dictionary = InventoryManager.inventory[i]
+			items.append({
+				"id": "basket_fish_%d" % i,
+				"name": str(fish.get("name", "-")),
+				"category": "fish",
+				"quantity": 1,
+				"description": "Рыба в садке.",
+				"stats": {
+					"weight": float(fish.get("weight", 0.0)),
+					"price": int(fish.get("price", 0)),
+					"rarity": str(fish.get("rarity", "-"))
+				}
+			})
+
+	return items
+
+func _get_selected_inventory_item() -> Dictionary:
+	for item in _visible_inventory_items:
+		if str(item.get("id", "")) == _selected_inventory_item_id:
+			return item
+
+	return {}
+
+func _get_inventory_item_display_text(item: Dictionary) -> String:
+	var category := str(item.get("category", "misc"))
+	var name := str(item.get("name", "-"))
+	var quantity := int(item.get("quantity", 1))
+
+	if category == "fish":
+		var stats: Dictionary = item.get("stats", {})
+		return "%s %.2f кг" % [name, float(stats.get("weight", 0.0))]
+
+	if quantity > 1:
+		return "%s x%d" % [name, quantity]
+
+	return name
+
+func _get_inventory_item_details_text(item: Dictionary) -> String:
+	var category := str(item.get("category", "misc"))
+	var name := str(item.get("name", "-"))
+	var quantity := int(item.get("quantity", 1))
+	var description := str(item.get("description", ""))
+	var stats: Dictionary = item.get("stats", {})
+
+	if category == "fish":
+		return "%s\nКатегория: Рыба / Садок\nВес: %.2f кг\nЦена: %d мон.\nРедкость: %s" % [
+			name,
+			float(stats.get("weight", 0.0)),
+			int(stats.get("price", 0)),
+			str(stats.get("rarity", "-"))
+		]
+
+	var details := "%s\nКатегория: %s\nКоличество: %d" % [
+		name,
+		_get_inventory_category_title(category),
+		quantity
+	]
+
+	if description != "":
+		details += "\n%s" % description
+
+	var stats_text := _get_inventory_stats_text(stats)
+	if stats_text != "":
+		details += "\n\n%s" % stats_text
+
+	return details
+
+func _get_inventory_stats_text(stats: Dictionary) -> String:
+	var stats_text := ""
+
+	for key in stats.keys():
+		var value = stats[key]
+
+		if typeof(value) == TYPE_DICTIONARY or typeof(value) == TYPE_ARRAY:
+			continue
+
+		if stats_text != "":
+			stats_text += "\n"
+
+		stats_text += "%s: %s" % [str(key), str(value)]
+
+	return stats_text
+
+func _get_inventory_category_title(category: String) -> String:
+	match category:
+		"all":
+			return "Все"
+		"rod":
+			return "Удилища"
+		"line":
+			return "Лески"
+		"float":
+			return "Поплавки"
+		"hook":
+			return "Крючки"
+		"bait":
+			return "Наживки"
+		"fish":
+			return "Рыба / Садок"
+		_:
+			return "Разное"
 
 func _reset_reeling_ui() -> void:
 	_last_reeling_state = {
@@ -441,6 +720,16 @@ func _on_fish_button_pressed() -> void:
 	var selected_index := spot_option_button.selected
 	PlayerData.current_spot = spot_option_button.get_item_metadata(selected_index)
 
+	if not PlayerData.consume_current_bait(1):
+		result_label.text = "Нет наживки."
+		timer_label.text = "Готов к забросу"
+		_update_ui()
+		return
+
+	basket_panel.visible = false
+	inventory_panel.visible = false
+	SaveManager.save_game()
+
 	_fishing_ui_state = FishingUiState.WAITING
 	result_label.text = "Туман сгущается. Ждем клев..."
 	FishingManager.start_fishing(PlayerData.current_spot)
@@ -465,11 +754,49 @@ func _on_sell_all_button_pressed() -> void:
 	_update_ui()
 
 func _on_basket_button_pressed() -> void:
+	inventory_panel.visible = false
 	basket_panel.visible = true
 	_update_basket_ui()
 
 func _on_basket_close_button_pressed() -> void:
 	basket_panel.visible = false
+
+func _on_inventory_button_pressed() -> void:
+	basket_panel.visible = false
+	inventory_panel.visible = true
+	_update_inventory_ui()
+
+func _on_inventory_close_button_pressed() -> void:
+	inventory_panel.visible = false
+
+func _set_inventory_category(category: String) -> void:
+	_inventory_category = category
+	_selected_inventory_item_id = ""
+	_update_inventory_ui()
+
+func _on_inventory_item_selected(index: int) -> void:
+	if index < 0 or index >= _visible_inventory_items.size():
+		_selected_inventory_item_id = ""
+	else:
+		_selected_inventory_item_id = str(_visible_inventory_items[index].get("id", ""))
+
+	_update_inventory_ui()
+
+func _on_inventory_equip_button_pressed() -> void:
+	var selected_item := _get_selected_inventory_item()
+
+	if selected_item.is_empty() or not PlayerData.can_equip_item(selected_item):
+		result_label.text = "Этот предмет нельзя экипировать."
+		_update_inventory_ui()
+		return
+
+	if PlayerData.equip_item(str(selected_item.get("id", ""))):
+		result_label.text = "Экипировано: %s" % str(selected_item.get("name", "-"))
+		SaveManager.save_game()
+	else:
+		result_label.text = "Не удалось экипировать предмет."
+
+	_update_ui()
 
 func _return_to_idle_after_result() -> void:
 	_fishing_ui_state = FishingUiState.IDLE
