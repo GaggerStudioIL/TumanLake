@@ -12,6 +12,7 @@ func save_game() -> void:
 		"current_spot": PlayerData.current_spot,
 		"unlocked_spots": PlayerData.unlocked_spots,
 		"upgrades": PlayerData.upgrades,
+		"current_tackle": PlayerData.current_tackle,
 		"inventory": InventoryManager.inventory,
 		"max_items": InventoryManager.max_items
 	}
@@ -60,6 +61,7 @@ func load_game() -> void:
 	PlayerData.current_spot = str(save_data.get("current_spot", "north_pier"))
 	PlayerData.unlocked_spots = save_data.get("unlocked_spots", ["north_pier"])
 	PlayerData.upgrades = save_data.get("upgrades", [])
+	PlayerData.set_current_tackle(save_data.get("current_tackle", {}))
 
 	InventoryManager.inventory = save_data.get("inventory", [])
 	InventoryManager.max_items = int(save_data.get("max_items", 20))

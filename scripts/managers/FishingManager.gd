@@ -21,6 +21,7 @@ var _control_value: float = 0.0
 var _green_min: float = 0.38
 var _green_max: float = 0.68
 var _difficulty: float = 1.0
+var _tackle_stats: Dictionary = {}
 var _fish_force: float = 0.0
 var _target_fish_force: float = 0.0
 var _struggle_power: float = 0.0
@@ -60,16 +61,34 @@ func start_fishing(spot_id: String) -> void:
 	is_fishing = true
 	is_reeling = false
 	_reel_input_active = false
+	_tackle_stats = PlayerData.get_tackle_stats()
 
-	var seconds: int = randi_range(3, 7)
+	var bite_speed: float = clamp(
+		1.0 + float(_tackle_stats.get("bite_detection_bonus", 0.0)) + float(_tackle_stats.get("fish_attraction", 0.0)) - float(_tackle_stats.get("visibility_penalty", 0.0)),
+		0.65,
+		1.45
+	)
+	var seconds: int = clamp(roundi(float(randi_range(3, 7)) / bite_speed), 2, 8)
 	fishing_started.emit(seconds)
 
 	for time_left in range(seconds, 0, -1):
 		fishing_tick.emit(time_left)
 		await get_tree().create_timer(1.0).timeout
 
+	var available_fish: Array = _get_tackle_available_fish(spot["available_fish"])
+	var bite_chance: float = clamp(
+		0.72 + float(_tackle_stats.get("bite_detection_bonus", 0.0)) + float(_tackle_stats.get("fish_attraction", 0.0)) + float(_tackle_stats.get("hook_success_bonus", 0.0)) - float(_tackle_stats.get("visibility_penalty", 0.0)),
+		0.30,
+		0.98
+	)
+
+	if randf() > bite_chance:
+		is_fishing = false
+		fishing_failed.emit("Поклёвки не было. Попробуй другой темп или наживку.")
+		return
+
 	var fish_id: String = FishDatabase.get_random_fish_id(
-		spot["available_fish"],
+		available_fish,
 		spot["rare_chance_modifier"]
 	)
 
@@ -77,6 +96,32 @@ func start_fishing(spot_id: String) -> void:
 	catch_data["spot_name"] = spot["name"]
 
 	_start_reeling(catch_data)
+
+func _get_tackle_available_fish(spot_fish: Array) -> Array:
+	var filtered_fish: Array = []
+	var allowed_rarities: Array = _tackle_stats.get("allowed_rarities", [])
+	var max_fish_weight: float = float(_tackle_stats.get("max_fish_weight", 1.0))
+	var line_strength: float = float(_tackle_stats.get("line_strength", 1.0))
+	var tackle_weight_limit: float = max(max_fish_weight * 1.25, line_strength * 4.0)
+
+	for fish_id in spot_fish:
+		var fish: Dictionary = FishDatabase.get_fish(str(fish_id))
+		if fish.is_empty():
+			continue
+
+		var rarity: String = str(fish.get("rarity", "common"))
+		if not allowed_rarities.is_empty() and not allowed_rarities.has(rarity):
+			continue
+
+		if float(fish.get("min_weight", 0.0)) > tackle_weight_limit:
+			continue
+
+		filtered_fish.append(fish_id)
+
+	if filtered_fish.is_empty():
+		return spot_fish
+
+	return filtered_fish
 
 func set_reel_input(active: bool) -> void:
 	_reel_input_active = active and is_reeling
@@ -101,6 +146,7 @@ func _start_reeling(catch_data: Dictionary) -> void:
 	_current_catch = catch_data
 	is_reeling = true
 	_reel_input_active = false
+	_tackle_stats = PlayerData.get_tackle_stats()
 
 	var fish: Dictionary = FishDatabase.get_fish(str(catch_data["id"]))
 	var rarity: String = str(catch_data.get("rarity", "common"))
@@ -112,8 +158,12 @@ func _start_reeling(catch_data: Dictionary) -> void:
 	var max_weight: float = float(fish.get("max_weight", catch_data["weight"]))
 	var weight_span: float = max(max_weight - min_weight, 0.01)
 	var weight_ratio: float = clamp((float(catch_data["weight"]) - min_weight) / weight_span, 0.0, 1.0)
+	var catch_weight: float = float(catch_data.get("weight", 0.0))
+	var rod_capacity_ratio: float = catch_weight / max(float(_tackle_stats.get("max_fish_weight", 1.0)), 0.1)
+	var line_capacity_ratio: float = catch_weight / max(float(_tackle_stats.get("line_strength", 1.0)), 0.1)
+	var overload_penalty: float = max(max(rod_capacity_ratio - 1.0, 0.0), max(line_capacity_ratio - 1.0, 0.0) * 0.42)
 
-	_difficulty = clamp(rarity_factor + weight_ratio * 0.55, 0.85, 2.35)
+	_difficulty = clamp(rarity_factor + weight_ratio * 0.55 + overload_penalty * 0.25, 0.85, 2.85)
 	_catch_progress = 0.0
 	_control_value = 0.0
 	_fish_force = 0.0
@@ -132,7 +182,9 @@ func _start_reeling(catch_data: Dictionary) -> void:
 	_player_force = 0.0
 
 	var green_width: float = clamp(
-		(0.36 - (_difficulty - 1.0) * 0.075) * float(tuning["green_width"]),
+		(0.36 - (_difficulty - 1.0) * 0.075)
+		* float(tuning["green_width"])
+		* (1.0 + float(_tackle_stats.get("control_bonus", 0.0)) + float(_tackle_stats.get("stability", 0.0))),
 		0.16,
 		0.38
 	)
@@ -141,10 +193,12 @@ func _start_reeling(catch_data: Dictionary) -> void:
 	_green_max = clamp(green_center + green_width * 0.5, _green_min + 0.11, 0.88)
 	_tension = clamp((_green_min + _green_max) * 0.5 - 0.04, 0.18, 0.82)
 
-	_high_fail_limit = clamp(1.30 / (_difficulty * float(tuning["danger"])), 0.52, 1.45)
-	_low_fail_limit = clamp(1.52 / (_difficulty * float(tuning["danger"])), 0.62, 1.65)
+	var break_safety: float = float(_tackle_stats.get("break_resistance", 1.0)) * float(_tackle_stats.get("durability", 1.0))
+	var escape_safety: float = (1.0 / max(float(_tackle_stats.get("fish_escape_modifier", 1.0)), 0.2)) + float(_tackle_stats.get("hook_success_bonus", 0.0))
+	_high_fail_limit = clamp((1.30 * break_safety) / (_difficulty * float(tuning["danger"]) * (1.0 + overload_penalty * 0.45)), 0.42, 1.55)
+	_low_fail_limit = clamp((1.52 * escape_safety) / (_difficulty * float(tuning["danger"])), 0.62, 1.85)
 	_target_progress_time = clamp(
-		(4.9 + _difficulty * 1.85) * float(tuning["progress_time"]),
+		(4.9 + _difficulty * 1.85) * float(tuning["progress_time"]) / (1.0 + float(_tackle_stats.get("control_bonus", 0.0)) + float(_tackle_stats.get("hook_success_bonus", 0.0))),
 		5.5,
 		12.5
 	)
@@ -355,7 +409,10 @@ func _update_critical_break(delta: float) -> void:
 
 	var severity: float = inverse_lerp(0.94, 1.0, _tension)
 	var force_bonus: float = clamp(_struggle_power * 0.35, 0.0, 0.35)
-	_critical_break_risk = clamp((0.10 + severity * 0.55) * _difficulty + force_bonus, 0.0, 1.0)
+	var catch_weight: float = float(_current_catch.get("weight", 0.0))
+	var line_pressure: float = catch_weight / max(float(_tackle_stats.get("line_strength", 1.0)), 0.1)
+	var break_safety: float = max(float(_tackle_stats.get("break_resistance", 1.0)) * float(_tackle_stats.get("durability", 1.0)), 0.1)
+	_critical_break_risk = clamp(((0.10 + severity * 0.55) * _difficulty + force_bonus) * max(line_pressure, 0.75) / break_safety, 0.0, 1.0)
 	_feedback_message = "Осторожно, обрыв!"
 
 	if randf() < _critical_break_risk * 0.32 * delta:

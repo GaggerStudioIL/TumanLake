@@ -9,6 +9,7 @@ extends Control
 @onready var fish_button: Button = $FishButton
 @onready var basket_button: Button = $BasketButton
 @onready var timer_label: Label = $TimerLabel
+@onready var tackle_label: Label = $TackleLabel
 @onready var result_label: Label = $ResultLabel
 @onready var reeling_panel: ColorRect = $ReelingPanel
 @onready var fight_title_label: Label = $ReelingPanel/FightTitleLabel
@@ -90,6 +91,7 @@ func _setup_layout() -> void:
 		fish_button,
 		basket_button,
 		timer_label,
+		tackle_label,
 		result_label,
 		reeling_panel,
 		basket_panel
@@ -149,6 +151,11 @@ func _setup_layout() -> void:
 	timer_label.size = Vector2(left_width, 34)
 	timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	timer_label.add_theme_font_size_override("font_size", 22)
+
+	tackle_label.position = Vector2(margin, 438)
+	tackle_label.size = Vector2(left_width, max(content_height - 414.0, 60.0))
+	tackle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tackle_label.add_theme_font_size_override("font_size", 15)
 
 	result_label.position = Vector2(right_x, margin)
 	result_label.size = Vector2(right_width, content_height)
@@ -269,6 +276,7 @@ func _connect_signals() -> void:
 
 func _update_ui() -> void:
 	money_label.text = "Деньги: %d мон." % PlayerData.money
+	tackle_label.text = PlayerData.get_tackle_text()
 	level_label.text = "LVL %d\nXP: %d / %d" % [
 		PlayerData.level,
 		PlayerData.current_xp,
