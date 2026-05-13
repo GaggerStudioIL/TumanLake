@@ -3,12 +3,13 @@ extends Control
 @onready var background: ColorRect = $Background
 @onready var title_label: Label = $TitleLabel
 @onready var money_label: Label = $MoneyLabel
+@onready var level_label: Label = $LevelLabel
+@onready var xp_progress_bar: ProgressBar = $XPProgressBar
 @onready var spot_option_button: OptionButton = $SpotOptionButton
 @onready var fish_button: Button = $FishButton
+@onready var basket_button: Button = $BasketButton
 @onready var timer_label: Label = $TimerLabel
 @onready var result_label: Label = $ResultLabel
-@onready var inventory_label: Label = $InventoryLabel
-@onready var sell_all_button: Button = $SellAllButton
 @onready var reeling_panel: ColorRect = $ReelingPanel
 @onready var fight_title_label: Label = $ReelingPanel/FightTitleLabel
 @onready var tension_label: Label = $ReelingPanel/TensionLabel
@@ -22,6 +23,21 @@ extends Control
 @onready var debug_label: Label = $ReelingPanel/DebugLabel
 @onready var fight_status_label: Label = $ReelingPanel/FightStatusLabel
 @onready var fight_hint_label: Label = $ReelingPanel/FightHintLabel
+@onready var basket_panel: ColorRect = $BasketPanel
+@onready var basket_title_label: Label = $BasketPanel/BasketTitleLabel
+@onready var basket_contents_label: Label = $BasketPanel/BasketContentsLabel
+@onready var basket_sell_all_button: Button = $BasketPanel/BasketSellAllButton
+@onready var basket_close_button: Button = $BasketPanel/BasketCloseButton
+
+enum FishingUiState {
+	IDLE,
+	WAITING,
+	FIGHTING,
+	CAUGHT,
+	FAILED
+}
+
+var _fishing_ui_state: int = FishingUiState.IDLE
 
 var _last_reeling_state := {
 	"tension": 0.46,
@@ -68,13 +84,15 @@ func _setup_layout() -> void:
 	for node in [
 		title_label,
 		money_label,
+		level_label,
+		xp_progress_bar,
 		spot_option_button,
 		fish_button,
+		basket_button,
 		timer_label,
 		result_label,
-		inventory_label,
-		sell_all_button,
-		reeling_panel
+		reeling_panel,
+		basket_panel
 	]:
 		node.set_anchors_preset(Control.PRESET_TOP_LEFT)
 
@@ -86,7 +104,11 @@ func _setup_layout() -> void:
 		progress_track,
 		debug_label,
 		fight_status_label,
-		fight_hint_label
+		fight_hint_label,
+		basket_title_label,
+		basket_contents_label,
+		basket_sell_all_button,
+		basket_close_button
 	]:
 		node.set_anchors_preset(Control.PRESET_TOP_LEFT)
 
@@ -103,20 +125,33 @@ func _setup_layout() -> void:
 	money_label.size = Vector2(left_width, 28)
 	money_label.add_theme_font_size_override("font_size", 20)
 
-	spot_option_button.position = Vector2(margin, 118)
+	level_label.position = Vector2(margin, 104)
+	level_label.size = Vector2(left_width, 42)
+	level_label.add_theme_font_size_override("font_size", 18)
+
+	xp_progress_bar.position = Vector2(margin, 148)
+	xp_progress_bar.size = Vector2(left_width, 18)
+	xp_progress_bar.show_percentage = false
+
+	spot_option_button.position = Vector2(margin, 186)
 	spot_option_button.size = Vector2(left_width, 46)
 
-	fish_button.position = Vector2(margin, 184)
+	fish_button.position = Vector2(margin, 252)
 	fish_button.size = Vector2(left_width, 64)
 	fish_button.add_theme_font_size_override("font_size", 24)
 
-	timer_label.position = Vector2(margin, 266)
+	basket_button.text = "Садок"
+	basket_button.position = Vector2(margin, 332)
+	basket_button.size = Vector2(left_width, 48)
+	basket_button.add_theme_font_size_override("font_size", 20)
+
+	timer_label.position = Vector2(margin, 396)
 	timer_label.size = Vector2(left_width, 34)
 	timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	timer_label.add_theme_font_size_override("font_size", 22)
 
-	result_label.position = Vector2(margin, 314)
-	result_label.size = Vector2(left_width, max(content_height - 396.0, 72.0))
+	result_label.position = Vector2(right_x, margin)
+	result_label.size = Vector2(right_width, content_height)
 	result_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	result_label.add_theme_font_size_override("font_size", 18)
 
@@ -170,16 +205,35 @@ func _setup_layout() -> void:
 	fight_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	fight_hint_label.add_theme_font_size_override("font_size", 16)
 
-	inventory_label.position = Vector2(right_x, margin)
-	inventory_label.size = Vector2(right_width, content_height - 76)
-	inventory_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	inventory_label.add_theme_font_size_override("font_size", 17)
+	var basket_width: float = min(screen_size.x - margin * 4.0, 640.0)
+	var basket_height: float = min(content_height - 20.0, 390.0)
+	var basket_x: float = (screen_size.x - basket_width) * 0.5
+	var basket_y: float = (screen_size.y - basket_height) * 0.5
+	var basket_padding := 20.0
+	var basket_inner_width: float = basket_width - basket_padding * 2.0
 
-	sell_all_button.text = "Продать всё"
-	sell_all_button.position = Vector2(right_x, screen_size.y - margin - 54)
-	sell_all_button.size = Vector2(right_width, 54)
+	basket_panel.position = Vector2(basket_x, basket_y)
+	basket_panel.size = Vector2(basket_width, basket_height)
+	basket_panel.z_index = 20
+
+	basket_title_label.position = Vector2(basket_padding, 16)
+	basket_title_label.size = Vector2(basket_inner_width, 36)
+	basket_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	basket_title_label.add_theme_font_size_override("font_size", 26)
+
+	basket_contents_label.position = Vector2(basket_padding, 68)
+	basket_contents_label.size = Vector2(basket_inner_width, basket_height - 146)
+	basket_contents_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	basket_contents_label.add_theme_font_size_override("font_size", 17)
+
+	basket_sell_all_button.position = Vector2(basket_padding, basket_height - 62)
+	basket_sell_all_button.size = Vector2((basket_inner_width - 16.0) * 0.5, 46)
+
+	basket_close_button.position = Vector2(basket_padding + (basket_inner_width + 16.0) * 0.5, basket_height - 62)
+	basket_close_button.size = Vector2((basket_inner_width - 16.0) * 0.5, 46)
 
 	_update_reeling_ui(_last_reeling_state)
+	_update_basket_ui()
 
 func _setup_spots() -> void:
 	spot_option_button.clear()
@@ -202,7 +256,9 @@ func _connect_signals() -> void:
 	fish_button.pressed.connect(_on_fish_button_pressed)
 	fish_button.button_down.connect(_on_reel_button_down)
 	fish_button.button_up.connect(_on_reel_button_up)
-	sell_all_button.pressed.connect(_on_sell_all_button_pressed)
+	basket_button.pressed.connect(_on_basket_button_pressed)
+	basket_sell_all_button.pressed.connect(_on_sell_all_button_pressed)
+	basket_close_button.pressed.connect(_on_basket_close_button_pressed)
 
 	FishingManager.fishing_started.connect(_on_fishing_started)
 	FishingManager.fishing_tick.connect(_on_fishing_tick)
@@ -213,18 +269,36 @@ func _connect_signals() -> void:
 
 func _update_ui() -> void:
 	money_label.text = "Деньги: %d мон." % PlayerData.money
-	inventory_label.text = InventoryManager.get_inventory_text()
+	level_label.text = "LVL %d\nXP: %d / %d" % [
+		PlayerData.level,
+		PlayerData.current_xp,
+		PlayerData.xp_to_next_level
+	]
+	xp_progress_bar.max_value = max(PlayerData.xp_to_next_level, 1)
+	xp_progress_bar.value = clamp(PlayerData.current_xp, 0, PlayerData.xp_to_next_level)
 
-	fish_button.disabled = FishingManager.is_fishing and not FishingManager.is_reeling
-	spot_option_button.disabled = FishingManager.is_fishing
-	sell_all_button.disabled = FishingManager.is_fishing
+	var locked_for_result_or_fishing: bool = _fishing_ui_state != FishingUiState.IDLE
+	fish_button.disabled = _fishing_ui_state == FishingUiState.WAITING
+	spot_option_button.disabled = locked_for_result_or_fishing
+	basket_button.disabled = _fishing_ui_state == FishingUiState.WAITING or _fishing_ui_state == FishingUiState.FIGHTING
 
-	if FishingManager.is_reeling:
-		fish_button.text = "Тянуть"
-	elif FishingManager.is_fishing:
-		fish_button.text = "Ждем клев..."
-	else:
-		fish_button.text = "Ловить"
+	match _fishing_ui_state:
+		FishingUiState.WAITING:
+			fish_button.text = "Ждём поклёвку..."
+		FishingUiState.FIGHTING:
+			fish_button.text = "Тянуть"
+		FishingUiState.CAUGHT, FishingUiState.FAILED:
+			fish_button.text = "Вытянуть удочку"
+		_:
+			fish_button.text = "Забросить"
+
+	_update_basket_ui()
+
+func _update_basket_ui() -> void:
+	var fish_count: int = InventoryManager.inventory.size()
+	basket_button.text = "Садок (%d)" % fish_count
+	basket_contents_label.text = InventoryManager.get_inventory_text()
+	basket_sell_all_button.disabled = fish_count == 0 or _fishing_ui_state == FishingUiState.WAITING or _fishing_ui_state == FishingUiState.FIGHTING
 
 func _reset_reeling_ui() -> void:
 	_last_reeling_state = {
@@ -331,18 +405,23 @@ func _on_spot_selected(index: int) -> void:
 	SaveManager.save_game()
 
 func _on_fish_button_pressed() -> void:
-	if FishingManager.is_fishing:
+	if _fishing_ui_state == FishingUiState.CAUGHT or _fishing_ui_state == FishingUiState.FAILED:
+		_return_to_idle_after_result()
+		return
+
+	if _fishing_ui_state != FishingUiState.IDLE:
 		return
 
 	var selected_index := spot_option_button.selected
 	PlayerData.current_spot = spot_option_button.get_item_metadata(selected_index)
 
+	_fishing_ui_state = FishingUiState.WAITING
 	result_label.text = "Туман сгущается. Ждем клев..."
 	FishingManager.start_fishing(PlayerData.current_spot)
 	_update_ui()
 
 func _on_reel_button_down() -> void:
-	if FishingManager.is_reeling:
+	if _fishing_ui_state == FishingUiState.FIGHTING and FishingManager.is_reeling:
 		FishingManager.set_reel_input(true)
 
 func _on_reel_button_up() -> void:
@@ -359,9 +438,23 @@ func _on_sell_all_button_pressed() -> void:
 	SaveManager.save_game()
 	_update_ui()
 
-func _on_fishing_started(seconds: int) -> void:
+func _on_basket_button_pressed() -> void:
+	basket_panel.visible = true
+	_update_basket_ui()
+
+func _on_basket_close_button_pressed() -> void:
+	basket_panel.visible = false
+
+func _return_to_idle_after_result() -> void:
+	_fishing_ui_state = FishingUiState.IDLE
+	timer_label.text = "Готов к забросу"
+	result_label.text = "Удочка вытянута. Можно забрасывать снова."
 	_reset_reeling_ui()
-	fish_button.disabled = true
+	_update_ui()
+
+func _on_fishing_started(seconds: int) -> void:
+	_fishing_ui_state = FishingUiState.WAITING
+	_reset_reeling_ui()
 	timer_label.text = "Клев через: %d сек." % seconds
 	fight_status_label.text = "Ожидание поклевки..."
 	_update_ui()
@@ -370,6 +463,7 @@ func _on_fishing_tick(seconds_left: int) -> void:
 	timer_label.text = "Клев через: %d сек." % seconds_left
 
 func _on_reeling_started(catch_data: Dictionary, state: Dictionary) -> void:
+	_fishing_ui_state = FishingUiState.FIGHTING
 	timer_label.text = "Поклевка!"
 	result_label.text = "На крючке: %s\nВес: %.2f кг\nРедкость: %s\nПоведение: %s" % [
 		catch_data["name"],
@@ -385,18 +479,28 @@ func _on_reeling_updated(state: Dictionary) -> void:
 	_update_reeling_ui(state)
 
 func _on_fish_caught(catch_data: Dictionary) -> void:
-	timer_label.text = ""
-	result_label.text = "Поймано: %s\nВес: %.2f кг\nЦена: %d мон." % [
+	_fishing_ui_state = FishingUiState.CAUGHT
+	timer_label.text = "Рыба поймана"
+
+	var xp_result: Dictionary = catch_data.get("xp_result", {})
+	var xp_text: String = "\nXP: +%d" % int(xp_result.get("gained_xp", 0))
+
+	if bool(xp_result.get("leveled_up", false)):
+		xp_text += "\nНовый уровень! LVL %d" % int(xp_result.get("level", PlayerData.level))
+
+	result_label.text = "Поймано: %s\nВес: %.2f кг\nЦена: %d мон.%s\nНажми “Вытянуть удочку”." % [
 		catch_data["name"],
 		catch_data["weight"],
-		catch_data["price"]
+		catch_data["price"],
+		xp_text
 	]
 	_reset_reeling_ui()
 	SaveManager.save_game()
 	_update_ui()
 
 func _on_fishing_failed(message: String) -> void:
-	timer_label.text = ""
-	result_label.text = message
+	_fishing_ui_state = FishingUiState.FAILED
+	timer_label.text = "Неудача"
+	result_label.text = "%s\nНажми “Вытянуть удочку”." % message
 	_reset_reeling_ui()
 	_update_ui()

@@ -374,7 +374,9 @@ func _finish_reeling_success() -> void:
 	_current_catch = {}
 
 	if added:
-		fish_caught.emit(catch_data)
+		var signal_data: Dictionary = catch_data.duplicate(true)
+		signal_data["xp_result"] = _award_catch_xp(catch_data)
+		fish_caught.emit(signal_data)
 	else:
 		fishing_failed.emit("Садок заполнен. Продай рыбу перед новой ловлей.")
 
@@ -387,6 +389,12 @@ func _finish_reeling_failed(message: String) -> void:
 	_reel_input_active = false
 	_current_catch = {}
 	fishing_failed.emit(message)
+
+func _award_catch_xp(catch_data: Dictionary) -> Dictionary:
+	var base_xp: int = int(catch_data.get("base_xp", 5))
+	var weight_bonus: int = max(roundi(float(catch_data.get("weight", 0.0)) * 2.0), 0)
+	var total_xp: int = base_xp + weight_bonus
+	return PlayerData.add_xp(total_xp)
 
 func _get_rarity_factor(rarity: String) -> float:
 	match rarity:

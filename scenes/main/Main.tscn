@@ -36,6 +36,18 @@ offset_right = 40.0
 offset_bottom = 23.0
 text = "Silver: 0"
 
+[node name="LevelLabel" type="Label" parent="."]
+layout_mode = 0
+offset_right = 120.0
+offset_bottom = 44.0
+text = "LVL 1\nXP: 0 / 175"
+
+[node name="XPProgressBar" type="ProgressBar" parent="."]
+layout_mode = 0
+offset_right = 120.0
+offset_bottom = 16.0
+show_percentage = false
+
 [node name="SpotOptionButton" type="OptionButton" parent="." unique_id=134641568]
 layout_mode = 0
 offset_right = 32.0
@@ -46,6 +58,12 @@ layout_mode = 0
 offset_right = 8.0
 offset_bottom = 8.0
 text = "Ловить"
+
+[node name="BasketButton" type="Button" parent="."]
+layout_mode = 0
+offset_right = 8.0
+offset_bottom = 8.0
+text = "Садок"
 
 [node name="TimerLabel" type="Label" parent="." unique_id=1124974755]
 layout_mode = 0
@@ -58,18 +76,6 @@ layout_mode = 0
 offset_right = 40.0
 offset_bottom = 23.0
 text = "..."
-
-[node name="InventoryLabel" type="Label" parent="." unique_id=839366067]
-layout_mode = 0
-offset_right = 40.0
-offset_bottom = 23.0
-text = "Инвентарь пуст"
-
-[node name="SellAllButton" type="Button" parent="." unique_id=1447370194]
-layout_mode = 0
-offset_right = 8.0
-offset_bottom = 8.0
-text = "Продать всё"
 
 [node name="ReelingPanel" type="ColorRect" parent="."]
 layout_mode = 0
@@ -159,3 +165,39 @@ theme_override_font_sizes/font_size = 16
 text = "Hold the button to raise tension. Release to drop it."
 horizontal_alignment = 1
 autowrap_mode = 3
+
+[node name="BasketPanel" type="ColorRect" parent="."]
+visible = false
+z_index = 20
+layout_mode = 0
+offset_right = 520.0
+offset_bottom = 360.0
+color = Color(0.0352941, 0.0509804, 0.0627451, 0.98)
+
+[node name="BasketTitleLabel" type="Label" parent="BasketPanel"]
+layout_mode = 0
+offset_right = 480.0
+offset_bottom = 34.0
+theme_override_font_sizes/font_size = 26
+text = "Садок"
+horizontal_alignment = 1
+
+[node name="BasketContentsLabel" type="Label" parent="BasketPanel"]
+layout_mode = 0
+offset_right = 480.0
+offset_bottom = 220.0
+theme_override_font_sizes/font_size = 17
+text = "Садок пуст."
+autowrap_mode = 3
+
+[node name="BasketSellAllButton" type="Button" parent="BasketPanel"]
+layout_mode = 0
+offset_right = 220.0
+offset_bottom = 52.0
+text = "Продать всё"
+
+[node name="BasketCloseButton" type="Button" parent="BasketPanel"]
+layout_mode = 0
+offset_right = 220.0
+offset_bottom = 52.0
+text = "Закрыть"

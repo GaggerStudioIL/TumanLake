@@ -6,7 +6,9 @@ func save_game() -> void:
 	var save_data := {
 		"money": PlayerData.money,
 		"level": PlayerData.level,
-		"xp": PlayerData.xp,
+		"current_xp": PlayerData.current_xp,
+		"xp": PlayerData.current_xp,
+		"xp_to_next_level": PlayerData.xp_to_next_level,
 		"current_spot": PlayerData.current_spot,
 		"unlocked_spots": PlayerData.unlocked_spots,
 		"upgrades": PlayerData.upgrades,
@@ -51,8 +53,10 @@ func load_game() -> void:
 		return
 
 	PlayerData.money = int(save_data.get("money", 0))
-	PlayerData.level = int(save_data.get("level", 1))
-	PlayerData.xp = int(save_data.get("xp", 0))
+	PlayerData.set_progression(
+		int(save_data.get("level", 1)),
+		int(save_data.get("current_xp", save_data.get("xp", 0)))
+	)
 	PlayerData.current_spot = str(save_data.get("current_spot", "north_pier"))
 	PlayerData.unlocked_spots = save_data.get("unlocked_spots", ["north_pier"])
 	PlayerData.upgrades = save_data.get("upgrades", [])
