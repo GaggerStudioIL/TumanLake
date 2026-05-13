@@ -1,0 +1,43 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="TumanLake"
+run/main_scene="uid://cq4euut2bjyf5"
+config/features=PackedStringArray("4.6", "Mobile")
+config/icon="res://icon.svg"
+
+[autoload]
+
+FishDatabase="*uid://dop3pbr3l2rm3"
+SpotDatabase="*uid://dp4ct65qmjs1a"
+PlayerData="*uid://6s7d0jm8ic1c"
+InventoryManager="*uid://41dqjqi3kwa5"
+FishingManager="*uid://4dgapc06dnc1"
+SaveManager="*uid://bjm2ww6ncy078"
+GameManager="*uid://c5r742uysrpqj"
+
+[display]
+
+window/size/viewport_width=960
+window/size/viewport_height=540
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[physics]
+
+3d/physics_engine="Jolt Physics"
+
+[rendering]
+
+textures/canvas_textures/default_texture_filter=0
+rendering_device/driver.windows="d3d12"
+renderer/rendering_method="mobile"

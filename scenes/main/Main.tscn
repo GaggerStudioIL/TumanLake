@@ -1,0 +1,161 @@
+[gd_scene format=3 uid="uid://cq4euut2bjyf5"]
+
+[ext_resource type="Script" uid="uid://bq6j3146wayk8" path="res://scripts/ui/Main.gd" id="1_u1xfj"]
+
+[node name="Main" type="Control" unique_id=1810428184]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_u1xfj")
+
+[node name="Background" type="ColorRect" parent="." unique_id=1501059547]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.02745098, 0.0627451, 0.09411765, 1)
+
+[node name="TitleLabel" type="Label" parent="." unique_id=1764905154]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 23.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 48
+text = "Tuman Lake"
+horizontal_alignment = 1
+
+[node name="MoneyLabel" type="Label" parent="." unique_id=615906210]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 23.0
+text = "Silver: 0"
+
+[node name="SpotOptionButton" type="OptionButton" parent="." unique_id=134641568]
+layout_mode = 0
+offset_right = 32.0
+offset_bottom = 20.0
+
+[node name="FishButton" type="Button" parent="." unique_id=1123455097]
+layout_mode = 0
+offset_right = 8.0
+offset_bottom = 8.0
+text = "Ловить"
+
+[node name="TimerLabel" type="Label" parent="." unique_id=1124974755]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 23.0
+text = "Готов к ловле"
+
+[node name="ResultLabel" type="Label" parent="." unique_id=1085324261]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 23.0
+text = "..."
+
+[node name="InventoryLabel" type="Label" parent="." unique_id=839366067]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 23.0
+text = "Инвентарь пуст"
+
+[node name="SellAllButton" type="Button" parent="." unique_id=1447370194]
+layout_mode = 0
+offset_right = 8.0
+offset_bottom = 8.0
+text = "Продать всё"
+
+[node name="ReelingPanel" type="ColorRect" parent="."]
+layout_mode = 0
+offset_right = 320.0
+offset_bottom = 320.0
+color = Color(0.0588235, 0.0862745, 0.105882, 1)
+
+[node name="FightTitleLabel" type="Label" parent="ReelingPanel"]
+layout_mode = 0
+offset_right = 280.0
+offset_bottom = 32.0
+theme_override_font_sizes/font_size = 24
+text = "Reeling"
+horizontal_alignment = 1
+
+[node name="TensionLabel" type="Label" parent="ReelingPanel"]
+layout_mode = 0
+offset_right = 280.0
+offset_bottom = 24.0
+text = "Tension: 0%"
+
+[node name="TensionTrack" type="ColorRect" parent="ReelingPanel"]
+layout_mode = 0
+offset_right = 280.0
+offset_bottom = 44.0
+color = Color(0.14, 0.16, 0.17, 1)
+
+[node name="SafeZone" type="ColorRect" parent="ReelingPanel/TensionTrack"]
+layout_mode = 0
+offset_right = 80.0
+offset_bottom = 44.0
+color = Color(0.16, 0.75, 0.36, 0.9)
+
+[node name="TensionFill" type="ColorRect" parent="ReelingPanel/TensionTrack"]
+layout_mode = 0
+offset_right = 120.0
+offset_bottom = 44.0
+color = Color(0.86, 0.7, 0.22, 0.68)
+
+[node name="TensionMarker" type="ColorRect" parent="ReelingPanel/TensionTrack"]
+layout_mode = 0
+offset_right = 6.0
+offset_bottom = 52.0
+color = Color(0.95, 0.95, 0.9, 1)
+
+[node name="ProgressLabel" type="Label" parent="ReelingPanel"]
+layout_mode = 0
+offset_right = 280.0
+offset_bottom = 24.0
+text = "Control: 0%"
+
+[node name="ProgressTrack" type="ColorRect" parent="ReelingPanel"]
+layout_mode = 0
+offset_right = 280.0
+offset_bottom = 24.0
+color = Color(0.14, 0.16, 0.17, 1)
+
+[node name="ProgressFill" type="ColorRect" parent="ReelingPanel/ProgressTrack"]
+layout_mode = 0
+offset_right = 20.0
+offset_bottom = 24.0
+color = Color(0.31, 0.62, 0.95, 0.85)
+
+[node name="DebugLabel" type="Label" parent="ReelingPanel"]
+layout_mode = 0
+offset_right = 280.0
+offset_bottom = 96.0
+theme_override_font_sizes/font_size = 15
+text = "Debug"
+autowrap_mode = 3
+
+[node name="FightStatusLabel" type="Label" parent="ReelingPanel"]
+layout_mode = 0
+offset_right = 280.0
+offset_bottom = 70.0
+theme_override_font_sizes/font_size = 20
+text = "Waiting for bite"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="FightHintLabel" type="Label" parent="ReelingPanel"]
+layout_mode = 0
+offset_right = 280.0
+offset_bottom = 84.0
+theme_override_font_sizes/font_size = 16
+text = "Hold the button to raise tension. Release to drop it."
+horizontal_alignment = 1
+autowrap_mode = 3
