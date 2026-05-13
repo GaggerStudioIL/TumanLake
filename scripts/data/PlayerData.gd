@@ -40,6 +40,11 @@ var current_tackle: Dictionary = {
 		"name": "Червь",
 		"bait_type": "worm",
 		"fish_attraction": 0.14,
+		"fish_attraction_by_id": {
+			"roach": 0.28,
+			"perch": 0.22,
+			"crucian": 0.24
+		},
 		"allowed_rarities": ["common", "uncommon", "rare"]
 	}
 }
@@ -112,6 +117,11 @@ func get_default_tackle() -> Dictionary:
 			"name": "Червь",
 			"bait_type": "worm",
 			"fish_attraction": 0.14,
+			"fish_attraction_by_id": {
+				"roach": 0.28,
+				"perch": 0.22,
+				"crucian": 0.24
+			},
 			"allowed_rarities": ["common", "uncommon", "rare"]
 		}
 	}
@@ -153,6 +163,7 @@ func get_tackle_stats() -> Dictionary:
 		"fish_escape_modifier": float(hook.get("fish_escape_modifier", 1.0)),
 		"bait_type": str(bait.get("bait_type", "worm")),
 		"fish_attraction": float(bait.get("fish_attraction", 0.0)),
+		"fish_attraction_by_id": bait.get("fish_attraction_by_id", {}),
 		"allowed_rarities": bait.get("allowed_rarities", [])
 	}
 

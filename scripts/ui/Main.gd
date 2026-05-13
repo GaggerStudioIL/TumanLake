@@ -41,6 +41,8 @@ enum FishingUiState {
 var _fishing_ui_state: int = FishingUiState.IDLE
 
 var _last_reeling_state := {
+	"fish_name": "-",
+	"fish_weight": 0.0,
 	"tension": 0.46,
 	"green_min": 0.38,
 	"green_max": 0.68,
@@ -53,7 +55,11 @@ var _last_reeling_state := {
 	"struggle_event": "пауза",
 	"feedback_message": "Держи зеленую зону.",
 	"behavior": "-",
+	"fight_power": 0.0,
+	"line_strength": 0.0,
 	"critical_break_risk": 0.0,
+	"break_risk": 0.0,
+	"escape_risk": 0.0,
 	"input_active": false,
 	"status": "green",
 	"high_danger": 0.0,
@@ -310,6 +316,8 @@ func _update_basket_ui() -> void:
 
 func _reset_reeling_ui() -> void:
 	_last_reeling_state = {
+		"fish_name": "-",
+		"fish_weight": 0.0,
 		"tension": 0.46,
 		"green_min": 0.38,
 		"green_max": 0.68,
@@ -322,7 +330,11 @@ func _reset_reeling_ui() -> void:
 		"struggle_event": "пауза",
 		"feedback_message": "Держи зеленую зону.",
 		"behavior": "-",
+		"fight_power": 0.0,
+		"line_strength": 0.0,
 		"critical_break_risk": 0.0,
+		"break_risk": 0.0,
+		"escape_risk": 0.0,
 		"input_active": false,
 		"status": "green",
 		"high_danger": 0.0,
@@ -340,9 +352,11 @@ func _update_reeling_ui(state: Dictionary) -> void:
 	var green_max: float = clamp(float(state.get("green_max", 0.68)), green_min, 1.0)
 	var progress: float = clamp(float(state.get("progress", 0.0)), 0.0, 1.0)
 	var catch_progress: float = clamp(float(state.get("catch_progress", progress)), 0.0, 1.0)
-	var control: float = clamp(float(state.get("control", 0.0)), 0.0, 1.0)
-	var struggle_power: float = clamp(float(state.get("struggle_power", 0.0)), 0.0, 2.0)
-	var critical_break_risk: float = clamp(float(state.get("critical_break_risk", 0.0)), 0.0, 1.0)
+	var critical_break_risk: float = clamp(float(state.get("break_risk", state.get("critical_break_risk", 0.0))), 0.0, 1.0)
+	var escape_risk: float = clamp(float(state.get("escape_risk", 0.0)), 0.0, 1.0)
+	var fight_power: float = max(float(state.get("fight_power", 0.0)), 0.0)
+	var line_strength: float = max(float(state.get("line_strength", 0.0)), 0.0)
+	var fish_weight: float = max(float(state.get("fish_weight", 0.0)), 0.0)
 	var high_danger: float = clamp(float(state.get("high_danger", 0.0)), 0.0, 1.0)
 	var low_danger: float = clamp(float(state.get("low_danger", 0.0)), 0.0, 1.0)
 	var track_width = max(tension_track.size.x, 1.0)
@@ -350,6 +364,7 @@ func _update_reeling_ui(state: Dictionary) -> void:
 	var progress_width = max(progress_track.size.x, 1.0)
 	var status := str(state.get("status", "green"))
 	var behavior := str(state.get("behavior", "-"))
+	var fish_name := str(state.get("fish_name", "-"))
 	var struggle_event := str(state.get("struggle_event", "пауза"))
 	var feedback_message := str(state.get("feedback_message", "Держи зеленую зону."))
 
@@ -372,16 +387,19 @@ func _update_reeling_ui(state: Dictionary) -> void:
 		roundi(green_max * 100.0)
 	]
 	progress_label.text = "Прогресс вываживания: %d%%" % roundi(catch_progress * 100.0)
-	debug_label.text = "tension: %d%% | green zone: %d-%d%%\ncontrol: %d%% | catch progress: %d%%\nfish struggle power: %d%% | event: %s\nfish behavior: %s | break risk: %d%%" % [
+	debug_label.text = "fish: %s %.2fkg | behavior: %s\nfight power: %.2f | line: %.1fkg\ntension: %d%% | green: %d-%d%%\nbreak risk: %d%% | escape risk: %d%%\ncatch progress: %d%% | event: %s" % [
+		fish_name,
+		fish_weight,
+		behavior,
+		fight_power,
+		line_strength,
 		roundi(tension * 100.0),
 		roundi(green_min * 100.0),
 		roundi(green_max * 100.0),
-		roundi(control * 100.0),
+		roundi(critical_break_risk * 100.0),
+		roundi(escape_risk * 100.0),
 		roundi(catch_progress * 100.0),
-		roundi(struggle_power * 100.0),
-		struggle_event,
-		behavior,
-		roundi(critical_break_risk * 100.0)
+		struggle_event
 	]
 
 	match status:
