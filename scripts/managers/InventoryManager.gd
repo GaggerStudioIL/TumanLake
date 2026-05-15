@@ -10,6 +10,24 @@ func add_fish(catch_data: Dictionary) -> bool:
 	inventory.append(catch_data)
 	return true
 
+func remove_fish(catch_data: Dictionary) -> bool:
+	for i in range(inventory.size() - 1, -1, -1):
+		var item: Dictionary = inventory[i]
+
+		if str(item.get("id", "")) != str(catch_data.get("id", "")):
+			continue
+
+		if abs(float(item.get("weight", 0.0)) - float(catch_data.get("weight", 0.0))) > 0.001:
+			continue
+
+		if int(item.get("price", 0)) != int(catch_data.get("price", 0)):
+			continue
+
+		inventory.remove_at(i)
+		return true
+
+	return false
+
 func sell_all() -> int:
 	var total_money := 0
 

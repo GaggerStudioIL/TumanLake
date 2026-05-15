@@ -18,7 +18,9 @@ config/icon="res://icon.svg"
 [autoload]
 
 FishDatabase="*uid://dop3pbr3l2rm3"
+WaterbodyDatabase="*res://scripts/data/WaterbodyDatabase.gd"
 SpotDatabase="*uid://dp4ct65qmjs1a"
+TimeManager="*res://scripts/managers/TimeManager.gd"
 PlayerData="*uid://6s7d0jm8ic1c"
 InventoryManager="*uid://41dqjqi3kwa5"
 FishingManager="*uid://4dgapc06dnc1"
@@ -41,3 +43,4 @@ window/stretch/aspect="expand"
 textures/canvas_textures/default_texture_filter=0
 rendering_device/driver.windows="d3d12"
 renderer/rendering_method="mobile"
+textures/vram_compression/import_etc2_astc=true
