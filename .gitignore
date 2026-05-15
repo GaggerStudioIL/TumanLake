@@ -13,4 +13,12 @@ data_*/
 
 # OS
 .DS_Store
+Thumbs.db
+
+build/
+saves/
+
+*.apk
+*.aab
+*.idsig
 *.keystore
