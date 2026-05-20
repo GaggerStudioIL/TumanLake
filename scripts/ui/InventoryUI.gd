@@ -2,6 +2,7 @@
 extends RefCounted
 
 var main
+var theme
 enum FishingUiState {
 	IDLE,
 	WAITING,
@@ -12,6 +13,7 @@ enum FishingUiState {
 
 func setup(main_ref) -> void:
 	main = main_ref
+	theme = main.ui_theme
 
 func open() -> void:
 	if main._is_catch_reward_open():
@@ -86,6 +88,25 @@ func _update_inventory_ui() -> void:
 	)
 	main.inventory_equip_button.disabled = not can_equip or main._fishing_ui_state != FishingUiState.IDLE
 	main.inventory_equip_button.visible = can_equip
+	_refresh_inventory_category_buttons()
+
+
+func _refresh_inventory_category_buttons() -> void:
+	var category_buttons: Array = [
+		[main.category_all_button, "all"],
+		[main.category_rods_button, "rod"],
+		[main.category_lines_button, "line"],
+		[main.category_floats_button, "float"],
+		[main.category_hooks_button, "hook"],
+		[main.category_baits_button, "bait"],
+		[main.category_fish_button, "fish"],
+		[main.category_misc_button, "misc"]
+	]
+
+	for item in category_buttons:
+		var button: Button = item[0]
+		var category: String = item[1]
+		theme.apply_tab_button_style(button, category == main._inventory_category)
 
 
 func _get_visible_inventory_items() -> Array:

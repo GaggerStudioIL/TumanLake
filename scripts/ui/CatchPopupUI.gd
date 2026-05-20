@@ -2,6 +2,7 @@
 extends RefCounted
 
 var main
+var theme
 signal catch_keep_requested
 signal catch_release_requested
 
@@ -46,6 +47,7 @@ const SMALL_FISH_ATLAS_REGIONS := {
 
 func setup(main_ref) -> void:
 	main = main_ref
+	theme = main.ui_theme
 
 func open(catch_data: Dictionary = {}) -> void:
 	if not catch_data.is_empty():

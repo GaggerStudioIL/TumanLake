@@ -2,6 +2,7 @@
 extends RefCounted
 
 var main
+var theme
 enum FishingUiState {
 	IDLE,
 	WAITING,
@@ -12,6 +13,7 @@ enum FishingUiState {
 
 func setup(main_ref) -> void:
 	main = main_ref
+	theme = main.ui_theme
 	_ensure_tackle_ui_nodes()
 
 func open() -> void:
@@ -230,7 +232,7 @@ func _update_tackle_ui() -> void:
 				button.text = "Крючок"
 			"bait":
 				button.text = "Наживка"
-		main._apply_button_style(button, main.STYLE_BOTTOM_NAV_ACTIVE if category == main._tackle_category else main.STYLE_SECONDARY_BUTTON)
+		theme.apply_tab_button_style(button, category == main._tackle_category)
 
 
 func _set_tackle_category(category: String) -> void:

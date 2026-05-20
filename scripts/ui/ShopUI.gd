@@ -2,6 +2,7 @@
 extends RefCounted
 
 var main
+var theme
 signal buy_requested(item_id: String)
 
 const SHOP_CATEGORY_BAIT := "bait"
@@ -32,6 +33,7 @@ const CONSUMABLE_ITEMS := [
 
 func setup(main_ref) -> void:
 	main = main_ref
+	theme = main.ui_theme
 	_ensure_shop_ui_nodes()
 
 func open() -> void:
@@ -123,8 +125,7 @@ func _ensure_shop_ui_nodes() -> void:
 	main.shop_backdrop = ColorRect.new()
 	main.shop_backdrop.name = "ShopBackdrop"
 	main.shop_backdrop.visible = false
-	main.shop_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
-	main.shop_backdrop.color = Color(0.0, 0.0, 0.0, 0.52)
+	theme.apply_modal_backdrop_style(main.shop_backdrop)
 	main.add_child(main.shop_backdrop)
 
 	main.shop_panel = Panel.new()
@@ -188,9 +189,9 @@ func _update_shop_ui() -> void:
 		return
 
 	main.shop_money_label.text = "%d мон." % PlayerData.money
-	main._apply_button_style(main.shop_bait_category_button, main.STYLE_BOTTOM_NAV_ACTIVE if main._shop_category == SHOP_CATEGORY_BAIT else main.STYLE_SECONDARY_BUTTON)
-	main._apply_button_style(main.shop_consumable_category_button, main.STYLE_BOTTOM_NAV_ACTIVE if main._shop_category == SHOP_CATEGORY_CONSUMABLE else main.STYLE_SECONDARY_BUTTON)
-	main._apply_button_style(main.shop_tackle_category_button, main.STYLE_BOTTOM_NAV_ACTIVE if main._shop_category == SHOP_CATEGORY_TACKLE else main.STYLE_SECONDARY_BUTTON)
+	theme.apply_tab_button_style(main.shop_bait_category_button, main._shop_category == SHOP_CATEGORY_BAIT)
+	theme.apply_tab_button_style(main.shop_consumable_category_button, main._shop_category == SHOP_CATEGORY_CONSUMABLE)
+	theme.apply_tab_button_style(main.shop_tackle_category_button, main._shop_category == SHOP_CATEGORY_TACKLE)
 	_rebuild_shop_cards()
 
 
@@ -200,16 +201,17 @@ func _rebuild_shop_cards() -> void:
 
 	main._shop_card_nodes.clear()
 	var items = _get_shop_items_for_category(main._shop_category)
-	var columns = 2
+	var columns = 3 if main.shop_items_container.size.x >= 820.0 else 2
 	var gap = 10.0
 
 	var card_width: float = (main.shop_items_container.size.x - gap * float(columns - 1)) / float(columns)
 	var rows: int = max(ceil(float(items.size()) / float(columns)), 1)
-	var card_min_height = 88.0
-	var card_max_height = 96.0
+	var card_min_height = 96.0
+	var card_max_height = 112.0
 
 	if main._shop_category == SHOP_CATEGORY_TACKLE:
 		gap = 8.0
+		columns = 3 if main.shop_items_container.size.x >= 760.0 else 2
 		card_width = (main.shop_items_container.size.x - gap * float(columns - 1)) / float(columns)
 		card_min_height = 64.0
 		card_max_height = 74.0
@@ -232,25 +234,17 @@ func _create_shop_card(item: Dictionary, card_size: Vector2) -> Panel:
 	card.mouse_filter = Control.MOUSE_FILTER_PASS
 	card.mouse_entered.connect(_on_shop_card_hovered.bind(str(item.get("id", "")), true))
 	card.mouse_exited.connect(_on_shop_card_hovered.bind(str(item.get("id", "")), false))
-	card.add_theme_stylebox_override(
-		"panel",
-		main._make_panel_style(
-			Color(0.065, 0.130, 0.120, 0.78),
-			Color(0.80, 1.0, 0.86, 0.24),
-			14,
-			7,
-			Color(0.0, 0.0, 0.0, 0.18)
-		)
-	)
+	theme.apply_card_style(card)
 
 	var item_id = str(item.get("id", ""))
 	var rarity = str(item.get("rarity", "common"))
 	var rarity_color = main._get_rarity_color(rarity)
-	var compact = card_size.y <= 78.0
+	theme.apply_shop_row_style(card, rarity)
+	var compact = card_size.y <= 80.0
 	var content_x = 52.0 if compact else 56.0
-	var button_width = 74.0 if compact else 78.0
-	var button_height = 28.0 if compact else 30.0
-	var button_x = card_size.x - button_width - 10.0
+	var button_width = 92.0 if compact else 96.0
+	var button_height = 56.0
+	var button_x = card_size.x - button_width - 12.0
 	var icon_size = 32.0 if compact else 36.0
 	var icon_y = (card_size.y - icon_size) * 0.5
 	var name_font_size = 13 if compact else 14
@@ -273,20 +267,21 @@ func _create_shop_card(item: Dictionary, card_size: Vector2) -> Panel:
 	)
 	card.add_child(icon_label)
 
-	var badge_label = Label.new()
-	badge_label.text = main._get_rarity_title(rarity)
-	badge_label.position = Vector2(button_x, 7.0)
-	badge_label.size = Vector2(button_width, 18.0 if compact else 20.0)
-	badge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	badge_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	badge_label.clip_text = true
-	badge_label.add_theme_font_size_override("font_size", badge_font_size)
-	badge_label.add_theme_color_override("font_color", Color(rarity_color.r, rarity_color.g, rarity_color.b, 1.0))
-	badge_label.add_theme_stylebox_override(
-		"normal",
-		main._make_panel_style(Color(rarity_color.r * 0.12, rarity_color.g * 0.16, rarity_color.b * 0.14, 0.64), Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.34), 10, 2, Color(0.0, 0.0, 0.0, 0.08))
-	)
-	card.add_child(badge_label)
+	if not compact:
+		var badge_label = Label.new()
+		badge_label.text = main._get_rarity_title(rarity)
+		badge_label.position = Vector2(button_x, 7.0)
+		badge_label.size = Vector2(button_width, 20.0)
+		badge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		badge_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		badge_label.clip_text = true
+		badge_label.add_theme_font_size_override("font_size", badge_font_size)
+		badge_label.add_theme_color_override("font_color", Color(rarity_color.r, rarity_color.g, rarity_color.b, 1.0))
+		badge_label.add_theme_stylebox_override(
+			"normal",
+			main._make_panel_style(Color(rarity_color.r * 0.12, rarity_color.g * 0.16, rarity_color.b * 0.14, 0.64), Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.34), 10, 2, Color(0.0, 0.0, 0.0, 0.08))
+		)
+		card.add_child(badge_label)
 
 	var name_label = Label.new()
 	name_label.text = str(item.get("name", "-"))
@@ -328,9 +323,8 @@ func _create_shop_card(item: Dictionary, card_size: Vector2) -> Panel:
 
 	var buy_button = Button.new()
 	buy_button.text = "Купить"
-	buy_button.position = Vector2(button_x, card_size.y - button_height - 7.0)
+	buy_button.position = Vector2(button_x, max(6.0, card_size.y - button_height - 8.0))
 	buy_button.size = Vector2(button_width, button_height)
-	buy_button.add_theme_font_size_override("font_size", 11 if compact else 12)
 	main._apply_button_style(buy_button, main.STYLE_PRIMARY_BUTTON)
 	buy_button.pressed.connect(_on_shop_buy_pressed.bind(item_id))
 	card.add_child(buy_button)

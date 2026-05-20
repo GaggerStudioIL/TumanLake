@@ -8,6 +8,8 @@ const WaterbodyUIScript := preload("res://scripts/ui/WaterbodyUI.gd")
 const CatchPopupUIScript := preload("res://scripts/ui/CatchPopupUI.gd")
 const FishingHUDUIScript := preload("res://scripts/ui/FishingHUDUI.gd")
 const FishingPresenceUIScript := preload("res://scripts/ui/FishingPresenceUI.gd")
+const UIThemeScript := preload("res://scripts/ui/UITheme.gd")
+const TUMAN_LAKE_THEME := preload("res://themes/TumanLakeUI.tres")
 
 const SHOW_DEBUG_PANEL := false
 const STYLE_HUD_PANEL := "HUDPanel"
@@ -16,6 +18,17 @@ const STYLE_PRIMARY_BUTTON := "PrimaryButton"
 const STYLE_SECONDARY_BUTTON := "SecondaryButton"
 const STYLE_BOTTOM_NAV_BUTTON := "BottomNavButton"
 const STYLE_BOTTOM_NAV_ACTIVE := "BottomNavActive"
+const BASE_SCREEN_SIZE := Vector2(960.0, 540.0)
+const HUD_HEIGHT := 44.0
+const LEFT_NAV_WIDTH := 138.0
+const LEFT_NAV_HEIGHT := 372.0
+const ACTION_BAR_HEIGHT := 46.0
+const MENU_BACKDROP_Z := 300
+const MENU_PANEL_Z := 301
+const WATER_SURFACE_Y := 376.0
+const FLOAT_DEFAULT_POS := Vector2(500.0, 376.0)
+const ROD_ANCHOR_POS := Vector2(1138.0, 666.0)
+const ROD_TARGET_POS := Vector2(586.0, 362.0)
 
 @onready var background: ColorRect = $Background
 @onready var scene_gradient: ColorRect = $SceneGradient
@@ -190,6 +203,25 @@ var waterbody_ui
 var catch_popup_ui
 var fishing_hud_ui
 var fishing_presence_ui
+var ui_theme
+var ui_canvas_layer: CanvasLayer
+var rod_sprite: Sprite2D
+var rod_shadow_sprite: Sprite2D
+var top_hud_container: HBoxContainer
+var top_hud_spacer: Control
+var quick_actions_container: VBoxContainer
+var bottom_nav_container: VBoxContainer
+var environment_layer: Node2D
+var environment_sprites: Dictionary = {}
+var time_hud_panel: Panel
+var weather_hud_panel: Panel
+var money_hud_icon: TextureRect
+var time_hud_icon: TextureRect
+var weather_hud_icon: TextureRect
+var lake_bg_base_rect: TextureRect
+var lake_bg_foreground_rect: TextureRect
+var lake_bg_mist_rect: TextureRect
+var water_overlay_rect: TextureRect
 
 enum FishingUiState {
 	IDLE,
@@ -232,6 +264,11 @@ var _float_visual_center := Vector2.ZERO
 var _rod_tip_visual := Vector2.ZERO
 var _rod_bend_direction_visual := Vector2.DOWN
 var _rod_bend_amount_visual := 3.0
+var _water_surface_y := 0.0
+var _water_zone_top := 0.0
+var _water_zone_bottom := 0.0
+var _rod_anchor_pos := Vector2.ZERO
+var _rod_target_pos := Vector2.ZERO
 
 var _last_reeling_state := {
 	"fish_name": "-",
@@ -262,8 +299,11 @@ var _last_reeling_state := {
 func _ready() -> void:
 	print("Tuman Lake: Main scene loaded")
 
+	theme = TUMAN_LAKE_THEME
 	SaveManager.load_game()
 	_setup_ui_controllers()
+	_ensure_ui_canvas_layer()
+	_ensure_gameplay_layer_names()
 
 	resized.connect(_on_resized)
 	var time_manager := _get_time_manager()
@@ -282,6 +322,7 @@ func _process(delta: float) -> void:
 	_update_time_hud()
 
 func _setup_ui_controllers() -> void:
+	ui_theme = UIThemeScript.new()
 	shop_ui = ShopUIScript.new()
 	keepnet_ui = KeepnetUIScript.new()
 	inventory_ui = InventoryUIScript.new()
@@ -305,6 +346,139 @@ func _setup_ui_controllers() -> void:
 	catch_popup_ui.catch_keep_requested.connect(_on_catch_keep_button_pressed)
 	catch_popup_ui.catch_release_requested.connect(_on_catch_release_button_pressed)
 
+func _ensure_ui_canvas_layer() -> void:
+	if ui_canvas_layer == null:
+		ui_canvas_layer = CanvasLayer.new()
+		ui_canvas_layer.name = "ui_layer"
+		ui_canvas_layer.layer = 20
+		add_child(ui_canvas_layer)
+
+	var ui_roots: Array = [
+		top_hud_panel,
+		left_hud_panel,
+		right_hud_panel,
+		bottom_nav_panel,
+		action_panel,
+		action_glow,
+		title_label,
+		money_label,
+		level_label,
+		xp_progress_bar,
+		clock_label,
+		weather_label,
+		spot_option_button,
+		nav_fish_button,
+		fish_button,
+		basket_button,
+		inventory_button,
+		tackle_button,
+		shop_button,
+		map_button,
+		profile_button,
+		feed_button,
+		auto_button,
+		bait_button,
+		timer_label,
+		tackle_label,
+		result_label,
+		reeling_panel,
+		debug_panel,
+		basket_backdrop,
+		basket_panel,
+		inventory_backdrop,
+		inventory_panel,
+		catch_popup_backdrop,
+		catch_popup_panel,
+		shop_backdrop,
+		shop_panel,
+		tackle_backdrop,
+		tackle_panel,
+		waterbody_backdrop,
+		waterbody_panel,
+		toast_label
+	]
+
+	for node in ui_roots:
+		if node == null or node.get_parent() == ui_canvas_layer:
+			continue
+		var parent: Node = node.get_parent()
+		if parent != null:
+			parent.remove_child(node)
+		ui_canvas_layer.add_child(node)
+
+func _ensure_gameplay_layer_names() -> void:
+	fishing_presence_layer.name = "gameplay_rod"
+	float_marker.name = "gameplay_float"
+	float_ripple.name = "gameplay_ripple"
+
+func _ensure_mobile_ui_containers() -> void:
+	if top_hud_container == null:
+		top_hud_container = HBoxContainer.new()
+		top_hud_container.name = "TopHudHBox"
+		top_hud_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		top_hud_container.add_theme_constant_override("separation", 8)
+		ui_canvas_layer.add_child(top_hud_container)
+
+	if top_hud_spacer == null:
+		top_hud_spacer = Control.new()
+		top_hud_spacer.name = "TopHudSpacer"
+		top_hud_spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		top_hud_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		top_hud_container.add_child(top_hud_spacer)
+
+	if quick_actions_container == null:
+		quick_actions_container = VBoxContainer.new()
+		quick_actions_container.name = "QuickActionsVBox"
+		quick_actions_container.mouse_filter = Control.MOUSE_FILTER_PASS
+		quick_actions_container.add_theme_constant_override("separation", 8)
+		action_panel.add_child(quick_actions_container)
+
+	if bottom_nav_container == null:
+		bottom_nav_container = VBoxContainer.new()
+		bottom_nav_container.name = "LeftNavVBox"
+		bottom_nav_container.mouse_filter = Control.MOUSE_FILTER_PASS
+		bottom_nav_container.add_theme_constant_override("separation", 7)
+		bottom_nav_panel.add_child(bottom_nav_container)
+
+	for node in [top_hud_panel, time_hud_panel, weather_hud_panel]:
+		_reparent_node(node, top_hud_container)
+	_reparent_node(top_hud_spacer, top_hud_container)
+	_reparent_node(spot_option_button, top_hud_container)
+	top_hud_container.move_child(top_hud_panel, 0)
+	top_hud_container.move_child(time_hud_panel, 1)
+	top_hud_container.move_child(weather_hud_panel, 2)
+	top_hud_container.move_child(top_hud_spacer, 3)
+	top_hud_container.move_child(spot_option_button, 4)
+
+	_reparent_node(money_label, top_hud_panel)
+	_reparent_node(clock_label, time_hud_panel)
+	_reparent_node(weather_label, weather_hud_panel)
+
+	for node in [feed_button, bait_button, tackle_button, auto_button]:
+		_reparent_node(node, quick_actions_container)
+	quick_actions_container.move_child(feed_button, 0)
+	quick_actions_container.move_child(bait_button, 1)
+	quick_actions_container.move_child(tackle_button, 2)
+	quick_actions_container.move_child(auto_button, 3)
+
+	for node in [nav_fish_button, basket_button, inventory_button, shop_button, map_button, profile_button]:
+		_reparent_node(node, bottom_nav_container)
+	bottom_nav_container.move_child(nav_fish_button, 0)
+	bottom_nav_container.move_child(basket_button, 1)
+	bottom_nav_container.move_child(inventory_button, 2)
+	bottom_nav_container.move_child(shop_button, 3)
+	bottom_nav_container.move_child(map_button, 4)
+	bottom_nav_container.move_child(profile_button, 5)
+
+func _reparent_node(node: Node, new_parent: Node) -> void:
+	if node == null or new_parent == null or node.get_parent() == new_parent:
+		return
+
+	var old_parent: Node = node.get_parent()
+	if old_parent != null:
+		old_parent.remove_child(node)
+	new_parent.add_child(node)
+
 func _ensure_shop_ui_nodes() -> void:
 	shop_ui._ensure_shop_ui_nodes()
 
@@ -324,119 +498,68 @@ func _make_panel_style(
 	shadow_size: int = 8,
 	shadow_color: Color = Color(0.0, 0.0, 0.0, 0.28)
 ) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = bg_color
-	style.border_color = border_color
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(radius)
-	style.shadow_color = shadow_color
-	style.shadow_size = shadow_size
-	style.content_margin_left = 8.0
-	style.content_margin_top = 6.0
-	style.content_margin_right = 8.0
-	style.content_margin_bottom = 6.0
-	return style
+	return ui_theme.make_style(bg_color, border_color, radius, shadow_size, shadow_color)
 
 func _get_panel_style(style_name: String) -> StyleBoxFlat:
 	match style_name:
 		STYLE_INFO_CARD:
-			return _make_panel_style(
-				Color(0.075, 0.145, 0.155, 0.58),
-				Color(0.82, 0.98, 0.90, 0.30),
-				14,
-				8,
-				Color(0.0, 0.0, 0.0, 0.18)
-			)
+			return ui_theme.get_card_style()
 		_:
-			return _make_panel_style(
-				Color(0.060, 0.105, 0.115, 0.58),
-				Color(0.82, 0.98, 0.90, 0.34),
-				16,
-				10,
-				Color(0.0, 0.0, 0.0, 0.20)
-			)
+			return ui_theme.get_panel_style()
 
 func _apply_panel_style(panel: Panel, style_name: String = STYLE_HUD_PANEL) -> void:
-	panel.add_theme_stylebox_override("panel", _get_panel_style(style_name))
+	if style_name == STYLE_INFO_CARD:
+		ui_theme.apply_card_style(panel)
+	else:
+		ui_theme.apply_panel_style(panel)
 
 func _get_button_style(style_name: String, state: String = "normal") -> StyleBoxFlat:
-	var radius := 12
-	var shadow_size := 3
-	var shadow_color := Color(0.0, 0.0, 0.0, 0.14)
-	var border_color := Color(0.80, 0.96, 0.86, 0.24)
-	var bg_color := Color(0.08, 0.15, 0.15, 0.66)
-
 	match style_name:
 		STYLE_PRIMARY_BUTTON:
-			radius = 18
-			shadow_size = 14
-			shadow_color = Color(0.16, 0.78, 0.42, 0.32)
-			border_color = Color(0.70, 1.00, 0.73, 0.46)
-			bg_color = Color(0.12, 0.44, 0.26, 0.96)
-
-			if state == "hover":
-				bg_color = Color(0.15, 0.52, 0.31, 1.0)
-				border_color = Color(0.78, 1.0, 0.78, 0.60)
-			elif state == "pressed":
-				bg_color = Color(0.08, 0.34, 0.21, 1.0)
-				shadow_size = 7
-			elif state == "disabled":
-				bg_color = Color(0.08, 0.17, 0.13, 0.58)
-				border_color = Color(0.62, 0.70, 0.66, 0.16)
-				shadow_color = Color(0.0, 0.0, 0.0, 0.12)
+			return ui_theme.get_button_style("primary", state)
 		STYLE_BOTTOM_NAV_ACTIVE:
-			radius = 13
-			shadow_size = 6
-			shadow_color = Color(0.10, 0.56, 0.32, 0.22)
-			border_color = Color(0.68, 0.96, 0.76, 0.42)
-			bg_color = Color(0.12, 0.31, 0.22, 0.92)
+			return ui_theme.get_button_style("nav_active", state)
 		STYLE_BOTTOM_NAV_BUTTON:
-			radius = 13
-			shadow_size = 2
-			border_color = Color(0.84, 0.98, 0.90, 0.22)
-			bg_color = Color(0.070, 0.115, 0.120, 0.58)
-
-			if state == "hover":
-				bg_color = Color(0.095, 0.155, 0.150, 0.76)
-			elif state == "pressed":
-				bg_color = Color(0.095, 0.24, 0.17, 0.88)
-			elif state == "disabled":
-				bg_color = Color(0.060, 0.080, 0.082, 0.46)
-				border_color = Color(0.80, 0.86, 0.82, 0.12)
+			return ui_theme.get_button_style("nav", state)
 		_:
-			radius = 12
-			shadow_size = 2
-			border_color = Color(0.82, 0.96, 0.88, 0.20)
-			bg_color = Color(0.070, 0.125, 0.125, 0.58)
-
-			if state == "hover":
-				bg_color = Color(0.095, 0.160, 0.150, 0.76)
-			elif state == "pressed":
-				bg_color = Color(0.095, 0.240, 0.160, 0.88)
-			elif state == "disabled":
-				bg_color = Color(0.060, 0.075, 0.076, 0.44)
-				border_color = Color(0.65, 0.70, 0.68, 0.14)
-
-	return _make_panel_style(bg_color, border_color, radius, shadow_size, shadow_color)
+			return ui_theme.get_button_style("secondary", state)
 
 func _apply_button_style(button: Button, style_name: String = STYLE_SECONDARY_BUTTON) -> void:
-	button.add_theme_stylebox_override("normal", _get_button_style(style_name, "normal"))
-	button.add_theme_stylebox_override("hover", _get_button_style(style_name, "hover"))
-	button.add_theme_stylebox_override("pressed", _get_button_style(style_name, "pressed"))
-	button.add_theme_stylebox_override("disabled", _get_button_style(style_name, "disabled"))
-	button.add_theme_color_override("font_color", Color(0.90, 0.97, 0.92, 1.0))
-	button.add_theme_color_override("font_hover_color", Color(0.98, 1.0, 0.96, 1.0))
-	button.add_theme_color_override("font_pressed_color", Color(0.84, 0.96, 0.86, 1.0))
-	button.add_theme_color_override("font_disabled_color", Color(0.66, 0.74, 0.70, 0.82))
+	match style_name:
+		STYLE_PRIMARY_BUTTON:
+			ui_theme.apply_primary_button_style(button)
+		STYLE_BOTTOM_NAV_ACTIVE:
+			ui_theme.apply_nav_button_style(button, true)
+		STYLE_BOTTOM_NAV_BUTTON:
+			ui_theme.apply_nav_button_style(button, false)
+		_:
+			ui_theme.apply_secondary_button_style(button)
+
+func _apply_action_button_style(button: Button, active: bool = false) -> void:
+	var normal_bg := Color(0.054, 0.088, 0.086, 0.94)
+	var hover_bg := Color(0.078, 0.130, 0.116, 0.98)
+	var pressed_bg := Color(0.082, 0.176, 0.118, 1.0)
+	var border := Color(0.80, 0.96, 0.86, 0.40)
+	var shadow := Color(0.0, 0.0, 0.0, 0.18)
+
+	if active:
+		normal_bg = Color(0.142, 0.332, 0.176, 1.0)
+		hover_bg = Color(0.180, 0.420, 0.210, 1.0)
+		pressed_bg = Color(0.100, 0.270, 0.140, 1.0)
+		border = Color(0.70, 1.0, 0.72, 0.54)
+		shadow = Color(0.18, 0.66, 0.24, 0.20)
+
+	button.add_theme_stylebox_override("normal", _make_panel_style(normal_bg, border, 8, 4, shadow))
+	button.add_theme_stylebox_override("hover", _make_panel_style(hover_bg, Color(border.r, border.g, border.b, min(border.a + 0.12, 1.0)), 8, 5, shadow))
+	button.add_theme_stylebox_override("pressed", _make_panel_style(pressed_bg, Color(border.r, border.g, border.b, min(border.a + 0.16, 1.0)), 8, 2, Color(0.0, 0.0, 0.0, 0.12)))
+	button.add_theme_stylebox_override("disabled", _make_panel_style(Color(0.040, 0.050, 0.052, 0.48), Color(0.58, 0.64, 0.62, 0.14), 8, 1, Color.TRANSPARENT))
+	button.add_theme_color_override("font_color", Color(0.94, 1.0, 0.92, 1.0))
+	button.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 0.94, 1.0))
+	button.add_theme_color_override("font_pressed_color", Color(0.86, 1.0, 0.84, 1.0))
+	button.add_theme_color_override("font_disabled_color", Color(0.62, 0.68, 0.66, 0.62))
 
 func _apply_label_style(label: Label, primary: bool = false) -> void:
-	if primary:
-		label.add_theme_color_override("font_color", Color(0.96, 1.0, 0.96, 1.0))
-		label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.28))
-		label.add_theme_constant_override("shadow_offset_x", 0)
-		label.add_theme_constant_override("shadow_offset_y", 1)
-	else:
-		label.add_theme_color_override("font_color", Color(0.82, 0.93, 0.88, 0.96))
+	ui_theme.apply_label_style(label, "title" if primary else "body")
 
 func _make_scene_shader_material(shader_code: String) -> ShaderMaterial:
 	var shader := Shader.new()
@@ -589,9 +712,10 @@ func _setup_atmosphere_materials() -> void:
 		shader_type canvas_item;
 		void fragment() {
 			vec2 uv = UV - vec2(0.5);
-			float pulse = 0.86 + sin(TIME * 1.35) * 0.10;
-			float glow = 1.0 - smoothstep(0.0, 0.50, length(uv));
-			COLOR = vec4(0.82, 1.0, 0.70, glow * 0.32 * pulse);
+			float pulse = 0.90 + sin(TIME * 1.35) * 0.08;
+			float glow = 1.0 - smoothstep(0.0, 0.48, length(uv));
+			float core = 1.0 - smoothstep(0.0, 0.18, length(uv));
+			COLOR = vec4(0.84, 1.0, 0.72, (glow * 0.34 + core * 0.14) * pulse);
 		}
 	""")
 
@@ -618,12 +742,12 @@ func _setup_atmosphere_materials() -> void:
 	float_ripple.material = _make_scene_shader_material("""
 		shader_type canvas_item;
 		void fragment() {
-			vec2 uv = (UV - vec2(0.5)) * vec2(1.0, 2.35);
+			vec2 uv = (UV - vec2(0.5)) * vec2(1.0, 2.60);
 			float d = length(uv);
-			float ring = 1.0 - smoothstep(0.020, 0.045, abs(d - 0.33));
-			float ring2 = 1.0 - smoothstep(0.020, 0.045, abs(d - 0.48));
+			float ring = 1.0 - smoothstep(0.015, 0.035, abs(d - 0.32));
+			float ring2 = 1.0 - smoothstep(0.018, 0.040, abs(d - 0.49));
 			float pulse = 0.72 + sin(TIME * 1.25) * 0.18;
-			COLOR = vec4(0.72, 0.96, 0.88, (ring * 0.16 + ring2 * 0.08) * pulse);
+			COLOR = vec4(0.80, 1.0, 0.92, (ring * 0.26 + ring2 * 0.12) * pulse);
 		}
 	""")
 
@@ -725,6 +849,558 @@ func _setup_atmosphere_materials() -> void:
 		}
 	""")
 
+func _setup_cinematic_environment_materials() -> void:
+	scene_gradient.material = _make_scene_shader_material("""
+		shader_type canvas_item;
+		void fragment() {
+			vec2 uv = UV;
+			float horizon = 0.455;
+			float sky = 1.0 - smoothstep(0.05, horizon + 0.12, uv.y);
+			float water = smoothstep(horizon - 0.03, 0.98, uv.y);
+			vec3 zenith = vec3(0.045, 0.150, 0.205);
+			vec3 warm_horizon = vec3(0.510, 0.500, 0.335);
+			vec3 deep_water = vec3(0.025, 0.105, 0.135);
+			vec3 near_water = vec3(0.070, 0.245, 0.255);
+			float sun_warmth = 1.0 - smoothstep(0.0, 0.58, distance(uv, vec2(0.155, 0.245)));
+			vec3 sky_color = mix(warm_horizon, zenith, smoothstep(0.02, horizon, uv.y));
+			sky_color += vec3(0.38, 0.23, 0.10) * sun_warmth * 0.34;
+			vec3 water_color = mix(near_water, deep_water, smoothstep(horizon, 1.0, uv.y));
+			float reflection = (1.0 - smoothstep(0.0, 0.22, abs(uv.x - 0.19))) * smoothstep(horizon, 0.66, uv.y) * (1.0 - smoothstep(0.78, 1.0, uv.y));
+			water_color += vec3(0.52, 0.42, 0.22) * reflection * 0.34;
+			vec3 color = mix(sky_color, water_color, water);
+			COLOR = vec4(color, 1.0);
+		}
+	""")
+
+	sun_glow_layer.material = _make_scene_shader_material("""
+		shader_type canvas_item;
+		void fragment() {
+			vec2 uv = UV;
+			float sun = 1.0 - smoothstep(0.0, 0.22, distance(uv, vec2(0.145, 0.28)));
+			float bloom = 1.0 - smoothstep(0.0, 0.58, distance(uv, vec2(0.16, 0.30)));
+			float water_path = (1.0 - smoothstep(0.0, 0.14, abs(uv.x - 0.18))) * smoothstep(0.47, 0.60, uv.y) * (1.0 - smoothstep(0.78, 1.0, uv.y));
+			vec3 color = vec3(1.0, 0.78, 0.43);
+			COLOR = vec4(color, sun * 0.34 + bloom * 0.13 + water_path * 0.12);
+		}
+	""")
+
+	far_forest_layer.material = _make_scene_shader_material("""
+		shader_type canvas_item;
+		float ridge(float x, float scale, float shift) {
+			return sin(x * scale + shift) * 0.025 + sin(x * scale * 0.43 + shift * 1.7) * 0.038;
+		}
+		void fragment() {
+			vec2 uv = UV;
+			float ridge_a = 0.320 + ridge(uv.x, 12.0, 0.2);
+			float ridge_b = 0.380 + ridge(uv.x, 20.0, 2.1);
+			float mountains = smoothstep(ridge_a - 0.012, ridge_a + 0.014, uv.y) * (1.0 - smoothstep(0.48, 0.62, uv.y));
+			float rear = smoothstep(ridge_b - 0.014, ridge_b + 0.014, uv.y) * (1.0 - smoothstep(0.51, 0.68, uv.y));
+			vec3 color = mix(vec3(0.090, 0.155, 0.150), vec3(0.035, 0.085, 0.078), uv.y);
+			COLOR = vec4(color, max(mountains * 0.58, rear * 0.46));
+		}
+	""")
+
+	mid_forest_layer.material = _make_scene_shader_material("""
+		shader_type canvas_item;
+		float random(vec2 value) {
+			return fract(sin(dot(value, vec2(12.9898, 78.233))) * 43758.5453);
+		}
+		float forest_ridge(float x) {
+			return sin(x * 38.0) * 0.014 + sin(x * 67.0 + 0.7) * 0.010;
+		}
+		void fragment() {
+			vec2 uv = UV;
+			float shoreline = 0.448 + forest_ridge(uv.x);
+			float cell = floor(uv.x * 155.0);
+			float seed = random(vec2(cell, 3.7));
+			float tree_height = 0.035 + seed * 0.105;
+			float local_x = abs(fract(uv.x * 155.0) - 0.5);
+			float crown = smoothstep(0.36, 0.03, local_x) * smoothstep(shoreline - tree_height, shoreline - tree_height * 0.30, uv.y) * (1.0 - smoothstep(shoreline - 0.01, shoreline + 0.02, uv.y));
+			float forest_body = smoothstep(shoreline - 0.018, shoreline + 0.012, uv.y) * (1.0 - smoothstep(0.56, 0.72, uv.y));
+			float side_depth = smoothstep(0.80, 1.0, uv.x) + (1.0 - smoothstep(0.0, 0.20, uv.x));
+			vec3 color = mix(vec3(0.035, 0.105, 0.078), vec3(0.015, 0.055, 0.044), uv.y);
+			color = mix(color, vec3(0.020, 0.075, 0.044), side_depth * 0.46);
+			COLOR = vec4(color, max(forest_body * 0.72, crown * 0.88));
+		}
+	""")
+
+	lake_layer.material = _make_scene_shader_material("""
+		shader_type canvas_item;
+		void fragment() {
+			vec2 uv = UV;
+			float water_mask = smoothstep(0.455, 0.505, uv.y);
+			float depth = smoothstep(0.48, 1.0, uv.y);
+			float wave_a = sin(uv.x * 54.0 + uv.y * 18.0 + TIME * 0.58) * 0.5 + 0.5;
+			float wave_b = sin(uv.x * 126.0 - uv.y * 12.0 - TIME * 0.36) * 0.5 + 0.5;
+			float horizon_fog = 1.0 - smoothstep(0.47, 0.60, uv.y);
+			float sun_path = (1.0 - smoothstep(0.0, 0.20, abs(uv.x - 0.18))) * smoothstep(0.47, 0.64, uv.y) * (1.0 - smoothstep(0.80, 0.98, uv.y));
+			float side_shadow = smoothstep(0.72, 1.0, uv.x) * 0.38 + (1.0 - smoothstep(0.0, 0.18, uv.x)) * 0.24;
+			vec3 shallow = vec3(0.090, 0.275, 0.255);
+			vec3 deep = vec3(0.018, 0.078, 0.112);
+			vec3 color = mix(shallow, deep, depth);
+			color += vec3(0.085, 0.145, 0.120) * (wave_a * 0.050 + wave_b * 0.030) * depth;
+			color += vec3(0.80, 0.62, 0.34) * sun_path * (0.10 + wave_a * 0.09);
+			color = mix(color, vec3(0.54, 0.70, 0.64), horizon_fog * 0.17);
+			color *= 1.0 - side_shadow;
+			COLOR = vec4(color, water_mask * 0.96);
+		}
+	""")
+
+	reflection_layer.material = _make_scene_shader_material("""
+		shader_type canvas_item;
+		void fragment() {
+			vec2 uv = UV;
+			float water_mask = smoothstep(0.475, 0.56, uv.y) * (1.0 - smoothstep(0.90, 1.0, uv.y));
+			float ripple = sin(uv.y * 160.0 + sin(uv.x * 18.0) * 2.0 + TIME * 0.56) * 0.5 + 0.5;
+			float fine = sin(uv.y * 310.0 + uv.x * 32.0 - TIME * 0.32) * 0.5 + 0.5;
+			float sun_lane = (1.0 - smoothstep(0.0, 0.23, abs(uv.x - 0.18))) * smoothstep(0.47, 0.67, uv.y) * (1.0 - smoothstep(0.78, 1.0, uv.y));
+			float forest_reflection = (smoothstep(0.48, 0.54, uv.y) * (1.0 - smoothstep(0.56, 0.72, uv.y))) * (0.30 + ripple * 0.18);
+			vec3 warm = vec3(0.95, 0.78, 0.44);
+			vec3 cool = vec3(0.22, 0.42, 0.36);
+			float alpha = water_mask * (sun_lane * (0.10 + ripple * 0.08 + fine * 0.025) + forest_reflection * 0.16);
+			vec3 color = mix(cool, warm, sun_lane);
+			COLOR = vec4(color, alpha);
+		}
+	""")
+
+	mist_layer.material = _make_scene_shader_material("""
+		shader_type canvas_item;
+		void fragment() {
+			vec2 uv = UV;
+			float drift = TIME * 0.018;
+			float noise = sin((uv.x + drift) * 13.0 + uv.y * 6.0) * 0.5 + 0.5;
+			float horizon = smoothstep(0.36, 0.43, uv.y) * (1.0 - smoothstep(0.51, 0.62, uv.y));
+			float near_water = smoothstep(0.50, 0.70, uv.y) * (1.0 - smoothstep(0.84, 1.0, uv.y));
+			COLOR = vec4(0.72, 0.86, 0.80, (0.060 + noise * 0.095) * (horizon + near_water * 0.42));
+		}
+	""")
+
+	foreground_mist_layer.material = _make_scene_shader_material("""
+		shader_type canvas_item;
+		float random(vec2 value) {
+			return fract(sin(dot(value, vec2(39.346, 11.135))) * 32758.5453);
+		}
+		void fragment() {
+			vec2 uv = UV;
+			float lower = smoothstep(0.74, 0.99, uv.y);
+			float right_bank = smoothstep(0.72, 0.92, uv.x) * smoothstep(0.64, 0.92, uv.y);
+			float left_bank = (1.0 - smoothstep(0.00, 0.18, uv.x)) * smoothstep(0.70, 0.98, uv.y);
+			float cell = floor(uv.x * 120.0);
+			float seed = random(vec2(cell, 8.2));
+			float blade_x = abs(fract(uv.x * 120.0 + seed * 0.2) - 0.5);
+			float blade_height = 0.10 + seed * 0.23;
+			float blade_mask = (right_bank + left_bank * 0.72) * smoothstep(1.0 - blade_height, 1.0 - blade_height * 0.18, uv.y) * (1.0 - smoothstep(0.006, 0.040, blade_x));
+			float ground = lower * (right_bank * 0.72 + left_bank * 0.42);
+			float fog = smoothstep(0.58, 0.78, uv.y) * (1.0 - smoothstep(0.90, 1.0, uv.y)) * (0.42 + sin(uv.x * 11.0 + TIME * 0.25) * 0.12);
+			vec3 grass = mix(vec3(0.050, 0.105, 0.050), vec3(0.145, 0.220, 0.085), seed);
+			vec3 ground_color = vec3(0.060, 0.050, 0.036);
+			vec3 fog_color = vec3(0.64, 0.78, 0.72);
+			vec3 color = mix(ground_color, grass, blade_mask);
+			color = mix(color, fog_color, fog * 0.45);
+			float alpha = clamp(ground * 0.72 + blade_mask * 0.92 + fog * 0.18, 0.0, 0.96);
+			COLOR = vec4(color, alpha);
+		}
+	""")
+
+	noise_layer.material = _make_scene_shader_material("""
+		shader_type canvas_item;
+		float random(vec2 value) {
+			return fract(sin(dot(value, vec2(12.9898, 78.233))) * 43758.5453);
+		}
+		void fragment() {
+			vec2 uv = UV;
+			float grain = random(floor(uv * 260.0));
+			vec2 particle_cell = floor(vec2(uv.x * 34.0, uv.y * 18.0 + TIME * 0.10));
+			float seed = random(particle_cell);
+			vec2 center = (particle_cell + vec2(seed, random(particle_cell + 2.31))) / vec2(34.0, 18.0);
+			center.y = fract(center.y - TIME * 0.018);
+			float sparkle = 1.0 - smoothstep(0.001, 0.006, distance(uv, center));
+			float focus = smoothstep(0.10, 0.54, uv.y) * (1.0 - smoothstep(0.92, 1.0, uv.y));
+			vec3 color = mix(vec3(0.0, 0.018, 0.020), vec3(0.74, 0.88, 0.74), grain);
+			COLOR = vec4(color, 0.014 + sparkle * focus * 0.13);
+		}
+	""")
+
+	vignette_layer.material = _make_scene_shader_material("""
+		shader_type canvas_item;
+		void fragment() {
+			vec2 uv = UV - vec2(0.48, 0.52);
+			float edge = smoothstep(0.38, 0.76, length(uv));
+			float bottom = smoothstep(0.72, 1.0, UV.y);
+			float top = 1.0 - smoothstep(0.0, 0.18, UV.y);
+			COLOR = vec4(0.0, 0.012, 0.015, edge * 0.35 + bottom * 0.18 + top * 0.08);
+		}
+	""")
+
+func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
+	_ensure_compact_hud_panels()
+	_ensure_mobile_ui_containers()
+	_ensure_hud_icons()
+
+	var sx: float = screen_size.x / BASE_SCREEN_SIZE.x
+	var sy: float = screen_size.y / BASE_SCREEN_SIZE.y
+	var ui_scale: float = min(sx, sy)
+	var chip_gap: float = 10.0 * ui_scale
+	var top_height: float = HUD_HEIGHT * sy
+	var cast_width: float = 154.0 * sx
+	var cast_height: float = 44.0 * sy
+	var quick_button_width: float = 86.0 * sx
+	var quick_button_height: float = 36.0 * sy
+	_water_surface_y = WATER_SURFACE_Y * sy
+	_water_zone_top = _water_surface_y - 12.0 * sy
+	_water_zone_bottom = _water_surface_y + 12.0 * sy
+	_rod_anchor_pos = _scale_point(ROD_ANCHOR_POS, screen_size)
+	_rod_target_pos = _scale_point(ROD_TARGET_POS, screen_size)
+
+	water_panel.position = Vector2.ZERO
+	water_panel.size = screen_size
+	water_panel.z_index = 0
+	water_panel.visible = false
+	water_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	water_panel.add_theme_stylebox_override(
+		"panel",
+		_make_panel_style(Color(0.020, 0.080, 0.090, 0.04), Color(0.78, 0.96, 0.88, 0.06), 0, 0, Color.TRANSPARENT)
+	)
+
+	left_hud_panel.visible = false
+	right_hud_panel.visible = false
+	timer_label.visible = false
+	tackle_label.visible = false
+	result_label.visible = false
+	debug_panel.visible = SHOW_DEBUG_PANEL
+
+	var hud_rect := _scale_rect(Rect2(20.0, 16.0, 910.0, HUD_HEIGHT), screen_size)
+	_anchor_control(top_hud_container, 0.0, 0.0, 0.0, 0.0, hud_rect.position.x, hud_rect.position.y, hud_rect.end.x, hud_rect.end.y)
+	top_hud_container.z_index = 100
+	top_hud_container.add_theme_constant_override("separation", int(9.0 * ui_scale))
+	top_hud_spacer.custom_minimum_size = _scale_size(Vector2(250.0, 1.0), screen_size)
+
+	top_hud_panel.visible = true
+	top_hud_panel.custom_minimum_size = _scale_size(Vector2(120.0, HUD_HEIGHT), screen_size)
+	top_hud_panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	top_hud_panel.size_flags_vertical = Control.SIZE_FILL
+	top_hud_panel.z_index = 100
+	ui_theme.apply_hud_badge_style(top_hud_panel)
+
+	time_hud_panel.custom_minimum_size = _scale_size(Vector2(110.0, HUD_HEIGHT), screen_size)
+	time_hud_panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	time_hud_panel.size_flags_vertical = Control.SIZE_FILL
+	time_hud_panel.z_index = 100
+	time_hud_panel.visible = true
+	ui_theme.apply_hud_badge_style(time_hud_panel)
+
+	weather_hud_panel.custom_minimum_size = _scale_size(Vector2(120.0, HUD_HEIGHT), screen_size)
+	weather_hud_panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	weather_hud_panel.size_flags_vertical = Control.SIZE_FILL
+	weather_hud_panel.z_index = 100
+	weather_hud_panel.visible = true
+	ui_theme.apply_hud_badge_style(weather_hud_panel)
+
+	title_label.visible = false
+	level_label.visible = false
+	xp_progress_bar.visible = false
+
+	money_label.visible = true
+	money_label.z_index = 102
+	_anchor_control(money_label, 0.0, 0.0, 1.0, 1.0, 36.0 * sx, 4.0 * sy, -8.0 * sx, -4.0 * sy)
+	money_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	money_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	money_label.add_theme_font_size_override("font_size", 14)
+	money_label.clip_text = true
+
+	clock_label.visible = true
+	clock_label.z_index = 102
+	_anchor_control(clock_label, 0.0, 0.0, 1.0, 1.0, 36.0 * sx, 4.0 * sy, -8.0 * sx, -4.0 * sy)
+	clock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	clock_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	clock_label.add_theme_font_size_override("font_size", 14)
+	clock_label.clip_text = true
+
+	weather_label.visible = true
+	weather_label.z_index = 102
+	_anchor_control(weather_label, 0.0, 0.0, 1.0, 1.0, 36.0 * sx, 4.0 * sy, -8.0 * sx, -4.0 * sy)
+	weather_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	weather_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	weather_label.add_theme_font_size_override("font_size", 13)
+	weather_label.clip_text = true
+
+	_layout_hud_icon(money_hud_icon, Vector2(11.0, 12.0), Vector2(19.0, 19.0), screen_size)
+	_layout_hud_icon(time_hud_icon, Vector2(11.0, 12.0), Vector2(19.0, 19.0), screen_size)
+	_layout_hud_icon(weather_hud_icon, Vector2(11.0, 12.0), Vector2(19.0, 19.0), screen_size)
+
+	spot_option_button.visible = true
+	spot_option_button.custom_minimum_size = _scale_size(Vector2(280.0, HUD_HEIGHT), screen_size)
+	spot_option_button.size_flags_horizontal = Control.SIZE_SHRINK_END
+	spot_option_button.size_flags_vertical = Control.SIZE_FILL
+	spot_option_button.z_index = 101
+	spot_option_button.add_theme_font_size_override("font_size", 13)
+	_set_button_icon(spot_option_button, "location", 20.0)
+	_apply_button_style(spot_option_button, STYLE_SECONDARY_BUTTON)
+	spot_option_button.add_theme_font_size_override("font_size", 13)
+
+	action_panel.visible = true
+	var action_panel_rect := _scale_rect(Rect2(174.0, 472.0, 612.0, ACTION_BAR_HEIGHT), screen_size)
+	_anchor_control(action_panel, 0.0, 0.0, 0.0, 0.0, action_panel_rect.position.x, action_panel_rect.position.y, action_panel_rect.end.x, action_panel_rect.end.y)
+	action_panel.z_index = 100
+	action_panel.add_theme_stylebox_override(
+		"panel",
+		_make_panel_style(Color(0.026, 0.052, 0.055, 0.46), Color(0.74, 0.96, 0.86, 0.22), 9, 2, Color(0.0, 0.0, 0.0, 0.10))
+	)
+
+	quick_actions_container.visible = false
+
+	var cast_rect := _scale_rect(Rect2(403.0, 473.0, 154.0, 44.0), screen_size)
+	var glow_rect := cast_rect.grow(3.0 * ui_scale)
+	_anchor_control(action_glow, 0.0, 0.0, 0.0, 0.0, glow_rect.position.x, glow_rect.position.y, glow_rect.end.x, glow_rect.end.y)
+	action_glow.z_index = 99
+	action_glow.visible = true
+	action_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	for quick_button in [feed_button, bait_button, tackle_button, auto_button]:
+		_reparent_node(quick_button, ui_canvas_layer)
+
+	var quick_size := Vector2(quick_button_width, quick_button_height)
+
+	_layout_action_button(feed_button, "Прикормка", _scale_point(Vector2(190.0, 477.0), screen_size), quick_size, false)
+	_layout_action_button(bait_button, "Наживка", _scale_point(Vector2(284.0, 477.0), screen_size), quick_size, true)
+	_layout_action_button(tackle_button, "Снасти", _scale_point(Vector2(596.0, 477.0), screen_size), quick_size, true)
+	_layout_action_button(auto_button, "Авто", _scale_point(Vector2(690.0, 477.0), screen_size), quick_size, false)
+
+	_anchor_control(fish_button, 0.0, 0.0, 0.0, 0.0, cast_rect.position.x, cast_rect.position.y, cast_rect.end.x, cast_rect.end.y)
+	fish_button.z_index = 102
+	fish_button.custom_minimum_size = Vector2(cast_width, cast_height)
+	fish_button.add_theme_font_size_override("font_size", 16)
+	fish_button.clip_text = true
+	_apply_button_style(fish_button, STYLE_PRIMARY_BUTTON)
+	fish_button.custom_minimum_size = Vector2(cast_width, cast_height)
+	fish_button.size = Vector2(cast_width, cast_height)
+	fish_button.add_theme_font_size_override("font_size", 16)
+
+	_set_button_icon(feed_button, "fish", 12.0)
+	_set_button_icon(bait_button, "bait", 12.0)
+	_set_button_icon(fish_button, "hook", 16.0)
+	_set_button_icon(tackle_button, "rod", 12.0)
+	_set_button_icon(auto_button, "auto", 12.0)
+
+	bottom_nav_panel.visible = true
+	var nav_rect := _scale_rect(Rect2(2.0, 94.0, LEFT_NAV_WIDTH, LEFT_NAV_HEIGHT), screen_size)
+	_anchor_control(bottom_nav_panel, 0.0, 0.0, 0.0, 0.0, nav_rect.position.x, nav_rect.position.y, nav_rect.end.x, nav_rect.end.y)
+	bottom_nav_panel.z_index = 100
+	ui_theme.apply_panel_style(bottom_nav_panel)
+
+	_anchor_control(bottom_nav_container, 0.0, 0.0, 1.0, 1.0, 9.0 * sx, 11.0 * sy, -9.0 * sx, -22.0 * sy)
+	bottom_nav_container.add_theme_constant_override("separation", int(7.0 * ui_scale))
+
+	var nav_buttons: Array = [nav_fish_button, basket_button, inventory_button, shop_button, map_button, profile_button]
+	var nav_labels: Array = ["Ловля", "Садок", "Инвентарь", "Магазин", "Карта", "Профиль"]
+	var nav_button_size := _scale_size(Vector2(LEFT_NAV_WIDTH - 18.0, 42.0), screen_size)
+	for i in nav_buttons.size():
+		_layout_nav_button(nav_buttons[i], nav_labels[i], Vector2.ZERO, nav_button_size, i == 0)
+	var nav_icons: Array = ["fish", "keepnet", "inventory", "cart", "map", "profile"]
+	for i in nav_buttons.size():
+		_set_button_icon(nav_buttons[i], nav_icons[i], 12.0)
+
+	basket_button.visible = true
+
+	map_button.disabled = false
+	profile_button.disabled = false
+
+	var water_anchor := _scale_point(FLOAT_DEFAULT_POS, screen_size)
+	_float_base_center = water_anchor
+	if not _presence_has_layout or _fishing_ui_state == FishingUiState.IDLE:
+		_float_visual_center = water_anchor
+		_rod_tip_visual = _rod_target_pos
+		_rod_bend_direction_visual = Vector2.DOWN
+		_rod_bend_amount_visual = 3.0
+		_presence_has_layout = true
+	_layout_float_visuals(water_anchor, clamp(screen_size.y / 540.0, 0.86, 1.22))
+
+	var reel_width: float = 520.0 * sx
+	var reel_height: float = 64.0 * sy
+	var reel_y: float = max(16.0 * sy + top_height + 10.0 * sy, action_panel_rect.position.y - reel_height - 10.0 * sy)
+	var reel_x: float = (screen_size.x - reel_width) * 0.5
+	_anchor_control(reeling_panel, 0.0, 0.0, 0.0, 0.0, reel_x, reel_y, reel_x + reel_width, reel_y + reel_height)
+	reeling_panel.color = Color(0.020, 0.040, 0.042, 0.78)
+	reeling_panel.z_index = 103
+
+	var reel_padding := 14.0
+	var reel_inner_width: float = reel_width - reel_padding * 2.0
+	fight_title_label.position = Vector2(reel_padding, 6.0)
+	fight_title_label.size = Vector2(142.0, 18.0)
+	fight_title_label.add_theme_font_size_override("font_size", 11)
+	fight_status_label.position = Vector2(reel_padding + 150.0, 6.0)
+	fight_status_label.size = Vector2(max(reel_inner_width - 150.0, 80.0), 18.0)
+	fight_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	fight_status_label.add_theme_font_size_override("font_size", 11)
+	tension_label.position = Vector2(reel_padding, 26.0)
+	tension_label.size = Vector2(reel_inner_width * 0.5, 14.0)
+	tension_label.add_theme_font_size_override("font_size", 10)
+	progress_label.position = Vector2(reel_padding + reel_inner_width * 0.5, 26.0)
+	progress_label.size = Vector2(reel_inner_width * 0.5, 14.0)
+	progress_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	progress_label.add_theme_font_size_override("font_size", 10)
+	tension_track.position = Vector2(reel_padding, 43.0)
+	tension_track.size = Vector2(reel_inner_width, 11.0)
+	progress_track.position = Vector2(reel_padding, 58.0)
+	progress_track.size = Vector2(reel_inner_width, 4.0)
+	ui_theme.apply_meter_track_style(tension_track, tension_fill)
+	ui_theme.apply_meter_track_style(progress_track, progress_fill, Color(0.58, 0.82, 0.28, 1.0))
+	fight_hint_label.visible = false
+
+func _ensure_compact_hud_panels() -> void:
+	if time_hud_panel == null:
+		time_hud_panel = Panel.new()
+		time_hud_panel.name = "TimeHudPanel"
+		time_hud_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		(ui_canvas_layer if ui_canvas_layer != null else self).add_child(time_hud_panel)
+
+	if weather_hud_panel == null:
+		weather_hud_panel = Panel.new()
+		weather_hud_panel.name = "WeatherHudPanel"
+		weather_hud_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		(ui_canvas_layer if ui_canvas_layer != null else self).add_child(weather_hud_panel)
+
+func _ensure_hud_icons() -> void:
+	money_hud_icon = _ensure_hud_icon(money_hud_icon, "MoneyHudIcon", top_hud_panel, "money")
+	time_hud_icon = _ensure_hud_icon(time_hud_icon, "TimeHudIcon", time_hud_panel, "time")
+	weather_hud_icon = _ensure_hud_icon(weather_hud_icon, "WeatherHudIcon", weather_hud_panel, "weather")
+
+func _ensure_hud_icon(icon: TextureRect, node_name: String, parent: Control, icon_name: String) -> TextureRect:
+	if icon == null:
+		icon = TextureRect.new()
+		icon.name = node_name
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		parent.add_child(icon)
+	elif icon.get_parent() != parent:
+		_reparent_node(icon, parent)
+
+	icon.texture = ui_theme.get_icon(icon_name)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.z_index = 103
+	icon.visible = icon.texture != null
+	return icon
+
+func _layout_hud_icon(icon: TextureRect, base_pos: Vector2, base_size: Vector2, screen_size: Vector2) -> void:
+	if icon == null:
+		return
+
+	icon.position = _scale_point(base_pos, screen_size)
+	icon.size = _scale_size(base_size, screen_size)
+
+func _scale_point(base_point: Vector2, screen_size: Vector2) -> Vector2:
+	return Vector2(
+		base_point.x * screen_size.x / BASE_SCREEN_SIZE.x,
+		base_point.y * screen_size.y / BASE_SCREEN_SIZE.y
+	)
+
+func _scale_size(base_size: Vector2, screen_size: Vector2) -> Vector2:
+	return Vector2(
+		base_size.x * screen_size.x / BASE_SCREEN_SIZE.x,
+		base_size.y * screen_size.y / BASE_SCREEN_SIZE.y
+	)
+
+func _scale_rect(base_rect: Rect2, screen_size: Vector2) -> Rect2:
+	return Rect2(
+		_scale_point(base_rect.position, screen_size),
+		_scale_size(base_rect.size, screen_size)
+	)
+
+func _anchor_control(
+	control: Control,
+	anchor_left: float,
+	anchor_top: float,
+	anchor_right: float,
+	anchor_bottom: float,
+	offset_left: float,
+	offset_top: float,
+	offset_right: float,
+	offset_bottom: float
+) -> void:
+	control.anchor_left = anchor_left
+	control.anchor_top = anchor_top
+	control.anchor_right = anchor_right
+	control.anchor_bottom = anchor_bottom
+	control.offset_left = offset_left
+	control.offset_top = offset_top
+	control.offset_right = offset_right
+	control.offset_bottom = offset_bottom
+
+func _layout_action_button(button: Button, label: String, pos: Vector2, button_size: Vector2, enabled: bool) -> void:
+	button.text = label
+	if button.get_parent() is Container:
+		button.custom_minimum_size = Vector2(max(button_size.x, 36.0), max(button_size.y, 36.0))
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	else:
+		_anchor_control(button, 0.0, 0.0, 0.0, 0.0, pos.x, pos.y, pos.x + button_size.x, pos.y + button_size.y)
+		button.custom_minimum_size = Vector2(max(button_size.x, 36.0), max(button_size.y, 36.0))
+	button.z_index = 102
+	button.disabled = not enabled
+	button.clip_text = true
+	button.add_theme_font_size_override("font_size", 10)
+	_apply_action_button_style(button, false)
+	button.custom_minimum_size = button_size
+	if not (button.get_parent() is Container):
+		button.size = button_size
+	button.add_theme_font_size_override("font_size", 10)
+
+func _layout_nav_button(button: Button, label: String, pos: Vector2, button_size: Vector2, active: bool) -> void:
+	button.text = label
+	if button.get_parent() is Container:
+		button.custom_minimum_size = button_size
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	else:
+		_anchor_control(button, 0.0, 0.0, 0.0, 0.0, pos.x, pos.y, pos.x + button_size.x, pos.y + button_size.y)
+		button.custom_minimum_size = button_size
+	button.z_index = 102
+	button.visible = true
+	button.clip_text = false
+	button.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+	button.add_theme_font_size_override("font_size", 9 if label.length() < 9 else 8)
+	_apply_button_style(button, STYLE_BOTTOM_NAV_ACTIVE if active else STYLE_BOTTOM_NAV_BUTTON)
+	button.modulate = Color(1.0, 1.0, 1.0, 1.0 if active else 0.86)
+	button.add_theme_font_size_override("font_size", 9 if label.length() < 9 else 8)
+
+func _set_button_icon(button: Button, icon_name: String, icon_size: float = 20.0) -> void:
+	if ui_theme == null or icon_name.is_empty():
+		button.icon = null
+		return
+
+	button.icon = ui_theme.get_icon(icon_name)
+	button.expand_icon = true
+	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
+	button.add_theme_constant_override("icon_max_width", int(icon_size))
+	button.add_theme_constant_override("h_separation", 4)
+
+func _layout_float_visuals(center: Vector2, scene_scale: float) -> void:
+	var surface_y: float = clamp(center.y, _water_zone_top, _water_zone_bottom)
+	var ripple_size := Vector2(32.0, 11.5) * scene_scale
+	float_ripple.position = Vector2(center.x - ripple_size.x * 0.5, surface_y - ripple_size.y * 0.5)
+	float_ripple.size = ripple_size
+	float_ripple.z_index = 24
+	float_ripple.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var reflection_size := Vector2(23.0, 7.5) * scene_scale
+	float_reflection.position = Vector2(center.x - reflection_size.x * 0.5, surface_y - reflection_size.y * 0.5 + 1.0 * scene_scale)
+	float_reflection.size = reflection_size
+	float_reflection.z_index = 23
+	float_reflection.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var glow_size := Vector2(26.0, 26.0) * scene_scale
+	float_glow.position = Vector2(center.x - glow_size.x * 0.5, surface_y - glow_size.y * 0.5 - 1.0 * scene_scale)
+	float_glow.size = glow_size
+	float_glow.z_index = 23
+	float_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	float_marker.position = Vector2(center.x - 2.4 * scene_scale, surface_y - 12.4 * scene_scale)
+	float_marker.size = Vector2(4.8, 22.0) * scene_scale
+	float_marker.color = Color(0.92, 1.0, 0.82, 1.0)
+	float_marker.z_index = 25
+	float_marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
 func _configure_fishing_presence_style() -> void:
 	fishing_presence_ui._configure_fishing_presence_style()
 
@@ -769,16 +1445,16 @@ func _update_fishing_presence(delta: float) -> void:
 func _setup_layout() -> void:
 	var screen_size := get_viewport_rect().size
 	var margin := 10.0
-	var top_height := 54.0
-	var bottom_nav_height := 52.0
-	var action_height := 82.0
+	var top_height := 58.0
+	var bottom_nav_height := 50.0
+	var action_height := 86.0
 	var content_top := margin + top_height + 8.0
 	var bottom_nav_y := screen_size.y - margin - bottom_nav_height
 	var content_bottom := bottom_nav_y - 8.0
 	var content_height = max(content_bottom - content_top, 220.0)
-	var left_width = clamp(screen_size.x * 0.20, 168.0, 220.0)
+	var left_width = clamp(screen_size.x * 0.19, 168.0, 220.0)
 	var right_width = clamp(screen_size.x * 0.24, 210.0, 268.0)
-	var action_width: float = min(max(screen_size.x * 0.56, 440.0), screen_size.x - margin * 2.0)
+	var action_width: float = min(max(screen_size.x * 0.64, 560.0), screen_size.x - margin * 2.0)
 	var action_x := (screen_size.x - action_width) * 0.5
 	var action_y := bottom_nav_y - action_height - 8.0
 	var center_width = max(screen_size.x - left_width - right_width - margin * 4.0, 280.0)
@@ -926,7 +1602,7 @@ func _setup_layout() -> void:
 		node.set_anchors_preset(Control.PRESET_TOP_LEFT)
 
 	background.set_anchors_preset(Control.PRESET_FULL_RECT)
-	background.z_index = -20
+	background.z_index = -120
 	background.color = Color("#12363b")
 
 	for layer in [
@@ -960,6 +1636,7 @@ func _setup_layout() -> void:
 	vignette_layer.z_index = 3
 	_setup_atmosphere_materials()
 	_apply_time_atmosphere()
+	fishing_presence_ui._layout_environment_scene(screen_size)
 
 	water_panel.add_theme_stylebox_override(
 		"panel",
@@ -977,111 +1654,79 @@ func _setup_layout() -> void:
 	_apply_panel_style(bottom_nav_panel, STYLE_HUD_PANEL)
 	_apply_panel_style(action_panel, STYLE_INFO_CARD)
 	_apply_panel_style(debug_panel, STYLE_INFO_CARD)
+	ui_theme.apply_hud_badge_style(top_hud_panel)
+	ui_theme.apply_hud_badge_style(left_hud_panel)
+	ui_theme.apply_hud_badge_style(right_hud_panel)
 
 	inventory_backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
 	inventory_backdrop.offset_left = 0.0
 	inventory_backdrop.offset_top = 0.0
 	inventory_backdrop.offset_right = 0.0
 	inventory_backdrop.offset_bottom = 0.0
-	inventory_backdrop.z_index = 24
-	inventory_backdrop.color = Color(0.0, 0.0, 0.0, 0.56)
-	inventory_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	inventory_backdrop.z_index = MENU_BACKDROP_Z
+	ui_theme.apply_modal_backdrop_style(inventory_backdrop)
+	inventory_backdrop.color = Color(0.0, 0.0, 0.0, 0.84)
 
 	basket_backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
 	basket_backdrop.offset_left = 0.0
 	basket_backdrop.offset_top = 0.0
 	basket_backdrop.offset_right = 0.0
 	basket_backdrop.offset_bottom = 0.0
-	basket_backdrop.z_index = 19
-	basket_backdrop.color = Color(0.0, 0.0, 0.0, 0.54)
+	basket_backdrop.z_index = MENU_BACKDROP_Z
 	basket_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	ui_theme.apply_modal_backdrop_style(basket_backdrop)
+	basket_backdrop.color = Color(0.0, 0.0, 0.0, 0.84)
 
 	shop_backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
 	shop_backdrop.offset_left = 0.0
 	shop_backdrop.offset_top = 0.0
 	shop_backdrop.offset_right = 0.0
 	shop_backdrop.offset_bottom = 0.0
-	shop_backdrop.z_index = 26
-	shop_backdrop.color = Color(0.0, 0.0, 0.0, 0.52)
-	shop_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	shop_backdrop.z_index = MENU_BACKDROP_Z
+	ui_theme.apply_modal_backdrop_style(shop_backdrop)
+	shop_backdrop.color = Color(0.0, 0.0, 0.0, 0.84)
 
 	tackle_backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
 	tackle_backdrop.offset_left = 0.0
 	tackle_backdrop.offset_top = 0.0
 	tackle_backdrop.offset_right = 0.0
 	tackle_backdrop.offset_bottom = 0.0
-	tackle_backdrop.z_index = 28
-	tackle_backdrop.color = Color(0.0, 0.0, 0.0, 0.54)
-	tackle_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	tackle_backdrop.z_index = MENU_BACKDROP_Z
+	ui_theme.apply_modal_backdrop_style(tackle_backdrop)
+	tackle_backdrop.color = Color(0.0, 0.0, 0.0, 0.84)
 
 	waterbody_backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
 	waterbody_backdrop.offset_left = 0.0
 	waterbody_backdrop.offset_top = 0.0
 	waterbody_backdrop.offset_right = 0.0
 	waterbody_backdrop.offset_bottom = 0.0
-	waterbody_backdrop.z_index = 30
-	waterbody_backdrop.color = Color(0.0, 0.0, 0.0, 0.54)
-	waterbody_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	waterbody_backdrop.z_index = MENU_BACKDROP_Z
+	ui_theme.apply_modal_backdrop_style(waterbody_backdrop)
+	waterbody_backdrop.color = Color(0.0, 0.0, 0.0, 0.84)
 
-	shop_panel.z_index = 27
+	shop_panel.z_index = MENU_PANEL_Z
 	shop_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	shop_panel.add_theme_stylebox_override(
-		"panel",
-		_make_panel_style(
-			Color(0.055, 0.105, 0.105, 0.92),
-			Color(0.82, 1.0, 0.86, 0.34),
-			20,
-			16,
-			Color(0.0, 0.0, 0.0, 0.30)
-		)
-	)
+	_apply_panel_style(shop_panel, STYLE_HUD_PANEL)
 
-	tackle_panel.z_index = 29
+	tackle_panel.z_index = MENU_PANEL_Z
 	tackle_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	tackle_panel.add_theme_stylebox_override(
-		"panel",
-		_make_panel_style(
-			Color(0.055, 0.105, 0.105, 0.94),
-			Color(0.82, 1.0, 0.86, 0.34),
-			20,
-			16,
-			Color(0.0, 0.0, 0.0, 0.30)
-		)
-	)
+	_apply_panel_style(tackle_panel, STYLE_HUD_PANEL)
 
-	waterbody_panel.z_index = 31
+	waterbody_panel.z_index = MENU_PANEL_Z
 	waterbody_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	waterbody_panel.add_theme_stylebox_override(
-		"panel",
-		_make_panel_style(
-			Color(0.055, 0.105, 0.105, 0.94),
-			Color(0.82, 1.0, 0.86, 0.34),
-			20,
-			16,
-			Color(0.0, 0.0, 0.0, 0.30)
-		)
-	)
+	_apply_panel_style(waterbody_panel, STYLE_HUD_PANEL)
 
 	catch_popup_backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
 	catch_popup_backdrop.offset_left = 0.0
 	catch_popup_backdrop.offset_top = 0.0
 	catch_popup_backdrop.offset_right = 0.0
 	catch_popup_backdrop.offset_bottom = 0.0
-	catch_popup_backdrop.z_index = 40
-	catch_popup_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	catch_popup_backdrop.z_index = 200
+	ui_theme.apply_modal_backdrop_style(catch_popup_backdrop)
 
-	catch_popup_panel.z_index = 41
+	catch_popup_panel.z_index = 201
 	catch_popup_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	catch_popup_panel.add_theme_stylebox_override(
-		"panel",
-		_make_panel_style(
-			Color(0.060, 0.115, 0.120, 0.88),
-			Color(0.88, 1.0, 0.86, 0.34),
-			22,
-			18,
-			Color(0.0, 0.0, 0.0, 0.36)
-		)
-	)
+	ui_theme.apply_popup_window_style(catch_popup_panel)
 
 	water_panel.position = Vector2(margin, content_top)
 	water_panel.size = Vector2(screen_size.x - margin * 2.0, content_height)
@@ -1120,20 +1765,28 @@ func _setup_layout() -> void:
 	float_marker.z_index = 4
 	float_marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
+	var top_cluster_width: float = min(max(screen_size.x * 0.43, 390.0), 430.0)
+	var location_card_width: float = min(max(screen_size.x * 0.27, 232.0), 300.0)
+	var side_card_width: float = min(max(screen_size.x * 0.22, 178.0), 230.0)
+	var status_card_height: float = min(max(content_height * 0.27, 94.0), 116.0)
+	var result_card_width: float = min(max(screen_size.x * 0.25, 224.0), 280.0)
+	var result_card_height: float = min(max(content_height * 0.31, 108.0), 146.0)
+	var nav_panel_width: float = min(max(screen_size.x * 0.48, 420.0), 560.0)
+
 	top_hud_panel.position = Vector2(margin, margin)
-	top_hud_panel.size = Vector2(screen_size.x - margin * 2.0, top_height)
+	top_hud_panel.size = Vector2(top_cluster_width, top_height)
 	top_hud_panel.z_index = 5
 
-	left_hud_panel.position = Vector2(margin, content_top)
-	left_hud_panel.size = Vector2(left_width, min(178.0, content_height))
+	left_hud_panel.position = Vector2(margin, content_top + 10.0)
+	left_hud_panel.size = Vector2(side_card_width, status_card_height)
 	left_hud_panel.z_index = 5
 
-	right_hud_panel.position = Vector2(screen_size.x - margin - right_width, content_top)
-	right_hud_panel.size = Vector2(right_width, min(236.0, content_height))
+	right_hud_panel.position = Vector2(screen_size.x - margin - result_card_width, content_top + 10.0)
+	right_hud_panel.size = Vector2(result_card_width, result_card_height)
 	right_hud_panel.z_index = 5
 
-	bottom_nav_panel.position = Vector2(margin, bottom_nav_y)
-	bottom_nav_panel.size = Vector2(screen_size.x - margin * 2.0, bottom_nav_height)
+	bottom_nav_panel.position = Vector2((screen_size.x - nav_panel_width) * 0.5, bottom_nav_y)
+	bottom_nav_panel.size = Vector2(nav_panel_width, bottom_nav_height)
 	bottom_nav_panel.z_index = 5
 
 	action_panel.position = Vector2(action_x, action_y)
@@ -1246,68 +1899,92 @@ func _setup_layout() -> void:
 	fight_hint_label.add_theme_font_size_override("font_size", 16)
 
 	title_label.text = "Tuman Lake"
-	title_label.position = Vector2(margin + 14.0, margin + 10.0)
-	title_label.size = Vector2(112.0, 24.0)
+	title_label.position = top_hud_panel.position + Vector2(14.0, 8.0)
+	title_label.size = Vector2(126.0, 20.0)
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	title_label.add_theme_font_size_override("font_size", 18)
+	title_label.add_theme_font_size_override("font_size", 16)
+	title_label.clip_text = true
 
-	money_label.position = Vector2(margin + 138.0, margin + 10.0)
-	money_label.size = Vector2(112.0, 22.0)
-	money_label.add_theme_font_size_override("font_size", 14)
+	level_label.position = top_hud_panel.position + Vector2(14.0, 30.0)
+	level_label.size = Vector2(128.0, 18.0)
+	level_label.add_theme_font_size_override("font_size", 12)
+	level_label.clip_text = true
 
-	level_label.position = Vector2(margin + 262.0, margin + 8.0)
-	level_label.size = Vector2(112.0, 22.0)
-	level_label.add_theme_font_size_override("font_size", 13)
-
-	xp_progress_bar.position = Vector2(margin + 262.0, margin + 32.0)
-	xp_progress_bar.size = Vector2(130.0, 8.0)
+	xp_progress_bar.position = top_hud_panel.position + Vector2(148.0, 36.0)
+	xp_progress_bar.size = Vector2(96.0, 7.0)
 	xp_progress_bar.show_percentage = false
+	ui_theme.apply_progress_bar_style(xp_progress_bar)
+
+	money_label.position = top_hud_panel.position + Vector2(150.0, 9.0)
+	money_label.size = Vector2(88.0, 20.0)
+	money_label.add_theme_font_size_override("font_size", 14)
+	money_label.clip_text = true
 
 	clock_label.text = _get_clock_text()
-	clock_label.position = Vector2(screen_size.x - margin - 362.0, margin + 10.0)
-	clock_label.size = Vector2(62.0, 22.0)
+	clock_label.position = top_hud_panel.position + Vector2(252.0, 9.0)
+	clock_label.size = Vector2(58.0, 20.0)
 	clock_label.add_theme_font_size_override("font_size", 13)
+	clock_label.clip_text = true
 
 	weather_label.text = _get_time_of_day_title()
-	weather_label.position = Vector2(screen_size.x - margin - 294.0, margin + 10.0)
-	weather_label.size = Vector2(74.0, 22.0)
+	weather_label.position = top_hud_panel.position + Vector2(318.0, 9.0)
+	weather_label.size = Vector2(max(top_hud_panel.size.x - 330.0, 64.0), 20.0)
 	weather_label.add_theme_font_size_override("font_size", 13)
+	weather_label.clip_text = true
 
-	spot_option_button.position = Vector2(screen_size.x - margin - 206.0, margin + 8.0)
-	spot_option_button.size = Vector2(190.0, 32.0)
+	spot_option_button.position = Vector2(screen_size.x - margin - location_card_width + 12.0, margin + 7.0)
+	spot_option_button.size = Vector2(location_card_width - 24.0, 44.0)
+	spot_option_button.add_theme_font_size_override("font_size", 13)
 	_apply_button_style(spot_option_button, STYLE_SECONDARY_BUTTON)
 
-	var compact_button_size := Vector2(68.0, 30.0)
-	feed_button.position = Vector2(action_x + 14.0, action_y + 26.0)
-	feed_button.size = compact_button_size
+	var action_button_gap: float = 8.0
+	var main_action_size := Vector2(224.0, 64.0)
+	var side_action_width: float = clamp((action_width - main_action_size.x - action_button_gap * 4.0) / 4.0, 72.0, 86.0)
+	var side_action_size := Vector2(side_action_width, 56.0)
+	var action_total_width: float = side_action_size.x * 4.0 + main_action_size.x + action_button_gap * 4.0
+	var action_start_x: float = action_x + max((action_width - action_total_width) * 0.5, 12.0)
+	var side_action_y: float = action_y + (action_height - side_action_size.y) * 0.5
+	var main_action_y: float = action_y + (action_height - main_action_size.y) * 0.5
+
+	feed_button.text = "Прикорм"
+	feed_button.position = Vector2(action_start_x, side_action_y)
+	feed_button.size = side_action_size
 	feed_button.z_index = 8
-	feed_button.add_theme_font_size_override("font_size", 11)
+	feed_button.add_theme_font_size_override("font_size", 12)
 	feed_button.disabled = true
 	_apply_button_style(feed_button, STYLE_SECONDARY_BUTTON)
 
-	bait_button.position = Vector2(action_x + 90.0, action_y + 26.0)
-	bait_button.size = compact_button_size
+	bait_button.text = "Наживка"
+	bait_button.position = Vector2(action_start_x + side_action_size.x + action_button_gap, side_action_y)
+	bait_button.size = side_action_size
 	bait_button.z_index = 8
-	bait_button.add_theme_font_size_override("font_size", 11)
+	bait_button.add_theme_font_size_override("font_size", 12)
 	_apply_button_style(bait_button, STYLE_SECONDARY_BUTTON)
 
-	auto_button.position = Vector2(action_x + action_width - 82.0, action_y + 26.0)
-	auto_button.size = compact_button_size
-	auto_button.z_index = 8
-	auto_button.add_theme_font_size_override("font_size", 11)
-	auto_button.disabled = true
-	_apply_button_style(auto_button, STYLE_SECONDARY_BUTTON)
-
-	fish_button.position = Vector2(action_x + action_width * 0.5 - 110.0, action_y + 9.0)
-	fish_button.size = Vector2(220.0, 62.0)
+	fish_button.position = Vector2(action_start_x + (side_action_size.x + action_button_gap) * 2.0, main_action_y)
+	fish_button.size = main_action_size
 	fish_button.z_index = 8
 	fish_button.add_theme_font_size_override("font_size", 22)
 	_apply_button_style(fish_button, STYLE_PRIMARY_BUTTON)
 
+	tackle_button.text = "Снасти"
+	tackle_button.position = Vector2(fish_button.position.x + main_action_size.x + action_button_gap, side_action_y)
+	tackle_button.size = side_action_size
+	tackle_button.z_index = 8
+	tackle_button.add_theme_font_size_override("font_size", 12)
+	_apply_button_style(tackle_button, STYLE_SECONDARY_BUTTON)
+
+	auto_button.text = "Авто"
+	auto_button.position = Vector2(tackle_button.position.x + side_action_size.x + action_button_gap, side_action_y)
+	auto_button.size = side_action_size
+	auto_button.z_index = 8
+	auto_button.add_theme_font_size_override("font_size", 12)
+	auto_button.disabled = true
+	_apply_button_style(auto_button, STYLE_SECONDARY_BUTTON)
+
 	var nav_buttons: Array = [
 		nav_fish_button,
 		inventory_button,
-		tackle_button,
 		shop_button,
 		basket_button,
 		map_button,
@@ -1322,36 +1999,37 @@ func _setup_layout() -> void:
 		"⌖ Карта",
 		"◎ Профиль"
 	]
+	nav_texts = ["Ловля", "Инвентарь", "Магазин", "Садок", "Карта", "Профиль"]
 	var nav_gap := 6.0
-	var nav_x := margin + 12.0
-	var nav_y := bottom_nav_y + 9.0
+	var nav_x := bottom_nav_panel.position.x + 10.0
+	var nav_y := bottom_nav_y + 3.0
 	var nav_width: float = (bottom_nav_panel.size.x - 24.0 - nav_gap * float(nav_buttons.size() - 1)) / float(nav_buttons.size())
 
 	for i in nav_buttons.size():
 		var nav_button: Button = nav_buttons[i]
 		nav_button.text = nav_texts[i]
 		nav_button.position = Vector2(nav_x + float(i) * (nav_width + nav_gap), nav_y)
-		nav_button.size = Vector2(nav_width, 34.0)
+		nav_button.size = Vector2(nav_width, 44.0)
 		nav_button.add_theme_font_size_override("font_size", 11)
 		_apply_button_style(nav_button, STYLE_BOTTOM_NAV_ACTIVE if i == 0 else STYLE_BOTTOM_NAV_BUTTON)
 
 	map_button.disabled = false
 	profile_button.disabled = true
 
-	timer_label.position = Vector2(margin + 12.0, content_top + 12.0)
-	timer_label.size = Vector2(left_width - 24.0, 24.0)
+	timer_label.position = left_hud_panel.position + Vector2(12.0, 10.0)
+	timer_label.size = Vector2(left_hud_panel.size.x - 24.0, 22.0)
 	timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	timer_label.add_theme_font_size_override("font_size", 14)
 	timer_label.clip_text = true
 
-	tackle_label.position = Vector2(margin + 12.0, content_top + 42.0)
-	tackle_label.size = Vector2(left_width - 24.0, left_hud_panel.size.y - 54.0)
+	tackle_label.position = left_hud_panel.position + Vector2(12.0, 36.0)
+	tackle_label.size = Vector2(left_hud_panel.size.x - 24.0, left_hud_panel.size.y - 46.0)
 	tackle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	tackle_label.add_theme_font_size_override("font_size", 12)
 	tackle_label.clip_text = true
 
-	result_label.position = Vector2(screen_size.x - margin - right_width + 12.0, content_top + 12.0)
-	result_label.size = Vector2(right_width - 24.0, right_hud_panel.size.y - 24.0)
+	result_label.position = right_hud_panel.position + Vector2(12.0, 12.0)
+	result_label.size = Vector2(right_hud_panel.size.x - 24.0, right_hud_panel.size.y - 24.0)
 	result_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	result_label.add_theme_font_size_override("font_size", 12)
 	result_label.clip_text = true
@@ -1410,11 +2088,11 @@ func _setup_layout() -> void:
 
 	tension_track.position = Vector2(panel_padding, 40.0)
 	tension_track.size = Vector2(panel_width, 11.0)
-	tension_track.color = Color(0.135, 0.190, 0.190, 0.95)
+	ui_theme.apply_meter_track_style(tension_track, tension_fill)
 
 	progress_track.position = Vector2(panel_padding, 55.0)
 	progress_track.size = Vector2(panel_width, 4.0)
-	progress_track.color = Color(0.135, 0.190, 0.190, 0.95)
+	ui_theme.apply_meter_track_style(progress_track, progress_fill, Color(0.58, 0.82, 0.28, 1.0))
 
 	debug_panel.position = Vector2(screen_size.x - margin - 360.0, content_top + 246.0)
 	debug_panel.size = Vector2(350.0, 148.0)
@@ -1433,121 +2111,121 @@ func _setup_layout() -> void:
 	fight_hint_label.add_theme_font_size_override("font_size", 10)
 	fight_hint_label.visible = false
 
+	_apply_gameplay_screen_composition(screen_size)
+
 	for primary_label in [title_label, money_label, level_label, fight_title_label, tension_label, progress_label, basket_title_label, shop_title_label, tackle_title_label]:
 		_apply_label_style(primary_label, true)
 
 	for secondary_label in [clock_label, weather_label, timer_label, tackle_label, result_label, fight_status_label, debug_label, basket_stats_label, basket_contents_label, basket_notice_label, shop_money_label, shop_notice_label, tackle_current_label, tackle_details_label, tackle_compare_label]:
 		_apply_label_style(secondary_label)
 
-	var basket_width: float = min(screen_size.x - margin * 4.0, 820.0)
-	var basket_height: float = min(screen_size.y - margin * 3.0, 468.0)
-	var basket_x: float = (screen_size.x - basket_width) * 0.5
-	var basket_y: float = (screen_size.y - basket_height) * 0.5
-	var basket_padding := 20.0
+	var basket_width: float = screen_size.x
+	var basket_height: float = screen_size.y
+	var basket_x := 0.0
+	var basket_y := 0.0
+	var basket_padding := 28.0
 	var basket_inner_width: float = basket_width - basket_padding * 2.0
-	var basket_footer_height := 58.0
-	var basket_scroll_y := 108.0
-	var basket_notice_width: float = basket_inner_width - 336.0
+	var basket_scroll_y := 104.0
+	var basket_footer_y: float = basket_height - basket_padding - 52.0
+	var basket_scroll_height: float = max(basket_footer_y - basket_scroll_y - 18.0, 160.0)
+	var basket_notice_width: float = basket_inner_width - 340.0
 
 	basket_panel.position = Vector2(basket_x, basket_y)
 	basket_panel.size = Vector2(basket_width, basket_height)
-	basket_panel.z_index = 20
-	basket_panel.color = Color(0.030, 0.060, 0.060, 0.58)
+	basket_panel.z_index = MENU_PANEL_Z
+	ui_theme.apply_panel_style(basket_panel)
+	basket_panel.color = Color(0.028, 0.038, 0.040, 0.90)
 	basket_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	basket_frame_panel.position = Vector2.ZERO
 	basket_frame_panel.size = Vector2(basket_width, basket_height)
 	basket_frame_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	basket_frame_panel.add_theme_stylebox_override(
-		"panel",
-		_make_panel_style(
-			Color(0.055, 0.105, 0.105, 0.88),
-			Color(0.82, 1.0, 0.86, 0.34),
-			20,
-			16,
-			Color(0.0, 0.0, 0.0, 0.32)
-		)
-	)
+	_apply_panel_style(basket_frame_panel, STYLE_HUD_PANEL)
 
-	basket_title_label.position = Vector2(basket_padding, 16)
-	basket_title_label.size = Vector2(basket_inner_width, 36)
+	basket_title_label.position = Vector2(basket_padding, 20.0)
+	basket_title_label.size = Vector2(basket_inner_width, 38.0)
 	basket_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	basket_title_label.add_theme_font_size_override("font_size", 25)
+	basket_title_label.add_theme_font_size_override("font_size", 24)
 	basket_title_label.z_index = 2
 
-	basket_stats_label.position = Vector2(basket_padding, 56.0)
+	basket_stats_label.position = Vector2(basket_padding, 62.0)
 	basket_stats_label.size = Vector2(basket_inner_width, 34.0)
 	basket_stats_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	basket_stats_label.add_theme_font_size_override("font_size", 14)
+	basket_stats_label.add_theme_font_size_override("font_size", 12)
 	basket_stats_label.add_theme_color_override("font_color", Color(0.82, 0.94, 0.84, 0.92))
 
 	basket_scroll.position = Vector2(basket_padding, basket_scroll_y)
-	basket_scroll.size = Vector2(basket_inner_width, basket_height - basket_scroll_y - basket_footer_height)
-	basket_scroll.mouse_filter = Control.MOUSE_FILTER_PASS
+	basket_scroll.size = Vector2(basket_inner_width, basket_scroll_height)
+	basket_scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+	basket_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	basket_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 
 	basket_cards_grid.position = Vector2.ZERO
 	basket_cards_grid.size = basket_scroll.size
+	basket_cards_grid.custom_minimum_size = Vector2(basket_inner_width, 0.0)
+	basket_cards_grid.mouse_filter = Control.MOUSE_FILTER_PASS
 	basket_cards_grid.columns = 2
 	basket_cards_grid.add_theme_constant_override("h_separation", 10)
 	basket_cards_grid.add_theme_constant_override("v_separation", 10)
 
 	basket_contents_label.position = Vector2(basket_padding, basket_scroll_y)
-	basket_contents_label.size = Vector2(basket_inner_width, basket_height - basket_scroll_y - basket_footer_height)
+	basket_contents_label.size = Vector2(basket_inner_width, basket_scroll_height)
 	basket_contents_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	basket_contents_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	basket_contents_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	basket_contents_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	basket_contents_label.add_theme_font_size_override("font_size", 20)
+	basket_contents_label.add_theme_font_size_override("font_size", 16)
 	basket_contents_label.z_index = 2
 
-	basket_notice_label.position = Vector2(basket_padding, basket_height - 48.0)
-	basket_notice_label.size = Vector2(max(basket_notice_width, 160.0), 36.0)
+	basket_notice_label.position = Vector2(basket_padding, basket_footer_y)
+	basket_notice_label.size = Vector2(max(basket_notice_width, 160.0), 44.0)
 	basket_notice_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	basket_notice_label.add_theme_font_size_override("font_size", 14)
+	basket_notice_label.add_theme_font_size_override("font_size", 12)
 	basket_notice_label.clip_text = true
 
-	basket_sell_all_button.position = Vector2(basket_width - basket_padding - 316.0, basket_height - 50.0)
-	basket_sell_all_button.size = Vector2(150.0, 40.0)
-	basket_sell_all_button.z_index = 20
+	basket_sell_all_button.position = Vector2(basket_width - basket_padding - 314.0, basket_footer_y)
+	basket_sell_all_button.size = Vector2(150.0, 52.0)
+	basket_sell_all_button.z_index = MENU_PANEL_Z + 3
 	basket_sell_all_button.mouse_filter = Control.MOUSE_FILTER_STOP
 	basket_sell_all_button.add_theme_font_size_override("font_size", 15)
 	_apply_button_style(basket_sell_all_button, STYLE_PRIMARY_BUTTON)
 
-	basket_close_button.position = Vector2(basket_width - basket_padding - 150.0, basket_height - 50.0)
-	basket_close_button.size = Vector2(150.0, 40.0)
-	basket_close_button.z_index = 20
+	basket_close_button.position = Vector2(basket_width - basket_padding - 140.0, basket_footer_y + 4.0)
+	basket_close_button.size = Vector2(140.0, 46.0)
+	basket_close_button.z_index = MENU_PANEL_Z + 3
 	basket_close_button.mouse_filter = Control.MOUSE_FILTER_STOP
-	basket_close_button.add_theme_font_size_override("font_size", 15)
-	_apply_button_style(basket_close_button, STYLE_SECONDARY_BUTTON)
+	basket_close_button.add_theme_font_size_override("font_size", 14)
+	ui_theme.apply_close_button_style(basket_close_button)
 
-	var inventory_width: float = min(screen_size.x - margin * 2.0, 860.0)
-	var inventory_height: float = min(screen_size.y - margin * 2.0, 500.0)
-	var inventory_x: float = (screen_size.x - inventory_width) * 0.5
-	var inventory_y: float = (screen_size.y - inventory_height) * 0.5
-	var inventory_padding := 18.0
-	var category_gap := 6.0
-	var category_columns := 4
+	var inventory_width: float = screen_size.x
+	var inventory_height: float = screen_size.y
+	var inventory_x := 0.0
+	var inventory_y := 0.0
+	var inventory_padding := 28.0
+	var category_gap := 8.0
+	var category_columns := 8
 	var category_button_width: float = (inventory_width - inventory_padding * 2.0 - category_gap * float(category_columns - 1)) / float(category_columns)
-	var list_width: float = inventory_width * 0.42
-	var right_panel_x: float = inventory_padding + list_width + 18.0
+	var list_width: float = inventory_width * 0.34
+	var right_panel_x: float = inventory_padding + list_width + 22.0
 	var right_panel_width: float = inventory_width - right_panel_x - inventory_padding
-	var inventory_body_y := 140.0
-	var close_button_size := Vector2(160.0, 46.0)
+	var inventory_body_y := 116.0
+	var close_button_size := Vector2(146.0, 48.0)
 	var inventory_action_y: float = inventory_height - inventory_padding - close_button_size.y
-	var tackle_height := 86.0
-	var tackle_y: float = inventory_action_y - tackle_height - 12.0
-	var inventory_body_height: float = max(tackle_y - inventory_body_y - 14.0, 110.0)
+	var tackle_height := 72.0
+	var tackle_y: float = inventory_action_y - tackle_height - 16.0
+	var inventory_body_height: float = max(tackle_y - inventory_body_y - 18.0, 140.0)
 
 	inventory_panel.position = Vector2(inventory_x, inventory_y)
 	inventory_panel.size = Vector2(inventory_width, inventory_height)
-	inventory_panel.z_index = 25
+	inventory_panel.z_index = MENU_PANEL_Z
 	inventory_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	inventory_panel.color = Color("#091016", 0.98)
+	ui_theme.apply_panel_style(inventory_panel)
+	inventory_panel.color = Color(0.028, 0.038, 0.040, 0.90)
 
-	inventory_title_label.position = Vector2(inventory_padding, 12)
-	inventory_title_label.size = Vector2(inventory_width - inventory_padding * 2.0, 32)
+	inventory_title_label.position = Vector2(inventory_padding, 20.0)
+	inventory_title_label.size = Vector2(inventory_width - inventory_padding * 2.0, 34.0)
 	inventory_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	inventory_title_label.add_theme_font_size_override("font_size", 26)
+	inventory_title_label.add_theme_font_size_override("font_size", 24)
 
 	var category_buttons: Array = [
 		category_all_button,
@@ -1577,240 +2255,246 @@ func _setup_layout() -> void:
 		category_button.text = category_texts[i]
 		category_button.position = Vector2(
 			inventory_padding + category_column * (category_button_width + category_gap),
-			56 + category_row * 40
+			62.0 + category_row * 46.0
 		)
-		category_button.size = Vector2(category_button_width, 34)
-		category_button.add_theme_font_size_override("font_size", 13)
+		category_button.size = Vector2(category_button_width, 44.0)
+		category_button.add_theme_font_size_override("font_size", 11)
 
 	inventory_details_card.position = Vector2(right_panel_x, inventory_body_y)
 	inventory_details_card.size = Vector2(right_panel_width, inventory_body_height)
-	inventory_details_card.color = Color("#121c22")
+	ui_theme.apply_card_style(inventory_details_card)
 
 	inventory_tackle_card.position = Vector2(inventory_padding, tackle_y)
 	inventory_tackle_card.size = Vector2(inventory_width - inventory_padding * 2.0, tackle_height)
-	inventory_tackle_card.color = Color("#121c22")
+	ui_theme.apply_card_style(inventory_tackle_card)
 
 	inventory_item_list.position = Vector2(inventory_padding, inventory_body_y)
 	inventory_item_list.size = Vector2(list_width, inventory_body_height)
+	ui_theme.apply_item_list_style(inventory_item_list)
 
 	inventory_details_label.position = Vector2(right_panel_x + 12.0, inventory_body_y + 12.0)
 	inventory_details_label.size = Vector2(right_panel_width - 24.0, max(inventory_body_height - 76.0, 48.0))
 	inventory_details_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	inventory_details_label.add_theme_font_size_override("font_size", 14)
+	inventory_details_label.add_theme_font_size_override("font_size", 12)
 	inventory_details_label.clip_text = true
 
 	inventory_tackle_label.position = Vector2(inventory_padding + 14.0, tackle_y + 10.0)
 	inventory_tackle_label.size = Vector2(inventory_width - inventory_padding * 2.0 - 28.0, tackle_height - 20.0)
 	inventory_tackle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	inventory_tackle_label.add_theme_font_size_override("font_size", 13)
+	inventory_tackle_label.add_theme_font_size_override("font_size", 11)
 	inventory_tackle_label.clip_text = true
 
-	inventory_equip_button.position = Vector2(right_panel_x + right_panel_width - 182.0, inventory_body_y + inventory_body_height - 56.0)
-	inventory_equip_button.size = Vector2(170.0, 42.0)
+	inventory_equip_button.position = Vector2(right_panel_x + right_panel_width - 154.0, inventory_body_y + inventory_body_height - 54.0)
+	inventory_equip_button.size = Vector2(142.0, 50.0)
+	_apply_button_style(inventory_equip_button, STYLE_PRIMARY_BUTTON)
 
 	inventory_close_button.position = Vector2(inventory_width - inventory_padding - close_button_size.x, inventory_action_y)
 	inventory_close_button.size = close_button_size
+	ui_theme.apply_close_button_style(inventory_close_button)
 
-	var tackle_width: float = min(screen_size.x - margin * 3.0, 820.0)
-	var tackle_panel_height: float = min(screen_size.y - margin * 3.0, 462.0)
-	var tackle_x: float = (screen_size.x - tackle_width) * 0.5
-	var tackle_y_pos: float = (screen_size.y - tackle_panel_height) * 0.5
-	var tackle_padding := 20.0
+	var tackle_width: float = screen_size.x
+	var tackle_panel_height: float = screen_size.y
+	var tackle_x := 0.0
+	var tackle_y_pos := 0.0
+	var tackle_padding := 28.0
 	var tackle_inner_width: float = tackle_width - tackle_padding * 2.0
-	var tackle_current_height := 74.0
-	var tackle_category_y := 110.0
-	var tackle_depth_y := 152.0
-	var tackle_list_y := 202.0
-	var tackle_footer_height := 58.0
-	var tackle_list_width: float = tackle_width * 0.38
-	var tackle_details_x: float = tackle_padding + tackle_list_width + 18.0
+	var tackle_current_height := 62.0
+	var tackle_category_y := 98.0
+	var tackle_depth_y := 154.0
+	var tackle_list_y := 212.0
+	var tackle_footer_button_y: float = tackle_panel_height - tackle_padding - 50.0
+	var tackle_list_width: float = tackle_width * 0.32
+	var tackle_details_x: float = tackle_padding + tackle_list_width + 24.0
 	var tackle_details_width: float = tackle_width - tackle_details_x - tackle_padding
-	var tackle_body_height: float = tackle_panel_height - tackle_list_y - tackle_footer_height
-	var tackle_category_width: float = (tackle_inner_width - 8.0 * 4.0) / 5.0
+	var tackle_body_height: float = max(tackle_footer_button_y - tackle_list_y - 18.0, 170.0)
+	var tackle_category_width: float = (tackle_inner_width - 10.0 * 4.0) / 5.0
 
 	tackle_panel.position = Vector2(tackle_x, tackle_y_pos)
 	tackle_panel.size = Vector2(tackle_width, tackle_panel_height)
 
-	tackle_title_label.position = Vector2(tackle_padding, 14.0)
-	tackle_title_label.size = Vector2(tackle_inner_width, 30.0)
-	tackle_title_label.add_theme_font_size_override("font_size", 25)
+	tackle_title_label.position = Vector2(tackle_padding, 20.0)
+	tackle_title_label.size = Vector2(tackle_inner_width, 34.0)
+	tackle_title_label.add_theme_font_size_override("font_size", 24)
 	tackle_title_label.add_theme_color_override("font_color", Color(0.94, 1.0, 0.90, 1.0))
 
-	tackle_current_label.position = Vector2(tackle_padding, 52.0)
+	tackle_current_label.position = Vector2(tackle_padding, 58.0)
 	tackle_current_label.size = Vector2(tackle_inner_width, tackle_current_height - 8.0)
-	tackle_current_label.add_theme_font_size_override("font_size", 12)
+	tackle_current_label.add_theme_font_size_override("font_size", 11)
 	tackle_current_label.add_theme_color_override("font_color", Color(0.82, 0.94, 0.84, 0.92))
 	tackle_current_label.clip_text = true
 
 	var tackle_category_buttons: Array = [tackle_rod_button, tackle_line_button, tackle_float_button, tackle_hook_button, tackle_bait_button]
 	for i in tackle_category_buttons.size():
 		var tackle_category_button: Button = tackle_category_buttons[i]
-		tackle_category_button.position = Vector2(tackle_padding + float(i) * (tackle_category_width + 8.0), tackle_category_y)
-		tackle_category_button.size = Vector2(tackle_category_width, 34.0)
-		tackle_category_button.add_theme_font_size_override("font_size", 12)
+		tackle_category_button.position = Vector2(tackle_padding + float(i) * (tackle_category_width + 10.0), tackle_category_y)
+		tackle_category_button.size = Vector2(tackle_category_width, 44.0)
+		tackle_category_button.add_theme_font_size_override("font_size", 11)
 
 	tackle_depth_label.position = Vector2(tackle_padding, tackle_depth_y)
-	tackle_depth_label.size = Vector2(178.0, 36.0)
-	tackle_depth_label.add_theme_font_size_override("font_size", 14)
+	tackle_depth_label.size = Vector2(206.0, 42.0)
+	tackle_depth_label.add_theme_font_size_override("font_size", 12)
 	tackle_depth_label.add_theme_color_override("font_color", Color(0.86, 0.98, 0.86, 0.96))
 
-	tackle_depth_minus_button.position = Vector2(tackle_padding + 188.0, tackle_depth_y + 1.0)
-	tackle_depth_minus_button.size = Vector2(38.0, 34.0)
+	tackle_depth_minus_button.position = Vector2(tackle_padding + 218.0, tackle_depth_y)
+	tackle_depth_minus_button.size = Vector2(44.0, 44.0)
 	tackle_depth_minus_button.add_theme_font_size_override("font_size", 18)
 	_apply_button_style(tackle_depth_minus_button, STYLE_SECONDARY_BUTTON)
 
-	tackle_depth_plus_button.position = Vector2(tackle_padding + 232.0, tackle_depth_y + 1.0)
-	tackle_depth_plus_button.size = Vector2(38.0, 34.0)
+	tackle_depth_plus_button.position = Vector2(tackle_padding + 270.0, tackle_depth_y)
+	tackle_depth_plus_button.size = Vector2(44.0, 44.0)
 	tackle_depth_plus_button.add_theme_font_size_override("font_size", 18)
 	_apply_button_style(tackle_depth_plus_button, STYLE_SECONDARY_BUTTON)
 
-	tackle_hint_label.position = Vector2(tackle_padding + 288.0, tackle_depth_y - 2.0)
-	tackle_hint_label.size = Vector2(tackle_inner_width - 288.0, 42.0)
-	tackle_hint_label.add_theme_font_size_override("font_size", 12)
+	tackle_hint_label.position = Vector2(tackle_padding + 332.0, tackle_depth_y)
+	tackle_hint_label.size = Vector2(tackle_inner_width - 332.0, 44.0)
+	tackle_hint_label.add_theme_font_size_override("font_size", 11)
 	tackle_hint_label.add_theme_color_override("font_color", Color(0.78, 0.92, 0.82, 0.92))
 	tackle_hint_label.clip_text = true
 
 	tackle_item_list.position = Vector2(tackle_padding, tackle_list_y)
 	tackle_item_list.size = Vector2(tackle_list_width, tackle_body_height)
-	tackle_item_list.add_theme_font_size_override("font_size", 13)
+	ui_theme.apply_item_list_style(tackle_item_list)
+	tackle_item_list.add_theme_font_size_override("font_size", 12)
 	tackle_item_list.add_theme_color_override("font_color", Color(0.84, 0.94, 0.86, 0.96))
 	tackle_item_list.add_theme_color_override("font_selected_color", Color(0.98, 1.0, 0.94, 1.0))
 
 	tackle_details_label.position = Vector2(tackle_details_x, tackle_list_y)
 	tackle_details_label.size = Vector2(tackle_details_width, max(tackle_body_height * 0.54, 120.0))
-	tackle_details_label.add_theme_font_size_override("font_size", 13)
+	tackle_details_label.add_theme_font_size_override("font_size", 12)
 	tackle_details_label.clip_text = true
 
 	tackle_compare_label.position = Vector2(tackle_details_x, tackle_list_y + tackle_details_label.size.y + 12.0)
 	tackle_compare_label.size = Vector2(tackle_details_width, max(tackle_body_height - tackle_details_label.size.y - 12.0, 86.0))
-	tackle_compare_label.add_theme_font_size_override("font_size", 12)
+	tackle_compare_label.add_theme_font_size_override("font_size", 11)
 	tackle_compare_label.add_theme_color_override("font_color", Color(0.78, 0.90, 0.82, 0.94))
 	tackle_compare_label.clip_text = true
 
-	tackle_equip_button.position = Vector2(tackle_width - tackle_padding - 324.0, tackle_panel_height - 50.0)
-	tackle_equip_button.size = Vector2(150.0, 40.0)
-	tackle_equip_button.add_theme_font_size_override("font_size", 15)
+	tackle_equip_button.position = Vector2(tackle_width - tackle_padding - 320.0, tackle_footer_button_y)
+	tackle_equip_button.size = Vector2(156.0, 50.0)
+	tackle_equip_button.add_theme_font_size_override("font_size", 14)
 	_apply_button_style(tackle_equip_button, STYLE_PRIMARY_BUTTON)
 
-	tackle_close_button.position = Vector2(tackle_width - tackle_padding - 150.0, tackle_panel_height - 50.0)
-	tackle_close_button.size = Vector2(150.0, 40.0)
-	tackle_close_button.add_theme_font_size_override("font_size", 15)
-	_apply_button_style(tackle_close_button, STYLE_SECONDARY_BUTTON)
+	tackle_close_button.position = Vector2(tackle_width - tackle_padding - 140.0, tackle_footer_button_y + 3.0)
+	tackle_close_button.size = Vector2(140.0, 46.0)
+	tackle_close_button.add_theme_font_size_override("font_size", 14)
+	ui_theme.apply_close_button_style(tackle_close_button)
 
-	var waterbody_width: float = min(screen_size.x - margin * 4.0, 760.0)
-	var waterbody_height: float = min(screen_size.y - margin * 3.0, 430.0)
-	var waterbody_x: float = (screen_size.x - waterbody_width) * 0.5
-	var waterbody_y: float = (screen_size.y - waterbody_height) * 0.5
-	var waterbody_padding := 20.0
+	var waterbody_width: float = screen_size.x
+	var waterbody_height: float = screen_size.y
+	var waterbody_x := 0.0
+	var waterbody_y := 0.0
+	var waterbody_padding := 28.0
 	var waterbody_inner_width: float = waterbody_width - waterbody_padding * 2.0
-	var waterbody_body_y := 68.0
-	var waterbody_footer_y := waterbody_height - 54.0
-	var waterbody_list_width: float = waterbody_width * 0.35
-	var waterbody_details_x: float = waterbody_padding + waterbody_list_width + 18.0
+	var waterbody_body_y := 78.0
+	var waterbody_footer_y := waterbody_height - waterbody_padding - 50.0
+	var waterbody_list_width: float = waterbody_width * 0.27
+	var waterbody_details_x: float = waterbody_padding + waterbody_list_width + 24.0
 	var waterbody_details_width: float = waterbody_width - waterbody_details_x - waterbody_padding
 	var waterbody_spot_list_width: float = waterbody_details_width * 0.46
 
 	waterbody_panel.position = Vector2(waterbody_x, waterbody_y)
 	waterbody_panel.size = Vector2(waterbody_width, waterbody_height)
 
-	waterbody_title_label.position = Vector2(waterbody_padding, 14.0)
-	waterbody_title_label.size = Vector2(waterbody_inner_width, 32.0)
-	waterbody_title_label.add_theme_font_size_override("font_size", 25)
+	waterbody_title_label.position = Vector2(waterbody_padding, 20.0)
+	waterbody_title_label.size = Vector2(waterbody_inner_width, 38.0)
+	waterbody_title_label.add_theme_font_size_override("font_size", 24)
 	waterbody_title_label.add_theme_color_override("font_color", Color(0.94, 1.0, 0.90, 1.0))
 
 	waterbody_item_list.position = Vector2(waterbody_padding, waterbody_body_y)
 	waterbody_item_list.size = Vector2(waterbody_list_width, waterbody_footer_y - waterbody_body_y - 12.0)
-	waterbody_item_list.add_theme_font_size_override("font_size", 14)
+	ui_theme.apply_item_list_style(waterbody_item_list)
+	waterbody_item_list.add_theme_font_size_override("font_size", 12)
 	waterbody_item_list.add_theme_color_override("font_color", Color(0.84, 0.94, 0.86, 0.96))
 	waterbody_item_list.add_theme_color_override("font_selected_color", Color(0.98, 1.0, 0.94, 1.0))
 
 	waterbody_preview.position = Vector2(waterbody_details_x, waterbody_body_y)
-	waterbody_preview.size = Vector2(waterbody_details_width, 74.0)
-	waterbody_preview.color = Color(0.12, 0.28, 0.25, 0.82)
+	waterbody_preview.size = Vector2(waterbody_details_width, 72.0)
+	ui_theme.apply_card_style(waterbody_preview)
 
-	waterbody_details_label.position = Vector2(waterbody_details_x, waterbody_body_y + 84.0)
-	waterbody_details_label.size = Vector2(waterbody_details_width, 72.0)
-	waterbody_details_label.add_theme_font_size_override("font_size", 13)
+	waterbody_details_label.position = Vector2(waterbody_details_x, waterbody_body_y + 86.0)
+	waterbody_details_label.size = Vector2(waterbody_details_width, 68.0)
+	waterbody_details_label.add_theme_font_size_override("font_size", 12)
 	waterbody_details_label.add_theme_color_override("font_color", Color(0.82, 0.94, 0.84, 0.94))
 	waterbody_details_label.clip_text = true
 
-	waterbody_spot_list.position = Vector2(waterbody_details_x, waterbody_body_y + 168.0)
-	waterbody_spot_list.size = Vector2(waterbody_spot_list_width, waterbody_footer_y - waterbody_body_y - 180.0)
-	waterbody_spot_list.add_theme_font_size_override("font_size", 13)
+	waterbody_spot_list.position = Vector2(waterbody_details_x, waterbody_body_y + 174.0)
+	waterbody_spot_list.size = Vector2(waterbody_spot_list_width, waterbody_footer_y - waterbody_body_y - 188.0)
+	ui_theme.apply_item_list_style(waterbody_spot_list)
+	waterbody_spot_list.add_theme_font_size_override("font_size", 12)
 	waterbody_spot_list.add_theme_color_override("font_color", Color(0.84, 0.94, 0.86, 0.96))
 	waterbody_spot_list.add_theme_color_override("font_selected_color", Color(0.98, 1.0, 0.94, 1.0))
 
-	waterbody_spot_details_label.position = Vector2(waterbody_details_x + waterbody_spot_list_width + 14.0, waterbody_body_y + 168.0)
-	waterbody_spot_details_label.size = Vector2(waterbody_details_width - waterbody_spot_list_width - 14.0, waterbody_footer_y - waterbody_body_y - 180.0)
-	waterbody_spot_details_label.add_theme_font_size_override("font_size", 12)
+	waterbody_spot_details_label.position = Vector2(waterbody_details_x + waterbody_spot_list_width + 16.0, waterbody_body_y + 174.0)
+	waterbody_spot_details_label.size = Vector2(waterbody_details_width - waterbody_spot_list_width - 16.0, waterbody_footer_y - waterbody_body_y - 188.0)
+	waterbody_spot_details_label.add_theme_font_size_override("font_size", 11)
 	waterbody_spot_details_label.add_theme_color_override("font_color", Color(0.82, 0.94, 0.84, 0.94))
 	waterbody_spot_details_label.clip_text = true
 
-	waterbody_select_button.position = Vector2(waterbody_width - waterbody_padding - 324.0, waterbody_footer_y)
-	waterbody_select_button.size = Vector2(150.0, 40.0)
-	waterbody_select_button.add_theme_font_size_override("font_size", 15)
+	waterbody_select_button.position = Vector2(waterbody_width - waterbody_padding - 320.0, waterbody_footer_y)
+	waterbody_select_button.size = Vector2(156.0, 50.0)
+	waterbody_select_button.add_theme_font_size_override("font_size", 14)
 	_apply_button_style(waterbody_select_button, STYLE_PRIMARY_BUTTON)
 
-	waterbody_close_button.position = Vector2(waterbody_width - waterbody_padding - 150.0, waterbody_footer_y)
-	waterbody_close_button.size = Vector2(150.0, 40.0)
-	waterbody_close_button.add_theme_font_size_override("font_size", 15)
-	_apply_button_style(waterbody_close_button, STYLE_SECONDARY_BUTTON)
+	waterbody_close_button.position = Vector2(waterbody_width - waterbody_padding - 140.0, waterbody_footer_y + 3.0)
+	waterbody_close_button.size = Vector2(140.0, 46.0)
+	waterbody_close_button.add_theme_font_size_override("font_size", 14)
+	ui_theme.apply_close_button_style(waterbody_close_button)
 
-	var shop_width: float = min(screen_size.x - margin * 4.0, 780.0)
-	var shop_height: float = min(screen_size.y - margin * 3.0, 462.0)
-	var shop_x: float = (screen_size.x - shop_width) * 0.5
-	var shop_y: float = (screen_size.y - shop_height) * 0.5
-	var shop_padding := 20.0
+	var shop_width: float = screen_size.x
+	var shop_height: float = screen_size.y
+	var shop_x := 0.0
+	var shop_y := 0.0
+	var shop_padding := 28.0
 	var shop_inner_width: float = shop_width - shop_padding * 2.0
-	var shop_category_y := 56.0
-	var shop_category_width := 142.0
-	var shop_items_y := 104.0
-	var shop_footer_height := 58.0
+	var shop_category_y := 64.0
+	var shop_category_width := 150.0
+	var shop_items_y := 126.0
+	var shop_footer_height := 76.0
 
 	shop_panel.position = Vector2(shop_x, shop_y)
 	shop_panel.size = Vector2(shop_width, shop_height)
 
-	shop_title_label.position = Vector2(shop_padding, 14.0)
-	shop_title_label.size = Vector2(shop_inner_width, 30.0)
-	shop_title_label.add_theme_font_size_override("font_size", 25)
+	shop_title_label.position = Vector2(shop_padding, 20.0)
+	shop_title_label.size = Vector2(shop_inner_width, 38.0)
+	shop_title_label.add_theme_font_size_override("font_size", 24)
 	shop_title_label.add_theme_color_override("font_color", Color(0.94, 1.0, 0.90, 1.0))
 
-	shop_money_label.position = Vector2(shop_width - shop_padding - 160.0, 20.0)
-	shop_money_label.size = Vector2(160.0, 22.0)
+	shop_money_label.position = Vector2(shop_width - shop_padding - 190.0, 26.0)
+	shop_money_label.size = Vector2(190.0, 24.0)
 	shop_money_label.add_theme_font_size_override("font_size", 14)
 	shop_money_label.add_theme_color_override("font_color", Color(0.82, 0.94, 0.84, 0.92))
 
 	shop_bait_category_button.position = Vector2(shop_padding, shop_category_y)
-	shop_bait_category_button.size = Vector2(shop_category_width, 34.0)
+	shop_bait_category_button.size = Vector2(shop_category_width, 46.0)
 	shop_bait_category_button.add_theme_font_size_override("font_size", 13)
 
-	shop_consumable_category_button.position = Vector2(shop_padding + shop_category_width + 8.0, shop_category_y)
-	shop_consumable_category_button.size = Vector2(shop_category_width, 34.0)
+	shop_consumable_category_button.position = Vector2(shop_padding + shop_category_width + 10.0, shop_category_y)
+	shop_consumable_category_button.size = Vector2(shop_category_width, 46.0)
 	shop_consumable_category_button.add_theme_font_size_override("font_size", 13)
 
-	shop_tackle_category_button.position = Vector2(shop_padding + (shop_category_width + 8.0) * 2.0, shop_category_y)
-	shop_tackle_category_button.size = Vector2(shop_category_width, 34.0)
+	shop_tackle_category_button.position = Vector2(shop_padding + (shop_category_width + 10.0) * 2.0, shop_category_y)
+	shop_tackle_category_button.size = Vector2(shop_category_width, 46.0)
 	shop_tackle_category_button.add_theme_font_size_override("font_size", 13)
 
 	shop_items_container.position = Vector2(shop_padding, shop_items_y)
 	shop_items_container.size = Vector2(shop_inner_width, shop_height - shop_items_y - shop_footer_height)
 
-	shop_notice_label.position = Vector2(shop_padding, shop_height - 46.0)
-	shop_notice_label.size = Vector2(shop_inner_width - 166.0, 34.0)
+	shop_notice_label.position = Vector2(shop_padding, shop_height - shop_padding - 44.0)
+	shop_notice_label.size = Vector2(shop_inner_width - 190.0, 44.0)
 	shop_notice_label.add_theme_font_size_override("font_size", 14)
 	shop_notice_label.clip_text = true
 
-	shop_close_button.position = Vector2(shop_width - shop_padding - 150.0, shop_height - 50.0)
-	shop_close_button.size = Vector2(150.0, 40.0)
-	shop_close_button.add_theme_font_size_override("font_size", 15)
-	_apply_button_style(shop_close_button, STYLE_SECONDARY_BUTTON)
+	shop_close_button.position = Vector2(shop_width - shop_padding - 140.0, shop_height - shop_padding - 46.0)
+	shop_close_button.size = Vector2(140.0, 46.0)
+	shop_close_button.add_theme_font_size_override("font_size", 14)
+	ui_theme.apply_close_button_style(shop_close_button)
 
 	_update_shop_ui()
 
 	if toast_label != null:
 		toast_label.position = Vector2((screen_size.x - 360.0) * 0.5, screen_size.y - 116.0)
 		toast_label.size = Vector2(360.0, 40.0)
-		toast_label.z_index = 45
+		toast_label.z_index = 220
 		toast_label.add_theme_font_size_override("font_size", 15)
 		toast_label.add_theme_color_override("font_color", Color(0.90, 1.0, 0.90, 1.0))
 		toast_label.add_theme_stylebox_override(
@@ -1818,15 +2502,15 @@ func _setup_layout() -> void:
 			_make_panel_style(Color(0.055, 0.135, 0.105, 0.92), Color(0.68, 1.0, 0.76, 0.36), 18, 10, Color(0.0, 0.0, 0.0, 0.24))
 		)
 
-	var reward_width: float = min(screen_size.x - margin * 6.0, 720.0)
-	var reward_height: float = min(screen_size.y - margin * 4.0, 486.0)
+	var reward_width: float = min(screen_size.x - margin * 10.0, 520.0)
+	var reward_height: float = min(screen_size.y - margin * 8.0, 342.0)
 	var reward_x: float = (screen_size.x - reward_width) * 0.5
 	var reward_y: float = (screen_size.y - reward_height) * 0.5
-	var reward_padding := 24.0
+	var reward_padding := 18.0
 	var reward_inner_width: float = reward_width - reward_padding * 2.0
 	var reward_button_gap := 14.0
-	var reward_button_width: float = min(max(reward_inner_width * 0.21, 126.0), 154.0)
-	var reward_button_height := 38.0
+	var reward_button_width: float = min(max(reward_inner_width * 0.26, 124.0), 148.0)
+	var reward_button_height := 50.0
 	var reward_buttons_width: float = reward_button_width * 2.0 + reward_button_gap
 	var reward_button_x: float = reward_width - reward_padding - reward_buttons_width
 	var reward_button_y: float = reward_height - 18.0 - reward_button_height
@@ -1840,73 +2524,73 @@ func _setup_layout() -> void:
 	catch_popup_particles.z_index = 0
 	catch_popup_particles.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	catch_popup_glow.position = Vector2((reward_width - 520.0) * 0.5, 92.0)
-	catch_popup_glow.size = Vector2(520.0, 264.0)
+	catch_popup_glow.position = Vector2((reward_width - 360.0) * 0.5, 70.0)
+	catch_popup_glow.size = Vector2(360.0, 170.0)
 	catch_popup_glow.z_index = 0
 	catch_popup_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	catch_popup_title_label.position = Vector2(reward_padding, 18.0)
 	catch_popup_title_label.size = Vector2(reward_inner_width, 24.0)
 	catch_popup_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	catch_popup_title_label.add_theme_font_size_override("font_size", 16)
+	catch_popup_title_label.add_theme_font_size_override("font_size", 13)
 	catch_popup_title_label.add_theme_color_override("font_color", Color(0.78, 0.94, 0.86, 0.92))
 
-	catch_popup_badge_label.position = Vector2((reward_width - 164.0) * 0.5, 48.0)
-	catch_popup_badge_label.size = Vector2(164.0, 28.0)
+	catch_popup_badge_label.position = Vector2((reward_width - 142.0) * 0.5, 44.0)
+	catch_popup_badge_label.size = Vector2(142.0, 24.0)
 	catch_popup_badge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	catch_popup_badge_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	catch_popup_badge_label.add_theme_font_size_override("font_size", 13)
+	catch_popup_badge_label.add_theme_font_size_override("font_size", 11)
 
-	catch_popup_name_label.position = Vector2(reward_padding, 76.0)
-	catch_popup_name_label.size = Vector2(reward_inner_width, 38.0)
+	catch_popup_name_label.position = Vector2(reward_padding, 68.0)
+	catch_popup_name_label.size = Vector2(reward_inner_width, 32.0)
 	catch_popup_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	catch_popup_name_label.add_theme_font_size_override("font_size", 28)
+	catch_popup_name_label.add_theme_font_size_override("font_size", 22)
 	catch_popup_name_label.add_theme_color_override("font_color", Color(0.98, 1.0, 0.94, 1.0))
 	catch_popup_name_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.34))
 	catch_popup_name_label.add_theme_constant_override("shadow_offset_x", 0)
 	catch_popup_name_label.add_theme_constant_override("shadow_offset_y", 2)
 
-	catch_trophy_banner_label.position = Vector2((reward_width - 220.0) * 0.5, 112.0)
-	catch_trophy_banner_label.size = Vector2(220.0, 34.0)
+	catch_trophy_banner_label.position = Vector2((reward_width - 190.0) * 0.5, 98.0)
+	catch_trophy_banner_label.size = Vector2(190.0, 28.0)
 	catch_trophy_banner_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	catch_trophy_banner_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	catch_trophy_banner_label.add_theme_font_size_override("font_size", 18)
+	catch_trophy_banner_label.add_theme_font_size_override("font_size", 14)
 	catch_trophy_banner_label.add_theme_color_override("font_color", Color(1.0, 0.90, 0.56, 1.0))
 	catch_trophy_banner_label.add_theme_stylebox_override(
 		"normal",
 		_make_panel_style(Color(0.34, 0.235, 0.08, 0.84), Color(1.0, 0.78, 0.38, 0.50), 15, 8, Color(0.86, 0.54, 0.16, 0.20))
 	)
 
-	var fish_visual_width: float = min(reward_inner_width, 560.0)
-	var fish_visual_height := 224.0
-	catch_fish_shadow.position = Vector2((reward_width - fish_visual_width) * 0.5 + 10.0, 132.0)
+	var fish_visual_width: float = min(reward_inner_width, 390.0)
+	var fish_visual_height: float = min(142.0, reward_height * 0.40)
+	catch_fish_shadow.position = Vector2((reward_width - fish_visual_width) * 0.5 + 8.0, 112.0)
 	catch_fish_shadow.size = Vector2(fish_visual_width, fish_visual_height)
 	catch_fish_shadow.z_index = 1
 	catch_fish_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_catch_shadow_base_position = catch_fish_shadow.position
 
-	catch_fish_visual.position = Vector2((reward_width - fish_visual_width) * 0.5, 122.0)
+	catch_fish_visual.position = Vector2((reward_width - fish_visual_width) * 0.5, 104.0)
 	catch_fish_visual.size = Vector2(fish_visual_width, fish_visual_height)
 	catch_fish_visual.z_index = 2
 	catch_fish_visual.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_catch_fish_base_position = catch_fish_visual.position
 
-	catch_popup_stats_label.position = Vector2(reward_padding, 348.0)
-	catch_popup_stats_label.size = Vector2(reward_inner_width, 58.0)
+	catch_popup_stats_label.position = Vector2(reward_padding, reward_height - 110.0)
+	catch_popup_stats_label.size = Vector2(reward_inner_width, 42.0)
 	catch_popup_stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	catch_popup_stats_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	catch_popup_stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	catch_popup_stats_label.add_theme_font_size_override("font_size", 16)
+	catch_popup_stats_label.add_theme_font_size_override("font_size", 13)
 	catch_popup_stats_label.add_theme_color_override("font_color", Color(0.88, 0.98, 0.91, 0.96))
 
 	catch_keep_button.position = Vector2(reward_button_x, reward_button_y)
 	catch_keep_button.size = Vector2(reward_button_width, reward_button_height)
-	catch_keep_button.add_theme_font_size_override("font_size", 15)
+	catch_keep_button.add_theme_font_size_override("font_size", 13)
 	_apply_button_style(catch_keep_button, STYLE_PRIMARY_BUTTON)
 
 	catch_release_button.position = Vector2(reward_button_x + reward_button_width + reward_button_gap, reward_button_y)
 	catch_release_button.size = Vector2(reward_button_width, reward_button_height)
-	catch_release_button.add_theme_font_size_override("font_size", 15)
+	catch_release_button.add_theme_font_size_override("font_size", 13)
 	_apply_button_style(catch_release_button, STYLE_SECONDARY_BUTTON)
 
 	_update_reeling_ui(_last_reeling_state)
@@ -1950,6 +2634,7 @@ func _connect_signals() -> void:
 	tackle_button.pressed.connect(_on_tackle_button_pressed)
 	shop_button.pressed.connect(_on_shop_button_pressed)
 	map_button.pressed.connect(_on_map_button_pressed)
+	profile_button.pressed.connect(_on_profile_button_pressed)
 	bait_button.pressed.connect(_on_bait_button_pressed)
 	inventory_close_button.pressed.connect(_on_inventory_close_button_pressed)
 	inventory_equip_button.pressed.connect(_on_inventory_equip_button_pressed)
@@ -2573,6 +3258,8 @@ func _on_basket_close_button_pressed() -> void:
 	keepnet_ui.close()
 
 func _on_inventory_button_pressed() -> void:
+	_inventory_category = "all"
+	_selected_inventory_item_id = ""
 	inventory_ui.open()
 
 func _on_tackle_button_pressed() -> void:
@@ -2584,6 +3271,24 @@ func _on_shop_button_pressed() -> void:
 func _on_map_button_pressed() -> void:
 	waterbody_ui.open()
 
+func _on_profile_button_pressed() -> void:
+	if _is_catch_reward_open():
+		return
+
+	basket_panel.visible = false
+	basket_backdrop.visible = false
+	inventory_panel.visible = false
+	inventory_backdrop.visible = false
+	tackle_panel.visible = false
+	tackle_backdrop.visible = false
+	waterbody_panel.visible = false
+	waterbody_backdrop.visible = false
+	shop_panel.visible = false
+	shop_backdrop.visible = false
+	_active_nav_tab = "profile"
+	_refresh_bottom_nav_styles()
+	_show_toast("Профиль пока недоступен.", false)
+
 func _on_bait_button_pressed() -> void:
 	if _is_catch_reward_open():
 		return
@@ -2591,7 +3296,7 @@ func _on_bait_button_pressed() -> void:
 	_active_nav_tab = "inventory"
 	_inventory_category = "bait"
 	_selected_inventory_item_id = ""
-	_on_inventory_button_pressed()
+	inventory_ui.open()
 
 func _on_shop_close_button_pressed() -> void:
 	shop_ui.close()

@@ -2,6 +2,7 @@
 extends RefCounted
 
 var main
+var theme
 signal sell_fish_requested(fish_index: int)
 
 enum FishingUiState {
@@ -14,6 +15,7 @@ enum FishingUiState {
 
 func setup(main_ref) -> void:
 	main = main_ref
+	theme = main.ui_theme
 	_ensure_keepnet_ui_nodes()
 
 func open() -> void:
@@ -60,10 +62,13 @@ func _ensure_keepnet_ui_nodes() -> void:
 	main.basket_backdrop = ColorRect.new()
 	main.basket_backdrop.name = "BasketBackdrop"
 	main.basket_backdrop.visible = false
-	main.basket_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
-	main.basket_backdrop.color = Color(0.0, 0.0, 0.0, 0.54)
-	main.add_child(main.basket_backdrop)
-	main.move_child(main.basket_backdrop, main.basket_panel.get_index())
+	theme.apply_modal_backdrop_style(main.basket_backdrop)
+	var backdrop_parent: Node = main.basket_panel.get_parent()
+	if backdrop_parent == null:
+		backdrop_parent = main
+	backdrop_parent.add_child(main.basket_backdrop)
+	if main.basket_panel.get_parent() == backdrop_parent:
+		backdrop_parent.move_child(main.basket_backdrop, main.basket_panel.get_index())
 
 	main.basket_frame_panel = Panel.new()
 	main.basket_frame_panel.name = "BasketFramePanel"
@@ -81,12 +86,15 @@ func _ensure_keepnet_ui_nodes() -> void:
 	main.basket_scroll = ScrollContainer.new()
 	main.basket_scroll.name = "BasketScroll"
 	main.basket_scroll.z_index = 2
+	main.basket_scroll.mouse_filter = Control.MOUSE_FILTER_STOP
 	main.basket_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	main.basket_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	main.basket_panel.add_child(main.basket_scroll)
 
 	main.basket_cards_grid = GridContainer.new()
 	main.basket_cards_grid.name = "BasketCardsGrid"
 	main.basket_cards_grid.columns = 2
+	main.basket_cards_grid.mouse_filter = Control.MOUSE_FILTER_PASS
 	main.basket_scroll.add_child(main.basket_cards_grid)
 
 	main.basket_notice_label = Label.new()
@@ -99,7 +107,7 @@ func _ensure_keepnet_ui_nodes() -> void:
 
 func _update_basket_ui() -> void:
 	var fish_count: int = InventoryManager.inventory.size()
-	main.basket_button.text = "△ %d" % fish_count
+	main.basket_button.text = "Садок"
 	var summary = _get_keepnet_summary()
 	main.basket_stats_label.text = "%d рыб  |  %.2f кг  |  %d мон." % [
 		fish_count,
@@ -140,11 +148,12 @@ func _rebuild_keepnet_cards() -> void:
 	if fish_count == 0:
 		return
 
-	var columns = 2
+	var columns = 3 if main.basket_scroll.size.x >= 820.0 else 2
 	var gap = 10.0
 	var card_width: float = (main.basket_scroll.size.x - gap * float(columns - 1)) / float(columns)
-	var card_height = 104.0
+	var card_height = 128.0
 	main.basket_cards_grid.columns = columns
+	main.basket_cards_grid.custom_minimum_size = Vector2(main.basket_scroll.size.x, 0.0)
 
 	for i in fish_count:
 		var fish: Dictionary = InventoryManager.inventory[i]
@@ -160,26 +169,15 @@ func _create_keepnet_card(fish: Dictionary, fish_index: int, card_size: Vector2)
 	card.size = card_size
 	card.mouse_filter = Control.MOUSE_FILTER_PASS
 	card.clip_contents = true
-	card.add_theme_stylebox_override(
-		"panel",
-		main._make_panel_style(
-			Color(0.070, 0.135, 0.125, 0.76),
-			Color(accent.r, accent.g, accent.b, 0.34),
-			14,
-			8,
-			Color(0.0, 0.0, 0.0, 0.18)
-		)
-	)
+	theme.apply_card_style(card)
 
 	var fish_slot = Panel.new()
 	fish_slot.position = Vector2(10.0, 18.0)
 	fish_slot.size = Vector2(132.0, 60.0)
 	fish_slot.clip_contents = true
 	fish_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	fish_slot.add_theme_stylebox_override(
-		"panel",
-		main._make_panel_style(Color(0.035, 0.080, 0.076, 0.34), Color(accent.r, accent.g, accent.b, 0.12), 10, 2, Color(0.0, 0.0, 0.0, 0.08))
-	)
+	var slot_rarity: String = "legendary" if tier == "trophy" else tier
+	theme.apply_rarity_slot_style(fish_slot, slot_rarity)
 	card.add_child(fish_slot)
 
 	var fish_texture = main._get_reward_fish_texture(str(fish.get("id", "")))
@@ -234,20 +232,21 @@ func _create_keepnet_card(fish: Dictionary, fish_index: int, card_size: Vector2)
 	var price = int(fish.get("price", 0))
 	var stats_label = Label.new()
 	stats_label.text = "%.2f кг  |  %.1f см\n%d мон." % [weight, length_cm, price]
-	stats_label.position = Vector2(154.0, 61.0)
-	stats_label.size = Vector2(card_size.x - 262.0, 36.0)
-	stats_label.add_theme_font_size_override("font_size", 13)
+	stats_label.position = Vector2(12.0, 86.0)
+	stats_label.size = Vector2(card_size.x - 128.0, 34.0)
+	stats_label.add_theme_font_size_override("font_size", 12)
 	stats_label.add_theme_color_override("font_color", Color(0.76, 0.88, 0.80, 0.92))
 	card.add_child(stats_label)
 
 	var sell_button = Button.new()
 	sell_button.text = "Продать"
-	sell_button.position = Vector2(card_size.x - 94.0, card_size.y - 38.0)
-	sell_button.size = Vector2(82.0, 30.0)
-	sell_button.z_index = 5
+	sell_button.position = Vector2(card_size.x - 104.0, card_size.y - 48.0)
+	sell_button.size = Vector2(92.0, 40.0)
+	sell_button.z_index = 10
 	sell_button.mouse_filter = Control.MOUSE_FILTER_STOP
-	sell_button.add_theme_font_size_override("font_size", 12)
 	main._apply_button_style(sell_button, main.STYLE_SECONDARY_BUTTON)
+	sell_button.size = Vector2(92.0, 40.0)
+	sell_button.add_theme_font_size_override("font_size", 12)
 	sell_button.pressed.connect(_on_keepnet_sell_fish_pressed.bind(fish_index))
 	card.add_child(sell_button)
 

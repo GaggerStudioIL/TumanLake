@@ -109,6 +109,279 @@ const TACKLE_CATALOG := {
 			"wear_rate": 0.016
 		}
 	},
+	"lakeline_nylon_basic_1_5kg": {
+		"id": "lakeline_nylon_basic_1_5kg",
+		"name": "LakeLine Nylon Basic 1.5 кг",
+		"type": "line",
+		"category": "line",
+		"rarity": "common",
+		"price": 4,
+		"description": "Бюджетная нейлоновая леска 100 м. Стартовый вариант для мелкой рыбы.",
+		"stats": {
+			"line_type": "nylon",
+			"length_m": 100,
+			"max_load_kg": 1.5,
+			"max_load": 1.5,
+			"strength": 1.5,
+			"break_resistance": 0.74,
+			"break_chance": 0.24,
+			"visibility": 0.08,
+			"durability": 1.0,
+			"wear_rate": 0.034
+		}
+	},
+	"lakeline_nylon_basic_2kg": {
+		"id": "lakeline_nylon_basic_2kg",
+		"name": "LakeLine Nylon Basic 2 кг",
+		"type": "line",
+		"category": "line",
+		"rarity": "common",
+		"price": 5,
+		"description": "Бюджетная нейлоновая леска 100 м. Дешёвая и заметная, но доступная с начала игры.",
+		"stats": {
+			"line_type": "nylon",
+			"length_m": 100,
+			"max_load_kg": 2.0,
+			"max_load": 2.0,
+			"strength": 2.0,
+			"break_resistance": 0.76,
+			"break_chance": 0.23,
+			"visibility": 0.09,
+			"durability": 1.0,
+			"wear_rate": 0.033
+		}
+	},
+	"lakeline_nylon_basic_2_5kg": {
+		"id": "lakeline_nylon_basic_2_5kg",
+		"name": "LakeLine Nylon Basic 2.5 кг",
+		"type": "line",
+		"category": "line",
+		"rarity": "common",
+		"price": 6,
+		"description": "Бюджетная нейлоновая леска 100 м для лёгкой маховой снасти.",
+		"stats": {
+			"line_type": "nylon",
+			"length_m": 100,
+			"max_load_kg": 2.5,
+			"max_load": 2.5,
+			"strength": 2.5,
+			"break_resistance": 0.78,
+			"break_chance": 0.22,
+			"visibility": 0.10,
+			"durability": 1.0,
+			"wear_rate": 0.032
+		}
+	},
+	"lakeline_nylon_basic_3kg": {
+		"id": "lakeline_nylon_basic_3kg",
+		"name": "LakeLine Nylon Basic 3 кг",
+		"type": "line",
+		"category": "line",
+		"rarity": "common",
+		"price": 8,
+		"description": "Бюджетная нейлоновая леска 100 м для начальной ловли на озере.",
+		"stats": {
+			"line_type": "nylon",
+			"length_m": 100,
+			"max_load_kg": 3.0,
+			"max_load": 3.0,
+			"strength": 3.0,
+			"break_resistance": 0.80,
+			"break_chance": 0.21,
+			"visibility": 0.11,
+			"durability": 1.0,
+			"wear_rate": 0.031
+		}
+	},
+	"lakeline_nylon_basic_4kg": {
+		"id": "lakeline_nylon_basic_4kg",
+		"name": "LakeLine Nylon Basic 4 кг",
+		"type": "line",
+		"category": "line",
+		"rarity": "common",
+		"price": 11,
+		"description": "Недорогая нейлоновая леска 100 м. Подходит для осторожного апгрейда снасти.",
+		"stats": {
+			"line_type": "nylon",
+			"length_m": 100,
+			"max_load_kg": 4.0,
+			"max_load": 4.0,
+			"strength": 4.0,
+			"break_resistance": 0.83,
+			"break_chance": 0.20,
+			"visibility": 0.13,
+			"durability": 1.0,
+			"wear_rate": 0.030
+		}
+	},
+	"lakeline_nylon_basic_5kg": {
+		"id": "lakeline_nylon_basic_5kg",
+		"name": "LakeLine Nylon Basic 5 кг",
+		"type": "line",
+		"category": "line",
+		"rarity": "common",
+		"price": 14,
+		"description": "Бюджетная нейлоновая леска 100 м. Более прочная, но заметнее в воде.",
+		"stats": {
+			"line_type": "nylon",
+			"length_m": 100,
+			"max_load_kg": 5.0,
+			"max_load": 5.0,
+			"strength": 5.0,
+			"break_resistance": 0.86,
+			"break_chance": 0.19,
+			"visibility": 0.15,
+			"durability": 1.0,
+			"wear_rate": 0.029
+		}
+	},
+	"lakeline_nylon_basic_6kg": {
+		"id": "lakeline_nylon_basic_6kg",
+		"name": "LakeLine Nylon Basic 6 кг",
+		"type": "line",
+		"category": "line",
+		"rarity": "common",
+		"price": 18,
+		"description": "Бюджетная нейлоновая леска 100 м для рыбы покрупнее.",
+		"stats": {
+			"line_type": "nylon",
+			"length_m": 100,
+			"max_load_kg": 6.0,
+			"max_load": 6.0,
+			"strength": 6.0,
+			"break_resistance": 0.89,
+			"break_chance": 0.18,
+			"visibility": 0.17,
+			"durability": 1.0,
+			"wear_rate": 0.028
+		}
+	},
+	"lakeline_nylon_basic_8kg": {
+		"id": "lakeline_nylon_basic_8kg",
+		"name": "LakeLine Nylon Basic 8 кг",
+		"type": "line",
+		"category": "line",
+		"rarity": "common",
+		"price": 25,
+		"description": "Бюджетная нейлоновая леска 100 м. Сильнее, но уже заметно грубее.",
+		"stats": {
+			"line_type": "nylon",
+			"length_m": 100,
+			"max_load_kg": 8.0,
+			"max_load": 8.0,
+			"strength": 8.0,
+			"break_resistance": 0.93,
+			"break_chance": 0.16,
+			"visibility": 0.21,
+			"durability": 1.0,
+			"wear_rate": 0.027
+		}
+	},
+	"lakeline_nylon_basic_10kg": {
+		"id": "lakeline_nylon_basic_10kg",
+		"name": "LakeLine Nylon Basic 10 кг",
+		"type": "line",
+		"category": "line",
+		"rarity": "common",
+		"price": 32,
+		"description": "Простая нейлоновая леска 100 м для тяжёлой бюджетной оснастки.",
+		"stats": {
+			"line_type": "nylon",
+			"length_m": 100,
+			"max_load_kg": 10.0,
+			"max_load": 10.0,
+			"strength": 10.0,
+			"break_resistance": 0.97,
+			"break_chance": 0.15,
+			"visibility": 0.25,
+			"durability": 1.0,
+			"wear_rate": 0.026
+		}
+	},
+	"lakeline_nylon_basic_12kg": {
+		"id": "lakeline_nylon_basic_12kg",
+		"name": "LakeLine Nylon Basic 12 кг",
+		"type": "line",
+		"category": "line",
+		"rarity": "common",
+		"price": 40,
+		"description": "Бюджетная нейлоновая леска 100 м. Прочная, но грубая для осторожной рыбы.",
+		"stats": {
+			"line_type": "nylon",
+			"length_m": 100,
+			"max_load_kg": 12.0,
+			"max_load": 12.0,
+			"strength": 12.0,
+			"break_resistance": 1.00,
+			"break_chance": 0.14,
+			"visibility": 0.29,
+			"durability": 1.0,
+			"wear_rate": 0.025
+		}
+	},
+	"lakeline_nylon_basic_15kg": {
+		"id": "lakeline_nylon_basic_15kg",
+		"name": "LakeLine Nylon Basic 15 кг",
+		"type": "line",
+		"category": "line",
+		"rarity": "common",
+		"price": 52,
+		"description": "Толстая бюджетная нейлоновая леска 100 м для силовой ловли.",
+		"stats": {
+			"line_type": "nylon",
+			"length_m": 100,
+			"max_load_kg": 15.0,
+			"max_load": 15.0,
+			"strength": 15.0,
+			"break_resistance": 1.05,
+			"break_chance": 0.13,
+			"visibility": 0.34,
+			"durability": 1.0,
+			"wear_rate": 0.024
+		}
+	},
+	"lakeline_nylon_basic_18kg": {
+		"id": "lakeline_nylon_basic_18kg",
+		"name": "LakeLine Nylon Basic 18 кг",
+		"type": "line",
+		"category": "line",
+		"rarity": "common",
+		"price": 62,
+		"description": "Толстая бюджетная нейлоновая леска 100 м. Дешёвая сила ценой заметности.",
+		"stats": {
+			"line_type": "nylon",
+			"length_m": 100,
+			"max_load_kg": 18.0,
+			"max_load": 18.0,
+			"strength": 18.0,
+			"break_resistance": 1.10,
+			"break_chance": 0.12,
+			"visibility": 0.39,
+			"durability": 1.0,
+			"wear_rate": 0.023
+		}
+	},
+	"lakeline_nylon_basic_20kg": {
+		"id": "lakeline_nylon_basic_20kg",
+		"name": "LakeLine Nylon Basic 20 кг",
+		"type": "line",
+		"category": "line",
+		"rarity": "common",
+		"price": 70,
+		"description": "Самая прочная леска LakeLine Nylon Basic 100 м. Бюджетная, толстая и хорошо заметная.",
+		"stats": {
+			"line_type": "nylon",
+			"length_m": 100,
+			"max_load_kg": 20.0,
+			"max_load": 20.0,
+			"strength": 20.0,
+			"break_resistance": 1.13,
+			"break_chance": 0.11,
+			"visibility": 0.43,
+			"durability": 1.0,
+			"wear_rate": 0.022
+		}
+	},
 	"light_float": {
 		"id": "light_float",
 		"name": "Лёгкий поплавок",
@@ -296,7 +569,7 @@ const TACKLE_CATALOG := {
 }
 const TACKLE_SLOTS := ["rod", "line", "float", "hook", "bait"]
 
-var money: int = 0
+var money: float = 0.0
 var level: int = 1
 var current_xp: int = 0
 var xp_to_next_level: int = 175
@@ -308,6 +581,18 @@ var upgrades: Array = []
 var fishing_depth: float = 1.2
 var owned_items: Array = get_default_owned_items()
 var current_tackle: Dictionary = get_default_tackle()
+
+func format_money_amount(value: float) -> String:
+	var rounded_value: float = round(value * 100.0) / 100.0
+
+	if abs(rounded_value - round(rounded_value)) < 0.005:
+		return "%d" % int(round(rounded_value))
+	if abs(rounded_value * 10.0 - round(rounded_value * 10.0)) < 0.005:
+		return "%.1f" % rounded_value
+	return "%.2f" % rounded_value
+
+func format_money(value: float, suffix: String = "мон.") -> String:
+	return "%s %s" % [format_money_amount(value), suffix]
 
 func get_xp_to_next_level(for_level: int) -> int:
 	return 100 + 50 * for_level + 25 * for_level * for_level
@@ -485,7 +770,7 @@ func get_tackle_catalog_items(type_filter: String = "all") -> Array:
 		var order_a: int = int(category_order.get(type_a, 9))
 		var order_b: int = int(category_order.get(type_b, 9))
 		if order_a == order_b:
-			return int(a.get("price", 0)) < int(b.get("price", 0))
+			return float(a.get("price", 0.0)) < float(b.get("price", 0.0))
 		return order_a < order_b
 	)
 
@@ -504,7 +789,7 @@ func get_tackle_shop_items() -> Array:
 		if starter_ids.has(str(item.get("id", ""))):
 			continue
 
-		if int(item.get("price", 0)) > 0 and str(item.get("type", "")) != "bait":
+		if float(item.get("price", 0.0)) > 0.0 and str(item.get("type", "")) != "bait":
 			var shop_item: Dictionary = item.duplicate(true)
 			shop_item["shop_category"] = "tackle"
 			shop_item["quantity"] = 1
@@ -528,7 +813,7 @@ func _make_tackle_component(item_id: String) -> Dictionary:
 	component["type"] = item_type
 	component["category"] = category
 	component["rarity"] = item.get("rarity", "common")
-	component["price"] = int(item.get("price", 0))
+	component["price"] = float(item.get("price", 0.0))
 	component["description"] = str(item.get("description", ""))
 	return component
 
@@ -641,7 +926,7 @@ func _normalize_owned_item(item: Dictionary) -> Dictionary:
 		"type": item_type,
 		"category": category,
 		"rarity": str(item.get("rarity", catalog_item.get("rarity", "common"))),
-		"price": int(item.get("price", catalog_item.get("price", 0))),
+		"price": float(item.get("price", catalog_item.get("price", 0.0))),
 		"quantity": max(int(item.get("quantity", 1)), 0),
 		"description": str(item.get("description", catalog_item.get("description", ""))),
 		"stats": stats
@@ -764,7 +1049,7 @@ func equip_item(item_id: String) -> bool:
 	component["type"] = item.get("type", category)
 	component["category"] = category
 	component["rarity"] = item.get("rarity", "common")
-	component["price"] = int(item.get("price", 0))
+	component["price"] = float(item.get("price", 0.0))
 	component["description"] = str(item.get("description", ""))
 
 	if category == "bait":
@@ -799,7 +1084,7 @@ func add_owned_item(item: Dictionary, amount: int = 1) -> void:
 		owned_item["type"] = str(normalized_item.get("type", owned_item.get("type", item_category)))
 		owned_item["category"] = str(normalized_item.get("category", owned_item.get("category", item_category)))
 		owned_item["rarity"] = str(normalized_item.get("rarity", owned_item.get("rarity", "common")))
-		owned_item["price"] = int(normalized_item.get("price", owned_item.get("price", 0)))
+		owned_item["price"] = float(normalized_item.get("price", owned_item.get("price", 0.0)))
 		owned_item["description"] = str(normalized_item.get("description", owned_item.get("description", "")))
 
 		if ["rod", "line", "hook"].has(item_category):

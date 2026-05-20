@@ -6,6 +6,8 @@ export_presets.cfg
 *.translation
 *.tmp
 *.bak
+tmp_*.gd
+tmp_*.uid
 
 # Mono
 .mono/

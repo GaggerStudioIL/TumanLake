@@ -2,6 +2,7 @@
 extends RefCounted
 
 var main
+var theme
 enum FishingUiState {
 	IDLE,
 	WAITING,
@@ -12,6 +13,7 @@ enum FishingUiState {
 
 func setup(main_ref) -> void:
 	main = main_ref
+	theme = main.ui_theme
 	_ensure_waterbody_ui_nodes()
 
 func open() -> void:

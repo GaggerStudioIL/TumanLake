@@ -2,6 +2,7 @@
 extends RefCounted
 
 var main
+var theme
 enum FishingUiState {
 	IDLE,
 	WAITING,
@@ -12,6 +13,7 @@ enum FishingUiState {
 
 func setup(main_ref) -> void:
 	main = main_ref
+	theme = main.ui_theme
 
 func open() -> void:
 	refresh()
@@ -36,6 +38,12 @@ func _update_ui() -> void:
 	]
 	main.xp_progress_bar.max_value = max(PlayerData.xp_to_next_level, 1)
 	main.xp_progress_bar.value = clamp(PlayerData.current_xp, 0, PlayerData.xp_to_next_level)
+	main.money_label.text = "%d ₽" % PlayerData.money
+	main.level_label.text = "LVL %d  %d/%d XP" % [
+		PlayerData.level,
+		PlayerData.current_xp,
+		PlayerData.xp_to_next_level
+	]
 
 	var locked_for_result_or_fishing: bool = main._fishing_ui_state != FishingUiState.IDLE
 	main.fish_button.disabled = main._fishing_ui_state == FishingUiState.WAITING
@@ -104,10 +112,9 @@ func _refresh_bottom_nav_styles() -> void:
 
 	var nav_data: Array = [
 		[main.nav_fish_button, "fish"],
-		[main.inventory_button, "inventory"],
-		[main.tackle_button, "tackle"],
-		[main.shop_button, "shop"],
 		[main.basket_button, "sell"],
+		[main.inventory_button, "inventory"],
+		[main.shop_button, "shop"],
 		[main.map_button, "map"],
 		[main.profile_button, "profile"]
 	]
@@ -115,7 +122,15 @@ func _refresh_bottom_nav_styles() -> void:
 	for item in nav_data:
 		var nav_button: Button = item[0]
 		var tab_name: String = item[1]
-		main._apply_button_style(nav_button, main.STYLE_BOTTOM_NAV_ACTIVE if tab_name == active_tab else main.STYLE_BOTTOM_NAV_BUTTON)
+		var is_active: bool = tab_name == active_tab
+		main._apply_button_style(nav_button, main.STYLE_BOTTOM_NAV_ACTIVE if is_active else main.STYLE_BOTTOM_NAV_BUTTON)
+		nav_button.modulate = Color(1.0, 1.0, 1.0, 1.0 if is_active else 0.86)
+
+	var bait_active: bool = main.inventory_panel.visible and main._inventory_category == "bait"
+	main._apply_action_button_style(main.feed_button, false)
+	main._apply_action_button_style(main.bait_button, bait_active)
+	main._apply_action_button_style(main.tackle_button, active_tab == "tackle")
+	main._apply_action_button_style(main.auto_button, false)
 
 
 func _get_main_hud_text() -> String:
@@ -131,6 +146,16 @@ func _get_main_hud_text() -> String:
 		bottom_type = "яма"
 
 	var activity = "ровная"
+	return "%s\n%s\nГлубина %.1f м · снасть %.1f м\nУд. %.1f кг · леска %.1f кг\nКлёв +%d%%" % [
+		main.timer_label.text,
+		str(waterbody.get("name", "-")),
+		depth,
+		float(tackle_stats.get("fishing_depth", PlayerData.fishing_depth)),
+		float(tackle_stats.get("max_fish_weight", 0.0)),
+		float(tackle_stats.get("line_strength", 0.0)),
+		roundi((float(tackle_stats.get("bite_detection_bonus", 0.0)) + float(tackle_stats.get("fish_attraction", 0.0))) * 100.0)
+	]
+
 	if float(spot.get("bite_chance_modifier", 1.0)) > 1.05:
 		activity = "активная"
 	elif float(spot.get("bite_chance_modifier", 1.0)) < 0.95:
