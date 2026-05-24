@@ -10,6 +10,14 @@ const SECONDARY_BUTTON_STYLE := preload("res://assets/ui/buttons/secondary_butto
 const NAV_BUTTON_STYLE := preload("res://assets/ui/buttons/nav_button.tres")
 const NAV_ACTIVE_STYLE := preload("res://assets/ui/buttons/nav_button_active.tres")
 const TAB_BUTTON_STYLE := preload("res://assets/ui/buttons/tab_button.tres")
+const CAST_BUTTON_REGULAR := preload("res://assets/ui/buttons/cast/button_cast_regular.png")
+const CAST_BUTTON_HOVER := preload("res://assets/ui/buttons/cast/button_cast_active.png")
+const CAST_BUTTON_PRESSED := preload("res://assets/ui/buttons/cast/button_cast_pressed.png")
+const CAST_BUTTON_DISABLED := preload("res://assets/ui/buttons/cast/button_cast_disable.png")
+const PULL_BUTTON_REGULAR := preload("res://assets/ui/buttons/pull/button_pull_regular.png")
+const PULL_BUTTON_HOVER := preload("res://assets/ui/buttons/pull/button_pull_active.png")
+const PULL_BUTTON_PRESSED := preload("res://assets/ui/buttons/pull/button_pull_pressed.png")
+const PULL_BUTTON_DISABLED := preload("res://assets/ui/buttons/pull/button_pull_disable.png")
 const PROGRESS_TRACK_STYLE := preload("res://assets/ui/hud/progress_track.tres")
 const PROGRESS_FILL_GREEN_STYLE := preload("res://assets/ui/hud/progress_fill_green.tres")
 const HUD_BADGE_STYLE := preload("res://assets/ui/hud/hud_badge.tres")
@@ -19,30 +27,31 @@ const RARITY_RARE_STYLE := preload("res://assets/ui/inventory/rarity_rare.tres")
 const RARITY_EPIC_STYLE := preload("res://assets/ui/inventory/rarity_epic.tres")
 const RARITY_LEGENDARY_STYLE := preload("res://assets/ui/inventory/rarity_legendary.tres")
 
-const ICON_HOOK := preload("res://assets/ui/icons/hook.png")
-const ICON_FISH := preload("res://assets/ui/icons/fish.png")
-const ICON_BASKET := preload("res://assets/ui/icons/bag.png")
-const ICON_BAIT := preload("res://assets/ui/icons/bait.png")
-const ICON_ROD := preload("res://assets/ui/icons/rod.png")
-const ICON_GEAR := preload("res://assets/ui/sprites/icons/gear.png")
-const ICON_CART := preload("res://assets/ui/icons/shop.png")
-const ICON_MONEY := preload("res://assets/ui/sprites/icons/money.png")
-const ICON_LOCATION := preload("res://assets/ui/sprites/icons/location.png")
-const ICON_PROFILE := preload("res://assets/ui/icons/profile.png")
-const ICON_INVENTORY := preload("res://assets/ui/icons/bag.png")
-const ICON_MAP := preload("res://assets/ui/icons/map.png")
-const ICON_WEATHER := preload("res://assets/ui/sprites/icons/weather.png")
-const ICON_TIME := preload("res://assets/ui/sprites/icons/time.png")
-const ICON_AUTO := preload("res://assets/ui/sprites/icons/auto.png")
-
-const ICON_HOOK_REGION := Rect2(600, 214, 329, 526)
-const ICON_FISH_REGION := Rect2(398, 250, 737, 433)
-const ICON_BAG_REGION := Rect2(378, 220, 774, 503)
-const ICON_BAIT_REGION := Rect2(364, 212, 795, 586)
-const ICON_ROD_REGION := Rect2(135, 82, 1251, 773)
-const ICON_SHOP_REGION := Rect2(438, 211, 663, 564)
-const ICON_MAP_REGION := Rect2(406, 189, 732, 507)
-const ICON_PROFILE_REGION := Rect2(484, 211, 573, 565)
+const ICON_FISH := preload("res://assets/ui/icons/icon_fish.png")
+const ICON_BAIT := preload("res://assets/ui/icons/icon_bait.png")
+const ICON_ROD := preload("res://assets/ui/icons/icon_rod.png")
+const ICON_SHOP := preload("res://assets/ui/icons/icon_shop.png")
+const ICON_INVENTORY := preload("res://assets/ui/icons/icon_inventory.png")
+const ICON_KEEPNET := preload("res://assets/ui/icons/icon_keepnet.png")
+const ICON_MAP := preload("res://assets/ui/icons/icon_map.png")
+const ICON_PROFILE := preload("res://assets/ui/icons/icon_profile.png")
+const ICON_MONEY := preload("res://assets/ui/icons/icon_money.png")
+const ICON_TIME := preload("res://assets/ui/icons/icon_time.png")
+const ICON_WEATHER_CLEAR := preload("res://assets/ui/icons/icon_weather_clear.png")
+const ICON_WEATHER_CLOUDY := preload("res://assets/ui/icons/icon_weather_cloudy.png")
+const ICON_WEATHER_RAINY := preload("res://assets/ui/icons/icon_weather_rainy.png")
+const ICON_WEATHER_STORM := preload("res://assets/ui/icons/icon_weather_storm.png")
+const ICON_WEATHER_FOG := preload("res://assets/ui/icons/icon_weather_fog.png")
+const ICON_HOOK := preload("res://assets/ui/icons/icon_hook.png")
+const ICON_AUTO := preload("res://assets/ui/icons/icon_auto.png")
+const ICON_LOCATION := preload("res://assets/ui/icons/icon_location.png")
+const ICON_SETTINGS := preload("res://assets/ui/icons/icon_settings.png")
+const ICON_LINE := preload("res://assets/ui/icons/icon_line.png")
+const SIDE_MENU_ICON_KEEPNET := preload("res://assets/ui/icons/side_menu/optimized/sadok.png")
+const SIDE_MENU_ICON_INVENTORY := preload("res://assets/ui/icons/side_menu/optimized/inventory.png")
+const SIDE_MENU_ICON_SHOP := preload("res://assets/ui/icons/side_menu/optimized/shop.png")
+const SIDE_MENU_ICON_MAP := preload("res://assets/ui/icons/side_menu/optimized/map.png")
+const SIDE_MENU_ICON_PROFILE := preload("res://assets/ui/icons/side_menu/optimized/profile.png")
 
 const GLASS_BG := Color(0.030, 0.043, 0.046, 0.72)
 const GLASS_BG_STRONG := Color(0.028, 0.038, 0.040, 0.86)
@@ -223,37 +232,171 @@ func get_button_style(kind: String = "secondary", state: String = "normal") -> S
 func get_icon(icon_name: String) -> Texture2D:
 	match icon_name:
 		"hook", "cast":
-			return _make_atlas_texture(ICON_HOOK, ICON_HOOK_REGION)
+			return ICON_HOOK
 		"fish", "fishing":
-			return _make_atlas_texture(ICON_FISH, ICON_FISH_REGION)
+			return ICON_FISH
 		"basket", "keepnet":
-			return _make_atlas_texture(ICON_BASKET, ICON_BAG_REGION)
+			return ICON_KEEPNET
 		"bait":
-			return _make_atlas_texture(ICON_BAIT, ICON_BAIT_REGION)
+			return ICON_BAIT
 		"rod", "tackle":
-			return _make_atlas_texture(ICON_ROD, ICON_ROD_REGION)
+			return ICON_ROD
 		"gear", "settings":
-			return ICON_GEAR
+			return ICON_SETTINGS
 		"cart", "shop":
-			return _make_atlas_texture(ICON_CART, ICON_SHOP_REGION)
+			return ICON_SHOP
 		"money":
 			return ICON_MONEY
 		"location":
 			return ICON_LOCATION
 		"profile":
-			return _make_atlas_texture(ICON_PROFILE, ICON_PROFILE_REGION)
+			return ICON_PROFILE
 		"inventory":
-			return _make_atlas_texture(ICON_INVENTORY, ICON_BAG_REGION)
+			return ICON_INVENTORY
 		"map":
-			return _make_atlas_texture(ICON_MAP, ICON_MAP_REGION)
-		"weather":
-			return ICON_WEATHER
+			return ICON_MAP
+		"weather", "weather_clear":
+			return ICON_WEATHER_CLEAR
+		"weather_cloudy":
+			return ICON_WEATHER_CLOUDY
+		"weather_rainy":
+			return ICON_WEATHER_RAINY
+		"weather_storm":
+			return ICON_WEATHER_STORM
+		"weather_fog":
+			return ICON_WEATHER_FOG
 		"time":
 			return ICON_TIME
 		"auto":
 			return ICON_AUTO
+		"line":
+			return ICON_LINE
 		_:
 			return null
+
+func get_cast_button_size() -> Vector2:
+	return CAST_BUTTON_REGULAR.get_size()
+
+func get_cast_button_texture(state: String = "regular") -> Texture2D:
+	match state:
+		"hover", "active":
+			return CAST_BUTTON_HOVER
+		"pressed":
+			return CAST_BUTTON_PRESSED
+		"disabled":
+			return CAST_BUTTON_DISABLED
+		_:
+			return CAST_BUTTON_REGULAR
+
+func get_pull_button_size() -> Vector2:
+	return PULL_BUTTON_REGULAR.get_size()
+
+func get_pull_button_texture(state: String = "regular") -> Texture2D:
+	match state:
+		"hover", "active":
+			return PULL_BUTTON_HOVER
+		"pressed":
+			return PULL_BUTTON_PRESSED
+		"disabled":
+			return PULL_BUTTON_DISABLED
+		_:
+			return PULL_BUTTON_REGULAR
+
+func apply_cast_button_hitbox_style(button: Button, target_size: Vector2 = Vector2.ZERO) -> void:
+	var button_size := get_cast_button_size() if target_size == Vector2.ZERO else target_size
+	button.custom_minimum_size = button_size
+	button.size = button_size
+	button.icon = null
+	button.expand_icon = false
+	var empty_style := StyleBoxEmpty.new()
+	button.add_theme_stylebox_override("normal", empty_style)
+	button.add_theme_stylebox_override("hover", empty_style)
+	button.add_theme_stylebox_override("pressed", empty_style)
+	button.add_theme_stylebox_override("disabled", empty_style)
+	button.add_theme_stylebox_override("focus", empty_style)
+	button.add_theme_color_override("font_color", Color.TRANSPARENT)
+	button.add_theme_color_override("font_hover_color", Color.TRANSPARENT)
+	button.add_theme_color_override("font_pressed_color", Color.TRANSPARENT)
+	button.add_theme_color_override("font_disabled_color", Color.TRANSPARENT)
+	button.add_theme_color_override("font_focus_color", Color.TRANSPARENT)
+	button.add_theme_constant_override("h_separation", 0)
+	button.add_theme_constant_override("icon_max_width", 0)
+	_bind_button_feedback(button)
+
+func apply_cast_button_style(button: Button, target_size: Vector2 = Vector2.ZERO) -> void:
+	apply_cast_button_hitbox_style(button, target_size)
+
+func apply_pull_button_hitbox_style(button: Button, target_size: Vector2 = Vector2.ZERO) -> void:
+	var button_size := get_pull_button_size() if target_size == Vector2.ZERO else target_size
+	apply_cast_button_hitbox_style(button, button_size)
+
+func apply_pull_button_style(button: Button, target_size: Vector2 = Vector2.ZERO) -> void:
+	apply_pull_button_hitbox_style(button, target_size)
+
+func get_atlas_icon(icon_name: String) -> Texture2D:
+	match icon_name:
+		_:
+			return null
+
+func get_side_menu_icon(icon_name: String) -> Texture2D:
+	match icon_name:
+		"keepnet", "basket", "sadok":
+			return SIDE_MENU_ICON_KEEPNET
+		"inventory":
+			return SIDE_MENU_ICON_INVENTORY
+		"shop":
+			return SIDE_MENU_ICON_SHOP
+		"map":
+			return SIDE_MENU_ICON_MAP
+		"profile":
+			return SIDE_MENU_ICON_PROFILE
+		_:
+			return null
+
+func get_side_menu_button_style(state: String = "normal") -> StyleBoxFlat:
+	var bg := Color(0.035, 0.048, 0.045, 0.78)
+	var border := Color(0.76, 0.88, 0.72, 0.32)
+	var shadow := Color(0.0, 0.0, 0.0, 0.34)
+
+	match state:
+		"hover":
+			bg = Color(0.050, 0.084, 0.064, 0.88)
+			border = Color(0.76, 1.0, 0.62, 0.58)
+			shadow = Color(0.22, 0.70, 0.20, 0.16)
+		"pressed":
+			bg = Color(0.020, 0.034, 0.032, 0.92)
+			border = Color(0.58, 0.88, 0.48, 0.48)
+			shadow = Color(0.0, 0.0, 0.0, 0.20)
+		"active":
+			bg = Color(0.060, 0.126, 0.074, 0.88)
+			border = Color(0.68, 1.0, 0.58, 0.70)
+			shadow = Color(0.20, 0.70, 0.22, 0.22)
+		"disabled":
+			bg = Color(0.030, 0.038, 0.038, 0.48)
+			border = Color(0.62, 0.68, 0.60, 0.16)
+			shadow = Color(0.0, 0.0, 0.0, 0.12)
+
+	var style := make_style(bg, border, 10, 5, shadow)
+	style.content_margin_left = 0.0
+	style.content_margin_top = 0.0
+	style.content_margin_right = 0.0
+	style.content_margin_bottom = 0.0
+	return style
+
+func apply_side_menu_button_style(button: Button, active := false) -> void:
+	button.add_theme_stylebox_override("normal", get_side_menu_button_style("active" if active else "normal"))
+	button.add_theme_stylebox_override("hover", get_side_menu_button_style("hover"))
+	button.add_theme_stylebox_override("pressed", get_side_menu_button_style("pressed"))
+	button.add_theme_stylebox_override("disabled", get_side_menu_button_style("disabled"))
+	button.add_theme_stylebox_override("focus", get_side_menu_button_style("active" if active else "hover"))
+	button.add_theme_color_override("font_color", Color.TRANSPARENT)
+	button.add_theme_color_override("font_hover_color", Color.TRANSPARENT)
+	button.add_theme_color_override("font_pressed_color", Color.TRANSPARENT)
+	button.add_theme_color_override("font_disabled_color", Color.TRANSPARENT)
+	button.add_theme_color_override("font_focus_color", Color.TRANSPARENT)
+	button.add_theme_constant_override("h_separation", 0)
+	button.add_theme_constant_override("icon_max_width", 0)
+	_bind_button_feedback(button)
 
 func apply_panel_style(control) -> void:
 	if control is Panel:
@@ -360,6 +503,15 @@ func apply_modal_backdrop_style(control) -> void:
 		control.color = BACKDROP_BG
 	control.mouse_filter = Control.MOUSE_FILTER_STOP
 
+func _make_texture_style(texture: Texture2D) -> StyleBoxTexture:
+	var style := StyleBoxTexture.new()
+	style.texture = texture
+	style.content_margin_left = 0.0
+	style.content_margin_top = 0.0
+	style.content_margin_right = 0.0
+	style.content_margin_bottom = 0.0
+	return style
+
 func _make_atlas_texture(texture: Texture2D, region: Rect2) -> AtlasTexture:
 	var atlas := AtlasTexture.new()
 	atlas.atlas = texture
@@ -419,7 +571,7 @@ func _get_rarity_slot_resource(rarity: String) -> StyleBoxFlat:
 		_:
 			return make_style(SLOT_BG, BORDER_FAINT, 10, 4, Color(0.0, 0.0, 0.0, 0.16))
 
-func _bind_button_feedback(button: Button) -> void:
+func _bind_button_feedback(button: BaseButton) -> void:
 	if button.has_meta("_tuman_feedback_bound"):
 		return
 
@@ -437,7 +589,7 @@ func _bind_button_feedback(button: Button) -> void:
 		_animate_button_scale(button, Vector2.ONE, 0.08)
 	)
 
-func _animate_button_scale(button: Button, target_scale: Vector2, duration: float) -> void:
+func _animate_button_scale(button: BaseButton, target_scale: Vector2, duration: float) -> void:
 	if not is_instance_valid(button) or button.disabled:
 		return
 

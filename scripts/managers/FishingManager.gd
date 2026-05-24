@@ -6,6 +6,7 @@ signal reeling_started(catch_data: Dictionary, state: Dictionary)
 signal reeling_updated(state: Dictionary)
 signal fish_caught(catch_data: Dictionary)
 signal fishing_failed(message: String)
+signal fishing_failed_detailed(failure_data: Dictionary)
 
 var is_fishing: bool = false
 var is_reeling: bool = false
@@ -63,6 +64,18 @@ const TENSION_VELOCITY_LIMIT := 0.72
 const BASE_FISH_DRAG := -0.055
 const PROGRESS_DECAY := 0.095
 const NEAR_ZONE_PROGRESS_MARGIN := 0.12
+const FAILURE_NO_BITE := "NO_BITE"
+const FAILURE_BAD_DEPTH := "BAD_DEPTH"
+const FAILURE_BAD_BAIT := "BAD_BAIT"
+const FAILURE_BAD_HOOK := "BAD_HOOK"
+const FAILURE_WEAK_TACKLE := "WEAK_TACKLE"
+const FAILURE_LINE_BROKE := "LINE_BROKE"
+const FAILURE_ROD_OVERLOAD := "ROD_OVERLOAD"
+const FAILURE_FISH_ESCAPED_LOW_TENSION := "FISH_ESCAPED_LOW_TENSION"
+const FAILURE_FISH_ESCAPED_HIGH_TENSION := "FISH_ESCAPED_HIGH_TENSION"
+const FAILURE_FISH_ESCAPED_HOOK := "FISH_ESCAPED_HOOK"
+const FAILURE_FISH_TOO_STRONG := "FISH_TOO_STRONG"
+const FAILURE_UNKNOWN := "UNKNOWN"
 
 func get_bite_candidates(spot_id: String) -> Array:
 	var spot: Dictionary = SpotDatabase.get_spot(spot_id)
@@ -72,6 +85,8 @@ func get_bite_candidates(spot_id: String) -> Array:
 
 	var previous_tackle_stats := _tackle_stats.duplicate(true)
 	_tackle_stats = PlayerData.get_tackle_stats()
+	# TODO: Wire depth_match_bonus and no_bite_reduction into the pre-bite odds after the no-bite balance pass.
+	# TODO: Wire fish_jerk_reduction, escape_risk_reduction, and hook_escape_reduction into reeling after tuning tests.
 	var candidates := _get_tackle_available_fish(spot.get("available_fish", []))
 	_tackle_stats = previous_tackle_stats
 	return candidates
@@ -83,7 +98,13 @@ func start_fishing(spot_id: String) -> void:
 	var spot: Dictionary = SpotDatabase.get_spot(spot_id)
 
 	if spot.is_empty():
-		fishing_failed.emit("Точка клева не найдена.")
+		_emit_fishing_failure(
+			FAILURE_UNKNOWN,
+			"Точка не найдена",
+			"Точка клёва не найдена.",
+			"Выберите доступную точку ловли на карте.",
+			{"severity": "low", "spot_id": spot_id}
+		)
 		return
 
 	is_fishing = true
@@ -93,7 +114,13 @@ func start_fishing(spot_id: String) -> void:
 	var tackle_block_reason := PlayerData.get_tackle_block_reason()
 	if tackle_block_reason != "":
 		is_fishing = false
-		fishing_failed.emit(tackle_block_reason)
+		_emit_fishing_failure(
+			FAILURE_WEAK_TACKLE,
+			"Снасть не готова",
+			tackle_block_reason,
+			"Проверьте удочку, леску, крючок и наживку перед забросом.",
+			{"severity": "medium", "spot_id": spot_id}
+		)
 		return
 
 	var available_fish: Array = _get_tackle_available_fish(spot["available_fish"])
@@ -108,12 +135,12 @@ func start_fishing(spot_id: String) -> void:
 			await get_tree().create_timer(1.0).timeout
 
 		is_fishing = false
-		fishing_failed.emit("Похоже, здесь мало рыбы. Попробуй другую глубину, наживку или точку.")
+		_emit_no_candidate_failure(spot, spot_id)
 		return
 
 	if available_fish.is_empty():
 		is_fishing = false
-		fishing_failed.emit("На этой глубине и снасти нет подходящей рыбы. Измени глубину, крючок или наживку.")
+		_emit_no_candidate_failure(spot, spot_id)
 		return
 
 	var bait_bonus: float = _get_best_bait_bonus(available_fish)
@@ -140,7 +167,19 @@ func start_fishing(spot_id: String) -> void:
 
 	if randf() > bite_chance:
 		is_fishing = false
-		fishing_failed.emit("Поклёвки не было. Попробуй другой темп или наживку.")
+		_emit_fishing_failure(
+			FAILURE_NO_BITE,
+			"",
+			"",
+			"",
+			{
+				"severity": "low",
+				"bite_chance": bite_chance,
+				"spot_depth_modifier": spot_depth_modifier,
+				"bait_bonus": bait_bonus,
+				"time_activity_modifier": time_activity_modifier
+			}
+		)
 		return
 
 	var fish_id: String = _get_random_tackle_fish_id(
@@ -148,14 +187,34 @@ func start_fishing(spot_id: String) -> void:
 		spot["rare_chance_modifier"]
 	)
 
+	if not PlayerData.consume_current_bait(1):
+		is_fishing = false
+		_emit_fishing_failure(
+			FAILURE_WEAK_TACKLE,
+			"Нет наживки",
+			"Наживка закончилась до поклёвки.",
+			"Пополните наживку или экипируйте другую.",
+			{"severity": "low", "spot_id": spot_id}
+		)
+		return
+
 	var catch_fish := FishDatabase.get_fish(fish_id)
 	var catch_data: Dictionary = FishDatabase.create_catch(fish_id, _get_time_peak_modifier(catch_fish))
 	if catch_data.is_empty():
 		is_fishing = false
-		fishing_failed.emit("Рыба сорвалась до подсечки. Проверь снасть.")
+		_emit_fishing_failure(
+			FAILURE_FISH_ESCAPED_HOOK,
+			"",
+			"Рыба сорвалась до подсечки.",
+			"Проверьте размер крючка, наживку и состояние снасти.",
+			{"severity": "medium", "fish_id": fish_id, "spot_id": spot_id}
+		)
 		return
 
+	catch_data["spot_id"] = str(spot.get("id", spot_id))
 	catch_data["spot_name"] = spot["name"]
+	catch_data["waterbody_id"] = str(spot.get("waterbody_id", PlayerData.current_waterbody))
+	catch_data["waterbody_name"] = str(spot.get("waterbody_name", ""))
 
 	_start_reeling(catch_data)
 
@@ -244,27 +303,39 @@ func _get_depth_match_multiplier(fish: Dictionary) -> float:
 	var depth: float = float(_tackle_stats.get("fishing_depth", 1.2))
 	var min_depth: float = float(fish.get("min_depth", 0.2))
 	var max_depth: float = float(fish.get("max_depth", 6.0))
+	var reach_bonus: float = clamp(float(_tackle_stats.get("reach_bonus", 0.0)), -0.06, 0.22)
+	var depth_range: float = max(max_depth - min_depth, 0.1)
+	var reach_margin: float = depth_range * max(reach_bonus, 0.0)
 
-	if depth < min_depth or depth > max_depth:
+	if depth < min_depth - reach_margin or depth > max_depth + reach_margin:
 		return 0.0
+	if depth < min_depth or depth > max_depth:
+		return clamp(0.38 + reach_bonus * 1.20, 0.34, 0.64)
 
 	var preferred_depth: float = clamp(float(fish.get("preferred_depth", (min_depth + max_depth) * 0.5)), min_depth, max_depth)
-	var half_range: float = max((max_depth - min_depth) * 0.5, 0.1)
+	var half_range: float = max(depth_range * 0.5 * (1.0 + max(reach_bonus, 0.0) * 1.35), 0.1)
 	var distance: float = abs(depth - preferred_depth) / half_range
-	return clamp(1.18 - distance * 0.48, 0.48, 1.18)
+	var falloff: float = max(0.48 - max(reach_bonus, 0.0) * 0.16, 0.36)
+	return clamp(1.18 - distance * falloff, 0.48, 1.20)
 
 func _get_spot_depth_match_multiplier(spot: Dictionary) -> float:
 	var depth: float = float(_tackle_stats.get("fishing_depth", PlayerData.fishing_depth))
 	var min_depth: float = float(spot.get("min_depth", 0.2))
 	var max_depth: float = float(spot.get("max_depth", 6.0))
+	var reach_bonus: float = clamp(float(_tackle_stats.get("reach_bonus", 0.0)), -0.06, 0.22)
+	var depth_range: float = max(max_depth - min_depth, 0.1)
+	var reach_margin: float = depth_range * max(reach_bonus, 0.0)
 
-	if depth < min_depth or depth > max_depth:
+	if depth < min_depth - reach_margin or depth > max_depth + reach_margin:
 		return 0.34
+	if depth < min_depth or depth > max_depth:
+		return clamp(0.34 + reach_bonus * 0.85, 0.34, 0.52)
 
 	var preferred_depth: float = clamp(float(spot.get("preferred_depth", spot.get("depth", (min_depth + max_depth) * 0.5))), min_depth, max_depth)
-	var half_range: float = max((max_depth - min_depth) * 0.5, 0.1)
+	var half_range: float = max(depth_range * 0.5 * (1.0 + max(reach_bonus, 0.0) * 1.10), 0.1)
 	var distance: float = abs(depth - preferred_depth) / half_range
-	return clamp(1.10 - distance * 0.26, 0.82, 1.10)
+	var falloff: float = max(0.26 - max(reach_bonus, 0.0) * 0.08, 0.18)
+	return clamp(1.10 - distance * falloff, 0.82, 1.12)
 
 func _get_bait_match_multiplier(fish: Dictionary, fish_id: String) -> float:
 	if fish.is_empty():
@@ -538,6 +609,7 @@ func _start_reeling(catch_data: Dictionary) -> void:
 		0.14,
 		0.38
 	)
+	green_width = clamp(green_width + clamp(float(_tackle_stats.get("green_zone_bonus", 0.0)), 0.0, 0.30), 0.14, 0.48)
 	var green_center: float = clamp(0.54 + randf_range(-0.045, 0.045), 0.43, 0.63)
 	_green_min = clamp(green_center - green_width * 0.5, 0.16, 0.72)
 	_green_max = clamp(green_center + green_width * 0.5, _green_min + 0.11, 0.88)
@@ -746,14 +818,14 @@ func _update_load_and_overload(delta: float) -> void:
 	var line_break_chance: float = float(_tackle_stats.get("break_chance", 0.15))
 	var line_limit: float = clamp((2.05 - line_break_chance * 1.45) / max(line_overload, 0.08), 0.42, 2.50)
 	if line_overload > 0.0 and _line_overload_time >= line_limit:
-		_finish_reeling_failed("Обрыв лески! Рыба ушла.", "line_break")
+		_finish_reeling_failed("Обрыв лески! Рыба ушла.", "line_break", FAILURE_LINE_BROKE)
 		return
 
 	var rod_limit: float = clamp(2.30 / max(rod_overload, 0.08), 0.65, 3.20)
 	if rod_overload > 0.0 and _rod_overload_time >= rod_limit:
 		var rod_break_chance: float = clamp((rod_overload * 0.22 + _tension * 0.08) * delta, 0.0, 0.32)
 		if rod_overload > 0.82 or randf() < rod_break_chance:
-			_finish_reeling_failed("Удочка повреждена! Рыба ушла.", "rod_break")
+			_finish_reeling_failed("Удочка повреждена! Рыба ушла.", "rod_break", FAILURE_ROD_OVERLOAD)
 
 func _update_progress_and_danger(delta: float) -> void:
 	var green_center: float = (_green_min + _green_max) * 0.5
@@ -813,9 +885,9 @@ func _update_progress_and_danger(delta: float) -> void:
 		return
 
 	if _high_danger_time >= _high_fail_limit:
-		_finish_reeling_failed("Леска не выдержала натяжения. Рыба сорвалась.", "line_break")
+		_finish_reeling_failed("Леска не выдержала натяжения. Рыба сорвалась.", "line_break", FAILURE_LINE_BROKE)
 	elif _low_danger_time >= _low_fail_limit:
-		_finish_reeling_failed("Натяжение упало. Рыба сошла с крючка.", "escape")
+		_finish_reeling_failed("Натяжение упало. Рыба сошла с крючка.", "escape", FAILURE_FISH_ESCAPED_LOW_TENSION)
 
 func _update_critical_break(delta: float) -> void:
 	_critical_break_risk = 0.0
@@ -838,7 +910,7 @@ func _update_critical_break(delta: float) -> void:
 	_feedback_message = "Осторожно, обрыв!"
 
 	if randf() < _critical_break_risk * 0.32 * delta:
-		_finish_reeling_failed("Критическое натяжение. Леска лопнула.", "line_break")
+		_finish_reeling_failed("Критическое натяжение. Леска лопнула.", "line_break", FAILURE_LINE_BROKE)
 
 func _apply_reeling_wear(outcome: String) -> Dictionary:
 	if _current_catch.is_empty():
@@ -873,7 +945,7 @@ func _finish_reeling_success() -> void:
 	if not is_reeling:
 		return
 
-	var catch_data: Dictionary = _current_catch.duplicate(true)
+	var catch_data: Dictionary = PlayerData.prepare_record_info(_current_catch.duplicate(true))
 	var wear_result := _apply_reeling_wear("caught")
 	var added: bool = InventoryManager.add_fish(catch_data)
 
@@ -888,9 +960,15 @@ func _finish_reeling_success() -> void:
 		signal_data["xp_result"] = _award_catch_xp(catch_data)
 		fish_caught.emit(signal_data)
 	else:
-		fishing_failed.emit("Садок заполнен. Продай рыбу перед новой ловлей.")
+		_emit_fishing_failure(
+			FAILURE_UNKNOWN,
+			"Садок заполнен",
+			"Садок заполнен. Продайте рыбу перед новой ловлей.",
+			"Откройте садок и освободите место.",
+			{"severity": "low", "catch_data": catch_data}
+		)
 
-func _finish_reeling_failed(message: String, fail_kind: String = "escape") -> void:
+func _finish_reeling_failed(message: String, fail_kind: String = "escape", reason: String = "") -> void:
 	if not is_reeling:
 		return
 
@@ -905,16 +983,276 @@ func _finish_reeling_failed(message: String, fail_kind: String = "escape") -> vo
 	if bool(wear_result.get("hook_lost", false)):
 		final_message += "\nКрючок потерян."
 
+	var failure_reason: String = reason if reason != "" else _get_failure_reason_for_fail_kind(fail_kind)
+	if fail_kind == "escape" and bool(wear_result.get("hook_lost", false)):
+		failure_reason = FAILURE_FISH_ESCAPED_HOOK
+
 	is_fishing = false
 	is_reeling = false
 	_reel_input_active = false
+	_emit_fishing_failure(
+		failure_reason,
+		"",
+		"",
+		"",
+		{
+			"severity": "medium",
+			"raw_message": final_message,
+			"fail_kind": fail_kind,
+			"tackle_wear": wear_result
+		}
+	)
 	_current_catch = {}
-	fishing_failed.emit(final_message)
+
+func _emit_no_candidate_failure(spot: Dictionary, spot_id: String) -> void:
+	var failure_data: Dictionary = _build_no_candidate_failure_data(spot, spot_id)
+	_emit_fishing_failure(
+		str(failure_data.get("reason", FAILURE_UNKNOWN)),
+		str(failure_data.get("title", "")),
+		str(failure_data.get("message", "")),
+		str(failure_data.get("hint", "")),
+		failure_data
+	)
+
+func _emit_fishing_failure(
+	reason: String,
+	title: String = "",
+	message: String = "",
+	hint: String = "",
+	extra_data: Dictionary = {}
+) -> void:
+	var template: Dictionary = _get_failure_template(reason)
+	var failure_data: Dictionary = {
+		"reason": reason,
+		"title": title if title != "" else str(template.get("title", "Неудачная попытка")),
+		"message": message if message != "" else str(template.get("message", "Рыба ушла.")),
+		"hint": hint if hint != "" else str(template.get("hint", "Проверьте снасть, наживку и глубину.")),
+		"severity": str(extra_data.get("severity", template.get("severity", "normal")))
+	}
+
+	var context: Dictionary = _get_failure_context(extra_data)
+	for key in context.keys():
+		failure_data[key] = context[key]
+	for key in extra_data.keys():
+		failure_data[key] = extra_data[key]
+
+	fishing_failed_detailed.emit(failure_data)
+	fishing_failed.emit(str(failure_data.get("message", message)))
+
+func _get_failure_context(extra_data: Dictionary = {}) -> Dictionary:
+	var catch_data: Dictionary = {}
+	var raw_catch = extra_data.get("catch_data", _current_catch)
+	if typeof(raw_catch) == TYPE_DICTIONARY:
+		catch_data = raw_catch
+
+	var fish_name := str(extra_data.get("fish_name", catch_data.get("name", "")))
+	var fish_weight: float = float(extra_data.get("fish_weight", catch_data.get("weight", 0.0)))
+	var context: Dictionary = {
+		"fish_name": fish_name,
+		"fish_weight": fish_weight,
+		"line_strength": float(_tackle_stats.get("line_strength", _tackle_stats.get("max_load", 0.0))),
+		"rod_strength": float(_tackle_stats.get("max_fish_weight", 0.0)),
+		"line_load_ratio": _line_load_ratio,
+		"rod_load_ratio": _rod_load_ratio,
+		"tension": _tension,
+		"fishing_depth": float(_tackle_stats.get("fishing_depth", PlayerData.fishing_depth)),
+		"bait": str(PlayerData.current_tackle.get("bait", {}).get("name", "")),
+		"hook": str(PlayerData.current_tackle.get("hook", {}).get("name", ""))
+	}
+
+	if catch_data.has("id"):
+		context["fish_id"] = str(catch_data.get("id", ""))
+	if catch_data.has("spot_name"):
+		context["spot_name"] = str(catch_data.get("spot_name", ""))
+	if catch_data.has("waterbody_name"):
+		context["waterbody_name"] = str(catch_data.get("waterbody_name", ""))
+
+	return context
+
+func _get_failure_template(reason: String) -> Dictionary:
+	match reason:
+		FAILURE_NO_BITE:
+			return {
+				"title": "Поклёвки не было",
+				"message": "Рыба не заинтересовалась наживкой.",
+				"hint": "Попробуйте другую наживку, глубину или точку ловли.",
+				"severity": "low"
+			}
+		FAILURE_BAD_DEPTH:
+			return {
+				"title": "Неподходящая глубина",
+				"message": "На этой глубине подходящей рыбы почти нет.",
+				"hint": "Измените глубину или выберите другую точку.",
+				"severity": "low"
+			}
+		FAILURE_BAD_BAIT:
+			return {
+				"title": "Наживка не подошла",
+				"message": "Рыба здесь плохо реагирует на текущую наживку.",
+				"hint": "Попробуйте червя, хлеб, тесто или опарыша.",
+				"severity": "low"
+			}
+		FAILURE_BAD_HOOK:
+			return {
+				"title": "Крючок не подходит",
+				"message": "Размер крючка плохо подходит для рыбы в этой точке.",
+				"hint": "Для мелкой рыбы используйте меньшие крючки, для крупной — более прочные.",
+				"severity": "low"
+			}
+		FAILURE_WEAK_TACKLE:
+			return {
+				"title": "Снасть слишком слабая",
+				"message": "Рыба оказалась сильнее текущей снасти.",
+				"hint": "Улучшите удочку, леску или крючок.",
+				"severity": "medium"
+			}
+		FAILURE_LINE_BROKE:
+			return {
+				"title": "Леска порвалась",
+				"message": "Натяжение стало слишком высоким, и леска не выдержала.",
+				"hint": "Поставьте более прочную леску или отпускайте натяжение вовремя.",
+				"severity": "medium"
+			}
+		FAILURE_ROD_OVERLOAD:
+			return {
+				"title": "Удочка не выдержала",
+				"message": "Снасть была перегружена во время вываживания.",
+				"hint": "Используйте более крепкое удилище для крупной рыбы.",
+				"severity": "medium"
+			}
+		FAILURE_FISH_ESCAPED_LOW_TENSION:
+			return {
+				"title": "Рыба сошла",
+				"message": "Натяжение было слишком слабым, и рыба освободилась.",
+				"hint": "Не отпускайте леску слишком сильно. Держите натяжение в зелёной зоне.",
+				"severity": "medium"
+			}
+		FAILURE_FISH_ESCAPED_HIGH_TENSION:
+			return {
+				"title": "Рыба сорвалась",
+				"message": "Натяжение было слишком высоким, рыба резко дёрнула и сошла.",
+				"hint": "Снижайте натяжение при рывках рыбы.",
+				"severity": "medium"
+			}
+		FAILURE_FISH_ESCAPED_HOOK:
+			return {
+				"title": "Рыба сорвалась с крючка",
+				"message": "Крючок плохо удержал рыбу.",
+				"hint": "Попробуйте другой размер крючка или более подходящую наживку.",
+				"severity": "medium"
+			}
+		FAILURE_FISH_TOO_STRONG:
+			return {
+				"title": "Рыба оказалась слишком сильной",
+				"message": "Вы подсекли крупную рыбу, но снасть была на пределе.",
+				"hint": "Вернитесь с более прочной леской и удочкой.",
+				"severity": "high"
+			}
+		_:
+			return {
+				"title": "Неудачная попытка",
+				"message": "Рыба ушла.",
+				"hint": "Проверьте снасть, наживку и глубину.",
+				"severity": "normal"
+			}
+
+func _get_failure_reason_for_fail_kind(fail_kind: String) -> String:
+	match fail_kind:
+		"line_break":
+			return FAILURE_LINE_BROKE
+		"rod_break":
+			return FAILURE_ROD_OVERLOAD
+		_:
+			if _tension > _green_max:
+				return FAILURE_FISH_ESCAPED_HIGH_TENSION
+			if _tension < _green_min:
+				return FAILURE_FISH_ESCAPED_LOW_TENSION
+			return FAILURE_FISH_ESCAPED_HOOK
+
+func _build_no_candidate_failure_data(spot: Dictionary, spot_id: String) -> Dictionary:
+	var blocker_counts: Dictionary = {
+		FAILURE_BAD_DEPTH: 0,
+		FAILURE_BAD_BAIT: 0,
+		FAILURE_BAD_HOOK: 0,
+		FAILURE_WEAK_TACKLE: 0,
+		FAILURE_FISH_TOO_STRONG: 0
+	}
+	var checked_count := 0
+	var allowed_rarities: Array = _tackle_stats.get("allowed_rarities", [])
+	var max_fish_weight: float = float(_tackle_stats.get("max_fish_weight", 1.0))
+	var line_strength: float = float(_tackle_stats.get("line_strength", 1.0))
+	var tackle_weight_limit: float = max(max_fish_weight * 1.32, line_strength * 2.25)
+
+	for fish_id in spot.get("available_fish", []):
+		var fish: Dictionary = FishDatabase.get_fish(str(fish_id))
+		if fish.is_empty():
+			continue
+
+		checked_count += 1
+		var rarity := str(fish.get("rarity", "common"))
+		if _get_depth_match_multiplier(fish) <= 0.0:
+			blocker_counts[FAILURE_BAD_DEPTH] += 1
+			continue
+		if not allowed_rarities.is_empty() and not allowed_rarities.has(rarity):
+			blocker_counts[FAILURE_WEAK_TACKLE] += 1
+			continue
+		if float(fish.get("min_weight", 0.0)) > tackle_weight_limit:
+			blocker_counts[FAILURE_FISH_TOO_STRONG] += 1
+			continue
+		if _get_hook_match_multiplier(fish) <= 0.08:
+			blocker_counts[FAILURE_BAD_HOOK] += 1
+			continue
+		if _get_bait_match_multiplier(fish, str(fish_id)) <= 0.06:
+			blocker_counts[FAILURE_BAD_BAIT] += 1
+			continue
+
+	if checked_count <= 0:
+		return {
+			"reason": FAILURE_UNKNOWN,
+			"title": "Рыбы не найдено",
+			"message": "В этой точке сейчас нет доступной рыбы.",
+			"hint": "Выберите другую точку ловли.",
+			"severity": "low",
+			"spot_id": spot_id
+		}
+
+	var best_reason := FAILURE_BAD_DEPTH
+	var best_count := -1
+	for reason in blocker_counts.keys():
+		var count := int(blocker_counts[reason])
+		if count > best_count:
+			best_count = count
+			best_reason = str(reason)
+
+	var template: Dictionary = _get_failure_template(best_reason)
+	return {
+		"reason": best_reason,
+		"title": str(template.get("title", "")),
+		"message": str(template.get("message", "")),
+		"hint": str(template.get("hint", "")),
+		"severity": str(template.get("severity", "low")),
+		"spot_id": spot_id,
+		"blocked_by_depth": int(blocker_counts[FAILURE_BAD_DEPTH]),
+		"blocked_by_bait": int(blocker_counts[FAILURE_BAD_BAIT]),
+		"blocked_by_hook": int(blocker_counts[FAILURE_BAD_HOOK]),
+		"blocked_by_tackle": int(blocker_counts[FAILURE_WEAK_TACKLE]),
+		"blocked_by_strength": int(blocker_counts[FAILURE_FISH_TOO_STRONG])
+	}
+
+func _infer_no_bite_failure_reason(_available_fish: Array, _spot_depth_modifier: float) -> String:
+	return FAILURE_NO_BITE
 
 func _award_catch_xp(catch_data: Dictionary) -> Dictionary:
 	var base_xp: int = int(catch_data.get("base_xp", 5))
 	var weight_bonus: int = max(roundi(float(catch_data.get("weight", 0.0)) * 2.0), 0)
 	var total_xp: int = base_xp + weight_bonus
+	var skill_effects := PlayerData.get_skill_effects()
+	var xp_multiplier: float = 1.0 + float(skill_effects.get("xp_bonus", 0.0))
+	var catch_rank := str(catch_data.get("catch_rank", "normal"))
+	var rarity := str(catch_data.get("rarity", "common"))
+	if catch_rank == "trophy" or catch_rank == "rarity" or rarity == "rare" or rarity == "very_rare" or rarity == "legendary":
+		xp_multiplier += float(skill_effects.get("trophy_xp_bonus", 0.0))
+	total_xp = max(roundi(float(total_xp) * max(xp_multiplier, 0.0)), 0)
 	return PlayerData.add_xp(total_xp)
 
 func _get_rarity_factor(rarity: String) -> float:

@@ -3,6 +3,8 @@ extends RefCounted
 
 var main
 var theme
+const TACKLE_ITEMS_PER_PAGE := 7
+
 enum FishingUiState {
 	IDLE,
 	WAITING,
@@ -15,6 +17,7 @@ func setup(main_ref) -> void:
 	main = main_ref
 	theme = main.ui_theme
 	_ensure_tackle_ui_nodes()
+	_ensure_tackle_pager_nodes()
 
 func open() -> void:
 	if main._is_catch_reward_open():
@@ -157,6 +160,56 @@ func _ensure_tackle_ui_nodes() -> void:
 	main.add_child(main.toast_label)
 
 
+func _ensure_tackle_pager_nodes() -> void:
+	if main == null or main.tackle_panel == null:
+		return
+
+	if main.tackle_prev_page_button == null:
+		main.tackle_prev_page_button = Button.new()
+		main.tackle_prev_page_button.name = "TacklePrevPageButton"
+		main.tackle_prev_page_button.text = "<"
+		main.tackle_prev_page_button.focus_mode = Control.FOCUS_NONE
+		main.tackle_prev_page_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		main.tackle_prev_page_button.z_index = 2
+		main.tackle_prev_page_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		main.tackle_panel.add_child(main.tackle_prev_page_button)
+		main.tackle_prev_page_button.pressed.connect(_on_tackle_prev_page_pressed)
+
+	if main.tackle_next_page_button == null:
+		main.tackle_next_page_button = Button.new()
+		main.tackle_next_page_button.name = "TackleNextPageButton"
+		main.tackle_next_page_button.text = ">"
+		main.tackle_next_page_button.focus_mode = Control.FOCUS_NONE
+		main.tackle_next_page_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		main.tackle_next_page_button.z_index = 2
+		main.tackle_next_page_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		main.tackle_panel.add_child(main.tackle_next_page_button)
+		main.tackle_next_page_button.pressed.connect(_on_tackle_next_page_pressed)
+
+	if main.tackle_page_label == null:
+		main.tackle_page_label = Label.new()
+		main.tackle_page_label.name = "TacklePageLabel"
+		main.tackle_page_label.text = ""
+		main.tackle_page_label.z_index = 2
+		main.tackle_page_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		main.tackle_page_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		main.tackle_panel.add_child(main.tackle_page_label)
+
+
+func _update_tackle_pager(page_count: int, total_count: int) -> void:
+	_ensure_tackle_pager_nodes()
+	if main.tackle_prev_page_button == null or main.tackle_next_page_button == null or main.tackle_page_label == null:
+		return
+
+	var has_pages := total_count > TACKLE_ITEMS_PER_PAGE
+	main.tackle_prev_page_button.visible = has_pages
+	main.tackle_next_page_button.visible = has_pages
+	main.tackle_page_label.visible = has_pages
+	main.tackle_prev_page_button.disabled = main._tackle_page <= 0
+	main.tackle_next_page_button.disabled = main._tackle_page >= page_count - 1
+	main.tackle_page_label.text = "%d / %d" % [main._tackle_page + 1, page_count]
+
+
 func _update_tackle_ui() -> void:
 	if main.tackle_panel == null:
 		return
@@ -165,11 +218,32 @@ func _update_tackle_ui() -> void:
 	main.tackle_title_label.text = "Сборка снасти"
 	main.tackle_current_label.text = main._get_tackle_build_summary_text()
 	main.tackle_depth_label.text = "Глубина: %.1f м" % PlayerData.fishing_depth
-	main.tackle_hint_label.text = _get_tackle_setup_hints_text(2)
+	main.tackle_hint_label.text = _get_tackle_setup_status_or_hints_text()
 	main.tackle_item_list.clear()
 
-	var selected_index = -1
-	for i in main._visible_tackle_items.size():
+	var total_count: int = main._visible_tackle_items.size()
+	var page_count: int = max(ceili(float(total_count) / float(TACKLE_ITEMS_PER_PAGE)), 1)
+	main._tackle_page = clampi(main._tackle_page, 0, page_count - 1)
+
+	var page_start: int = main._tackle_page * TACKLE_ITEMS_PER_PAGE
+	var page_end: int = mini(page_start + TACKLE_ITEMS_PER_PAGE, total_count)
+	var selected_index := -1
+
+	for i in total_count:
+		var item: Dictionary = main._visible_tackle_items[i]
+		if str(item.get("id", "")) == main._selected_tackle_item_id:
+			selected_index = i
+			break
+
+	if selected_index < page_start or selected_index >= page_end:
+		if page_start < page_end:
+			selected_index = page_start
+			main._selected_tackle_item_id = str(main._visible_tackle_items[selected_index].get("id", ""))
+		else:
+			selected_index = -1
+			main._selected_tackle_item_id = ""
+
+	for i in range(page_start, page_end):
 		var item: Dictionary = main._visible_tackle_items[i]
 		main.tackle_item_list.add_item(_get_tackle_item_display_text(item))
 		var list_index = main.tackle_item_list.item_count - 1
@@ -178,17 +252,12 @@ func _update_tackle_ui() -> void:
 			main.tackle_item_list.set_item_custom_bg_color(list_index, Color(0.12, 0.34, 0.22, 0.66))
 			main.tackle_item_list.set_item_custom_fg_color(list_index, Color(0.80, 1.0, 0.82, 1.0))
 
-		if str(item.get("id", "")) == main._selected_tackle_item_id:
-			selected_index = i
-
-	if selected_index < 0 and not main._visible_tackle_items.is_empty():
-		selected_index = 0
-		main._selected_tackle_item_id = str(main._visible_tackle_items[0].get("id", ""))
-
-	if selected_index >= 0:
-		main.tackle_item_list.select(selected_index)
+	if selected_index >= page_start and selected_index < page_end:
+		main.tackle_item_list.select(selected_index - page_start)
 	else:
 		main._selected_tackle_item_id = ""
+
+	_update_tackle_pager(page_count, total_count)
 
 	var selected_item = _get_selected_tackle_item()
 	var hints_text = _get_tackle_setup_hints_text(4)
@@ -221,45 +290,100 @@ func _update_tackle_ui() -> void:
 	for item in category_buttons:
 		var button: Button = item[0]
 		var category: String = item[1]
-		match category:
-			"rod":
-				button.text = "Удочка"
-			"line":
-				button.text = "Леска"
-			"float":
-				button.text = "Поплавок"
-			"hook":
-				button.text = "Крючок"
-			"bait":
-				button.text = "Наживка"
+		button.text = _get_tackle_slot_button_text(category)
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		button.clip_text = true
+		button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		theme.apply_tab_button_style(button, category == main._tackle_category)
+		button.add_theme_font_size_override("font_size", 11)
+
+
+func _get_tackle_slot_button_text(category: String) -> String:
+	return "%s\nНадето: %s" % [
+		_get_tackle_slot_title(category),
+		_get_tackle_slot_equipped_name(category)
+	]
+
+
+func _get_tackle_slot_title(category: String) -> String:
+	match category:
+		"rod":
+			return "Удочка"
+		"line":
+			return "Леска"
+		"float":
+			return "Поплавок"
+		"hook":
+			return "Крючок"
+		"bait":
+			return "Наживка"
+		_:
+			return "Слот"
+
+
+func _get_tackle_slot_equipped_name(category: String) -> String:
+	var current: Dictionary = PlayerData.current_tackle.get(category, {})
+	var equipped_name := str(current.get("name", "-"))
+
+	if category == "bait":
+		return "%s x%d" % [_short_tackle_slot_text(equipped_name, 17), PlayerData.get_current_bait_quantity()]
+
+	return _short_tackle_slot_text(equipped_name, 20)
+
+
+func _short_tackle_slot_text(value: String, max_chars: int) -> String:
+	if value.length() <= max_chars:
+		return value
+
+	return "%s..." % value.substr(0, max(max_chars - 3, 1))
 
 
 func _set_tackle_category(category: String) -> void:
 	main._tackle_category = category
+	main._tackle_page = 0
 	main._selected_tackle_item_id = ""
 	_update_tackle_ui()
 
 
 func _on_tackle_item_selected(index: int) -> void:
-	if index < 0 or index >= main._visible_tackle_items.size():
+	var item_index: int = main._tackle_page * TACKLE_ITEMS_PER_PAGE + index
+	if item_index < 0 or item_index >= main._visible_tackle_items.size():
 		main._selected_tackle_item_id = ""
 	else:
-		main._selected_tackle_item_id = str(main._visible_tackle_items[index].get("id", ""))
+		main._selected_tackle_item_id = str(main._visible_tackle_items[item_index].get("id", ""))
 
 	_update_tackle_ui()
 
 
 func _on_tackle_item_activated(index: int) -> void:
-	if index < 0 or index >= main._visible_tackle_items.size():
+	var item_index: int = main._tackle_page * TACKLE_ITEMS_PER_PAGE + index
+	if item_index < 0 or item_index >= main._visible_tackle_items.size():
 		return
 
-	main._selected_tackle_item_id = str(main._visible_tackle_items[index].get("id", ""))
+	main._selected_tackle_item_id = str(main._visible_tackle_items[item_index].get("id", ""))
 
-	if main._fishing_ui_state == FishingUiState.IDLE and not _is_tackle_item_equipped(main._visible_tackle_items[index]):
+	if main._fishing_ui_state == FishingUiState.IDLE and not _is_tackle_item_equipped(main._visible_tackle_items[item_index]):
 		main._on_tackle_equip_button_pressed()
-	else:
-		_update_tackle_ui()
+
+
+func _on_tackle_prev_page_pressed() -> void:
+	if main._tackle_page <= 0:
+		return
+
+	main._tackle_page -= 1
+	main._selected_tackle_item_id = ""
+	_update_tackle_ui()
+
+
+func _on_tackle_next_page_pressed() -> void:
+	var total_count: int = PlayerData.get_owned_items_for_category(main._tackle_category).size()
+	var page_count: int = max(ceili(float(total_count) / float(TACKLE_ITEMS_PER_PAGE)), 1)
+	if main._tackle_page >= page_count - 1:
+		return
+
+	main._tackle_page += 1
+	main._selected_tackle_item_id = ""
+	_update_tackle_ui()
 
 
 func _get_selected_tackle_item() -> Dictionary:
@@ -273,7 +397,7 @@ func _get_selected_tackle_item() -> Dictionary:
 func _get_tackle_item_display_text(item: Dictionary) -> String:
 	var name = str(item.get("name", "-"))
 	var quantity = int(item.get("quantity", 1))
-	var equipped_marker = "  ✓ Equipped" if _is_tackle_item_equipped(item) else ""
+	var equipped_marker = "  [Надето]" if _is_tackle_item_equipped(item) else ""
 
 	if str(item.get("category", "")) == "bait":
 		return "%s x%d%s" % [name, quantity, equipped_marker]
@@ -283,11 +407,13 @@ func _get_tackle_item_display_text(item: Dictionary) -> String:
 
 func _get_tackle_item_details_text(item: Dictionary) -> String:
 	var category = str(item.get("category", "misc"))
-	var details = "%s\nТип: %s\nРедкость: %s\nЦена: %d мон.\nКоличество: %d" % [
+	var equipped_line := "Статус: надето в текущей сборке\n" if _is_tackle_item_equipped(item) else ""
+	var details = "%s\n%sТип: %s\nРедкость: %s\nЦена: %s\nКоличество: %d" % [
 		str(item.get("name", "-")),
+		equipped_line,
 		main._get_inventory_category_title(category),
 		_get_rarity_title(str(item.get("rarity", "common"))),
-		int(item.get("price", 0)),
+		PlayerData.format_money(float(item.get("price", 0.0))),
 		int(item.get("quantity", 1))
 	]
 	var description = str(item.get("description", ""))
@@ -361,6 +487,14 @@ func _get_tackle_setup_hints_text(max_lines: int = 4) -> String:
 		visible_hints.append(hints[i])
 
 	return "\n".join(visible_hints)
+
+
+func _get_tackle_setup_status_or_hints_text() -> String:
+	var issues: Array = PlayerData.get_tackle_setup_issues()
+	if issues.is_empty():
+		return _get_tackle_setup_hints_text(2)
+
+	return "Сборка не готова: %s" % "; ".join(issues)
 
 
 func _get_tackle_setup_hints() -> Array:
@@ -506,7 +640,7 @@ func _get_no_bite_candidate_reason(spot_id: String) -> String:
 func _get_tackle_stat_keys(category: String) -> Array:
 	match category:
 		"rod":
-			return ["max_fish_weight", "control_bonus", "stiffness", "durability", "durability_loss"]
+			return ["length_m", "rod_class", "max_fish_weight", "control_bonus", "handling_bonus", "reach_bonus", "stiffness", "durability", "durability_loss"]
 		"line":
 			return ["max_load", "break_resistance", "break_chance", "visibility", "durability", "wear_rate"]
 		"float":
@@ -521,6 +655,10 @@ func _get_tackle_stat_keys(category: String) -> Array:
 
 func _get_tackle_stat_title(key: String) -> String:
 	match key:
+		"length_m":
+			return "Длина"
+		"rod_class":
+			return "Класс"
 		"max_fish_weight":
 			return "Макс. рыба"
 		"strength":
@@ -531,6 +669,10 @@ func _get_tackle_stat_title(key: String) -> String:
 			return "Контроль"
 		"control_bonus":
 			return "Контроль"
+		"handling_bonus":
+			return "Управляемость"
+		"reach_bonus":
+			return "Досягаемость"
 		"durability":
 			return "Прочность"
 		"durability_loss":
@@ -573,10 +715,30 @@ func _get_tackle_stat_title(key: String) -> String:
 
 func _format_tackle_stat_value(key: String, value) -> String:
 	match key:
+		"hook_size":
+			return "№%s" % PlayerData.format_hook_size(int(value))
+		"length_m":
+			return "%.1f м" % float(value)
 		"max_fish_weight", "max_load_kg", "max_load":
 			return "%.1f кг" % float(value)
-		"tension_bonus", "control_bonus", "break_resistance", "break_chance", "visibility", "sensitivity", "stability", "bite_visibility", "hook_chance", "fish_escape_modifier", "fish_attraction", "strength", "stiffness", "durability", "durability_loss", "wear_rate", "hook_strength":
+		"tension_bonus", "control_bonus", "handling_bonus", "reach_bonus", "break_resistance", "break_chance", "visibility", "sensitivity", "stability", "bite_visibility", "hook_chance", "fish_escape_modifier", "fish_attraction", "strength", "stiffness", "durability", "durability_loss", "wear_rate", "hook_strength":
 			return "%d%%" % roundi(float(value) * 100.0)
+		"rod_class":
+			match str(value):
+				"ultra_light":
+					return "ультра лайт"
+				"light":
+					return "лайт"
+				"medium":
+					return "медиум"
+				"universal":
+					return "универсал"
+				"heavy":
+					return "тяжёлая"
+				"extra_heavy":
+					return "экстра тяжёлая"
+				_:
+					return str(value)
 		"target_fish_size":
 			match str(value):
 				"small":

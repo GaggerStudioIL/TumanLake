@@ -162,7 +162,9 @@ func _rebuild_keepnet_cards() -> void:
 
 
 func _create_keepnet_card(fish: Dictionary, fish_index: int, card_size: Vector2) -> Panel:
-	var tier = main._get_reward_tier(fish)
+	var tier := str(fish.get("catch_rank", "normal"))
+	if tier != "trophy" and tier != "rarity":
+		tier = "normal"
 	var accent = _get_keepnet_tier_color(tier)
 	var card = Panel.new()
 	card.custom_minimum_size = card_size
@@ -176,7 +178,7 @@ func _create_keepnet_card(fish: Dictionary, fish_index: int, card_size: Vector2)
 	fish_slot.size = Vector2(132.0, 60.0)
 	fish_slot.clip_contents = true
 	fish_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var slot_rarity: String = "legendary" if tier == "trophy" else tier
+	var slot_rarity: String = "epic" if tier == "rarity" else ("legendary" if tier == "trophy" else "common")
 	theme.apply_rarity_slot_style(fish_slot, slot_rarity)
 	card.add_child(fish_slot)
 
@@ -215,6 +217,7 @@ func _create_keepnet_card(fish: Dictionary, fish_index: int, card_size: Vector2)
 
 	var badge_label = Label.new()
 	badge_label.text = _get_keepnet_tier_label(tier)
+	badge_label.visible = tier == "trophy" or tier == "rarity"
 	badge_label.position = Vector2(154.0, 34.0)
 	badge_label.size = Vector2(112.0, 22.0)
 	badge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -255,6 +258,8 @@ func _create_keepnet_card(fish: Dictionary, fish_index: int, card_size: Vector2)
 
 func _get_keepnet_tier_color(tier: String) -> Color:
 	match tier:
+		"rarity":
+			return Color(0.82, 0.56, 1.0, 1.0)
 		"trophy":
 			return Color(1.0, 0.80, 0.38, 1.0)
 		"rare":
@@ -267,6 +272,8 @@ func _get_keepnet_tier_color(tier: String) -> Color:
 
 func _get_keepnet_tier_label(tier: String) -> String:
 	match tier:
+		"rarity":
+			return "Раритет"
 		"trophy":
 			return "Трофей"
 		"rare":

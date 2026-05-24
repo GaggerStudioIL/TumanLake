@@ -29,7 +29,7 @@ func is_open() -> bool:
 
 func _update_ui() -> void:
 	main._update_time_hud()
-	main.money_label.text = "%d мон." % PlayerData.money
+	main.money_label.text = PlayerData.format_money(PlayerData.money)
 	main.tackle_label.text = _get_main_hud_text()
 	main.level_label.text = "LVL %d  XP %d/%d" % [
 		PlayerData.level,
@@ -38,18 +38,18 @@ func _update_ui() -> void:
 	]
 	main.xp_progress_bar.max_value = max(PlayerData.xp_to_next_level, 1)
 	main.xp_progress_bar.value = clamp(PlayerData.current_xp, 0, PlayerData.xp_to_next_level)
-	main.money_label.text = "%d ₽" % PlayerData.money
+	main.money_label.text = "%s ₽" % PlayerData.format_money_amount(PlayerData.money)
 	main.level_label.text = "LVL %d  %d/%d XP" % [
 		PlayerData.level,
 		PlayerData.current_xp,
 		PlayerData.xp_to_next_level
 	]
 
-	var locked_for_result_or_fishing: bool = main._fishing_ui_state != FishingUiState.IDLE
-	main.fish_button.disabled = main._fishing_ui_state == FishingUiState.WAITING
+	var locked_for_result_or_fishing: bool = main._fishing_ui_state != FishingUiState.IDLE or main.is_cast_animating
+	main.fish_button.disabled = main._fishing_ui_state == FishingUiState.WAITING or main.is_cast_animating
 	main.spot_option_button.disabled = locked_for_result_or_fishing
-	main.basket_button.disabled = main._fishing_ui_state == FishingUiState.WAITING or main._fishing_ui_state == FishingUiState.FIGHTING
-	main.inventory_button.disabled = main._fishing_ui_state == FishingUiState.WAITING or main._fishing_ui_state == FishingUiState.FIGHTING
+	main.basket_button.disabled = main._fishing_ui_state == FishingUiState.WAITING or main._fishing_ui_state == FishingUiState.FIGHTING or main.is_cast_animating
+	main.inventory_button.disabled = main._fishing_ui_state == FishingUiState.WAITING or main._fishing_ui_state == FishingUiState.FIGHTING or main.is_cast_animating
 	main.tackle_button.disabled = main.inventory_button.disabled
 	main.shop_button.disabled = main.inventory_button.disabled
 	main.map_button.disabled = main.inventory_button.disabled
@@ -84,6 +84,10 @@ func _update_ui() -> void:
 		_:
 			main.fish_button.text = "Забросить"
 
+	if main.is_cast_animating:
+		main.fish_button.text = "Заброс..."
+
+	main._refresh_fish_button_presentation()
 	main._update_basket_ui()
 	_refresh_bottom_nav_styles()
 	if main.inventory_panel.visible:
@@ -111,7 +115,6 @@ func _refresh_bottom_nav_styles() -> void:
 		active_tab = "map"
 
 	var nav_data: Array = [
-		[main.nav_fish_button, "fish"],
 		[main.basket_button, "sell"],
 		[main.inventory_button, "inventory"],
 		[main.shop_button, "shop"],
@@ -123,8 +126,8 @@ func _refresh_bottom_nav_styles() -> void:
 		var nav_button: Button = item[0]
 		var tab_name: String = item[1]
 		var is_active: bool = tab_name == active_tab
-		main._apply_button_style(nav_button, main.STYLE_BOTTOM_NAV_ACTIVE if is_active else main.STYLE_BOTTOM_NAV_BUTTON)
-		nav_button.modulate = Color(1.0, 1.0, 1.0, 1.0 if is_active else 0.86)
+		main._refresh_side_menu_button_state(nav_button, is_active)
+	main.nav_fish_button.visible = false
 
 	var bait_active: bool = main.inventory_panel.visible and main._inventory_category == "bait"
 	main._apply_action_button_style(main.feed_button, false)

@@ -3,6 +3,8 @@ extends RefCounted
 
 var main
 var theme
+const INVENTORY_ITEMS_PER_PAGE := 8
+
 enum FishingUiState {
 	IDLE,
 	WAITING,
@@ -14,6 +16,7 @@ enum FishingUiState {
 func setup(main_ref) -> void:
 	main = main_ref
 	theme = main.ui_theme
+	_ensure_inventory_pager_nodes()
 
 func open() -> void:
 	if main._is_catch_reward_open():
@@ -54,18 +57,42 @@ func _update_inventory_ui() -> void:
 	main.inventory_tackle_label.text = _get_current_tackle_inventory_text()
 	main.inventory_item_list.clear()
 
-	var selected_index = -1
-	for i in main._visible_inventory_items.size():
-		var item: Dictionary = main._visible_inventory_items[i]
-		main.inventory_item_list.add_item(_get_inventory_item_display_text(item))
+	var total_count: int = main._visible_inventory_items.size()
+	var page_count: int = max(ceili(float(total_count) / float(INVENTORY_ITEMS_PER_PAGE)), 1)
+	main._inventory_page = clampi(main._inventory_page, 0, page_count - 1)
 
+	var page_start: int = main._inventory_page * INVENTORY_ITEMS_PER_PAGE
+	var page_end: int = mini(page_start + INVENTORY_ITEMS_PER_PAGE, total_count)
+	var selected_index := -1
+
+	for i in total_count:
+		var item: Dictionary = main._visible_inventory_items[i]
 		if str(item.get("id", "")) == main._selected_inventory_item_id:
 			selected_index = i
+			break
 
-	if selected_index >= 0:
-		main.inventory_item_list.select(selected_index)
+	if selected_index < page_start or selected_index >= page_end:
+		if page_start < page_end:
+			selected_index = page_start
+			main._selected_inventory_item_id = str(main._visible_inventory_items[selected_index].get("id", ""))
+		else:
+			selected_index = -1
+			main._selected_inventory_item_id = ""
+
+	for i in range(page_start, page_end):
+		var item: Dictionary = main._visible_inventory_items[i]
+		main.inventory_item_list.add_item(_get_inventory_item_display_text(item))
+		var list_index = main.inventory_item_list.item_count - 1
+		if _is_inventory_item_equipped(item):
+			main.inventory_item_list.set_item_custom_bg_color(list_index, Color(0.12, 0.34, 0.22, 0.66))
+			main.inventory_item_list.set_item_custom_fg_color(list_index, Color(0.80, 1.0, 0.82, 1.0))
+
+	if selected_index >= page_start and selected_index < page_end:
+		main.inventory_item_list.select(selected_index - page_start)
 	else:
 		main._selected_inventory_item_id = ""
+
+	_update_inventory_pager(page_count, total_count)
 
 	var selected_item = _get_selected_inventory_item()
 	if selected_item.is_empty():
@@ -77,6 +104,7 @@ func _update_inventory_ui() -> void:
 		main.inventory_details_label.text = _get_inventory_item_details_text(selected_item)
 
 	var can_equip = not selected_item.is_empty() and PlayerData.can_equip_item(selected_item)
+	var is_equipped := can_equip and _is_inventory_item_equipped(selected_item)
 	var details_bottom_padding = 24.0
 
 	if can_equip:
@@ -86,9 +114,65 @@ func _update_inventory_ui() -> void:
 		main.inventory_details_label.size.x,
 		max(main.inventory_details_card.size.y - details_bottom_padding, 48.0)
 	)
-	main.inventory_equip_button.disabled = not can_equip or main._fishing_ui_state != FishingUiState.IDLE
+	main.inventory_equip_button.disabled = not can_equip or is_equipped or main._fishing_ui_state != FishingUiState.IDLE
 	main.inventory_equip_button.visible = can_equip
+	if is_equipped:
+		main.inventory_equip_button.text = "Надето"
+	elif main._fishing_ui_state != FishingUiState.IDLE and can_equip:
+		main.inventory_equip_button.text = "Только вне ловли"
+	else:
+		main.inventory_equip_button.text = "Экипировать"
 	_refresh_inventory_category_buttons()
+
+
+func _ensure_inventory_pager_nodes() -> void:
+	if main == null or main.inventory_panel == null:
+		return
+
+	if main.inventory_prev_page_button == null:
+		main.inventory_prev_page_button = Button.new()
+		main.inventory_prev_page_button.name = "InventoryPrevPageButton"
+		main.inventory_prev_page_button.text = "<"
+		main.inventory_prev_page_button.focus_mode = Control.FOCUS_NONE
+		main.inventory_prev_page_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		main.inventory_prev_page_button.z_index = 2
+		main.inventory_prev_page_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		main.inventory_panel.add_child(main.inventory_prev_page_button)
+		main.inventory_prev_page_button.pressed.connect(_on_inventory_prev_page_pressed)
+
+	if main.inventory_next_page_button == null:
+		main.inventory_next_page_button = Button.new()
+		main.inventory_next_page_button.name = "InventoryNextPageButton"
+		main.inventory_next_page_button.text = ">"
+		main.inventory_next_page_button.focus_mode = Control.FOCUS_NONE
+		main.inventory_next_page_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		main.inventory_next_page_button.z_index = 2
+		main.inventory_next_page_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		main.inventory_panel.add_child(main.inventory_next_page_button)
+		main.inventory_next_page_button.pressed.connect(_on_inventory_next_page_pressed)
+
+	if main.inventory_page_label == null:
+		main.inventory_page_label = Label.new()
+		main.inventory_page_label.name = "InventoryPageLabel"
+		main.inventory_page_label.text = ""
+		main.inventory_page_label.z_index = 2
+		main.inventory_page_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		main.inventory_page_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		main.inventory_panel.add_child(main.inventory_page_label)
+
+
+func _update_inventory_pager(page_count: int, total_count: int) -> void:
+	_ensure_inventory_pager_nodes()
+	if main.inventory_prev_page_button == null or main.inventory_next_page_button == null or main.inventory_page_label == null:
+		return
+
+	var has_pages := total_count > INVENTORY_ITEMS_PER_PAGE
+	main.inventory_prev_page_button.visible = has_pages
+	main.inventory_next_page_button.visible = has_pages
+	main.inventory_page_label.visible = has_pages
+	main.inventory_prev_page_button.disabled = main._inventory_page <= 0
+	main.inventory_next_page_button.disabled = main._inventory_page >= page_count - 1
+	main.inventory_page_label.text = "%d / %d" % [main._inventory_page + 1, page_count]
 
 
 func _refresh_inventory_category_buttons() -> void:
@@ -148,15 +232,16 @@ func _get_inventory_item_display_text(item: Dictionary) -> String:
 	var category = str(item.get("category", "misc"))
 	var name = str(item.get("name", "-"))
 	var quantity = int(item.get("quantity", 1))
+	var equipped_marker := "  [Надето]" if _is_inventory_item_equipped(item) else ""
 
 	if category == "fish":
 		var stats: Dictionary = item.get("stats", {})
 		return "%s %.2f кг" % [name, float(stats.get("weight", 0.0))]
 
 	if quantity > 1:
-		return "%s x%d" % [name, quantity]
+		return "%s x%d%s" % [name, quantity, equipped_marker]
 
-	return name
+	return "%s%s" % [name, equipped_marker]
 
 
 func _get_inventory_item_details_text(item: Dictionary) -> String:
@@ -174,8 +259,10 @@ func _get_inventory_item_details_text(item: Dictionary) -> String:
 			str(stats.get("rarity", "-"))
 		]
 
-	var details = "%s\nКатегория: %s\nКоличество: %d" % [
+	var equipped_line := "Статус: надето в текущей сборке\n" if _is_inventory_item_equipped(item) else ""
+	var details = "%s\n%sКатегория: %s\nКоличество: %d" % [
 		name,
+		equipped_line,
 		_get_inventory_category_title(category),
 		quantity
 	]
@@ -208,21 +295,7 @@ func _get_inventory_stats_text(stats: Dictionary) -> String:
 
 
 func _get_current_tackle_inventory_text() -> String:
-	return "Текущая маховая снасть\nУдилище: %s\nЛеска: %s | Поплавок: %s\nКрючок: %s | Наживка: %s x%d\nПрочность: уд. %d%% | леска %d%% | крючок %d%%" % [
-		PlayerData.current_tackle.get("rod", {}).get("name", "-"),
-		PlayerData.current_tackle.get("line", {}).get("name", "-"),
-		PlayerData.current_tackle.get("float", {}).get("name", "-"),
-		PlayerData.current_tackle.get("hook", {}).get("name", "-"),
-		PlayerData.current_tackle.get("bait", {}).get("name", "-"),
-		PlayerData.get_current_bait_quantity(),
-		roundi(PlayerData.get_tackle_condition("rod") * 100.0),
-		roundi(PlayerData.get_tackle_condition("line") * 100.0),
-		roundi(PlayerData.get_tackle_condition("hook") * 100.0)
-	]
-
-
-func _get_tackle_build_summary_text() -> String:
-	return "Текущая сборка: %s | %s | %s\n%s | %s x%d | глубина %.1f м\nПрочность: уд. %d%% | леска %d%% | крючок %d%%" % [
+	return "СЕЙЧАС НАДЕТО В СБОРКЕ\nУдочка: %s\nЛеска: %s  |  Поплавок: %s\nКрючок: %s  |  Наживка: %s x%d\nГлубина %.1f м  |  Состояние: уд.%d%% / леска %d%% / крючок %d%%\n%s" % [
 		PlayerData.current_tackle.get("rod", {}).get("name", "-"),
 		PlayerData.current_tackle.get("line", {}).get("name", "-"),
 		PlayerData.current_tackle.get("float", {}).get("name", "-"),
@@ -232,8 +305,41 @@ func _get_tackle_build_summary_text() -> String:
 		PlayerData.fishing_depth,
 		roundi(PlayerData.get_tackle_condition("rod") * 100.0),
 		roundi(PlayerData.get_tackle_condition("line") * 100.0),
-		roundi(PlayerData.get_tackle_condition("hook") * 100.0)
+		roundi(PlayerData.get_tackle_condition("hook") * 100.0),
+		_get_tackle_setup_status_inline()
 	]
+
+
+func _get_tackle_build_summary_text() -> String:
+	return "СЕЙЧАС НАДЕТО В СБОРКЕ\nУдочка: %s\nЛеска: %s  |  Поплавок: %s\nКрючок: %s  |  Наживка: %s x%d\nГлубина %.1f м  |  Состояние: уд.%d%% / леска %d%% / крючок %d%%\n%s" % [
+		PlayerData.current_tackle.get("rod", {}).get("name", "-"),
+		PlayerData.current_tackle.get("line", {}).get("name", "-"),
+		PlayerData.current_tackle.get("float", {}).get("name", "-"),
+		PlayerData.current_tackle.get("hook", {}).get("name", "-"),
+		PlayerData.current_tackle.get("bait", {}).get("name", "-"),
+		PlayerData.get_current_bait_quantity(),
+		PlayerData.fishing_depth,
+		roundi(PlayerData.get_tackle_condition("rod") * 100.0),
+		roundi(PlayerData.get_tackle_condition("line") * 100.0),
+		roundi(PlayerData.get_tackle_condition("hook") * 100.0),
+		_get_tackle_setup_status_inline()
+	]
+
+
+func _get_tackle_setup_status_inline() -> String:
+	var issues: Array = PlayerData.get_tackle_setup_issues()
+	if issues.is_empty():
+		return "Статус: сборка готова."
+
+	return "Проблемы: %s" % "; ".join(issues)
+
+
+func _is_inventory_item_equipped(item: Dictionary) -> bool:
+	var category := str(item.get("category", ""))
+	if not PlayerData.current_tackle.has(category):
+		return false
+
+	return str(PlayerData.current_tackle[category].get("id", "")) == str(item.get("id", ""))
 
 
 func _get_inventory_category_title(category: String) -> String:
@@ -258,14 +364,36 @@ func _get_inventory_category_title(category: String) -> String:
 
 func _set_inventory_category(category: String) -> void:
 	main._inventory_category = category
+	main._inventory_page = 0
 	main._selected_inventory_item_id = ""
 	_update_inventory_ui()
 
 
 func _on_inventory_item_selected(index: int) -> void:
-	if index < 0 or index >= main._visible_inventory_items.size():
+	var item_index: int = main._inventory_page * INVENTORY_ITEMS_PER_PAGE + index
+	if item_index < 0 or item_index >= main._visible_inventory_items.size():
 		main._selected_inventory_item_id = ""
 	else:
-		main._selected_inventory_item_id = str(main._visible_inventory_items[index].get("id", ""))
+		main._selected_inventory_item_id = str(main._visible_inventory_items[item_index].get("id", ""))
 
+	_update_inventory_ui()
+
+
+func _on_inventory_prev_page_pressed() -> void:
+	if main._inventory_page <= 0:
+		return
+
+	main._inventory_page -= 1
+	main._selected_inventory_item_id = ""
+	_update_inventory_ui()
+
+
+func _on_inventory_next_page_pressed() -> void:
+	var total_count: int = _get_visible_inventory_items().size()
+	var page_count: int = max(ceili(float(total_count) / float(INVENTORY_ITEMS_PER_PAGE)), 1)
+	if main._inventory_page >= page_count - 1:
+		return
+
+	main._inventory_page += 1
+	main._selected_inventory_item_id = ""
 	_update_inventory_ui()

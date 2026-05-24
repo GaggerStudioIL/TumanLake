@@ -997,6 +997,42 @@ var fish_data := {
 
 const FISH_RULES := {}
 const FISH_ACTIVITY := {}
+const CATCH_WEIGHT_CURVE := 2.85
+const CATCH_WEIGHT_PEAK_BIAS_STRENGTH := 0.45
+const CATCH_RANK_WEIGHTS := {
+	"bleak": {"trophy_weight": 0.06, "rarity_weight": 0.075},
+	"roach": {"trophy_weight": 0.6, "rarity_weight": 0.75},
+	"rudd": {"trophy_weight": 0.55, "rarity_weight": 0.66},
+	"rotan": {"trophy_weight": 0.38, "rarity_weight": 0.47},
+	"ruffe": {"trophy_weight": 0.15, "rarity_weight": 0.19},
+	"silver_crucian": {"trophy_weight": 1.1, "rarity_weight": 1.35},
+	"golden_crucian": {"trophy_weight": 0.9, "rarity_weight": 1.1},
+	"perch": {"trophy_weight": 0.9, "rarity_weight": 1.1},
+	"white_bream": {"trophy_weight": 0.55, "rarity_weight": 0.66},
+	"skimmer_bream": {"trophy_weight": 0.95, "rarity_weight": 1.15},
+	"tench": {"trophy_weight": 1.55, "rarity_weight": 1.85},
+	"bream": {"trophy_weight": 2.7, "rarity_weight": 3.25},
+	"topmouth_gudgeon": {"trophy_weight": 0.03, "rarity_weight": 0.038},
+	"gudgeon": {"trophy_weight": 0.11, "rarity_weight": 0.14},
+	"young_chub": {"trophy_weight": 0.8, "rarity_weight": 0.95},
+	"young_pike": {"trophy_weight": 2.3, "rarity_weight": 2.8},
+	"ide": {"trophy_weight": 1.9, "rarity_weight": 2.35},
+	"young_grass_carp": {"trophy_weight": 2.3, "rarity_weight": 2.8},
+	"young_mirror_carp": {"trophy_weight": 3.1, "rarity_weight": 3.75},
+	"small_catfish": {"trophy_weight": 3.8, "rarity_weight": 4.7},
+	"frog": {"trophy_weight": 0.11, "rarity_weight": 0.14},
+	"loach": {"trophy_weight": 0.19, "rarity_weight": 0.24},
+	"goby": {"trophy_weight": 0.19, "rarity_weight": 0.24},
+	"crayfish": {"trophy_weight": 0.15, "rarity_weight": 0.19},
+	"water_turtle": {"trophy_weight": 1.5, "rarity_weight": 1.9},
+	"crucian": {"trophy_weight": 1.1, "rarity_weight": 1.35},
+	"pike": {"trophy_weight": 3.9, "rarity_weight": 4.8},
+	"catfish": {"trophy_weight": 13.5, "rarity_weight": 17.0},
+	"eel": {"trophy_weight": 1.7, "rarity_weight": 2.1},
+	"zander": {"trophy_weight": 4.7, "rarity_weight": 5.8},
+	"mist_carp": {"trophy_weight": 15.5, "rarity_weight": 19.0},
+	"moon_catfish": {"trophy_weight": 23.5, "rarity_weight": 29.0}
+}
 
 var _fish_rules_applied := false
 
@@ -1047,6 +1083,15 @@ func _ensure_fish_rules() -> void:
 			fish_entry["escape_chance"] = fish_entry.get("escape_risk", 0.25)
 		if not fish_entry.has("strength_label"):
 			fish_entry["strength_label"] = _get_strength_label(float(fish_entry["strength"]))
+		if CATCH_RANK_WEIGHTS.has(fish_id):
+			var rank_weights: Dictionary = CATCH_RANK_WEIGHTS[fish_id]
+			fish_entry["trophy_weight"] = float(rank_weights.get("trophy_weight", max_weight * 0.80))
+			fish_entry["rarity_weight"] = float(rank_weights.get("rarity_weight", max_weight * 0.92))
+		else:
+			if not fish_entry.has("trophy_weight"):
+				fish_entry["trophy_weight"] = max_weight * 0.80
+			if not fish_entry.has("rarity_weight"):
+				fish_entry["rarity_weight"] = max_weight * 0.92
 
 		fish_data[fish_id] = fish_entry
 
@@ -1077,6 +1122,16 @@ func _get_strength_label(strength: float) -> String:
 func get_fish(fish_id: String) -> Dictionary:
 	_ensure_fish_rules()
 	return fish_data.get(fish_id, {})
+
+func get_catch_rank(fish: Dictionary, weight: float) -> String:
+	var rarity_weight := float(fish.get("rarity_weight", fish.get("max_weight", 999.0) * 0.92))
+	var trophy_weight := float(fish.get("trophy_weight", fish.get("max_weight", 999.0) * 0.80))
+
+	if weight >= rarity_weight:
+		return "rarity"
+	if weight >= trophy_weight:
+		return "trophy"
+	return "normal"
 
 func get_random_fish_id(available_fish: Array, rare_chance_modifier: float) -> String:
 	_ensure_fish_rules()
@@ -1115,18 +1170,23 @@ func create_catch(fish_id: String, weight_bias: float = 0.0) -> Dictionary:
 	if fish.is_empty():
 		return {}
 
-	var weight_roll: float = randf()
-	if weight_bias > 0.0:
-		weight_roll = pow(weight_roll, 1.0 / (1.0 + clamp(weight_bias, 0.0, 1.0) * 1.35))
-
+	var weight_roll: float = _roll_catch_weight_ratio(weight_bias)
 	var weight: float = snapped(lerp(float(fish["min_weight"]), float(fish["max_weight"]), weight_roll), 0.01)
 	var price: int = max(round(weight * fish["price_per_kg"]) + int(fish.get("base_price", 0)), 1)
 	var length_cm: float = snapped(_estimate_length_cm(weight), 0.1)
+	var catch_rank := get_catch_rank(fish, weight)
+	var trophy_weight := float(fish.get("trophy_weight", fish.get("max_weight", 999.0) * 0.80))
+	var rarity_weight := float(fish.get("rarity_weight", fish.get("max_weight", 999.0) * 0.92))
 
 	return {
 		"id": fish["id"],
 		"name": fish["name"],
 		"rarity": fish["rarity"],
+		"catch_rank": catch_rank,
+		"is_trophy": catch_rank == "trophy" or catch_rank == "rarity",
+		"is_rarity": catch_rank == "rarity",
+		"trophy_weight": trophy_weight,
+		"rarity_weight": rarity_weight,
 		"behavior": fish.get("behavior_type", fish.get("behavior", "calm")),
 		"behavior_type": fish.get("behavior_type", fish.get("behavior", "calm")),
 		"base_fight_power": fish.get("base_fight_power", 1.0),
@@ -1146,6 +1206,13 @@ func create_catch(fish_id: String, weight_bias: float = 0.0) -> Dictionary:
 		"price": price,
 		"description": fish["description"]
 	}
+
+func _roll_catch_weight_ratio(weight_bias: float = 0.0) -> float:
+	var roll: float = pow(randf(), CATCH_WEIGHT_CURVE)
+	var bias: float = clamp(weight_bias, 0.0, 1.0)
+	if bias > 0.0:
+		roll = pow(roll, 1.0 / (1.0 + bias * CATCH_WEIGHT_PEAK_BIAS_STRENGTH))
+	return clamp(roll, 0.0, 1.0)
 
 func _estimate_length_cm(weight: float) -> float:
 	var length: float = 12.0 + pow(max(weight, 0.05), 0.42) * 23.0 + randf_range(-1.4, 1.6)

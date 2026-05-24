@@ -32,7 +32,7 @@ func sell_all() -> int:
 	var total_money := 0
 
 	for item in inventory:
-		total_money += item["price"]
+		total_money += PlayerData.get_skill_adjusted_sell_price(int(item.get("price", 0)))
 
 	inventory.clear()
 	PlayerData.money += total_money

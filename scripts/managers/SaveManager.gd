@@ -9,6 +9,18 @@ func save_game() -> void:
 		"current_xp": PlayerData.current_xp,
 		"xp": PlayerData.current_xp,
 		"xp_to_next_level": PlayerData.xp_to_next_level,
+		"skill_points": PlayerData.skill_points,
+		"learned_skills": PlayerData.learned_skills,
+		"player_name": PlayerData.player_name,
+		"total_fish_caught": PlayerData.total_fish_caught,
+		"total_trophies_caught": PlayerData.total_trophies_caught,
+		"total_rarity_caught": PlayerData.total_rarity_caught,
+		"biggest_fish": PlayerData.biggest_fish,
+		"biggest_fish_by_species": PlayerData.biggest_fish_by_species,
+		"trophy_catches": PlayerData.trophy_catches,
+		"personal_records": PlayerData.personal_records,
+		"rescue_kit_claims_total": PlayerData.rescue_kit_claims_total,
+		"rescue_kit_last_claim_day": PlayerData.rescue_kit_last_claim_day,
 		"current_waterbody": PlayerData.current_waterbody,
 		"unlocked_waterbodies": PlayerData.unlocked_waterbodies,
 		"current_spot": PlayerData.current_spot,
@@ -59,11 +71,18 @@ func load_game() -> void:
 		print("Save data is not valid")
 		return
 
-	PlayerData.money = int(save_data.get("money", 0))
+	PlayerData.money = float(save_data.get("money", 0.0))
 	PlayerData.set_progression(
 		int(save_data.get("level", 1)),
 		int(save_data.get("current_xp", save_data.get("xp", 0)))
 	)
+	PlayerData.set_skill_state(
+		int(save_data.get("skill_points", 0)),
+		save_data.get("learned_skills", {})
+	)
+	PlayerData.set_catch_stats_from_save(save_data)
+	PlayerData.rescue_kit_claims_total = max(int(save_data.get("rescue_kit_claims_total", 0)), 0)
+	PlayerData.rescue_kit_last_claim_day = int(save_data.get("rescue_kit_last_claim_day", -1))
 	PlayerData.set_unlocked_waterbodies(save_data.get("unlocked_waterbodies", ["agamin_lake"]))
 	PlayerData.current_waterbody = str(save_data.get("current_waterbody", "agamin_lake"))
 	if not PlayerData.can_use_waterbody(PlayerData.current_waterbody):

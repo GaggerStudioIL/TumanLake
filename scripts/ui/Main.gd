@@ -8,6 +8,8 @@ const WaterbodyUIScript := preload("res://scripts/ui/WaterbodyUI.gd")
 const CatchPopupUIScript := preload("res://scripts/ui/CatchPopupUI.gd")
 const FishingHUDUIScript := preload("res://scripts/ui/FishingHUDUI.gd")
 const FishingPresenceUIScript := preload("res://scripts/ui/FishingPresenceUI.gd")
+const ProfileUIScript := preload("res://scripts/ui/ProfileUI.gd")
+const FailurePopupUIScript := preload("res://scripts/ui/FailurePopupUI.gd")
 const UIThemeScript := preload("res://scripts/ui/UITheme.gd")
 const TUMAN_LAKE_THEME := preload("res://themes/TumanLakeUI.tres")
 
@@ -20,15 +22,16 @@ const STYLE_BOTTOM_NAV_BUTTON := "BottomNavButton"
 const STYLE_BOTTOM_NAV_ACTIVE := "BottomNavActive"
 const BASE_SCREEN_SIZE := Vector2(960.0, 540.0)
 const HUD_HEIGHT := 44.0
-const LEFT_NAV_WIDTH := 138.0
-const LEFT_NAV_HEIGHT := 372.0
+const LEFT_NAV_WIDTH := 140.0
+const LEFT_NAV_HEIGHT := 282.0
 const ACTION_BAR_HEIGHT := 46.0
 const MENU_BACKDROP_Z := 300
 const MENU_PANEL_Z := 301
-const WATER_SURFACE_Y := 376.0
-const FLOAT_DEFAULT_POS := Vector2(500.0, 376.0)
-const ROD_ANCHOR_POS := Vector2(1138.0, 666.0)
-const ROD_TARGET_POS := Vector2(586.0, 362.0)
+const MODAL_TAP_GUARD_MSEC := 320
+const WATER_SURFACE_Y := 382.0
+const FLOAT_DEFAULT_POS := Vector2(500.0, 382.0)
+const ROD_ANCHOR_POS := Vector2(1108.0, 646.0)
+const ROD_TARGET_POS := Vector2(590.0, 382.0)
 
 @onready var background: ColorRect = $Background
 @onready var scene_gradient: ColorRect = $SceneGradient
@@ -129,6 +132,9 @@ const ROD_TARGET_POS := Vector2(586.0, 362.0)
 @onready var inventory_tackle_label: Label = $InventoryPanel/InventoryTackleLabel
 @onready var inventory_equip_button: Button = $InventoryPanel/InventoryEquipButton
 @onready var inventory_close_button: Button = $InventoryPanel/InventoryCloseButton
+var inventory_prev_page_button: Button
+var inventory_next_page_button: Button
+var inventory_page_label: Label
 @onready var catch_popup_backdrop: ColorRect = $CatchPopupBackdrop
 @onready var catch_popup_panel: Panel = $CatchPopupPanel
 @onready var catch_popup_particles: ColorRect = $CatchPopupPanel/CatchPopupParticles
@@ -154,9 +160,16 @@ var shop_money_label: Label
 var shop_bait_category_button: Button
 var shop_consumable_category_button: Button
 var shop_tackle_category_button: Button
+var shop_line_category_button: Button
+var shop_hook_category_button: Button
+var shop_float_category_button: Button
+var shop_items_scroll: ScrollContainer
 var shop_items_container: Control
 var shop_notice_label: Label
 var shop_close_button: Button
+var shop_prev_page_button: Button
+var shop_next_page_button: Button
+var shop_page_label: Label
 var shop_buy_audio: AudioStreamPlayer
 var shop_error_audio: AudioStreamPlayer
 var basket_backdrop: ColorRect
@@ -183,16 +196,24 @@ var tackle_hook_button: Button
 var tackle_bait_button: Button
 var tackle_equip_button: Button
 var tackle_close_button: Button
+var tackle_prev_page_button: Button
+var tackle_next_page_button: Button
+var tackle_page_label: Label
 var waterbody_backdrop: ColorRect
 var waterbody_panel: Panel
 var waterbody_title_label: Label
 var waterbody_item_list: ItemList
-var waterbody_preview: ColorRect
+var waterbody_preview_frame: Panel
+var waterbody_preview: TextureRect
 var waterbody_details_label: Label
 var waterbody_spot_list: ItemList
 var waterbody_spot_details_label: Label
 var waterbody_select_button: Button
 var waterbody_close_button: Button
+var waterbody_spot_prev_page_button: Button
+var waterbody_spot_next_page_button: Button
+var waterbody_spot_page_label: Label
+var waterbody_spot_buttons: Array = []
 var toast_label: Label
 var _toast_tween: Tween
 var shop_ui
@@ -203,8 +224,12 @@ var waterbody_ui
 var catch_popup_ui
 var fishing_hud_ui
 var fishing_presence_ui
+var profile_ui
+var failure_popup_ui
 var ui_theme
 var ui_canvas_layer: CanvasLayer
+var modal_input_shield: ColorRect
+var cast_button_visual: TextureRect
 var rod_sprite: Sprite2D
 var rod_shadow_sprite: Sprite2D
 var top_hud_container: HBoxContainer
@@ -222,6 +247,10 @@ var lake_bg_base_rect: TextureRect
 var lake_bg_foreground_rect: TextureRect
 var lake_bg_mist_rect: TextureRect
 var water_overlay_rect: TextureRect
+var time_color_overlay: ColorRect
+var time_celestial_overlay: ColorRect
+var time_stars_overlay: ColorRect
+var time_vignette_overlay: ColorRect
 
 enum FishingUiState {
 	IDLE,
@@ -232,15 +261,20 @@ enum FishingUiState {
 }
 
 var _fishing_ui_state: int = FishingUiState.IDLE
+var is_cast_animating := false
+var _pending_cast_spot_id := ""
 var _active_nav_tab: String = "fish"
 var _inventory_category: String = "all"
+var _inventory_page: int = 0
 var _visible_inventory_items: Array = []
 var _selected_inventory_item_id: String = ""
 var _tackle_category: String = "rod"
+var _tackle_page: int = 0
 var _visible_tackle_items: Array = []
 var _selected_tackle_item_id: String = ""
 var _visible_waterbodies: Array = []
 var _selected_waterbody_id: String = ""
+var _waterbody_spot_page: int = 0
 var _visible_waterbody_spots: Array = []
 var _selected_waterbody_spot_id: String = ""
 var _pending_reward_catch: Dictionary = {}
@@ -253,12 +287,19 @@ var _catch_shadow_base_position := Vector2.ZERO
 var _catch_reward_buttons_ready := false
 var _catch_reward_unlock_after_msec := 0
 var _shop_category: String = "bait"
+var _shop_page: int = 0
 var _shop_card_nodes: Dictionary = {}
 var _shop_feedback_tween: Tween
 var _presence_time := 0.0
 var _presence_bite_timer := 0.0
 var _presence_caught_timer := 0.0
 var _presence_has_layout := false
+var _cast_button_hovered := false
+var _cast_button_pressed := false
+var _fish_button_action_guard_msec := 0
+var _modal_tap_guard_until_msec := 0
+var _use_cast_png_button := true
+var _use_pull_png_button := true
 var _float_base_center := Vector2.ZERO
 var _float_visual_center := Vector2.ZERO
 var _rod_tip_visual := Vector2.ZERO
@@ -269,6 +310,7 @@ var _water_zone_top := 0.0
 var _water_zone_bottom := 0.0
 var _rod_anchor_pos := Vector2.ZERO
 var _rod_target_pos := Vector2.ZERO
+var _last_detailed_failure_msec := -100000
 
 var _last_reeling_state := {
 	"fish_name": "-",
@@ -298,11 +340,14 @@ var _last_reeling_state := {
 
 func _ready() -> void:
 	print("Tuman Lake: Main scene loaded")
+	_play_main_ambient()
 
 	theme = TUMAN_LAKE_THEME
 	SaveManager.load_game()
 	_setup_ui_controllers()
 	_ensure_ui_canvas_layer()
+	failure_popup_ui.setup(self)
+	profile_ui.setup(self)
 	_ensure_gameplay_layer_names()
 
 	resized.connect(_on_resized)
@@ -319,7 +364,26 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_update_fishing_presence(delta)
 	_update_catch_reward_input_lock()
+	_update_modal_tap_guard()
 	_update_time_hud()
+
+func _input(event: InputEvent) -> void:
+	if not _is_fish_button_pointer_event(event):
+		return
+
+	var mouse_event := event as InputEventMouseButton
+	if mouse_event.pressed:
+		_cast_button_pressed = true
+		_update_cast_button_visual()
+		_on_reel_button_down()
+		if not fish_button.disabled:
+			_trigger_fish_button_action()
+	else:
+		_cast_button_pressed = false
+		_update_cast_button_visual()
+		_on_reel_button_up()
+
+	get_viewport().set_input_as_handled()
 
 func _setup_ui_controllers() -> void:
 	ui_theme = UIThemeScript.new()
@@ -331,6 +395,8 @@ func _setup_ui_controllers() -> void:
 	catch_popup_ui = CatchPopupUIScript.new()
 	fishing_hud_ui = FishingHUDUIScript.new()
 	fishing_presence_ui = FishingPresenceUIScript.new()
+	profile_ui = ProfileUIScript.new()
+	failure_popup_ui = FailurePopupUIScript.new()
 
 	shop_ui.setup(self)
 	keepnet_ui.setup(self)
@@ -340,6 +406,7 @@ func _setup_ui_controllers() -> void:
 	catch_popup_ui.setup(self)
 	fishing_hud_ui.setup(self)
 	fishing_presence_ui.setup(self)
+	fishing_presence_ui.cast_visual_finished.connect(_on_cast_visual_finished)
 
 	shop_ui.buy_requested.connect(_on_shop_buy_pressed)
 	keepnet_ui.sell_fish_requested.connect(_on_keepnet_sell_fish_pressed)
@@ -406,6 +473,25 @@ func _ensure_ui_canvas_layer() -> void:
 			parent.remove_child(node)
 		ui_canvas_layer.add_child(node)
 
+	_ensure_modal_input_shield()
+
+func _ensure_modal_input_shield() -> void:
+	if modal_input_shield != null:
+		return
+
+	modal_input_shield = ColorRect.new()
+	modal_input_shield.name = "ModalInputShield"
+	modal_input_shield.visible = false
+	modal_input_shield.mouse_filter = Control.MOUSE_FILTER_STOP
+	modal_input_shield.color = Color(0.0, 0.0, 0.0, 0.01)
+	modal_input_shield.z_index = MENU_BACKDROP_Z - 1
+	modal_input_shield.set_anchors_preset(Control.PRESET_FULL_RECT)
+	modal_input_shield.offset_left = 0.0
+	modal_input_shield.offset_top = 0.0
+	modal_input_shield.offset_right = 0.0
+	modal_input_shield.offset_bottom = 0.0
+	ui_canvas_layer.add_child(modal_input_shield)
+
 func _ensure_gameplay_layer_names() -> void:
 	fishing_presence_layer.name = "gameplay_rod"
 	float_marker.name = "gameplay_float"
@@ -461,14 +547,49 @@ func _ensure_mobile_ui_containers() -> void:
 	quick_actions_container.move_child(tackle_button, 2)
 	quick_actions_container.move_child(auto_button, 3)
 
-	for node in [nav_fish_button, basket_button, inventory_button, shop_button, map_button, profile_button]:
+	if nav_fish_button.get_parent() == bottom_nav_container:
+		_reparent_node(nav_fish_button, ui_canvas_layer)
+	nav_fish_button.visible = false
+
+	for node in [basket_button, inventory_button, shop_button, map_button, profile_button]:
 		_reparent_node(node, bottom_nav_container)
-	bottom_nav_container.move_child(nav_fish_button, 0)
-	bottom_nav_container.move_child(basket_button, 1)
-	bottom_nav_container.move_child(inventory_button, 2)
-	bottom_nav_container.move_child(shop_button, 3)
-	bottom_nav_container.move_child(map_button, 4)
-	bottom_nav_container.move_child(profile_button, 5)
+	bottom_nav_container.move_child(basket_button, 0)
+	bottom_nav_container.move_child(inventory_button, 1)
+	bottom_nav_container.move_child(shop_button, 2)
+	bottom_nav_container.move_child(map_button, 3)
+	bottom_nav_container.move_child(profile_button, 4)
+
+func _ensure_cast_button_visual() -> void:
+	if cast_button_visual != null:
+		return
+
+	cast_button_visual = TextureRect.new()
+	cast_button_visual.name = "CastButtonVisual"
+	cast_button_visual.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cast_button_visual.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	cast_button_visual.stretch_mode = TextureRect.STRETCH_SCALE
+	cast_button_visual.visible = false
+	cast_button_visual.z_index = 102
+	cast_button_visual.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	ui_canvas_layer.add_child(cast_button_visual)
+
+	fish_button.mouse_entered.connect(func() -> void:
+		_cast_button_hovered = true
+		_update_cast_button_visual()
+	)
+	fish_button.mouse_exited.connect(func() -> void:
+		_cast_button_hovered = false
+		_cast_button_pressed = false
+		_update_cast_button_visual()
+	)
+	fish_button.button_down.connect(func() -> void:
+		_cast_button_pressed = true
+		_update_cast_button_visual()
+	)
+	fish_button.button_up.connect(func() -> void:
+		_cast_button_pressed = false
+		_update_cast_button_visual()
+	)
 
 func _reparent_node(node: Node, new_parent: Node) -> void:
 	if node == null or new_parent == null or node.get_parent() == new_parent:
@@ -568,6 +689,145 @@ func _make_scene_shader_material(shader_code: String) -> ShaderMaterial:
 	var material := ShaderMaterial.new()
 	material.shader = shader
 	return material
+
+func _create_time_of_day_overlay(node_name: String, z: int, material: ShaderMaterial) -> ColorRect:
+	var overlay := ColorRect.new()
+	overlay.name = node_name
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.z_as_relative = false
+	overlay.z_index = z
+	overlay.color = Color.WHITE
+	overlay.material = material
+	add_child(overlay)
+	return overlay
+
+func _ensure_time_of_day_layers() -> void:
+	if time_color_overlay == null:
+		time_color_overlay = _create_time_of_day_overlay("TimeColorOverlay", -99, _make_time_color_material())
+	if time_stars_overlay == null:
+		time_stars_overlay = _create_time_of_day_overlay("TimeStarsOverlay", -98, _make_time_stars_material())
+	if time_celestial_overlay == null:
+		time_celestial_overlay = _create_time_of_day_overlay("TimeCelestialOverlay", -97, _make_time_celestial_material())
+	if time_vignette_overlay == null:
+		time_vignette_overlay = _create_time_of_day_overlay("TimeVignetteOverlay", -96, _make_time_vignette_material())
+
+func _layout_time_of_day_layers(_screen_size: Vector2) -> void:
+	for overlay in [
+		time_color_overlay,
+		time_stars_overlay,
+		time_celestial_overlay,
+		time_vignette_overlay
+	]:
+		if overlay == null:
+			continue
+		overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+		overlay.offset_left = 0.0
+		overlay.offset_top = 0.0
+		overlay.offset_right = 0.0
+		overlay.offset_bottom = 0.0
+		overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		overlay.visible = true
+
+func _make_time_color_material() -> ShaderMaterial:
+	return _make_scene_shader_material("""
+		shader_type canvas_item;
+
+		uniform vec4 sky_tint : source_color = vec4(0.03, 0.06, 0.12, 0.18);
+		uniform vec4 water_tint : source_color = vec4(0.02, 0.05, 0.08, 0.20);
+		uniform vec4 horizon_tint : source_color = vec4(1.0, 0.56, 0.22, 0.0);
+		uniform float horizon_y = 0.47;
+
+		void fragment() {
+			float water_mask = smoothstep(horizon_y - 0.04, horizon_y + 0.18, UV.y);
+			vec4 tint = mix(sky_tint, water_tint, water_mask);
+			float horizon_band = (1.0 - smoothstep(0.0, 0.13, abs(UV.y - horizon_y))) * horizon_tint.a;
+			vec3 color = mix(tint.rgb, horizon_tint.rgb, clamp(horizon_band, 0.0, 1.0));
+			float alpha = clamp(max(tint.a, horizon_band * 0.82), 0.0, 0.88);
+			COLOR = vec4(color, alpha);
+		}
+	""")
+
+func _make_time_celestial_material() -> ShaderMaterial:
+	return _make_scene_shader_material("""
+		shader_type canvas_item;
+
+		uniform vec2 body_pos = vec2(0.22, 0.34);
+		uniform vec4 body_color : source_color = vec4(1.0, 0.78, 0.42, 1.0);
+		uniform vec4 glow_color : source_color = vec4(1.0, 0.54, 0.22, 1.0);
+		uniform vec4 reflection_color : source_color = vec4(1.0, 0.68, 0.32, 1.0);
+		uniform float body_radius = 0.018;
+		uniform float body_alpha = 0.34;
+		uniform float glow_radius = 0.22;
+		uniform float glow_alpha = 0.16;
+		uniform float reflection_alpha = 0.12;
+		uniform float horizon_y = 0.47;
+
+		void fragment() {
+			float aspect = SCREEN_PIXEL_SIZE.y / SCREEN_PIXEL_SIZE.x;
+			vec2 to_body = UV - body_pos;
+			to_body.x *= aspect;
+			float dist_to_body = length(to_body);
+			float glow = (1.0 - smoothstep(body_radius, glow_radius, dist_to_body)) * glow_alpha;
+			float body = (1.0 - smoothstep(body_radius * 0.72, body_radius, dist_to_body)) * body_alpha;
+
+			float water = smoothstep(horizon_y, horizon_y + 0.10, UV.y);
+			float bottom_fade = 1.0 - smoothstep(0.82, 1.0, UV.y);
+			float lane = (1.0 - smoothstep(0.0, 0.18, abs(UV.x - body_pos.x))) * water * bottom_fade;
+			float ripple = 0.62 + sin(UV.y * 132.0 + UV.x * 24.0 + TIME * 0.45) * 0.16;
+			float reflection = lane * ripple * reflection_alpha;
+
+			vec3 color = glow_color.rgb;
+			color = mix(color, body_color.rgb, clamp(body * 2.2, 0.0, 1.0));
+			color = mix(color, reflection_color.rgb, clamp(reflection * 2.4, 0.0, 1.0));
+			float alpha = clamp(max(glow, body) + reflection, 0.0, 0.92);
+			COLOR = vec4(color, alpha);
+		}
+	""")
+
+func _make_time_stars_material() -> ShaderMaterial:
+	return _make_scene_shader_material("""
+		shader_type canvas_item;
+
+		uniform float star_alpha = 0.0;
+		uniform float horizon_y = 0.47;
+		uniform vec4 star_color : source_color = vec4(0.84, 0.95, 1.0, 1.0);
+
+		float rand(vec2 value) {
+			return fract(sin(dot(value, vec2(12.9898, 78.233))) * 43758.5453);
+		}
+
+		void fragment() {
+			vec2 cell = floor(UV * vec2(92.0, 46.0));
+			vec2 local = fract(UV * vec2(92.0, 46.0));
+			float seed = rand(cell);
+			vec2 star_pos = vec2(rand(cell + 4.7), rand(cell + 9.3));
+			float point = 1.0 - smoothstep(0.0, 0.055, distance(local, star_pos));
+			float star_mask = step(0.985, seed);
+			float sky_mask = 1.0 - smoothstep(horizon_y - 0.12, horizon_y + 0.02, UV.y);
+			float twinkle = 0.72 + sin(TIME * 0.8 + seed * 18.0) * 0.20;
+			float alpha = point * star_mask * sky_mask * twinkle * star_alpha;
+			COLOR = vec4(star_color.rgb, alpha);
+		}
+	""")
+
+func _make_time_vignette_material() -> ShaderMaterial:
+	return _make_scene_shader_material("""
+		shader_type canvas_item;
+
+		uniform vec4 vignette_color : source_color = vec4(0.0, 0.025, 0.045, 1.0);
+		uniform float vignette_alpha = 0.22;
+
+		void fragment() {
+			float aspect = SCREEN_PIXEL_SIZE.y / SCREEN_PIXEL_SIZE.x;
+			vec2 centered = UV * 2.0 - 1.0;
+			centered.x *= aspect;
+			float edge = smoothstep(0.58, 1.22, length(centered));
+			float top = (1.0 - smoothstep(0.00, 0.34, UV.y)) * 0.32;
+			float bottom = smoothstep(0.58, 1.0, UV.y) * 0.38;
+			float alpha = clamp((edge + top + bottom) * vignette_alpha, 0.0, 0.78);
+			COLOR = vec4(vignette_color.rgb, alpha);
+		}
+	""")
 
 func _setup_atmosphere_materials() -> void:
 	scene_gradient.material = _make_scene_shader_material("""
@@ -767,9 +1027,9 @@ func _setup_atmosphere_materials() -> void:
 		void fragment() {
 			vec2 uv = UV - vec2(0.5);
 			uv.x *= 1.75;
-			float pulse = 0.72 + sin(TIME * 1.15) * 0.12;
-			float glow = 1.0 - smoothstep(0.08, 0.64, length(uv));
-			COLOR = vec4(0.32, 0.92, 0.46, glow * 0.24 * pulse);
+			float pulse = 0.64 + sin(TIME * 0.95) * 0.08;
+			float glow = 1.0 - smoothstep(0.10, 0.58, length(uv));
+			COLOR = vec4(0.30, 0.78, 0.40, glow * 0.14 * pulse);
 		}
 	""")
 
@@ -1035,6 +1295,7 @@ func _setup_cinematic_environment_materials() -> void:
 func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	_ensure_compact_hud_panels()
 	_ensure_mobile_ui_containers()
+	_ensure_cast_button_visual()
 	_ensure_hud_icons()
 
 	var sx: float = screen_size.x / BASE_SCREEN_SIZE.x
@@ -1042,15 +1303,14 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	var ui_scale: float = min(sx, sy)
 	var chip_gap: float = 10.0 * ui_scale
 	var top_height: float = HUD_HEIGHT * sy
-	var cast_width: float = 154.0 * sx
-	var cast_height: float = 44.0 * sy
+	var cast_button_size := _scale_size(ui_theme.get_cast_button_size(), screen_size)
 	var quick_button_width: float = 86.0 * sx
 	var quick_button_height: float = 36.0 * sy
 	_water_surface_y = WATER_SURFACE_Y * sy
 	_water_zone_top = _water_surface_y - 12.0 * sy
 	_water_zone_bottom = _water_surface_y + 12.0 * sy
-	_rod_anchor_pos = _scale_point(ROD_ANCHOR_POS, screen_size)
-	_rod_target_pos = _scale_point(ROD_TARGET_POS, screen_size)
+	_rod_anchor_pos = _get_adaptive_rod_anchor(screen_size, ui_scale)
+	_rod_target_pos = _get_adaptive_rod_tip(screen_size, sy)
 
 	water_panel.position = Vector2.ZERO
 	water_panel.size = screen_size
@@ -1149,7 +1409,8 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 
 	quick_actions_container.visible = false
 
-	var cast_rect := _scale_rect(Rect2(403.0, 473.0, 154.0, 44.0), screen_size)
+	var cast_center := _scale_point(Vector2(480.0, 495.0), screen_size)
+	var cast_rect := Rect2(cast_center - cast_button_size * 0.5, cast_button_size)
 	var glow_rect := cast_rect.grow(3.0 * ui_scale)
 	_anchor_control(action_glow, 0.0, 0.0, 0.0, 0.0, glow_rect.position.x, glow_rect.position.y, glow_rect.end.x, glow_rect.end.y)
 	action_glow.z_index = 99
@@ -1167,38 +1428,53 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	_layout_action_button(auto_button, "Авто", _scale_point(Vector2(690.0, 477.0), screen_size), quick_size, false)
 
 	_anchor_control(fish_button, 0.0, 0.0, 0.0, 0.0, cast_rect.position.x, cast_rect.position.y, cast_rect.end.x, cast_rect.end.y)
-	fish_button.z_index = 102
-	fish_button.custom_minimum_size = Vector2(cast_width, cast_height)
+	fish_button.z_index = 104
+	fish_button.custom_minimum_size = cast_button_size
 	fish_button.add_theme_font_size_override("font_size", 16)
 	fish_button.clip_text = true
 	_apply_button_style(fish_button, STYLE_PRIMARY_BUTTON)
-	fish_button.custom_minimum_size = Vector2(cast_width, cast_height)
-	fish_button.size = Vector2(cast_width, cast_height)
+	fish_button.custom_minimum_size = cast_button_size
+	fish_button.size = cast_button_size
 	fish_button.add_theme_font_size_override("font_size", 16)
+	if cast_button_visual != null:
+		_anchor_control(cast_button_visual, 0.0, 0.0, 0.0, 0.0, cast_rect.position.x, cast_rect.position.y, cast_rect.end.x, cast_rect.end.y)
+		cast_button_visual.z_index = 103
+		cast_button_visual.size = cast_button_size
 
-	_set_button_icon(feed_button, "fish", 12.0)
+	_set_button_icon(feed_button, "bait", 12.0)
 	_set_button_icon(bait_button, "bait", 12.0)
 	_set_button_icon(fish_button, "hook", 16.0)
 	_set_button_icon(tackle_button, "rod", 12.0)
 	_set_button_icon(auto_button, "auto", 12.0)
+	_refresh_fish_button_presentation()
 
 	bottom_nav_panel.visible = true
-	var nav_rect := _scale_rect(Rect2(2.0, 94.0, LEFT_NAV_WIDTH, LEFT_NAV_HEIGHT), screen_size)
+	var nav_rect := _scale_rect(Rect2(38.0, 150.0, LEFT_NAV_WIDTH, LEFT_NAV_HEIGHT), screen_size)
 	_anchor_control(bottom_nav_panel, 0.0, 0.0, 0.0, 0.0, nav_rect.position.x, nav_rect.position.y, nav_rect.end.x, nav_rect.end.y)
 	bottom_nav_panel.z_index = 100
-	ui_theme.apply_panel_style(bottom_nav_panel)
+	bottom_nav_panel.mouse_filter = Control.MOUSE_FILTER_PASS
+	bottom_nav_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 
-	_anchor_control(bottom_nav_container, 0.0, 0.0, 1.0, 1.0, 9.0 * sx, 11.0 * sy, -9.0 * sx, -22.0 * sy)
-	bottom_nav_container.add_theme_constant_override("separation", int(7.0 * ui_scale))
+	_anchor_control(bottom_nav_container, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0)
+	bottom_nav_container.mouse_filter = Control.MOUSE_FILTER_PASS
+	bottom_nav_container.add_theme_constant_override("separation", int(9.0 * ui_scale))
 
 	var nav_buttons: Array = [nav_fish_button, basket_button, inventory_button, shop_button, map_button, profile_button]
 	var nav_labels: Array = ["Ловля", "Садок", "Инвентарь", "Магазин", "Карта", "Профиль"]
 	var nav_button_size := _scale_size(Vector2(LEFT_NAV_WIDTH - 18.0, 42.0), screen_size)
 	for i in nav_buttons.size():
 		_layout_nav_button(nav_buttons[i], nav_labels[i], Vector2.ZERO, nav_button_size, i == 0)
-	var nav_icons: Array = ["fish", "keepnet", "inventory", "cart", "map", "profile"]
+	var nav_icons: Array = ["fish", "keepnet", "inventory", "shop", "map", "profile"]
 	for i in nav_buttons.size():
 		_set_button_icon(nav_buttons[i], nav_icons[i], 12.0)
+
+	nav_fish_button.visible = false
+	var side_menu_buttons: Array = [basket_button, inventory_button, shop_button, map_button, profile_button]
+	var side_menu_labels: Array = ["Садок", "Инвентарь", "Магазин", "Карта", "Профиль"]
+	var side_menu_icons: Array = ["keepnet", "inventory", "shop", "map", "profile"]
+	var side_menu_button_size := _scale_size(Vector2(LEFT_NAV_WIDTH, 48.0), screen_size)
+	for i in side_menu_buttons.size():
+		_layout_side_menu_button(side_menu_buttons[i], side_menu_labels[i], side_menu_icons[i], side_menu_button_size, false)
 
 	basket_button.visible = true
 
@@ -1246,6 +1522,18 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	ui_theme.apply_meter_track_style(tension_track, tension_fill)
 	ui_theme.apply_meter_track_style(progress_track, progress_fill, Color(0.58, 0.82, 0.28, 1.0))
 	fight_hint_label.visible = false
+
+func _get_adaptive_rod_anchor(screen_size: Vector2, ui_scale: float) -> Vector2:
+	return Vector2(
+		screen_size.x + 58.0 * ui_scale,
+		screen_size.y + 18.0 * ui_scale
+	)
+
+func _get_adaptive_rod_tip(screen_size: Vector2, sy: float) -> Vector2:
+	return Vector2(
+		screen_size.x * 0.640,
+		min(screen_size.y * 0.705, _water_zone_bottom + 26.0 * sy)
+	)
 
 func _ensure_compact_hud_panels() -> void:
 	if time_hud_panel == null:
@@ -1363,6 +1651,109 @@ func _layout_nav_button(button: Button, label: String, pos: Vector2, button_size
 	button.modulate = Color(1.0, 1.0, 1.0, 1.0 if active else 0.86)
 	button.add_theme_font_size_override("font_size", 9 if label.length() < 9 else 8)
 
+func _layout_side_menu_button(button: Button, label: String, icon_name: String, button_size: Vector2, active: bool) -> void:
+	button.text = ""
+	button.icon = null
+	button.expand_icon = false
+	if button.get_parent() is Container:
+		button.custom_minimum_size = button_size
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	else:
+		_anchor_control(button, 0.0, 0.0, 0.0, 0.0, button.position.x, button.position.y, button.position.x + button_size.x, button.position.y + button_size.y)
+		button.custom_minimum_size = button_size
+	button.size = button_size
+	button.z_index = 102
+	button.visible = true
+	button.clip_text = false
+	button.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+	button.add_theme_constant_override("h_separation", 0)
+	button.add_theme_constant_override("icon_max_width", 0)
+
+	var icon_rect := _ensure_side_menu_icon(button)
+	var text_label := _ensure_side_menu_label(button)
+	var arrow_label := _ensure_side_menu_arrow(button)
+	var scale_factor: float = clamp(button_size.y / 48.0, 0.78, 1.22)
+	var icon_size := Vector2(31.0, 31.0) * scale_factor
+	var left_pad := 9.0 * scale_factor
+	var arrow_width := 12.0 * scale_factor
+	var text_x := 45.0 * scale_factor
+	var font_size := int(round(13.0 * scale_factor))
+
+	icon_rect.texture = ui_theme.get_side_menu_icon(icon_name)
+	icon_rect.position = Vector2(left_pad, (button_size.y - icon_size.y) * 0.5)
+	icon_rect.size = icon_size
+	icon_rect.visible = icon_rect.texture != null
+
+	text_label.text = label
+	text_label.position = Vector2(text_x, 0.0)
+	text_label.size = Vector2(max(button_size.x - text_x - arrow_width - 8.0 * scale_factor, 56.0), button_size.y)
+	text_label.add_theme_font_size_override("font_size", font_size)
+
+	arrow_label.text = ">"
+	arrow_label.position = Vector2(button_size.x - arrow_width - 9.0 * scale_factor, 0.0)
+	arrow_label.size = Vector2(arrow_width, button_size.y)
+	arrow_label.add_theme_font_size_override("font_size", font_size + 1)
+
+	_refresh_side_menu_button_state(button, active)
+
+func _refresh_side_menu_button_state(button: Button, active: bool) -> void:
+	if button == null or ui_theme == null:
+		return
+
+	ui_theme.apply_side_menu_button_style(button, active)
+	button.modulate = Color(1.0, 1.0, 1.0, 1.0 if active else 0.92)
+	var text_color := Color(0.94, 0.98, 0.91, 1.0) if active else Color(0.86, 0.91, 0.84, 0.96)
+	var arrow_color := Color(0.76, 1.0, 0.58, 0.96) if active else Color(0.84, 0.90, 0.78, 0.86)
+	var icon_color := Color(1.0, 1.0, 0.94, 1.0) if active else Color(0.94, 0.96, 0.86, 0.92)
+
+	var icon_rect := button.get_node_or_null("SideMenuIcon") as TextureRect
+	if icon_rect != null:
+		icon_rect.modulate = icon_color if not button.disabled else Color(0.60, 0.64, 0.58, 0.48)
+
+	var text_label := button.get_node_or_null("SideMenuText") as Label
+	if text_label != null:
+		text_label.add_theme_color_override("font_color", text_color if not button.disabled else Color(0.60, 0.64, 0.58, 0.52))
+
+	var arrow_label := button.get_node_or_null("SideMenuArrow") as Label
+	if arrow_label != null:
+		arrow_label.add_theme_color_override("font_color", arrow_color if not button.disabled else Color(0.60, 0.64, 0.58, 0.42))
+
+func _ensure_side_menu_icon(button: Button) -> TextureRect:
+	var icon_rect := button.get_node_or_null("SideMenuIcon") as TextureRect
+	if icon_rect == null:
+		icon_rect = TextureRect.new()
+		icon_rect.name = "SideMenuIcon"
+		icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		button.add_child(icon_rect)
+	return icon_rect
+
+func _ensure_side_menu_label(button: Button) -> Label:
+	var text_label := button.get_node_or_null("SideMenuText") as Label
+	if text_label == null:
+		text_label = Label.new()
+		text_label.name = "SideMenuText"
+		text_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		text_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		text_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		text_label.clip_text = true
+		text_label.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+		button.add_child(text_label)
+	return text_label
+
+func _ensure_side_menu_arrow(button: Button) -> Label:
+	var arrow_label := button.get_node_or_null("SideMenuArrow") as Label
+	if arrow_label == null:
+		arrow_label = Label.new()
+		arrow_label.name = "SideMenuArrow"
+		arrow_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		arrow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		arrow_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		button.add_child(arrow_label)
+	return arrow_label
+
 func _set_button_icon(button: Button, icon_name: String, icon_size: float = 20.0) -> void:
 	if ui_theme == null or icon_name.is_empty():
 		button.icon = null
@@ -1374,6 +1765,130 @@ func _set_button_icon(button: Button, icon_name: String, icon_size: float = 20.0
 	button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
 	button.add_theme_constant_override("icon_max_width", int(icon_size))
 	button.add_theme_constant_override("h_separation", 4)
+
+func _refresh_fish_button_presentation() -> void:
+	if fish_button == null or ui_theme == null:
+		return
+
+	var target_size: Vector2 = fish_button.size
+	if target_size == Vector2.ZERO:
+		target_size = _scale_size(ui_theme.get_cast_button_size(), get_viewport_rect().size)
+
+	var use_cast_texture := _use_cast_png_button and (_fishing_ui_state == FishingUiState.IDLE or _fishing_ui_state == FishingUiState.WAITING)
+	var use_pull_texture := _use_pull_png_button and (
+		_fishing_ui_state == FishingUiState.FIGHTING
+		or _fishing_ui_state == FishingUiState.CAUGHT
+		or _fishing_ui_state == FishingUiState.FAILED
+	)
+
+	fish_button.visible = true
+	fish_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	fish_button.z_index = 260
+	fish_button.custom_minimum_size = target_size
+	fish_button.size = target_size
+	if cast_button_visual != null:
+		cast_button_visual.z_index = fish_button.z_index - 1
+
+	if use_cast_texture or use_pull_texture:
+		if use_pull_texture:
+			ui_theme.apply_pull_button_hitbox_style(fish_button, target_size)
+		else:
+			ui_theme.apply_cast_button_hitbox_style(fish_button, target_size)
+		_update_cast_button_visual()
+		return
+
+	if cast_button_visual != null:
+		cast_button_visual.visible = false
+	_cast_button_hovered = false
+	_cast_button_pressed = false
+	_apply_button_style(fish_button, STYLE_PRIMARY_BUTTON)
+	_set_button_icon(fish_button, "hook", 16.0)
+
+func _update_cast_button_visual() -> void:
+	if cast_button_visual == null or ui_theme == null:
+		return
+
+	var use_cast_texture := _use_cast_png_button and (_fishing_ui_state == FishingUiState.IDLE or _fishing_ui_state == FishingUiState.WAITING)
+	var use_pull_texture := _use_pull_png_button and (
+		_fishing_ui_state == FishingUiState.FIGHTING
+		or _fishing_ui_state == FishingUiState.CAUGHT
+		or _fishing_ui_state == FishingUiState.FAILED
+	)
+	var use_action_texture := use_cast_texture or use_pull_texture
+	cast_button_visual.visible = use_action_texture
+	if not use_action_texture:
+		return
+
+	var texture_state := "regular"
+	if fish_button.disabled:
+		texture_state = "disabled"
+	elif _cast_button_pressed:
+		texture_state = "pressed"
+	elif _cast_button_hovered:
+		texture_state = "hover"
+
+	cast_button_visual.texture = ui_theme.get_pull_button_texture(texture_state) if use_pull_texture else ui_theme.get_cast_button_texture(texture_state)
+
+func _is_fish_button_pointer_event(event: InputEvent) -> bool:
+	if fish_button == null or not fish_button.visible or not fish_button.is_visible_in_tree():
+		return false
+	if not (event is InputEventMouseButton):
+		return false
+
+	var mouse_event := event as InputEventMouseButton
+	if mouse_event.button_index != MOUSE_BUTTON_LEFT:
+		return false
+	if _is_catch_reward_open():
+		return false
+	if basket_panel.visible or inventory_panel.visible or shop_panel.visible or tackle_panel.visible or waterbody_panel.visible:
+		return false
+
+	return fish_button.get_global_rect().has_point(mouse_event.position)
+
+func _arm_modal_tap_guard() -> void:
+	_ensure_modal_input_shield()
+	_modal_tap_guard_until_msec = Time.get_ticks_msec() + MODAL_TAP_GUARD_MSEC
+	if modal_input_shield != null:
+		modal_input_shield.visible = true
+		modal_input_shield.z_index = MENU_BACKDROP_Z - 1
+	get_viewport().set_input_as_handled()
+
+func _is_modal_tap_guard_active() -> bool:
+	return Time.get_ticks_msec() < _modal_tap_guard_until_msec
+
+func _update_modal_tap_guard() -> void:
+	if modal_input_shield == null or not modal_input_shield.visible:
+		return
+	if not _is_modal_tap_guard_active():
+		modal_input_shield.visible = false
+
+func _is_visible_ui_control(control: CanvasItem) -> bool:
+	return control != null and control.visible
+
+func _is_menu_overlay_open() -> bool:
+	if _is_catch_reward_open():
+		return true
+	if _is_visible_ui_control(basket_panel) or _is_visible_ui_control(inventory_panel):
+		return true
+	if _is_visible_ui_control(shop_panel) or _is_visible_ui_control(tackle_panel):
+		return true
+	if _is_visible_ui_control(waterbody_panel):
+		return true
+	return profile_ui != null and profile_ui.is_open()
+
+func _should_ignore_base_ui_press() -> bool:
+	return _is_modal_tap_guard_active() or _is_catch_reward_open()
+
+func _trigger_fish_button_action() -> void:
+	if _should_ignore_base_ui_press():
+		return
+
+	var now := Time.get_ticks_msec()
+	if now - _fish_button_action_guard_msec < 120:
+		return
+
+	_fish_button_action_guard_msec = now
+	_on_fish_button_pressed()
 
 func _layout_float_visuals(center: Vector2, scene_scale: float) -> void:
 	var surface_y: float = clamp(center.y, _water_zone_top, _water_zone_bottom)
@@ -1560,6 +2075,10 @@ func _setup_layout() -> void:
 		shop_bait_category_button,
 		shop_consumable_category_button,
 		shop_tackle_category_button,
+		shop_line_category_button,
+		shop_hook_category_button,
+		shop_float_category_button,
+		shop_items_scroll,
 		shop_items_container,
 		shop_notice_label,
 		shop_close_button,
@@ -1581,6 +2100,7 @@ func _setup_layout() -> void:
 		tackle_close_button,
 		waterbody_title_label,
 		waterbody_item_list,
+		waterbody_preview_frame,
 		waterbody_preview,
 		waterbody_details_label,
 		waterbody_spot_list,
@@ -1635,8 +2155,10 @@ func _setup_layout() -> void:
 	noise_layer.z_index = -11
 	vignette_layer.z_index = 3
 	_setup_atmosphere_materials()
-	_apply_time_atmosphere()
 	fishing_presence_ui._layout_environment_scene(screen_size)
+	_ensure_time_of_day_layers()
+	_layout_time_of_day_layers(screen_size)
+	_apply_time_atmosphere()
 
 	water_panel.add_theme_stylebox_override(
 		"panel",
@@ -2211,7 +2733,7 @@ func _setup_layout() -> void:
 	var inventory_body_y := 116.0
 	var close_button_size := Vector2(146.0, 48.0)
 	var inventory_action_y: float = inventory_height - inventory_padding - close_button_size.y
-	var tackle_height := 72.0
+	var tackle_height := 100.0
 	var tackle_y: float = inventory_action_y - tackle_height - 16.0
 	var inventory_body_height: float = max(tackle_y - inventory_body_y - 18.0, 140.0)
 
@@ -2260,6 +2782,10 @@ func _setup_layout() -> void:
 		category_button.size = Vector2(category_button_width, 44.0)
 		category_button.add_theme_font_size_override("font_size", 11)
 
+	var inventory_pager_height := 42.0
+	var inventory_pager_gap := 8.0
+	var inventory_list_height: float = max(inventory_body_height - inventory_pager_height - inventory_pager_gap, 120.0)
+
 	inventory_details_card.position = Vector2(right_panel_x, inventory_body_y)
 	inventory_details_card.size = Vector2(right_panel_width, inventory_body_height)
 	ui_theme.apply_card_style(inventory_details_card)
@@ -2269,8 +2795,30 @@ func _setup_layout() -> void:
 	ui_theme.apply_card_style(inventory_tackle_card)
 
 	inventory_item_list.position = Vector2(inventory_padding, inventory_body_y)
-	inventory_item_list.size = Vector2(list_width, inventory_body_height)
+	inventory_item_list.size = Vector2(list_width, inventory_list_height)
+	inventory_item_list.max_columns = 1
 	ui_theme.apply_item_list_style(inventory_item_list)
+
+	if inventory_prev_page_button != null and inventory_next_page_button != null and inventory_page_label != null:
+		var pager_y: float = inventory_body_y + inventory_list_height + inventory_pager_gap
+		inventory_prev_page_button.position = Vector2(inventory_padding, pager_y)
+		inventory_prev_page_button.size = Vector2(58.0, inventory_pager_height)
+		inventory_prev_page_button.z_index = MENU_PANEL_Z + 4
+		inventory_prev_page_button.add_theme_font_size_override("font_size", 14)
+		_apply_button_style(inventory_prev_page_button, STYLE_SECONDARY_BUTTON)
+
+		inventory_next_page_button.position = Vector2(inventory_padding + list_width - 58.0, pager_y)
+		inventory_next_page_button.size = Vector2(58.0, inventory_pager_height)
+		inventory_next_page_button.z_index = MENU_PANEL_Z + 4
+		inventory_next_page_button.add_theme_font_size_override("font_size", 14)
+		_apply_button_style(inventory_next_page_button, STYLE_SECONDARY_BUTTON)
+
+		inventory_page_label.position = Vector2(inventory_padding + 66.0, pager_y + 6.0)
+		inventory_page_label.size = Vector2(max(list_width - 132.0, 48.0), inventory_pager_height - 12.0)
+		inventory_page_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		inventory_page_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		inventory_page_label.add_theme_font_size_override("font_size", 12)
+		inventory_page_label.add_theme_color_override("font_color", Color(0.82, 0.94, 0.84, 0.92))
 
 	inventory_details_label.position = Vector2(right_panel_x + 12.0, inventory_body_y + 12.0)
 	inventory_details_label.size = Vector2(right_panel_width - 24.0, max(inventory_body_height - 76.0, 48.0))
@@ -2281,7 +2829,7 @@ func _setup_layout() -> void:
 	inventory_tackle_label.position = Vector2(inventory_padding + 14.0, tackle_y + 10.0)
 	inventory_tackle_label.size = Vector2(inventory_width - inventory_padding * 2.0 - 28.0, tackle_height - 20.0)
 	inventory_tackle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	inventory_tackle_label.add_theme_font_size_override("font_size", 11)
+	inventory_tackle_label.add_theme_font_size_override("font_size", 12)
 	inventory_tackle_label.clip_text = true
 
 	inventory_equip_button.position = Vector2(right_panel_x + right_panel_width - 154.0, inventory_body_y + inventory_body_height - 54.0)
@@ -2298,10 +2846,10 @@ func _setup_layout() -> void:
 	var tackle_y_pos := 0.0
 	var tackle_padding := 28.0
 	var tackle_inner_width: float = tackle_width - tackle_padding * 2.0
-	var tackle_current_height := 62.0
-	var tackle_category_y := 98.0
-	var tackle_depth_y := 154.0
-	var tackle_list_y := 212.0
+	var tackle_current_height := 96.0
+	var tackle_category_y := 136.0
+	var tackle_depth_y := 210.0
+	var tackle_list_y := 268.0
 	var tackle_footer_button_y: float = tackle_panel_height - tackle_padding - 50.0
 	var tackle_list_width: float = tackle_width * 0.32
 	var tackle_details_x: float = tackle_padding + tackle_list_width + 24.0
@@ -2318,16 +2866,16 @@ func _setup_layout() -> void:
 	tackle_title_label.add_theme_color_override("font_color", Color(0.94, 1.0, 0.90, 1.0))
 
 	tackle_current_label.position = Vector2(tackle_padding, 58.0)
-	tackle_current_label.size = Vector2(tackle_inner_width, tackle_current_height - 8.0)
-	tackle_current_label.add_theme_font_size_override("font_size", 11)
-	tackle_current_label.add_theme_color_override("font_color", Color(0.82, 0.94, 0.84, 0.92))
+	tackle_current_label.size = Vector2(tackle_inner_width, tackle_current_height - 12.0)
+	tackle_current_label.add_theme_font_size_override("font_size", 12)
+	tackle_current_label.add_theme_color_override("font_color", Color(0.88, 1.0, 0.88, 0.96))
 	tackle_current_label.clip_text = true
 
 	var tackle_category_buttons: Array = [tackle_rod_button, tackle_line_button, tackle_float_button, tackle_hook_button, tackle_bait_button]
 	for i in tackle_category_buttons.size():
 		var tackle_category_button: Button = tackle_category_buttons[i]
 		tackle_category_button.position = Vector2(tackle_padding + float(i) * (tackle_category_width + 10.0), tackle_category_y)
-		tackle_category_button.size = Vector2(tackle_category_width, 44.0)
+		tackle_category_button.size = Vector2(tackle_category_width, 62.0)
 		tackle_category_button.add_theme_font_size_override("font_size", 11)
 
 	tackle_depth_label.position = Vector2(tackle_padding, tackle_depth_y)
@@ -2351,12 +2899,38 @@ func _setup_layout() -> void:
 	tackle_hint_label.add_theme_color_override("font_color", Color(0.78, 0.92, 0.82, 0.92))
 	tackle_hint_label.clip_text = true
 
+	var tackle_pager_height := 42.0
+	var tackle_pager_gap := 8.0
+	var tackle_list_height: float = max(tackle_body_height - tackle_pager_height - tackle_pager_gap, 120.0)
+
 	tackle_item_list.position = Vector2(tackle_padding, tackle_list_y)
-	tackle_item_list.size = Vector2(tackle_list_width, tackle_body_height)
+	tackle_item_list.size = Vector2(tackle_list_width, tackle_list_height)
+	tackle_item_list.max_columns = 1
 	ui_theme.apply_item_list_style(tackle_item_list)
 	tackle_item_list.add_theme_font_size_override("font_size", 12)
 	tackle_item_list.add_theme_color_override("font_color", Color(0.84, 0.94, 0.86, 0.96))
 	tackle_item_list.add_theme_color_override("font_selected_color", Color(0.98, 1.0, 0.94, 1.0))
+
+	if tackle_prev_page_button != null and tackle_next_page_button != null and tackle_page_label != null:
+		var tackle_pager_y: float = tackle_list_y + tackle_list_height + tackle_pager_gap
+		tackle_prev_page_button.position = Vector2(tackle_padding, tackle_pager_y)
+		tackle_prev_page_button.size = Vector2(58.0, tackle_pager_height)
+		tackle_prev_page_button.z_index = MENU_PANEL_Z + 4
+		tackle_prev_page_button.add_theme_font_size_override("font_size", 14)
+		_apply_button_style(tackle_prev_page_button, STYLE_SECONDARY_BUTTON)
+
+		tackle_next_page_button.position = Vector2(tackle_padding + tackle_list_width - 58.0, tackle_pager_y)
+		tackle_next_page_button.size = Vector2(58.0, tackle_pager_height)
+		tackle_next_page_button.z_index = MENU_PANEL_Z + 4
+		tackle_next_page_button.add_theme_font_size_override("font_size", 14)
+		_apply_button_style(tackle_next_page_button, STYLE_SECONDARY_BUTTON)
+
+		tackle_page_label.position = Vector2(tackle_padding + 66.0, tackle_pager_y + 6.0)
+		tackle_page_label.size = Vector2(max(tackle_list_width - 132.0, 48.0), tackle_pager_height - 12.0)
+		tackle_page_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		tackle_page_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		tackle_page_label.add_theme_font_size_override("font_size", 12)
+		tackle_page_label.add_theme_color_override("font_color", Color(0.82, 0.94, 0.84, 0.92))
 
 	tackle_details_label.position = Vector2(tackle_details_x, tackle_list_y)
 	tackle_details_label.size = Vector2(tackle_details_width, max(tackle_body_height * 0.54, 120.0))
@@ -2387,10 +2961,11 @@ func _setup_layout() -> void:
 	var waterbody_inner_width: float = waterbody_width - waterbody_padding * 2.0
 	var waterbody_body_y := 78.0
 	var waterbody_footer_y := waterbody_height - waterbody_padding - 50.0
-	var waterbody_list_width: float = waterbody_width * 0.27
-	var waterbody_details_x: float = waterbody_padding + waterbody_list_width + 24.0
+	var waterbody_list_width: float = min(max(waterbody_width * 0.24, 200.0), 236.0)
+	var waterbody_details_x: float = waterbody_padding + waterbody_list_width + 20.0
 	var waterbody_details_width: float = waterbody_width - waterbody_details_x - waterbody_padding
-	var waterbody_spot_list_width: float = waterbody_details_width * 0.46
+	var waterbody_spot_grid_y := waterbody_body_y + 138.0
+	var waterbody_spot_grid_height: float = waterbody_footer_y - waterbody_spot_grid_y - 8.0
 
 	waterbody_panel.position = Vector2(waterbody_x, waterbody_y)
 	waterbody_panel.size = Vector2(waterbody_width, waterbody_height)
@@ -2401,32 +2976,86 @@ func _setup_layout() -> void:
 	waterbody_title_label.add_theme_color_override("font_color", Color(0.94, 1.0, 0.90, 1.0))
 
 	waterbody_item_list.position = Vector2(waterbody_padding, waterbody_body_y)
-	waterbody_item_list.size = Vector2(waterbody_list_width, waterbody_footer_y - waterbody_body_y - 12.0)
+	waterbody_item_list.size = Vector2(waterbody_list_width, 126.0)
 	ui_theme.apply_item_list_style(waterbody_item_list)
-	waterbody_item_list.add_theme_font_size_override("font_size", 12)
+	waterbody_item_list.add_theme_font_size_override("font_size", 14)
+	waterbody_item_list.add_theme_constant_override("v_separation", 12)
+	waterbody_item_list.add_theme_constant_override("h_separation", 8)
 	waterbody_item_list.add_theme_color_override("font_color", Color(0.84, 0.94, 0.86, 0.96))
 	waterbody_item_list.add_theme_color_override("font_selected_color", Color(0.98, 1.0, 0.94, 1.0))
 
-	waterbody_preview.position = Vector2(waterbody_details_x, waterbody_body_y)
-	waterbody_preview.size = Vector2(waterbody_details_width, 72.0)
-	ui_theme.apply_card_style(waterbody_preview)
+	waterbody_preview_frame.position = Vector2(waterbody_details_x, waterbody_body_y)
+	waterbody_preview_frame.size = Vector2(waterbody_details_width, 72.0)
+	ui_theme.apply_card_style(waterbody_preview_frame)
 
-	waterbody_details_label.position = Vector2(waterbody_details_x, waterbody_body_y + 86.0)
-	waterbody_details_label.size = Vector2(waterbody_details_width, 68.0)
-	waterbody_details_label.add_theme_font_size_override("font_size", 12)
+	waterbody_preview.position = Vector2(4.0, 4.0)
+	waterbody_preview.size = Vector2(max(waterbody_details_width - 8.0, 1.0), 64.0)
+	waterbody_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	waterbody_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	waterbody_preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	waterbody_preview.modulate = Color(0.90, 1.0, 0.92, 0.96)
+
+	waterbody_details_label.position = Vector2(waterbody_details_x, waterbody_body_y + 84.0)
+	waterbody_details_label.size = Vector2(waterbody_details_width, 44.0)
+	waterbody_details_label.add_theme_font_size_override("font_size", 13)
 	waterbody_details_label.add_theme_color_override("font_color", Color(0.82, 0.94, 0.84, 0.94))
 	waterbody_details_label.clip_text = true
 
-	waterbody_spot_list.position = Vector2(waterbody_details_x, waterbody_body_y + 174.0)
-	waterbody_spot_list.size = Vector2(waterbody_spot_list_width, waterbody_footer_y - waterbody_body_y - 188.0)
+	var waterbody_spot_pager_height := 48.0
+	var waterbody_spot_pager_gap := 8.0
+	var waterbody_spot_list_height: float = max(waterbody_spot_grid_height - waterbody_spot_pager_height - waterbody_spot_pager_gap, 120.0)
+
+	waterbody_spot_list.position = Vector2(waterbody_details_x, waterbody_spot_grid_y)
+	waterbody_spot_list.size = Vector2(waterbody_details_width, waterbody_spot_list_height)
+	waterbody_spot_list.visible = false
+	waterbody_spot_list.max_columns = 2
+	waterbody_spot_list.same_column_width = true
+	waterbody_spot_list.fixed_column_width = int((waterbody_details_width - 12.0) * 0.5)
 	ui_theme.apply_item_list_style(waterbody_spot_list)
 	waterbody_spot_list.add_theme_font_size_override("font_size", 12)
+	waterbody_spot_list.add_theme_constant_override("h_separation", 8)
+	waterbody_spot_list.add_theme_constant_override("v_separation", 4)
 	waterbody_spot_list.add_theme_color_override("font_color", Color(0.84, 0.94, 0.86, 0.96))
 	waterbody_spot_list.add_theme_color_override("font_selected_color", Color(0.98, 1.0, 0.94, 1.0))
 
-	waterbody_spot_details_label.position = Vector2(waterbody_details_x + waterbody_spot_list_width + 16.0, waterbody_body_y + 174.0)
-	waterbody_spot_details_label.size = Vector2(waterbody_details_width - waterbody_spot_list_width - 16.0, waterbody_footer_y - waterbody_body_y - 188.0)
-	waterbody_spot_details_label.add_theme_font_size_override("font_size", 11)
+	var waterbody_spot_button_gap := 8.0
+	var waterbody_spot_button_height: float = min(54.0, max((waterbody_spot_list_height - waterbody_spot_button_gap * 3.0) / 4.0, 46.0))
+	for i in waterbody_spot_buttons.size():
+		var spot_button := waterbody_spot_buttons[i] as Button
+		if spot_button == null:
+			continue
+		spot_button.position = Vector2(waterbody_details_x, waterbody_spot_grid_y + float(i) * (waterbody_spot_button_height + waterbody_spot_button_gap))
+		spot_button.size = Vector2(waterbody_details_width, waterbody_spot_button_height)
+		spot_button.custom_minimum_size = spot_button.size
+		spot_button.z_index = MENU_PANEL_Z + 2
+		spot_button.add_theme_font_size_override("font_size", 15)
+
+	if waterbody_spot_prev_page_button != null and waterbody_spot_next_page_button != null and waterbody_spot_page_label != null:
+		var waterbody_spot_pager_y: float = waterbody_spot_grid_y + waterbody_spot_list_height + waterbody_spot_pager_gap
+		waterbody_spot_prev_page_button.position = Vector2(waterbody_details_x, waterbody_spot_pager_y)
+		waterbody_spot_prev_page_button.size = Vector2(66.0, waterbody_spot_pager_height)
+		waterbody_spot_prev_page_button.custom_minimum_size = waterbody_spot_prev_page_button.size
+		waterbody_spot_prev_page_button.z_index = MENU_PANEL_Z + 4
+		waterbody_spot_prev_page_button.add_theme_font_size_override("font_size", 18)
+		_apply_button_style(waterbody_spot_prev_page_button, STYLE_SECONDARY_BUTTON)
+
+		waterbody_spot_next_page_button.position = Vector2(waterbody_details_x + waterbody_details_width - 66.0, waterbody_spot_pager_y)
+		waterbody_spot_next_page_button.size = Vector2(66.0, waterbody_spot_pager_height)
+		waterbody_spot_next_page_button.custom_minimum_size = waterbody_spot_next_page_button.size
+		waterbody_spot_next_page_button.z_index = MENU_PANEL_Z + 4
+		waterbody_spot_next_page_button.add_theme_font_size_override("font_size", 18)
+		_apply_button_style(waterbody_spot_next_page_button, STYLE_SECONDARY_BUTTON)
+
+		waterbody_spot_page_label.position = Vector2(waterbody_details_x + 76.0, waterbody_spot_pager_y + 6.0)
+		waterbody_spot_page_label.size = Vector2(max(waterbody_details_width - 152.0, 48.0), waterbody_spot_pager_height - 12.0)
+		waterbody_spot_page_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		waterbody_spot_page_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		waterbody_spot_page_label.add_theme_font_size_override("font_size", 14)
+		waterbody_spot_page_label.add_theme_color_override("font_color", Color(0.82, 0.94, 0.84, 0.92))
+
+	waterbody_spot_details_label.position = Vector2(waterbody_padding, waterbody_body_y + 142.0)
+	waterbody_spot_details_label.size = Vector2(waterbody_list_width, waterbody_footer_y - waterbody_body_y - 152.0)
+	waterbody_spot_details_label.add_theme_font_size_override("font_size", 12)
 	waterbody_spot_details_label.add_theme_color_override("font_color", Color(0.82, 0.94, 0.84, 0.94))
 	waterbody_spot_details_label.clip_text = true
 
@@ -2447,8 +3076,10 @@ func _setup_layout() -> void:
 	var shop_padding := 28.0
 	var shop_inner_width: float = shop_width - shop_padding * 2.0
 	var shop_category_y := 64.0
-	var shop_category_width := 150.0
-	var shop_items_y := 126.0
+	var shop_category_gap := 8.0
+	var shop_category_columns := 6
+	var shop_category_width: float = (shop_inner_width - shop_category_gap * float(shop_category_columns - 1)) / float(shop_category_columns)
+	var shop_items_y := 118.0
 	var shop_footer_height := 76.0
 
 	shop_panel.position = Vector2(shop_x, shop_y)
@@ -2465,24 +3096,63 @@ func _setup_layout() -> void:
 	shop_money_label.add_theme_color_override("font_color", Color(0.82, 0.94, 0.84, 0.92))
 
 	shop_bait_category_button.position = Vector2(shop_padding, shop_category_y)
-	shop_bait_category_button.size = Vector2(shop_category_width, 46.0)
-	shop_bait_category_button.add_theme_font_size_override("font_size", 13)
+	shop_bait_category_button.size = Vector2(shop_category_width, 40.0)
+	shop_bait_category_button.add_theme_font_size_override("font_size", 12)
 
-	shop_consumable_category_button.position = Vector2(shop_padding + shop_category_width + 10.0, shop_category_y)
-	shop_consumable_category_button.size = Vector2(shop_category_width, 46.0)
-	shop_consumable_category_button.add_theme_font_size_override("font_size", 13)
+	shop_consumable_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap), shop_category_y)
+	shop_consumable_category_button.size = Vector2(shop_category_width, 40.0)
+	shop_consumable_category_button.add_theme_font_size_override("font_size", 12)
 
-	shop_tackle_category_button.position = Vector2(shop_padding + (shop_category_width + 10.0) * 2.0, shop_category_y)
-	shop_tackle_category_button.size = Vector2(shop_category_width, 46.0)
-	shop_tackle_category_button.add_theme_font_size_override("font_size", 13)
+	shop_tackle_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 2.0, shop_category_y)
+	shop_tackle_category_button.size = Vector2(shop_category_width, 40.0)
+	shop_tackle_category_button.add_theme_font_size_override("font_size", 12)
 
-	shop_items_container.position = Vector2(shop_padding, shop_items_y)
-	shop_items_container.size = Vector2(shop_inner_width, shop_height - shop_items_y - shop_footer_height)
+	shop_line_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 3.0, shop_category_y)
+	shop_line_category_button.size = Vector2(shop_category_width, 40.0)
+	shop_line_category_button.add_theme_font_size_override("font_size", 12)
+
+	shop_hook_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 4.0, shop_category_y)
+	shop_hook_category_button.size = Vector2(shop_category_width, 40.0)
+	shop_hook_category_button.add_theme_font_size_override("font_size", 12)
+
+	shop_float_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 5.0, shop_category_y)
+	shop_float_category_button.size = Vector2(shop_category_width, 40.0)
+	shop_float_category_button.add_theme_font_size_override("font_size", 12)
+
+	shop_items_scroll.position = Vector2(shop_padding, shop_items_y)
+	shop_items_scroll.size = Vector2(shop_inner_width, shop_height - shop_items_y - shop_footer_height)
+	shop_items_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	shop_items_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	shop_items_container.position = Vector2.ZERO
+	shop_items_container.size = shop_items_scroll.size
+	shop_items_container.custom_minimum_size = shop_items_scroll.size
 
 	shop_notice_label.position = Vector2(shop_padding, shop_height - shop_padding - 44.0)
 	shop_notice_label.size = Vector2(shop_inner_width - 190.0, 44.0)
 	shop_notice_label.add_theme_font_size_override("font_size", 14)
 	shop_notice_label.clip_text = true
+
+	if shop_prev_page_button != null and shop_next_page_button != null and shop_page_label != null:
+		var shop_pager_y: float = shop_height - shop_padding - 44.0
+		var shop_pager_center_x: float = shop_width * 0.5
+		shop_prev_page_button.position = Vector2(shop_pager_center_x - 122.0, shop_pager_y)
+		shop_prev_page_button.size = Vector2(58.0, 40.0)
+		shop_prev_page_button.z_index = MENU_PANEL_Z + 4
+		shop_prev_page_button.add_theme_font_size_override("font_size", 14)
+		_apply_button_style(shop_prev_page_button, STYLE_SECONDARY_BUTTON)
+
+		shop_page_label.position = Vector2(shop_pager_center_x - 58.0, shop_pager_y + 7.0)
+		shop_page_label.size = Vector2(116.0, 26.0)
+		shop_page_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		shop_page_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		shop_page_label.add_theme_font_size_override("font_size", 12)
+		shop_page_label.add_theme_color_override("font_color", Color(0.82, 0.94, 0.84, 0.92))
+
+		shop_next_page_button.position = Vector2(shop_pager_center_x + 64.0, shop_pager_y)
+		shop_next_page_button.size = Vector2(58.0, 40.0)
+		shop_next_page_button.z_index = MENU_PANEL_Z + 4
+		shop_next_page_button.add_theme_font_size_override("font_size", 14)
+		_apply_button_style(shop_next_page_button, STYLE_SECONDARY_BUTTON)
 
 	shop_close_button.position = Vector2(shop_width - shop_padding - 140.0, shop_height - shop_padding - 46.0)
 	shop_close_button.size = Vector2(140.0, 46.0)
@@ -2502,17 +3172,17 @@ func _setup_layout() -> void:
 			_make_panel_style(Color(0.055, 0.135, 0.105, 0.92), Color(0.68, 1.0, 0.76, 0.36), 18, 10, Color(0.0, 0.0, 0.0, 0.24))
 		)
 
-	var reward_width: float = min(screen_size.x - margin * 10.0, 520.0)
-	var reward_height: float = min(screen_size.y - margin * 8.0, 342.0)
+	var reward_width: float = min(screen_size.x - margin * 4.0, 700.0)
+	var reward_height: float = min(screen_size.y - margin * 3.0, 486.0)
 	var reward_x: float = (screen_size.x - reward_width) * 0.5
 	var reward_y: float = (screen_size.y - reward_height) * 0.5
 	var reward_padding := 18.0
 	var reward_inner_width: float = reward_width - reward_padding * 2.0
-	var reward_button_gap := 14.0
-	var reward_button_width: float = min(max(reward_inner_width * 0.26, 124.0), 148.0)
-	var reward_button_height := 50.0
+	var reward_button_gap := 12.0
+	var reward_button_width: float = min(max(reward_inner_width * 0.18, 116.0), 128.0)
+	var reward_button_height := 38.0
 	var reward_buttons_width: float = reward_button_width * 2.0 + reward_button_gap
-	var reward_button_x: float = reward_width - reward_padding - reward_buttons_width
+	var reward_button_x: float = (reward_width - reward_buttons_width) * 0.5
 	var reward_button_y: float = reward_height - 18.0 - reward_button_height
 
 	catch_popup_panel.position = Vector2(reward_x, reward_y)
@@ -2524,8 +3194,8 @@ func _setup_layout() -> void:
 	catch_popup_particles.z_index = 0
 	catch_popup_particles.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	catch_popup_glow.position = Vector2((reward_width - 360.0) * 0.5, 70.0)
-	catch_popup_glow.size = Vector2(360.0, 170.0)
+	catch_popup_glow.position = Vector2((reward_width - 470.0) * 0.5, 112.0)
+	catch_popup_glow.size = Vector2(470.0, 176.0)
 	catch_popup_glow.z_index = 0
 	catch_popup_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
@@ -2535,63 +3205,72 @@ func _setup_layout() -> void:
 	catch_popup_title_label.add_theme_font_size_override("font_size", 13)
 	catch_popup_title_label.add_theme_color_override("font_color", Color(0.78, 0.94, 0.86, 0.92))
 
-	catch_popup_badge_label.position = Vector2((reward_width - 142.0) * 0.5, 44.0)
-	catch_popup_badge_label.size = Vector2(142.0, 24.0)
+	catch_popup_badge_label.position = Vector2((reward_width - 142.0) * 0.5, 42.0)
+	catch_popup_badge_label.size = Vector2(142.0, 22.0)
 	catch_popup_badge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	catch_popup_badge_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	catch_popup_badge_label.add_theme_font_size_override("font_size", 11)
 
-	catch_popup_name_label.position = Vector2(reward_padding, 68.0)
-	catch_popup_name_label.size = Vector2(reward_inner_width, 32.0)
+	catch_popup_name_label.position = Vector2(reward_padding, 64.0)
+	catch_popup_name_label.size = Vector2(reward_inner_width, 34.0)
 	catch_popup_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	catch_popup_name_label.add_theme_font_size_override("font_size", 22)
+	catch_popup_name_label.add_theme_font_size_override("font_size", 24)
 	catch_popup_name_label.add_theme_color_override("font_color", Color(0.98, 1.0, 0.94, 1.0))
 	catch_popup_name_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.34))
 	catch_popup_name_label.add_theme_constant_override("shadow_offset_x", 0)
 	catch_popup_name_label.add_theme_constant_override("shadow_offset_y", 2)
 
-	catch_trophy_banner_label.position = Vector2((reward_width - 190.0) * 0.5, 98.0)
-	catch_trophy_banner_label.size = Vector2(190.0, 28.0)
+	catch_trophy_banner_label.position = Vector2((reward_width - 430.0) * 0.5, 98.0)
+	catch_trophy_banner_label.size = Vector2(430.0, 40.0)
+	catch_trophy_banner_label.z_index = 5
 	catch_trophy_banner_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	catch_trophy_banner_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	catch_trophy_banner_label.add_theme_font_size_override("font_size", 14)
+	catch_trophy_banner_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	catch_trophy_banner_label.add_theme_font_size_override("font_size", 12)
 	catch_trophy_banner_label.add_theme_color_override("font_color", Color(1.0, 0.90, 0.56, 1.0))
 	catch_trophy_banner_label.add_theme_stylebox_override(
 		"normal",
 		_make_panel_style(Color(0.34, 0.235, 0.08, 0.84), Color(1.0, 0.78, 0.38, 0.50), 15, 8, Color(0.86, 0.54, 0.16, 0.20))
 	)
 
-	var fish_visual_width: float = min(reward_inner_width, 390.0)
-	var fish_visual_height: float = min(142.0, reward_height * 0.40)
-	catch_fish_shadow.position = Vector2((reward_width - fish_visual_width) * 0.5 + 8.0, 112.0)
+	var fish_visual_width: float = min(reward_inner_width, 450.0)
+	var fish_visual_height: float = min(148.0, reward_height * 0.34)
+	catch_fish_shadow.position = Vector2((reward_width - fish_visual_width) * 0.5 + 8.0, 144.0)
 	catch_fish_shadow.size = Vector2(fish_visual_width, fish_visual_height)
 	catch_fish_shadow.z_index = 1
 	catch_fish_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_catch_shadow_base_position = catch_fish_shadow.position
 
-	catch_fish_visual.position = Vector2((reward_width - fish_visual_width) * 0.5, 104.0)
+	catch_fish_visual.position = Vector2((reward_width - fish_visual_width) * 0.5, 136.0)
 	catch_fish_visual.size = Vector2(fish_visual_width, fish_visual_height)
 	catch_fish_visual.z_index = 2
 	catch_fish_visual.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_catch_fish_base_position = catch_fish_visual.position
 
-	catch_popup_stats_label.position = Vector2(reward_padding, reward_height - 110.0)
-	catch_popup_stats_label.size = Vector2(reward_inner_width, 42.0)
+	catch_popup_stats_label.position = Vector2(reward_padding, reward_height - 158.0)
+	catch_popup_stats_label.size = Vector2(reward_inner_width, 82.0)
+	catch_popup_stats_label.z_index = 5
 	catch_popup_stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	catch_popup_stats_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	catch_popup_stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	catch_popup_stats_label.add_theme_font_size_override("font_size", 13)
+	catch_popup_stats_label.add_theme_font_size_override("font_size", 11)
 	catch_popup_stats_label.add_theme_color_override("font_color", Color(0.88, 0.98, 0.91, 0.96))
 
 	catch_keep_button.position = Vector2(reward_button_x, reward_button_y)
 	catch_keep_button.size = Vector2(reward_button_width, reward_button_height)
-	catch_keep_button.add_theme_font_size_override("font_size", 13)
+	catch_keep_button.add_theme_font_size_override("font_size", 12)
 	_apply_button_style(catch_keep_button, STYLE_PRIMARY_BUTTON)
+	catch_keep_button.custom_minimum_size = Vector2(reward_button_width, reward_button_height)
+	catch_keep_button.size = Vector2(reward_button_width, reward_button_height)
+	catch_keep_button.add_theme_font_size_override("font_size", 12)
 
 	catch_release_button.position = Vector2(reward_button_x + reward_button_width + reward_button_gap, reward_button_y)
 	catch_release_button.size = Vector2(reward_button_width, reward_button_height)
-	catch_release_button.add_theme_font_size_override("font_size", 13)
+	catch_release_button.add_theme_font_size_override("font_size", 12)
 	_apply_button_style(catch_release_button, STYLE_SECONDARY_BUTTON)
+	catch_release_button.custom_minimum_size = Vector2(reward_button_width, reward_button_height)
+	catch_release_button.size = Vector2(reward_button_width, reward_button_height)
+	catch_release_button.add_theme_font_size_override("font_size", 12)
 
 	_update_reeling_ui(_last_reeling_state)
 	_update_basket_ui()
@@ -2623,7 +3302,7 @@ func _setup_spots() -> void:
 
 func _connect_signals() -> void:
 	spot_option_button.item_selected.connect(_on_spot_selected)
-	fish_button.pressed.connect(_on_fish_button_pressed)
+	fish_button.pressed.connect(_trigger_fish_button_action)
 	fish_button.button_down.connect(_on_reel_button_down)
 	fish_button.button_up.connect(_on_reel_button_up)
 	nav_fish_button.pressed.connect(_on_nav_fish_button_pressed)
@@ -2642,7 +3321,10 @@ func _connect_signals() -> void:
 	shop_close_button.pressed.connect(_on_shop_close_button_pressed)
 	shop_bait_category_button.pressed.connect(_set_shop_category.bind("bait"))
 	shop_consumable_category_button.pressed.connect(_set_shop_category.bind("consumable"))
-	shop_tackle_category_button.pressed.connect(_set_shop_category.bind("tackle"))
+	shop_tackle_category_button.pressed.connect(_set_shop_category.bind("rod"))
+	shop_line_category_button.pressed.connect(_set_shop_category.bind("line"))
+	shop_hook_category_button.pressed.connect(_set_shop_category.bind("hook"))
+	shop_float_category_button.pressed.connect(_set_shop_category.bind("float"))
 	tackle_rod_button.pressed.connect(_set_tackle_category.bind("rod"))
 	tackle_line_button.pressed.connect(_set_tackle_category.bind("line"))
 	tackle_float_button.pressed.connect(_set_tackle_category.bind("float"))
@@ -2674,6 +3356,7 @@ func _connect_signals() -> void:
 	FishingManager.reeling_started.connect(_on_reeling_started)
 	FishingManager.reeling_updated.connect(_on_reeling_updated)
 	FishingManager.fish_caught.connect(_on_fish_caught)
+	FishingManager.fishing_failed_detailed.connect(_on_fishing_failed_detailed)
 	FishingManager.fishing_failed.connect(_on_fishing_failed)
 
 func _update_ui() -> void:
@@ -2681,6 +3364,7 @@ func _update_ui() -> void:
 
 func _on_global_time_changed(_time_state: Dictionary) -> void:
 	_update_time_hud()
+	_apply_time_atmosphere()
 
 func _on_global_period_changed(_time_of_day: String) -> void:
 	_apply_time_atmosphere()
@@ -2708,6 +3392,226 @@ func _apply_time_atmosphere() -> void:
 	far_forest_layer.modulate = settings.get("scene", Color.WHITE)
 	mid_forest_layer.modulate = settings.get("scene", Color.WHITE)
 	vignette_layer.modulate = settings.get("vignette", Color.WHITE)
+	_apply_time_of_day_overlays()
+
+func _apply_time_of_day_overlays() -> void:
+	_ensure_time_of_day_layers()
+	var visuals := _get_time_visual_settings()
+
+	if lake_bg_base_rect != null:
+		lake_bg_base_rect.modulate = visuals.get("base_modulate", Color.WHITE)
+
+	var color_material := time_color_overlay.material as ShaderMaterial
+	if color_material != null:
+		color_material.set_shader_parameter("sky_tint", visuals.get("sky_tint", Color.TRANSPARENT))
+		color_material.set_shader_parameter("water_tint", visuals.get("water_tint", Color.TRANSPARENT))
+		color_material.set_shader_parameter("horizon_tint", visuals.get("horizon_tint", Color.TRANSPARENT))
+		color_material.set_shader_parameter("horizon_y", visuals.get("horizon_y", 0.47))
+
+	var celestial_material := time_celestial_overlay.material as ShaderMaterial
+	if celestial_material != null:
+		celestial_material.set_shader_parameter("body_pos", visuals.get("body_pos", Vector2(0.22, 0.34)))
+		celestial_material.set_shader_parameter("body_color", visuals.get("body_color", Color(1.0, 0.80, 0.45, 1.0)))
+		celestial_material.set_shader_parameter("glow_color", visuals.get("glow_color", Color(1.0, 0.55, 0.24, 1.0)))
+		celestial_material.set_shader_parameter("reflection_color", visuals.get("reflection_color", Color(1.0, 0.68, 0.34, 1.0)))
+		celestial_material.set_shader_parameter("body_radius", visuals.get("body_radius", 0.018))
+		celestial_material.set_shader_parameter("body_alpha", visuals.get("body_alpha", 0.0))
+		celestial_material.set_shader_parameter("glow_radius", visuals.get("glow_radius", 0.22))
+		celestial_material.set_shader_parameter("glow_alpha", visuals.get("glow_alpha", 0.0))
+		celestial_material.set_shader_parameter("reflection_alpha", visuals.get("reflection_alpha", 0.0))
+		celestial_material.set_shader_parameter("horizon_y", visuals.get("horizon_y", 0.47))
+
+	var stars_material := time_stars_overlay.material as ShaderMaterial
+	if stars_material != null:
+		stars_material.set_shader_parameter("star_alpha", visuals.get("star_alpha", 0.0))
+		stars_material.set_shader_parameter("horizon_y", visuals.get("horizon_y", 0.47))
+		stars_material.set_shader_parameter("star_color", visuals.get("star_color", Color(0.84, 0.95, 1.0, 1.0)))
+
+	var vignette_material := time_vignette_overlay.material as ShaderMaterial
+	if vignette_material != null:
+		vignette_material.set_shader_parameter("vignette_color", visuals.get("vignette_color", Color(0.0, 0.025, 0.045, 1.0)))
+		vignette_material.set_shader_parameter("vignette_alpha", visuals.get("vignette_alpha", 0.22))
+
+func _get_time_visual_settings() -> Dictionary:
+	var minutes := _get_current_game_minutes()
+	var horizon_y := 0.47
+	var base_modulate := _sample_time_color(minutes, [
+		[0.0, Color(0.34, 0.43, 0.60, 1.0)],
+		[300.0, Color(0.45, 0.52, 0.66, 1.0)],
+		[420.0, Color(1.05, 0.88, 0.70, 1.0)],
+		[660.0, Color(1.02, 1.02, 0.96, 1.0)],
+		[1020.0, Color(1.04, 1.00, 0.92, 1.0)],
+		[1170.0, Color(1.08, 0.78, 0.58, 1.0)],
+		[1320.0, Color(0.40, 0.48, 0.66, 1.0)],
+		[1440.0, Color(0.34, 0.43, 0.60, 1.0)]
+	])
+	var sky_tint := _sample_time_color(minutes, [
+		[0.0, Color(0.00, 0.02, 0.08, 0.54)],
+		[300.0, Color(0.06, 0.08, 0.16, 0.34)],
+		[390.0, Color(1.00, 0.46, 0.18, 0.28)],
+		[690.0, Color(0.20, 0.42, 0.64, 0.06)],
+		[1080.0, Color(1.00, 0.58, 0.24, 0.15)],
+		[1200.0, Color(1.00, 0.34, 0.12, 0.34)],
+		[1320.0, Color(0.02, 0.05, 0.14, 0.58)],
+		[1440.0, Color(0.00, 0.02, 0.08, 0.54)]
+	])
+	var water_tint := _sample_time_color(minutes, [
+		[0.0, Color(0.00, 0.03, 0.08, 0.50)],
+		[300.0, Color(0.04, 0.08, 0.14, 0.30)],
+		[390.0, Color(0.88, 0.42, 0.18, 0.24)],
+		[690.0, Color(0.04, 0.22, 0.26, 0.08)],
+		[1080.0, Color(0.78, 0.38, 0.18, 0.17)],
+		[1200.0, Color(0.86, 0.30, 0.10, 0.31)],
+		[1320.0, Color(0.00, 0.04, 0.10, 0.56)],
+		[1440.0, Color(0.00, 0.03, 0.08, 0.50)]
+	])
+	var horizon_tint := _sample_time_color(minutes, [
+		[0.0, Color(0.24, 0.42, 0.84, 0.05)],
+		[300.0, Color(0.72, 0.48, 0.22, 0.12)],
+		[390.0, Color(1.00, 0.64, 0.25, 0.42)],
+		[660.0, Color(1.00, 0.86, 0.50, 0.04)],
+		[1080.0, Color(1.00, 0.70, 0.30, 0.18)],
+		[1200.0, Color(1.00, 0.44, 0.16, 0.46)],
+		[1320.0, Color(0.34, 0.46, 0.88, 0.09)],
+		[1440.0, Color(0.24, 0.42, 0.84, 0.05)]
+	])
+	var vignette_alpha := _sample_time_value(minutes, [
+		[0.0, 0.50],
+		[300.0, 0.34],
+		[420.0, 0.22],
+		[720.0, 0.15],
+		[1080.0, 0.20],
+		[1200.0, 0.31],
+		[1320.0, 0.54],
+		[1440.0, 0.50]
+	])
+	var star_alpha := _sample_time_value(minutes, [
+		[0.0, 0.34],
+		[300.0, 0.16],
+		[390.0, 0.0],
+		[1140.0, 0.0],
+		[1260.0, 0.18],
+		[1320.0, 0.36],
+		[1440.0, 0.34]
+	])
+	var celestial := _get_celestial_visuals(minutes)
+
+	return {
+		"base_modulate": base_modulate,
+		"sky_tint": sky_tint,
+		"water_tint": water_tint,
+		"horizon_tint": horizon_tint,
+		"horizon_y": horizon_y,
+		"star_alpha": star_alpha,
+		"star_color": Color(0.86, 0.96, 1.0, 1.0),
+		"vignette_color": Color(0.0, 0.020, 0.045, 1.0),
+		"vignette_alpha": vignette_alpha,
+		"body_pos": celestial.get("body_pos", Vector2(0.22, 0.34)),
+		"body_color": celestial.get("body_color", Color(1.0, 0.80, 0.45, 1.0)),
+		"glow_color": celestial.get("glow_color", Color(1.0, 0.55, 0.24, 1.0)),
+		"reflection_color": celestial.get("reflection_color", Color(1.0, 0.68, 0.34, 1.0)),
+		"body_radius": celestial.get("body_radius", 0.018),
+		"body_alpha": celestial.get("body_alpha", 0.0),
+		"glow_radius": celestial.get("glow_radius", 0.22),
+		"glow_alpha": celestial.get("glow_alpha", 0.0),
+		"reflection_alpha": celestial.get("reflection_alpha", 0.0)
+	}
+
+func _get_celestial_visuals(minutes: float) -> Dictionary:
+	var sun_start := 300.0
+	var sun_end := 1320.0
+	var is_daylight := minutes >= sun_start and minutes <= sun_end
+
+	if is_daylight:
+		var sun_t := clampf((minutes - sun_start) / max(sun_end - sun_start, 1.0), 0.0, 1.0)
+		var sun_arc := sin(sun_t * PI)
+		var edge_fade: float = clampf(min((minutes - sun_start) / 120.0, (sun_end - minutes) / 120.0), 0.0, 1.0)
+		var sunrise_sunset_boost := 1.0 - clampf(abs(sun_t - 0.5) / 0.5, 0.0, 1.0)
+		var warm_edge := 1.0 - sunrise_sunset_boost
+		var body_alpha: float = (0.12 + warm_edge * 0.24) * edge_fade
+		var glow_alpha: float = (0.06 + warm_edge * 0.20) * edge_fade
+		var reflection_alpha: float = (0.06 + warm_edge * 0.17) * edge_fade
+		return {
+			"body_pos": Vector2(lerpf(0.16, 0.86, sun_t), lerpf(0.36, 0.12, sun_arc)),
+			"body_color": Color(1.0, lerpf(0.58, 0.92, sun_arc), lerpf(0.28, 0.70, sun_arc), 1.0),
+			"glow_color": Color(1.0, 0.48 + sun_arc * 0.28, 0.16 + sun_arc * 0.22, 1.0),
+			"reflection_color": Color(1.0, 0.62, 0.28, 1.0),
+			"body_radius": lerpf(0.020, 0.014, sun_arc),
+			"body_alpha": body_alpha,
+			"glow_radius": lerpf(0.24, 0.16, sun_arc),
+			"glow_alpha": glow_alpha,
+			"reflection_alpha": reflection_alpha
+		}
+
+	var night_length := 1440.0 - sun_end + sun_start
+	var moon_minutes := minutes - sun_end if minutes >= sun_end else minutes + 1440.0 - sun_end
+	var moon_t := clampf(moon_minutes / max(night_length, 1.0), 0.0, 1.0)
+	var moon_arc := sin(moon_t * PI)
+	var night_edge_fade: float = clampf(min(moon_minutes / 90.0, (night_length - moon_minutes) / 90.0), 0.0, 1.0)
+	return {
+		"body_pos": Vector2(lerpf(0.18, 0.82, moon_t), lerpf(0.34, 0.18, moon_arc)),
+		"body_color": Color(0.70, 0.84, 1.0, 1.0),
+		"glow_color": Color(0.22, 0.42, 0.82, 1.0),
+		"reflection_color": Color(0.42, 0.64, 1.0, 1.0),
+		"body_radius": 0.012,
+		"body_alpha": 0.46 * night_edge_fade,
+		"glow_radius": 0.15,
+		"glow_alpha": 0.10 * night_edge_fade,
+		"reflection_alpha": 0.055 * night_edge_fade
+	}
+
+func _get_current_game_minutes() -> float:
+	var time_manager := _get_time_manager()
+
+	if time_manager != null:
+		var raw_minutes: Variant = time_manager.get("current_game_minutes")
+		if raw_minutes != null:
+			return fposmod(float(raw_minutes), 1440.0)
+
+	return 460.0
+
+func _sample_time_color(minutes: float, anchors: Array) -> Color:
+	if anchors.is_empty():
+		return Color.WHITE
+
+	var wrapped_minutes := fposmod(minutes, 1440.0)
+	var previous: Array = anchors[0]
+
+	for index in range(1, anchors.size()):
+		var current: Array = anchors[index]
+		var current_minute := float(current[0])
+		if wrapped_minutes <= current_minute:
+			var previous_minute := float(previous[0])
+			var span: float = max(current_minute - previous_minute, 0.001)
+			var t: float = clampf((wrapped_minutes - previous_minute) / span, 0.0, 1.0)
+			t = t * t * (3.0 - 2.0 * t)
+			var previous_color: Color = previous[1]
+			var current_color: Color = current[1]
+			return previous_color.lerp(current_color, t)
+		previous = current
+
+	var last_color: Color = anchors[anchors.size() - 1][1]
+	return last_color
+
+func _sample_time_value(minutes: float, anchors: Array) -> float:
+	if anchors.is_empty():
+		return 0.0
+
+	var wrapped_minutes := fposmod(minutes, 1440.0)
+	var previous: Array = anchors[0]
+
+	for index in range(1, anchors.size()):
+		var current: Array = anchors[index]
+		var current_minute := float(current[0])
+		if wrapped_minutes <= current_minute:
+			var previous_minute := float(previous[0])
+			var span: float = max(current_minute - previous_minute, 0.001)
+			var t: float = clampf((wrapped_minutes - previous_minute) / span, 0.0, 1.0)
+			t = t * t * (3.0 - 2.0 * t)
+			return lerpf(float(previous[1]), float(current[1]), t)
+		previous = current
+
+	return float(anchors[anchors.size() - 1][1])
 
 func _get_time_manager() -> Node:
 	return get_node_or_null("/root/TimeManager")
@@ -2843,6 +3747,40 @@ func _get_reward_fish_texture(fish_id: String) -> Texture2D:
 
 func _play_catch_reward_sound(tier: String) -> void:
 	catch_popup_ui._play_catch_reward_sound(tier)
+
+func _play_main_ambient() -> void:
+	_call_audio_manager("play_water_ambient_loop")
+
+func _play_game_sfx(sfx_name: String) -> void:
+	_call_audio_manager("play_sfx", [sfx_name])
+
+func _play_line_break_sfx_if_needed(failure_data: Dictionary) -> void:
+	var reason := str(failure_data.get("reason", ""))
+	var fail_kind := str(failure_data.get("fail_kind", ""))
+	var failure_text := "%s %s %s" % [
+		str(failure_data.get("title", "")),
+		str(failure_data.get("message", "")),
+		str(failure_data.get("raw_message", ""))
+	]
+	if reason == "LINE_BROKE" or fail_kind == "line_break" or _message_mentions_line_break(failure_text):
+		_call_audio_manager("play_line_break")
+
+func _message_mentions_line_break(message: String) -> bool:
+	var normalized_message := message.to_lower()
+	return (
+		normalized_message.find("line_broke") != -1
+		or normalized_message.find("line_break") != -1
+		or normalized_message.find("леска") != -1
+		or normalized_message.find("порвалась") != -1
+		or normalized_message.find("обрыв") != -1
+	)
+
+func _call_audio_manager(method_name: String, args: Array = []) -> void:
+	var audio_manager := get_node_or_null("/root/AudioManager")
+	if audio_manager == null or not audio_manager.has_method(method_name):
+		return
+
+	audio_manager.callv(method_name, args)
 
 func _play_audio_hook(player: AudioStreamPlayer) -> void:
 	if player == null or player.stream == null:
@@ -3008,6 +3946,10 @@ func _on_tackle_depth_button_pressed(delta: float) -> void:
 	_update_ui()
 
 func _on_tackle_close_button_pressed() -> void:
+	_arm_modal_tap_guard()
+	call_deferred("_close_tackle_ui_after_guard")
+
+func _close_tackle_ui_after_guard() -> void:
 	tackle_ui.close()
 
 func _update_waterbody_ui() -> void:
@@ -3044,17 +3986,40 @@ func _on_waterbody_select_button_pressed() -> void:
 		return
 
 	var waterbody_id := str(selected_waterbody.get("id", ""))
+	var selected_spot := _get_selected_waterbody_spot()
+	var selected_spot_id := str(selected_spot.get("id", ""))
+	var is_current_spot := waterbody_id == PlayerData.current_waterbody and selected_spot_id == PlayerData.current_spot
+
+	if is_current_spot:
+		if _fishing_ui_state == FishingUiState.FAILED:
+			_return_to_idle_after_result()
+		_show_toast("Вы уже на этой точке", true)
+		_on_waterbody_close_button_pressed()
+		return
+
+	if _fishing_ui_state == FishingUiState.FAILED:
+		_return_to_idle_after_result()
+	elif _fishing_ui_state != FishingUiState.IDLE:
+		_show_toast("Сначала закончите текущую ловлю", false)
+		_update_waterbody_ui()
+		return
+
 	if not PlayerData.set_current_waterbody(waterbody_id):
 		var required_level := int(selected_waterbody.get("required_level", 1))
 		_show_toast("Нужен LVL %d" % required_level, false)
 		_update_waterbody_ui()
 		return
 
-	var selected_spot := _get_selected_waterbody_spot()
-	if selected_spot.is_empty():
-		PlayerData.current_spot = _get_primary_waterbody_spot(waterbody_id)
-	else:
-		PlayerData.set_current_spot(str(selected_spot.get("id", "")))
+	if selected_spot_id == "":
+		selected_spot_id = _get_primary_waterbody_spot(waterbody_id)
+
+	if selected_spot_id != "" and not PlayerData.set_current_spot(selected_spot_id):
+		_show_toast("Точка недоступна", false)
+		_update_waterbody_ui()
+		return
+
+	_selected_waterbody_id = PlayerData.current_waterbody
+	_selected_waterbody_spot_id = PlayerData.current_spot
 	_setup_spots()
 	result_label.text = "Выбрано: %s / %s" % [
 		str(selected_waterbody.get("name", "-")),
@@ -3066,6 +4031,10 @@ func _on_waterbody_select_button_pressed() -> void:
 	_on_waterbody_close_button_pressed()
 
 func _on_waterbody_close_button_pressed() -> void:
+	_arm_modal_tap_guard()
+	call_deferred("_close_waterbody_ui_after_guard")
+
+func _close_waterbody_ui_after_guard() -> void:
 	waterbody_ui.close()
 
 func _get_selected_tackle_item() -> Dictionary:
@@ -3142,6 +4111,9 @@ func _on_fish_button_pressed() -> void:
 	if _is_catch_reward_open():
 		return
 
+	if is_cast_animating:
+		return
+
 	if _fishing_ui_state == FishingUiState.CAUGHT or _fishing_ui_state == FishingUiState.FAILED:
 		_return_to_idle_after_result()
 		return
@@ -3164,8 +4136,9 @@ func _on_fish_button_pressed() -> void:
 		result_label.text = _get_no_bite_candidate_reason(PlayerData.current_spot)
 		_show_toast("Поклёвка может быть редкой", false)
 
-	if not PlayerData.consume_current_bait(1):
+	if not PlayerData.has_current_bait():
 		result_label.text = "Нет наживки."
+		_show_toast("Нет наживки", false)
 		timer_label.text = "Готов к забросу"
 		_update_ui()
 		return
@@ -3180,11 +4153,17 @@ func _on_fish_button_pressed() -> void:
 	waterbody_backdrop.visible = false
 	shop_panel.visible = false
 	shop_backdrop.visible = false
+	if profile_ui != null:
+		profile_ui.close(false)
 	SaveManager.save_game()
 
-	_fishing_ui_state = FishingUiState.WAITING
-	result_label.text = "Туман сгущается. Ждем клев..."
-	FishingManager.start_fishing(PlayerData.current_spot)
+	_pending_cast_spot_id = PlayerData.current_spot
+	is_cast_animating = true
+	timer_label.text = "Заброс..."
+	result_label.text = "Снасть летит к воде..."
+	_call_audio_manager("play_cast")
+	if fishing_presence_ui != null:
+		fishing_presence_ui.start_cast_visual()
 	_update_ui()
 
 func _on_reel_button_down() -> void:
@@ -3223,7 +4202,7 @@ func _on_keepnet_sell_fish_pressed(fish_index: int) -> void:
 		return
 
 	var fish: Dictionary = InventoryManager.inventory[fish_index]
-	var price := int(fish.get("price", 0))
+	var price := PlayerData.get_skill_adjusted_sell_price(int(fish.get("price", 0)))
 	InventoryManager.inventory.remove_at(fish_index)
 	PlayerData.money += price
 	result_label.text = "Рыба продана: %s +%d мон." % [
@@ -3235,6 +4214,8 @@ func _on_keepnet_sell_fish_pressed(fish_index: int) -> void:
 	_update_ui()
 
 func _on_nav_fish_button_pressed() -> void:
+	if _should_ignore_base_ui_press():
+		return
 	if _is_catch_reward_open():
 		return
 
@@ -3249,29 +4230,65 @@ func _on_nav_fish_button_pressed() -> void:
 	waterbody_backdrop.visible = false
 	shop_panel.visible = false
 	shop_backdrop.visible = false
+	if profile_ui != null:
+		profile_ui.close(false)
 	_refresh_bottom_nav_styles()
 
 func _on_basket_button_pressed() -> void:
+	if _should_ignore_base_ui_press():
+		return
+
+	if profile_ui != null:
+		profile_ui.close(false)
 	keepnet_ui.open()
 
 func _on_basket_close_button_pressed() -> void:
+	_arm_modal_tap_guard()
+	call_deferred("_close_keepnet_ui_after_guard")
+
+func _close_keepnet_ui_after_guard() -> void:
 	keepnet_ui.close()
 
 func _on_inventory_button_pressed() -> void:
+	if _should_ignore_base_ui_press():
+		return
+
+	if profile_ui != null:
+		profile_ui.close(false)
 	_inventory_category = "all"
 	_selected_inventory_item_id = ""
 	inventory_ui.open()
 
 func _on_tackle_button_pressed() -> void:
+	if _should_ignore_base_ui_press():
+		return
+
+	if profile_ui != null:
+		profile_ui.close(false)
 	tackle_ui.open()
 
 func _on_shop_button_pressed() -> void:
+	if _should_ignore_base_ui_press():
+		return
+
+	if profile_ui != null:
+		profile_ui.close(false)
 	shop_ui.open()
 
 func _on_map_button_pressed() -> void:
+	if _should_ignore_base_ui_press():
+		return
+
+	if profile_ui != null:
+		profile_ui.close(false)
 	waterbody_ui.open()
 
 func _on_profile_button_pressed() -> void:
+	if _should_ignore_base_ui_press():
+		return
+
+	profile_ui.open()
+	return
 	if _is_catch_reward_open():
 		return
 
@@ -3290,15 +4307,24 @@ func _on_profile_button_pressed() -> void:
 	_show_toast("Профиль пока недоступен.", false)
 
 func _on_bait_button_pressed() -> void:
+	if _should_ignore_base_ui_press():
+		return
+
 	if _is_catch_reward_open():
 		return
 
+	if profile_ui != null:
+		profile_ui.close(false)
 	_active_nav_tab = "inventory"
 	_inventory_category = "bait"
 	_selected_inventory_item_id = ""
 	inventory_ui.open()
 
 func _on_shop_close_button_pressed() -> void:
+	_arm_modal_tap_guard()
+	call_deferred("_close_shop_ui_after_guard")
+
+func _close_shop_ui_after_guard() -> void:
 	shop_ui.close()
 
 func _on_shop_buy_pressed(item_id: String) -> void:
@@ -3307,7 +4333,7 @@ func _on_shop_buy_pressed(item_id: String) -> void:
 	if shop_item.is_empty():
 		return
 
-	var price := int(shop_item.get("price", 0))
+	var price := float(shop_item.get("price", 0.0))
 	var quantity := int(shop_item.get("quantity", 1))
 
 	if PlayerData.money < price:
@@ -3336,6 +4362,10 @@ func _on_shop_buy_pressed(item_id: String) -> void:
 	_play_shop_card_feedback(item_id, true)
 
 func _on_inventory_close_button_pressed() -> void:
+	_arm_modal_tap_guard()
+	call_deferred("_close_inventory_ui_after_guard")
+
+func _close_inventory_ui_after_guard() -> void:
 	inventory_ui.close()
 
 func _on_catch_keep_button_pressed() -> void:
@@ -3347,6 +4377,7 @@ func _on_catch_keep_button_pressed() -> void:
 	_hide_catch_reward_popup()
 
 	if not catch_data.is_empty():
+		PlayerData.register_catch_stats(catch_data)
 		result_label.text = "Рыба в садке: %s\nНажми “Вытянуть”, чтобы закончить цикл." % str(catch_data.get("name", "-"))
 
 	SaveManager.save_game()
@@ -3392,13 +4423,36 @@ func _on_inventory_equip_button_pressed() -> void:
 
 func _return_to_idle_after_result() -> void:
 	_pending_reward_catch = {}
+	_pending_cast_spot_id = ""
+	is_cast_animating = false
 	_hide_catch_reward_popup(false)
+	if fishing_presence_ui != null:
+		fishing_presence_ui.stop_cast_visual()
+	if failure_popup_ui != null:
+		failure_popup_ui.close()
 	_presence_bite_timer = 0.0
 	_presence_caught_timer = 0.0
 	_fishing_ui_state = FishingUiState.IDLE
 	timer_label.text = "Готов к забросу"
 	result_label.text = "Удочка вытянута. Можно забрасывать снова."
 	_reset_reeling_ui()
+	_update_ui()
+
+func _on_cast_visual_finished() -> void:
+	if not is_cast_animating:
+		return
+
+	var spot_id := _pending_cast_spot_id
+	_pending_cast_spot_id = ""
+	is_cast_animating = false
+
+	if spot_id == "":
+		_update_ui()
+		return
+
+	_fishing_ui_state = FishingUiState.WAITING
+	result_label.text = "Туман сгущается. Ждем клев..."
+	FishingManager.start_fishing(spot_id)
 	_update_ui()
 
 func _on_fishing_started(seconds: int) -> void:
@@ -3414,6 +4468,7 @@ func _on_fishing_tick(seconds_left: int) -> void:
 	timer_label.text = "Клев через: %d сек." % seconds_left
 
 func _on_reeling_started(catch_data: Dictionary, state: Dictionary) -> void:
+	_call_audio_manager("play_bite")
 	_presence_bite_timer = 0.95
 	_presence_caught_timer = 0.0
 	_fishing_ui_state = FishingUiState.FIGHTING
@@ -3427,11 +4482,13 @@ func _on_reeling_started(catch_data: Dictionary, state: Dictionary) -> void:
 	fight_hint_label.text = "Удерживай кнопку, чтобы тянуть. Отпускай, когда натяжение уходит выше зеленой зоны."
 	_update_reeling_ui(state)
 	_update_ui()
+	SaveManager.save_game()
 
 func _on_reeling_updated(state: Dictionary) -> void:
 	_update_reeling_ui(state)
 
 func _on_fish_caught(catch_data: Dictionary) -> void:
+	_call_audio_manager("play_catch_success")
 	_presence_bite_timer = 0.0
 	_presence_caught_timer = 1.1
 	_fishing_ui_state = FishingUiState.CAUGHT
@@ -3457,7 +4514,37 @@ func _on_fish_caught(catch_data: Dictionary) -> void:
 	_update_ui()
 	_show_catch_reward_popup(catch_data)
 
+func _on_fishing_failed_detailed(failure_data: Dictionary) -> void:
+	_play_line_break_sfx_if_needed(failure_data)
+	_last_detailed_failure_msec = Time.get_ticks_msec()
+	_pending_reward_catch = {}
+	_hide_catch_reward_popup(false)
+	_presence_bite_timer = 0.0
+	_presence_caught_timer = 0.0
+	_fishing_ui_state = FishingUiState.FAILED
+	timer_label.text = "Неудача"
+
+	var title := str(failure_data.get("title", "Неудачная попытка"))
+	var message := str(failure_data.get("message", "Рыба ушла."))
+	var hint := str(failure_data.get("hint", ""))
+	result_label.text = "%s\n%s" % [title, message]
+	if hint != "":
+		result_label.text += "\n%s" % hint
+	result_label.text += "\nНажми “Вытянуть удочку”."
+
+	_reset_reeling_ui()
+	SaveManager.save_game()
+	_update_ui()
+	if failure_popup_ui != null:
+		failure_popup_ui.show(failure_data)
+
 func _on_fishing_failed(message: String) -> void:
+	if Time.get_ticks_msec() - _last_detailed_failure_msec < 250:
+		return
+
+	if _message_mentions_line_break(message):
+		_call_audio_manager("play_line_break")
+
 	_pending_reward_catch = {}
 	_hide_catch_reward_popup(false)
 	_presence_bite_timer = 0.0

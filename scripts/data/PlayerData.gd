@@ -10,11 +10,15 @@ const TACKLE_CATALOG := {
 		"price": 0,
 		"description": "Стартовое маховое удилище. Подходит для небольшой рыбы у берега.",
 		"stats": {
+			"length_m": 4.0,
+			"rod_class": "light",
 			"max_fish_weight": 2.0,
 			"strength": 0.85,
 			"stiffness": 0.85,
 			"tension_bonus": 0.05,
 			"control_bonus": 0.05,
+			"reach_bonus": 0.00,
+			"handling_bonus": 0.01,
 			"durability": 1.0,
 			"durability_loss": 0.012
 		}
@@ -28,11 +32,15 @@ const TACKLE_CATALOG := {
 		"price": 220,
 		"description": "Более длинное и упругое удилище. Лучше держит среднюю рыбу.",
 		"stats": {
+			"length_m": 5.0,
+			"rod_class": "medium",
 			"max_fish_weight": 3.6,
 			"strength": 1.08,
 			"stiffness": 1.08,
 			"tension_bonus": 0.10,
 			"control_bonus": 0.10,
+			"reach_bonus": 0.05,
+			"handling_bonus": 0.00,
 			"durability": 1.0,
 			"durability_loss": 0.010
 		}
@@ -46,13 +54,501 @@ const TACKLE_CATALOG := {
 		"price": 540,
 		"description": "Жёсткий бланк для крупной рыбы. Даёт больше контроля при вываживании.",
 		"stats": {
+			"length_m": 6.0,
+			"rod_class": "heavy",
 			"max_fish_weight": 6.0,
 			"strength": 1.35,
 			"stiffness": 1.35,
 			"tension_bonus": 0.16,
 			"control_bonus": 0.16,
+			"reach_bonus": 0.13,
+			"handling_bonus": -0.02,
 			"durability": 1.0,
 			"durability_loss": 0.008
+		}
+	},
+	"green_line_xs_light": {
+		"id": "green_line_xs_light",
+		"name": "Green Line XS Light",
+		"type": "rod",
+		"category": "rod",
+		"rarity": "common",
+		"price": 48,
+		"description": "Короткая народная ultra light удочка для мелкой рыбы у берега. Очень послушная, но не любит перегруз.",
+		"stats": {
+			"length_m": 3.6,
+			"rod_class": "ultra_light",
+			"max_fish_weight": 1.2,
+			"strength": 0.72,
+			"stiffness": 0.70,
+			"tension_bonus": 0.12,
+			"control_bonus": 0.12,
+			"reach_bonus": -0.02,
+			"handling_bonus": 0.04,
+			"durability": 1.0,
+			"durability_loss": 0.013
+		}
+	},
+	"green_line_breeze_pole": {
+		"id": "green_line_breeze_pole",
+		"name": "Green Line Breeze Pole",
+		"type": "rod",
+		"category": "rod",
+		"rarity": "common",
+		"price": 120,
+		"description": "Лёгкая ранняя удочка с хорошим контролем. Подходит для плотвы, карася и спокойной учебной ловли.",
+		"stats": {
+			"length_m": 4.2,
+			"rod_class": "light",
+			"max_fish_weight": 2.2,
+			"strength": 0.92,
+			"stiffness": 0.90,
+			"tension_bonus": 0.10,
+			"control_bonus": 0.10,
+			"reach_bonus": 0.01,
+			"handling_bonus": 0.03,
+			"durability": 1.0,
+			"durability_loss": 0.011
+		}
+	},
+	"green_line_river_pro": {
+		"id": "green_line_river_pro",
+		"name": "Green Line River Pro",
+		"type": "rod",
+		"category": "rod",
+		"rarity": "uncommon",
+		"price": 260,
+		"description": "Универсальная средняя удочка для первых серьёзных точек. Хорошо держит темп и глубину.",
+		"stats": {
+			"length_m": 5.0,
+			"rod_class": "medium",
+			"max_fish_weight": 3.8,
+			"strength": 1.10,
+			"stiffness": 1.08,
+			"tension_bonus": 0.12,
+			"control_bonus": 0.12,
+			"reach_bonus": 0.06,
+			"handling_bonus": 0.01,
+			"durability": 1.0,
+			"durability_loss": 0.010
+		}
+	},
+	"green_line_silver_flow": {
+		"id": "green_line_silver_flow",
+		"name": "Green Line Silver Flow",
+		"type": "rod",
+		"category": "rod",
+		"rarity": "rare",
+		"price": 430,
+		"description": "Длинная универсальная удочка для более рабочей глубины. Сохраняет мягкий народный характер.",
+		"stats": {
+			"length_m": 5.6,
+			"rod_class": "universal",
+			"max_fish_weight": 5.0,
+			"strength": 1.25,
+			"stiffness": 1.20,
+			"tension_bonus": 0.14,
+			"control_bonus": 0.14,
+			"reach_bonus": 0.10,
+			"handling_bonus": 0.00,
+			"durability": 1.0,
+			"durability_loss": 0.009
+		}
+	},
+	"green_line_xh_master": {
+		"id": "green_line_xh_master",
+		"name": "Green Line XH Master",
+		"type": "rod",
+		"category": "rod",
+		"rarity": "rare",
+		"price": 760,
+		"description": "Топовая силовая Green Line для крупной рыбы. Длинная, мощная, но требует аккуратного контроля.",
+		"stats": {
+			"length_m": 6.2,
+			"rod_class": "heavy",
+			"max_fish_weight": 7.5,
+			"strength": 1.48,
+			"stiffness": 1.44,
+			"tension_bonus": 0.14,
+			"control_bonus": 0.14,
+			"reach_bonus": 0.15,
+			"handling_bonus": -0.01,
+			"durability": 1.0,
+			"durability_loss": 0.007
+		}
+	},
+	"nordriver_ice_reed": {
+		"id": "nordriver_ice_reed",
+		"name": "NordRiver Ice Reed",
+		"type": "rod",
+		"category": "rod",
+		"rarity": "common",
+		"price": 90,
+		"description": "Северная лёгкая удочка с запасом прочности. Спокойнее и надёжнее дешёвых стартовых моделей.",
+		"stats": {
+			"length_m": 4.0,
+			"rod_class": "light",
+			"max_fish_weight": 1.8,
+			"strength": 0.95,
+			"stiffness": 0.94,
+			"tension_bonus": 0.07,
+			"control_bonus": 0.07,
+			"reach_bonus": 0.00,
+			"handling_bonus": 0.02,
+			"durability": 1.0,
+			"durability_loss": 0.010
+		}
+	},
+	"nordriver_arctic_pole": {
+		"id": "nordriver_arctic_pole",
+		"name": "NordRiver Arctic Pole",
+		"type": "rod",
+		"category": "rod",
+		"rarity": "uncommon",
+		"price": 240,
+		"description": "Холодная стабильная medium удочка. Хороший вариант для уверенного перехода к средней рыбе.",
+		"stats": {
+			"length_m": 4.8,
+			"rod_class": "medium",
+			"max_fish_weight": 3.2,
+			"strength": 1.15,
+			"stiffness": 1.14,
+			"tension_bonus": 0.09,
+			"control_bonus": 0.09,
+			"reach_bonus": 0.05,
+			"handling_bonus": 0.01,
+			"durability": 1.0,
+			"durability_loss": 0.009
+		}
+	},
+	"nordriver_stream_hunter": {
+		"id": "nordriver_stream_hunter",
+		"name": "NordRiver Stream Hunter",
+		"type": "rod",
+		"category": "rod",
+		"rarity": "rare",
+		"price": 420,
+		"description": "Универсальная северная удочка для глубины и течения. Хорошо держит перегруз и не теряет стабильность.",
+		"stats": {
+			"length_m": 5.4,
+			"rod_class": "universal",
+			"max_fish_weight": 4.8,
+			"strength": 1.32,
+			"stiffness": 1.30,
+			"tension_bonus": 0.11,
+			"control_bonus": 0.11,
+			"reach_bonus": 0.09,
+			"handling_bonus": 0.00,
+			"durability": 1.0,
+			"durability_loss": 0.008
+		}
+	},
+	"nordriver_white_pike": {
+		"id": "nordriver_white_pike",
+		"name": "NordRiver White Pike",
+		"type": "rod",
+		"category": "rod",
+		"rarity": "rare",
+		"price": 690,
+		"description": "Жёсткая heavy удочка под хищника и крупную рыбу. Прочная, но менее деликатная.",
+		"stats": {
+			"length_m": 5.8,
+			"rod_class": "heavy",
+			"max_fish_weight": 6.8,
+			"strength": 1.55,
+			"stiffness": 1.58,
+			"tension_bonus": 0.09,
+			"control_bonus": 0.09,
+			"reach_bonus": 0.12,
+			"handling_bonus": -0.02,
+			"durability": 1.0,
+			"durability_loss": 0.007
+		}
+	},
+	"nordriver_carbon_wind": {
+		"id": "nordriver_carbon_wind",
+		"name": "NordRiver Carbon Wind",
+		"type": "rod",
+		"category": "rod",
+		"rarity": "trophy",
+		"price": 980,
+		"description": "Карбоновая северная удочка pro-класса. Много прочности без грубого ощущения в руках.",
+		"stats": {
+			"length_m": 6.0,
+			"rod_class": "heavy",
+			"max_fish_weight": 8.0,
+			"strength": 1.68,
+			"stiffness": 1.62,
+			"tension_bonus": 0.13,
+			"control_bonus": 0.13,
+			"reach_bonus": 0.14,
+			"handling_bonus": 0.00,
+			"durability": 1.0,
+			"durability_loss": 0.006
+		}
+	},
+	"sakura_fish_hana_light": {
+		"id": "sakura_fish_hana_light",
+		"name": "Sakura Fish Hana Light",
+		"type": "rod",
+		"category": "rod",
+		"rarity": "common",
+		"price": 70,
+		"description": "Очень лёгкая finesse удочка для осторожной мелкой рыбы. Максимум контроля, минимум силового запаса.",
+		"stats": {
+			"length_m": 3.3,
+			"rod_class": "ultra_light",
+			"max_fish_weight": 0.9,
+			"strength": 0.64,
+			"stiffness": 0.62,
+			"tension_bonus": 0.18,
+			"control_bonus": 0.18,
+			"reach_bonus": -0.03,
+			"handling_bonus": 0.06,
+			"durability": 1.0,
+			"durability_loss": 0.014
+		}
+	},
+	"sakura_fish_koi_master": {
+		"id": "sakura_fish_koi_master",
+		"name": "Sakura Fish Koi Master",
+		"type": "rod",
+		"category": "rod",
+		"rarity": "uncommon",
+		"price": 260,
+		"description": "Точная light удочка для карася, плотвы и аккуратной игры в зелёной зоне.",
+		"stats": {
+			"length_m": 4.5,
+			"rod_class": "light",
+			"max_fish_weight": 2.6,
+			"strength": 0.96,
+			"stiffness": 0.94,
+			"tension_bonus": 0.18,
+			"control_bonus": 0.18,
+			"reach_bonus": 0.03,
+			"handling_bonus": 0.04,
+			"durability": 1.0,
+			"durability_loss": 0.010
+		}
+	},
+	"sakura_fish_red_moon": {
+		"id": "sakura_fish_red_moon",
+		"name": "Sakura Fish Red Moon",
+		"type": "rod",
+		"category": "rod",
+		"rarity": "rare",
+		"price": 460,
+		"description": "Средняя японская удочка с высоким контролем. Хороша для точной ловли на вечерних точках.",
+		"stats": {
+			"length_m": 5.0,
+			"rod_class": "medium",
+			"max_fish_weight": 3.6,
+			"strength": 1.10,
+			"stiffness": 1.06,
+			"tension_bonus": 0.20,
+			"control_bonus": 0.20,
+			"reach_bonus": 0.06,
+			"handling_bonus": 0.03,
+			"durability": 1.0,
+			"durability_loss": 0.009
+		}
+	},
+	"sakura_fish_silent_river": {
+		"id": "sakura_fish_silent_river",
+		"name": "Sakura Fish Silent River",
+		"type": "rod",
+		"category": "rod",
+		"rarity": "trophy",
+		"price": 780,
+		"description": "Премиальная finesse universal удочка. Не самая силовая, зато отлично держит контроль.",
+		"stats": {
+			"length_m": 5.5,
+			"rod_class": "universal",
+			"max_fish_weight": 4.6,
+			"strength": 1.20,
+			"stiffness": 1.14,
+			"tension_bonus": 0.24,
+			"control_bonus": 0.24,
+			"reach_bonus": 0.09,
+			"handling_bonus": 0.04,
+			"durability": 1.0,
+			"durability_loss": 0.007
+		}
+	},
+	"titan_hook_iron_flex": {
+		"id": "titan_hook_iron_flex",
+		"name": "Titan Hook Iron Flex",
+		"type": "rod",
+		"category": "rod",
+		"rarity": "uncommon",
+		"price": 360,
+		"description": "Силовая medium-heavy удочка. Прощает перегруз, но не такая мягкая в контроле.",
+		"stats": {
+			"length_m": 4.8,
+			"rod_class": "medium",
+			"max_fish_weight": 4.8,
+			"strength": 1.38,
+			"stiffness": 1.42,
+			"tension_bonus": 0.05,
+			"control_bonus": 0.05,
+			"reach_bonus": 0.04,
+			"handling_bonus": -0.02,
+			"durability": 1.0,
+			"durability_loss": 0.008
+		}
+	},
+	"titan_hook_black_carbon": {
+		"id": "titan_hook_black_carbon",
+		"name": "Titan Hook Black Carbon",
+		"type": "rod",
+		"category": "rod",
+		"rarity": "rare",
+		"price": 620,
+		"description": "Чёрный карбон для тяжёлой рыбы. Большой запас прочности при умеренном контроле.",
+		"stats": {
+			"length_m": 5.2,
+			"rod_class": "heavy",
+			"max_fish_weight": 6.4,
+			"strength": 1.62,
+			"stiffness": 1.68,
+			"tension_bonus": 0.07,
+			"control_bonus": 0.07,
+			"reach_bonus": 0.08,
+			"handling_bonus": -0.02,
+			"durability": 1.0,
+			"durability_loss": 0.007
+		}
+	},
+	"titan_hook_predator_x": {
+		"id": "titan_hook_predator_x",
+		"name": "Titan Hook Predator X",
+		"type": "rod",
+		"category": "rod",
+		"rarity": "rare",
+		"price": 880,
+		"description": "Хищная heavy удочка для рывков и крупного сопротивления. Сила важнее деликатности.",
+		"stats": {
+			"length_m": 5.6,
+			"rod_class": "heavy",
+			"max_fish_weight": 8.2,
+			"strength": 1.85,
+			"stiffness": 1.92,
+			"tension_bonus": 0.06,
+			"control_bonus": 0.06,
+			"reach_bonus": 0.11,
+			"handling_bonus": -0.03,
+			"durability": 1.0,
+			"durability_loss": 0.006
+		}
+	},
+	"titan_hook_storm_pole": {
+		"id": "titan_hook_storm_pole",
+		"name": "Titan Hook Storm Pole",
+		"type": "rod",
+		"category": "rod",
+		"rarity": "trophy",
+		"price": 1160,
+		"description": "Extra heavy удочка для самой тяжёлой альфа-рыбы. Мощная, но грубая.",
+		"stats": {
+			"length_m": 6.0,
+			"rod_class": "extra_heavy",
+			"max_fish_weight": 10.0,
+			"strength": 2.10,
+			"stiffness": 2.18,
+			"tension_bonus": 0.04,
+			"control_bonus": 0.04,
+			"reach_bonus": 0.14,
+			"handling_bonus": -0.04,
+			"durability": 1.0,
+			"durability_loss": 0.006
+		}
+	},
+	"titan_hook_ultra_match": {
+		"id": "titan_hook_ultra_match",
+		"name": "Titan Hook Ultra Match",
+		"type": "rod",
+		"category": "rod",
+		"rarity": "trophy",
+		"price": 1500,
+		"description": "Топовая силовая universal удочка с максимальной длиной и запасом. Для поздней альфы.",
+		"stats": {
+			"length_m": 6.5,
+			"rod_class": "universal",
+			"max_fish_weight": 12.0,
+			"strength": 2.25,
+			"stiffness": 2.20,
+			"tension_bonus": 0.10,
+			"control_bonus": 0.10,
+			"reach_bonus": 0.18,
+			"handling_bonus": -0.02,
+			"durability": 1.0,
+			"durability_loss": 0.005
+		}
+	},
+	"aquanova_crystal_pole": {
+		"id": "aquanova_crystal_pole",
+		"name": "AquaNova Crystal Pole",
+		"type": "rod",
+		"category": "rod",
+		"rarity": "rare",
+		"price": 650,
+		"description": "Современная premium medium удочка. Лёгкая, точная и комфортная в долгом вываживании.",
+		"stats": {
+			"length_m": 4.6,
+			"rod_class": "medium",
+			"max_fish_weight": 3.4,
+			"strength": 1.16,
+			"stiffness": 1.10,
+			"tension_bonus": 0.22,
+			"control_bonus": 0.22,
+			"reach_bonus": 0.04,
+			"handling_bonus": 0.04,
+			"durability": 1.0,
+			"durability_loss": 0.007
+		}
+	},
+	"aquanova_neo_river": {
+		"id": "aquanova_neo_river",
+		"name": "AquaNova Neo River",
+		"type": "rod",
+		"category": "rod",
+		"rarity": "trophy",
+		"price": 1050,
+		"description": "Премиальная universal удочка для прогресса в поздней альфе. Баланс силы, длины и контроля.",
+		"stats": {
+			"length_m": 5.4,
+			"rod_class": "universal",
+			"max_fish_weight": 5.8,
+			"strength": 1.45,
+			"stiffness": 1.38,
+			"tension_bonus": 0.23,
+			"control_bonus": 0.23,
+			"reach_bonus": 0.10,
+			"handling_bonus": 0.04,
+			"durability": 1.0,
+			"durability_loss": 0.006
+		}
+	},
+	"aquanova_sky_drift": {
+		"id": "aquanova_sky_drift",
+		"name": "AquaNova Sky Drift",
+		"type": "rod",
+		"category": "rod",
+		"rarity": "trophy",
+		"price": 1400,
+		"description": "Длинная premium удочка с отличным контролем для глубины. Дальняя рабочая вода без тяжёлого ощущения.",
+		"stats": {
+			"length_m": 6.2,
+			"rod_class": "universal",
+			"max_fish_weight": 7.8,
+			"strength": 1.70,
+			"stiffness": 1.62,
+			"tension_bonus": 0.22,
+			"control_bonus": 0.22,
+			"reach_bonus": 0.16,
+			"handling_bonus": 0.03,
+			"durability": 1.0,
+			"durability_loss": 0.005
 		}
 	},
 	"mono_1_2kg": {
@@ -424,6 +920,329 @@ const TACKLE_CATALOG := {
 			"bite_visibility": 0.24
 		}
 	},
+	"riverstart_basic_hook_24": {
+		"id": "riverstart_basic_hook_24",
+		"name": "RiverStart Basic Hook №24",
+		"type": "hook",
+		"category": "hook",
+		"rarity": "common",
+		"price": 0.3,
+		"description": "Стартовый бюджетный крючок для самой мелкой осторожной рыбы.",
+		"stats": {
+			"hook_size": 24,
+			"hook_size_label": "24",
+			"hook_strength": 0.32,
+			"hook_chance": 0.03,
+			"target_fish_size": "small",
+			"fish_escape_modifier": 1.22,
+			"durability": 1.0,
+			"wear_rate": 0.046
+		}
+	},
+	"riverstart_basic_hook_22": {
+		"id": "riverstart_basic_hook_22",
+		"name": "RiverStart Basic Hook №22",
+		"type": "hook",
+		"category": "hook",
+		"rarity": "common",
+		"price": 0.4,
+		"description": "Дешёвый тонкий крючок для мелкой рыбы.",
+		"stats": {
+			"hook_size": 22,
+			"hook_size_label": "22",
+			"hook_strength": 0.34,
+			"hook_chance": 0.034,
+			"target_fish_size": "small",
+			"fish_escape_modifier": 1.21,
+			"durability": 1.0,
+			"wear_rate": 0.045
+		}
+	},
+	"riverstart_basic_hook_20": {
+		"id": "riverstart_basic_hook_20",
+		"name": "RiverStart Basic Hook №20",
+		"type": "hook",
+		"category": "hook",
+		"rarity": "common",
+		"price": 0.6,
+		"description": "Бюджетный крючок для уклейки и другой небольшой рыбы.",
+		"stats": {
+			"hook_size": 20,
+			"hook_size_label": "20",
+			"hook_strength": 0.38,
+			"hook_chance": 0.04,
+			"target_fish_size": "small",
+			"fish_escape_modifier": 1.20,
+			"durability": 1.0,
+			"wear_rate": 0.044
+		}
+	},
+	"riverstart_basic_hook_18": {
+		"id": "riverstart_basic_hook_18",
+		"name": "RiverStart Basic Hook №18",
+		"type": "hook",
+		"category": "hook",
+		"rarity": "common",
+		"price": 0.8,
+		"description": "Стартовый крючок для лёгкой поплавочной оснастки.",
+		"stats": {
+			"hook_size": 18,
+			"hook_size_label": "18",
+			"hook_strength": 0.42,
+			"hook_chance": 0.046,
+			"target_fish_size": "small",
+			"fish_escape_modifier": 1.19,
+			"durability": 1.0,
+			"wear_rate": 0.043
+		}
+	},
+	"riverstart_basic_hook_16": {
+		"id": "riverstart_basic_hook_16",
+		"name": "RiverStart Basic Hook №16",
+		"type": "hook",
+		"category": "hook",
+		"rarity": "common",
+		"price": 1.0,
+		"description": "Недорогой крючок для мелкой и некрупной белой рыбы.",
+		"stats": {
+			"hook_size": 16,
+			"hook_size_label": "16",
+			"hook_strength": 0.47,
+			"hook_chance": 0.052,
+			"target_fish_size": "small",
+			"fish_escape_modifier": 1.18,
+			"durability": 1.0,
+			"wear_rate": 0.042
+		}
+	},
+	"riverstart_basic_hook_14": {
+		"id": "riverstart_basic_hook_14",
+		"name": "RiverStart Basic Hook №14",
+		"type": "hook",
+		"category": "hook",
+		"rarity": "common",
+		"price": 1.3,
+		"description": "Бюджетный универсальный крючок для ранней ловли.",
+		"stats": {
+			"hook_size": 14,
+			"hook_size_label": "14",
+			"hook_strength": 0.52,
+			"hook_chance": 0.058,
+			"target_fish_size": "small",
+			"fish_escape_modifier": 1.17,
+			"durability": 1.0,
+			"wear_rate": 0.041
+		}
+	},
+	"riverstart_basic_hook_12": {
+		"id": "riverstart_basic_hook_12",
+		"name": "RiverStart Basic Hook №12",
+		"type": "hook",
+		"category": "hook",
+		"rarity": "common",
+		"price": 1.7,
+		"description": "Дешёвый крючок ходового размера. Уступает фирменным крючкам по прочности.",
+		"stats": {
+			"hook_size": 12,
+			"hook_size_label": "12",
+			"hook_strength": 0.58,
+			"hook_chance": 0.064,
+			"target_fish_size": "small",
+			"fish_escape_modifier": 1.16,
+			"durability": 1.0,
+			"wear_rate": 0.040
+		}
+	},
+	"riverstart_basic_hook_10": {
+		"id": "riverstart_basic_hook_10",
+		"name": "RiverStart Basic Hook №10",
+		"type": "hook",
+		"category": "hook",
+		"rarity": "common",
+		"price": 2.2,
+		"description": "Бюджетный крючок для плотвы, карася и окуня.",
+		"stats": {
+			"hook_size": 10,
+			"hook_size_label": "10",
+			"hook_strength": 0.65,
+			"hook_chance": 0.070,
+			"target_fish_size": "small",
+			"fish_escape_modifier": 1.15,
+			"durability": 1.0,
+			"wear_rate": 0.039
+		}
+	},
+	"riverstart_basic_hook_8": {
+		"id": "riverstart_basic_hook_8",
+		"name": "RiverStart Basic Hook №8",
+		"type": "hook",
+		"category": "hook",
+		"rarity": "common",
+		"price": 3.0,
+		"description": "Бюджетный крючок среднего размера для универсальной ловли.",
+		"stats": {
+			"hook_size": 8,
+			"hook_size_label": "8",
+			"hook_strength": 0.76,
+			"hook_chance": 0.074,
+			"target_fish_size": "medium",
+			"fish_escape_modifier": 1.14,
+			"durability": 1.0,
+			"wear_rate": 0.038
+		}
+	},
+	"riverstart_basic_hook_6": {
+		"id": "riverstart_basic_hook_6",
+		"name": "RiverStart Basic Hook №6",
+		"type": "hook",
+		"category": "hook",
+		"rarity": "common",
+		"price": 4.2,
+		"description": "Недорогой средний крючок для рыбы покрупнее.",
+		"stats": {
+			"hook_size": 6,
+			"hook_size_label": "6",
+			"hook_strength": 0.86,
+			"hook_chance": 0.078,
+			"target_fish_size": "medium",
+			"fish_escape_modifier": 1.13,
+			"durability": 1.0,
+			"wear_rate": 0.037
+		}
+	},
+	"riverstart_basic_hook_4": {
+		"id": "riverstart_basic_hook_4",
+		"name": "RiverStart Basic Hook №4",
+		"type": "hook",
+		"category": "hook",
+		"rarity": "common",
+		"price": 5.8,
+		"description": "Крупный бюджетный крючок. Подходит для сильной рыбы, но грубоват.",
+		"stats": {
+			"hook_size": 4,
+			"hook_size_label": "4",
+			"hook_strength": 0.98,
+			"hook_chance": 0.080,
+			"target_fish_size": "large",
+			"fish_escape_modifier": 1.12,
+			"durability": 1.0,
+			"wear_rate": 0.036
+		}
+	},
+	"riverstart_basic_hook_2": {
+		"id": "riverstart_basic_hook_2",
+		"name": "RiverStart Basic Hook №2",
+		"type": "hook",
+		"category": "hook",
+		"rarity": "common",
+		"price": 7.5,
+		"description": "Крупный бюджетный крючок для силовой ловли.",
+		"stats": {
+			"hook_size": 2,
+			"hook_size_label": "2",
+			"hook_strength": 1.08,
+			"hook_chance": 0.082,
+			"target_fish_size": "large",
+			"fish_escape_modifier": 1.11,
+			"durability": 1.0,
+			"wear_rate": 0.035
+		}
+	},
+	"riverstart_basic_hook_1": {
+		"id": "riverstart_basic_hook_1",
+		"name": "RiverStart Basic Hook №1",
+		"type": "hook",
+		"category": "hook",
+		"rarity": "common",
+		"price": 9.5,
+		"description": "Большой бюджетный крючок для крупной рыбы.",
+		"stats": {
+			"hook_size": 1,
+			"hook_size_label": "1",
+			"hook_strength": 1.16,
+			"hook_chance": 0.084,
+			"target_fish_size": "large",
+			"fish_escape_modifier": 1.10,
+			"durability": 1.0,
+			"wear_rate": 0.034
+		}
+	},
+	"riverstart_basic_hook_1_0": {
+		"id": "riverstart_basic_hook_1_0",
+		"name": "RiverStart Basic Hook №1/0",
+		"type": "hook",
+		"category": "hook",
+		"rarity": "common",
+		"price": 12,
+		"description": "Бюджетный крючок 1/0 для крупной рыбы и грубой оснастки.",
+		"stats": {
+			"hook_size": 0,
+			"hook_size_label": "1/0",
+			"hook_strength": 1.24,
+			"hook_chance": 0.084,
+			"target_fish_size": "large",
+			"fish_escape_modifier": 1.10,
+			"durability": 1.0,
+			"wear_rate": 0.033
+		}
+	},
+	"riverstart_basic_hook_2_0": {
+		"id": "riverstart_basic_hook_2_0",
+		"name": "RiverStart Basic Hook №2/0",
+		"type": "hook",
+		"category": "hook",
+		"rarity": "common",
+		"price": 15,
+		"description": "Бюджетный крючок 2/0 для самой крупной рыбы.",
+		"stats": {
+			"hook_size": -1,
+			"hook_size_label": "2/0",
+			"hook_strength": 1.34,
+			"hook_chance": 0.082,
+			"target_fish_size": "large",
+			"fish_escape_modifier": 1.11,
+			"durability": 1.0,
+			"wear_rate": 0.033
+		}
+	},
+	"riverstart_basic_hook_3_0": {
+		"id": "riverstart_basic_hook_3_0",
+		"name": "RiverStart Basic Hook №3/0",
+		"type": "hook",
+		"category": "hook",
+		"rarity": "common",
+		"price": 19,
+		"description": "Крупный бюджетный крючок 3/0. Требует подходящей рыбы и снасти.",
+		"stats": {
+			"hook_size": -2,
+			"hook_size_label": "3/0",
+			"hook_strength": 1.46,
+			"hook_chance": 0.080,
+			"target_fish_size": "large",
+			"fish_escape_modifier": 1.12,
+			"durability": 1.0,
+			"wear_rate": 0.032
+		}
+	},
+	"riverstart_basic_hook_4_0": {
+		"id": "riverstart_basic_hook_4_0",
+		"name": "RiverStart Basic Hook №4/0",
+		"type": "hook",
+		"category": "hook",
+		"rarity": "common",
+		"price": 24,
+		"description": "Самый крупный крючок RiverStart Basic Hook. Дешёвый, прочный и грубый.",
+		"stats": {
+			"hook_size": -3,
+			"hook_size_label": "4/0",
+			"hook_strength": 1.60,
+			"hook_chance": 0.078,
+			"target_fish_size": "large",
+			"fish_escape_modifier": 1.13,
+			"durability": 1.0,
+			"wear_rate": 0.032
+		}
+	},
 	"small_hook_12": {
 		"id": "small_hook_12",
 		"name": "Крючок малый №12",
@@ -568,11 +1387,18 @@ const TACKLE_CATALOG := {
 	}
 }
 const TACKLE_SLOTS := ["rod", "line", "float", "hook", "bait"]
+const RESCUE_KIT_MONEY_LIMIT := 10.0
+const RESCUE_KIT_LINE_ID := "lakeline_nylon_basic_1_5kg"
+const RESCUE_KIT_PRIMARY_HOOK_ID := "riverstart_basic_hook_16"
+const RESCUE_KIT_FALLBACK_HOOK_ID := "small_hook_12"
 
 var money: float = 0.0
 var level: int = 1
 var current_xp: int = 0
 var xp_to_next_level: int = 175
+var skill_points: int = 0
+var learned_skills: Dictionary = {}
+var player_name: String = "Рыбак"
 var current_waterbody: String = "agamin_lake"
 var unlocked_waterbodies: Array = ["agamin_lake"]
 var current_spot: String = "old_oak_pier"
@@ -581,6 +1407,15 @@ var upgrades: Array = []
 var fishing_depth: float = 1.2
 var owned_items: Array = get_default_owned_items()
 var current_tackle: Dictionary = get_default_tackle()
+var total_fish_caught := 0
+var total_trophies_caught := 0
+var total_rarity_caught := 0
+var biggest_fish := {}
+var biggest_fish_by_species := {}
+var trophy_catches := []
+var personal_records := {}
+var rescue_kit_claims_total := 0
+var rescue_kit_last_claim_day := -1
 
 func format_money_amount(value: float) -> String:
 	var rounded_value: float = round(value * 100.0) / 100.0
@@ -593,6 +1428,11 @@ func format_money_amount(value: float) -> String:
 
 func format_money(value: float, suffix: String = "мон.") -> String:
 	return "%s %s" % [format_money_amount(value), suffix]
+
+func format_hook_size(size: int) -> String:
+	if size <= 0:
+		return "%d/0" % (1 - size)
+	return "%d" % size
 
 func get_xp_to_next_level(for_level: int) -> int:
 	return 100 + 50 * for_level + 25 * for_level * for_level
@@ -610,6 +1450,7 @@ func add_xp(amount: int) -> Dictionary:
 		xp_to_next_level = get_xp_to_next_level(level)
 
 	if levels_gained > 0:
+		skill_points += levels_gained
 		refresh_waterbody_unlocks()
 
 	return {
@@ -620,6 +1461,176 @@ func add_xp(amount: int) -> Dictionary:
 		"current_xp": current_xp,
 		"xp_to_next_level": xp_to_next_level
 	}
+
+func register_catch_stats(catch_data: Dictionary) -> void:
+	if catch_data.is_empty():
+		return
+
+	if bool(catch_data.get("stats_registered", false)):
+		return
+
+	if not catch_data.has("previous_species_record_weight"):
+		var prepared := prepare_record_info(catch_data)
+		catch_data.clear()
+		catch_data.merge(prepared, true)
+
+	var fish_id := str(catch_data.get("id", ""))
+	var weight := float(catch_data.get("weight", 0.0))
+	var catch_rank := str(catch_data.get("catch_rank", "normal"))
+	var is_new_personal_record := bool(catch_data.get("is_new_personal_record", biggest_fish.is_empty() or weight > float(biggest_fish.get("weight", 0.0))))
+	var is_new_species_record := bool(catch_data.get("is_new_species_record", fish_id != "" and (not biggest_fish_by_species.has(fish_id) or weight > float(biggest_fish_by_species[fish_id].get("weight", 0.0)))))
+
+	catch_data["is_new_personal_record"] = is_new_personal_record
+	catch_data["is_new_species_record"] = is_new_species_record
+	_fill_catch_record_context(catch_data)
+
+	total_fish_caught += 1
+
+	var record_entry := _build_catch_record_entry(catch_data)
+	if catch_rank == "trophy":
+		total_trophies_caught += 1
+		trophy_catches.append(record_entry.duplicate(true))
+	elif catch_rank == "rarity":
+		total_trophies_caught += 1
+		total_rarity_caught += 1
+		trophy_catches.append(record_entry.duplicate(true))
+
+	if trophy_catches.size() > 60:
+		trophy_catches = trophy_catches.slice(trophy_catches.size() - 60)
+
+	if is_new_personal_record:
+		biggest_fish = record_entry.duplicate(true)
+
+	if is_new_species_record:
+		biggest_fish_by_species[fish_id] = record_entry.duplicate(true)
+		personal_records[fish_id] = record_entry.duplicate(true)
+	catch_data["stats_registered"] = true
+
+func prepare_record_info(catch_data: Dictionary) -> Dictionary:
+	var result := catch_data.duplicate(true)
+	var fish_id := str(result.get("id", ""))
+	var current_weight := float(result.get("weight", 0.0))
+
+	var previous_record := {}
+	if personal_records.has(fish_id):
+		previous_record = personal_records[fish_id].duplicate(true)
+
+	var previous_weight := float(previous_record.get("weight", 0.0))
+	result["previous_species_record_weight"] = previous_weight
+	result["previous_species_record_name"] = str(previous_record.get("name", previous_record.get("fish_name", "")))
+	result["previous_species_record_length_cm"] = float(previous_record.get("length_cm", 0.0))
+	result["previous_species_record_catch_rank"] = str(previous_record.get("catch_rank", "normal"))
+	result["is_new_species_record"] = previous_weight <= 0.0 or current_weight > previous_weight
+	result["is_new_personal_record"] = biggest_fish.is_empty() or current_weight > float(biggest_fish.get("weight", 0.0))
+	_fill_catch_record_context(result)
+	return result
+
+func get_catch_stats_save_data() -> Dictionary:
+	return {
+		"player_name": player_name,
+		"total_fish_caught": total_fish_caught,
+		"total_trophies_caught": total_trophies_caught,
+		"total_rarity_caught": total_rarity_caught,
+		"biggest_fish": biggest_fish.duplicate(true),
+		"biggest_fish_by_species": biggest_fish_by_species.duplicate(true),
+		"trophy_catches": trophy_catches.duplicate(true),
+		"personal_records": personal_records.duplicate(true)
+	}
+
+func set_catch_stats_from_save(save_data: Dictionary) -> void:
+	player_name = str(save_data.get("player_name", player_name))
+	total_fish_caught = max(int(save_data.get("total_fish_caught", 0)), 0)
+	total_trophies_caught = max(int(save_data.get("total_trophies_caught", 0)), 0)
+	total_rarity_caught = max(int(save_data.get("total_rarity_caught", 0)), 0)
+	biggest_fish = _safe_saved_dictionary(save_data.get("biggest_fish", {}))
+	biggest_fish_by_species = _safe_saved_dictionary(save_data.get("biggest_fish_by_species", {}))
+	trophy_catches = _safe_saved_array(save_data.get("trophy_catches", []))
+	personal_records = _safe_saved_dictionary(save_data.get("personal_records", {}))
+
+func _fill_catch_record_context(catch_data: Dictionary) -> void:
+	var spot := SpotDatabase.get_spot(str(catch_data.get("spot_id", current_spot)))
+	if spot.is_empty():
+		spot = SpotDatabase.get_spot(current_spot)
+
+	var spot_id := str(spot.get("id", catch_data.get("spot_id", current_spot)))
+	var waterbody_id := str(spot.get("waterbody_id", catch_data.get("waterbody_id", current_waterbody)))
+	var waterbody := _get_waterbody(waterbody_id)
+	var spot_name := str(catch_data.get("spot_name", ""))
+	if spot_name == "":
+		spot_name = str(spot.get("name", "-"))
+	var waterbody_name := str(catch_data.get("waterbody_name", ""))
+	if waterbody_name == "":
+		waterbody_name = str(waterbody.get("name", "-"))
+
+	catch_data["spot_id"] = spot_id
+	catch_data["spot_name"] = spot_name
+	catch_data["waterbody_id"] = waterbody_id
+	catch_data["waterbody_name"] = waterbody_name
+	catch_data["bait"] = str(catch_data.get("bait", current_tackle.get("bait", {}).get("name", "-")))
+	catch_data["tackle_summary"] = str(catch_data.get("tackle_summary", _get_record_tackle_summary()))
+	catch_data["caught_at"] = str(catch_data.get("caught_at", _get_record_caught_at()))
+
+func _build_catch_record_entry(catch_data: Dictionary) -> Dictionary:
+	var fish_id := str(catch_data.get("id", ""))
+	var fish_name := str(catch_data.get("name", "-"))
+	var fish_rarity := str(catch_data.get("rarity", "common"))
+
+	return {
+		"player_name": player_name,
+		"fish_id": fish_id,
+		"id": fish_id,
+		"fish_name": fish_name,
+		"name": fish_name,
+		"weight": float(catch_data.get("weight", 0.0)),
+		"length_cm": float(catch_data.get("length_cm", 0.0)),
+		"price": int(catch_data.get("price", 0)),
+		"fish_rarity": fish_rarity,
+		"rarity": fish_rarity,
+		"catch_rank": str(catch_data.get("catch_rank", "normal")),
+		"is_trophy": bool(catch_data.get("is_trophy", false)),
+		"is_rarity": bool(catch_data.get("is_rarity", false)),
+		"is_new_personal_record": bool(catch_data.get("is_new_personal_record", false)),
+		"is_new_species_record": bool(catch_data.get("is_new_species_record", false)),
+		"spot_id": str(catch_data.get("spot_id", "")),
+		"spot_name": str(catch_data.get("spot_name", "-")),
+		"waterbody_id": str(catch_data.get("waterbody_id", "")),
+		"waterbody_name": str(catch_data.get("waterbody_name", "-")),
+		"bait": str(catch_data.get("bait", "-")),
+		"tackle_summary": str(catch_data.get("tackle_summary", "-")),
+		"caught_at": str(catch_data.get("caught_at", ""))
+	}
+
+func _get_record_tackle_summary() -> String:
+	return "%s | %s | %s | %s" % [
+		str(current_tackle.get("rod", {}).get("name", "-")),
+		str(current_tackle.get("line", {}).get("name", "-")),
+		str(current_tackle.get("float", {}).get("name", "-")),
+		str(current_tackle.get("hook", {}).get("name", "-"))
+	]
+
+func _get_record_caught_at() -> String:
+	var time_manager := get_node_or_null("/root/TimeManager")
+	if time_manager != null:
+		var minutes := int(time_manager.get("current_game_minutes"))
+		var day := int(time_manager.get("day_index"))
+		var hour := int(minutes / 60)
+		var minute := minutes % 60
+		return "День %d, %02d:%02d" % [day, hour, minute]
+
+	return Time.get_datetime_string_from_system(false, true)
+
+func _safe_saved_dictionary(value) -> Dictionary:
+	if typeof(value) == TYPE_DICTIONARY:
+		return value.duplicate(true)
+	return {}
+
+func _safe_saved_array(value) -> Array:
+	if typeof(value) == TYPE_ARRAY:
+		return value.duplicate(true)
+	return []
+
+func _get_skill_database() -> Node:
+	return get_node_or_null("/root/SkillDatabase")
 
 func set_progression(saved_level: int, saved_xp: int) -> void:
 	level = max(saved_level, 1)
@@ -632,6 +1643,123 @@ func set_progression(saved_level: int, saved_xp: int) -> void:
 		xp_to_next_level = get_xp_to_next_level(level)
 
 	refresh_waterbody_unlocks()
+
+func has_skill(skill_id: String) -> bool:
+	return bool(learned_skills.get(skill_id, false))
+
+func can_learn_skill(skill_id: String) -> Dictionary:
+	var skill_database := _get_skill_database()
+	if skill_database == null or not skill_database.has_method("get_skill"):
+		return {
+			"success": false,
+			"can_learn": false,
+			"reason": "База навыков недоступна."
+		}
+
+	var skill: Dictionary = skill_database.call("get_skill", skill_id)
+	if skill.is_empty():
+		return {
+			"success": false,
+			"can_learn": false,
+			"reason": "Навык не найден."
+		}
+
+	if has_skill(skill_id):
+		return {
+			"success": false,
+			"can_learn": false,
+			"reason": "Навык уже изучен."
+		}
+
+	var cost: int = max(int(skill.get("cost", 0)), 0)
+	if skill_points < cost:
+		return {
+			"success": false,
+			"can_learn": false,
+			"reason": "Недостаточно очков навыков."
+		}
+
+	for required_id in skill.get("requires", []):
+		if not has_skill(str(required_id)):
+			return {
+				"success": false,
+				"can_learn": false,
+				"reason": "Сначала изучите предыдущий навык."
+			}
+
+	return {
+		"success": true,
+		"can_learn": true,
+		"reason": ""
+	}
+
+func learn_skill(skill_id: String) -> Dictionary:
+	var check := can_learn_skill(skill_id)
+	if not bool(check.get("can_learn", false)):
+		return check
+
+	var skill_database := _get_skill_database()
+	var skill: Dictionary = skill_database.call("get_skill", skill_id)
+	var cost: int = max(int(skill.get("cost", 0)), 0)
+	skill_points = max(skill_points - cost, 0)
+	learned_skills[skill_id] = true
+
+	return {
+		"success": true,
+		"can_learn": true,
+		"reason": "Навык изучен."
+	}
+
+func get_skill_effects() -> Dictionary:
+	var result := {}
+	var skill_database := _get_skill_database()
+	if skill_database == null or not skill_database.has_method("get_skill"):
+		return result
+
+	for skill_id in learned_skills.keys():
+		if not bool(learned_skills.get(skill_id, false)):
+			continue
+
+		var skill: Dictionary = skill_database.call("get_skill", str(skill_id))
+		if skill.is_empty():
+			continue
+
+		var effects: Dictionary = skill.get("effects", {})
+		for effect_id in effects.keys():
+			result[effect_id] = float(result.get(effect_id, 0.0)) + float(effects[effect_id])
+
+	return result
+
+func get_skill_effect_value(effect_id: String) -> float:
+	return float(get_skill_effects().get(effect_id, 0.0))
+
+func get_sell_price_multiplier() -> float:
+	return max(1.0 + get_skill_effect_value("sell_price_bonus"), 0.0)
+
+func get_skill_adjusted_sell_price(base_price: int) -> int:
+	return max(roundi(float(max(base_price, 0)) * get_sell_price_multiplier()), 0)
+
+func set_skill_state(saved_skill_points: int, saved_learned_skills) -> void:
+	skill_points = max(saved_skill_points, 0)
+	learned_skills = {}
+
+	var skill_database := _get_skill_database()
+	var saved_ids: Array = []
+
+	if typeof(saved_learned_skills) == TYPE_DICTIONARY:
+		for skill_id in saved_learned_skills.keys():
+			if bool(saved_learned_skills.get(skill_id, false)):
+				saved_ids.append(str(skill_id))
+	elif typeof(saved_learned_skills) == TYPE_ARRAY:
+		for skill_id in saved_learned_skills:
+			saved_ids.append(str(skill_id))
+
+	for skill_id in saved_ids:
+		if skill_id.is_empty():
+			continue
+		if skill_database != null and skill_database.has_method("has_skill") and not bool(skill_database.call("has_skill", skill_id)):
+			continue
+		learned_skills[skill_id] = true
 
 func refresh_waterbody_unlocks() -> void:
 	for waterbody in _get_all_waterbodies():
@@ -846,10 +1974,18 @@ func _normalize_equipment_stats(stats: Dictionary, category: String) -> Dictiona
 
 	match category:
 		"rod":
+			if not normalized.has("length_m"):
+				normalized["length_m"] = 4.0
+			if not normalized.has("rod_class"):
+				normalized["rod_class"] = _get_default_rod_class(float(normalized["length_m"]))
 			if not normalized.has("control_bonus"):
 				normalized["control_bonus"] = float(normalized.get("tension_bonus", 0.0))
 			if not normalized.has("tension_bonus"):
 				normalized["tension_bonus"] = float(normalized.get("control_bonus", 0.0))
+			if not normalized.has("reach_bonus"):
+				normalized["reach_bonus"] = _get_default_rod_reach_bonus(float(normalized["length_m"]))
+			if not normalized.has("handling_bonus"):
+				normalized["handling_bonus"] = _get_default_rod_handling_bonus(float(normalized["length_m"]), str(normalized["rod_class"]))
 			if not normalized.has("stiffness"):
 				normalized["stiffness"] = float(normalized.get("strength", 1.0))
 			if not normalized.has("strength"):
@@ -860,6 +1996,9 @@ func _normalize_equipment_stats(stats: Dictionary, category: String) -> Dictiona
 				normalized["durability"] = 1.0
 			if not normalized.has("durability_loss"):
 				normalized["durability_loss"] = 0.012
+			normalized["length_m"] = clamp(float(normalized["length_m"]), 2.7, 7.2)
+			normalized["reach_bonus"] = clamp(float(normalized["reach_bonus"]), -0.06, 0.22)
+			normalized["handling_bonus"] = clamp(float(normalized["handling_bonus"]), -0.08, 0.08)
 			normalized["durability"] = clamp(float(normalized["durability"]), 0.0, 1.0)
 		"line":
 			var max_load: float = float(normalized.get("max_load", normalized.get("max_load_kg", normalized.get("strength", 1.0))))
@@ -904,6 +2043,37 @@ func _normalize_equipment_stats(stats: Dictionary, category: String) -> Dictiona
 			normalized["durability"] = clamp(float(normalized["durability"]), 0.0, 1.0)
 
 	return normalized
+
+func _get_default_rod_class(length_m: float) -> String:
+	if length_m <= 3.8:
+		return "ultra_light"
+	if length_m <= 4.6:
+		return "light"
+	if length_m <= 5.2:
+		return "medium"
+	if length_m <= 5.8:
+		return "universal"
+	return "heavy"
+
+func _get_default_rod_reach_bonus(length_m: float) -> float:
+	return clamp((length_m - 4.0) * 0.045, -0.04, 0.18)
+
+func _get_default_rod_handling_bonus(length_m: float, rod_class: String) -> float:
+	var class_bonus := 0.0
+	match rod_class:
+		"ultra_light":
+			class_bonus = 0.035
+		"light":
+			class_bonus = 0.020
+		"medium":
+			class_bonus = 0.005
+		"extra_heavy":
+			class_bonus = -0.030
+		"heavy":
+			class_bonus = -0.020
+		_:
+			class_bonus = 0.0
+	return clamp(class_bonus - max(length_m - 5.2, 0.0) * 0.018, -0.06, 0.06)
 
 func _normalize_owned_item(item: Dictionary) -> Dictionary:
 	var item_id := str(item.get("id", ""))
@@ -1036,6 +2206,141 @@ func can_equip_item(item: Dictionary) -> bool:
 
 	return true
 
+func has_usable_basic_tackle() -> bool:
+	for slot in TACKLE_SLOTS:
+		if _is_current_tackle_slot_usable(slot):
+			continue
+		if not _has_usable_owned_tackle_item(slot):
+			return false
+
+	return true
+
+func can_claim_rescue_kit() -> Dictionary:
+	if money >= RESCUE_KIT_MONEY_LIMIT:
+		return {
+			"allowed": false,
+			"reason": "У вас достаточно денег для покупки снастей."
+		}
+
+	if has_usable_basic_tackle():
+		return {
+			"allowed": false,
+			"reason": "У вас уже есть рабочий комплект."
+		}
+
+	var current_day: int = _get_current_game_day()
+	if rescue_kit_last_claim_day == current_day:
+		return {
+			"allowed": false,
+			"reason": "Базовый набор уже получен сегодня."
+		}
+
+	return {
+		"allowed": true,
+		"reason": "Вы можете получить базовый набор."
+	}
+
+func claim_rescue_kit() -> Dictionary:
+	var check: Dictionary = can_claim_rescue_kit()
+	if not bool(check.get("allowed", false)):
+		check["success"] = false
+		check["message"] = str(check.get("reason", "Базовый набор сейчас недоступен."))
+		return check
+
+	var hook_id: String = _get_rescue_hook_id()
+	var hook_quantity: int = 5 if hook_id == RESCUE_KIT_PRIMARY_HOOK_ID else 3
+
+	_grant_rescue_item("simple_pole_rod_4m", 1)
+	_grant_rescue_item(RESCUE_KIT_LINE_ID, 1)
+	_grant_rescue_item("light_float", 1)
+	_grant_rescue_item(hook_id, hook_quantity)
+	_grant_rescue_item("worm", 5)
+	_equip_rescue_items_if_needed(hook_id)
+
+	rescue_kit_claims_total += 1
+	rescue_kit_last_claim_day = _get_current_game_day()
+	_save_after_rescue_kit()
+
+	return {
+		"allowed": true,
+		"success": true,
+		"message": "Базовый набор выдан: удочка, леска, поплавок, крючки и наживка."
+	}
+
+func _is_current_tackle_slot_usable(slot: String) -> bool:
+	if not current_tackle.has(slot):
+		return false
+
+	var raw_component: Variant = current_tackle.get(slot, {})
+	if typeof(raw_component) != TYPE_DICTIONARY:
+		return false
+
+	var component: Dictionary = raw_component
+	var item_id: String = str(component.get("id", ""))
+	if item_id == "":
+		return false
+
+	if slot == "bait":
+		return get_current_bait_quantity() > 0
+
+	if _get_owned_item_quantity(item_id) <= 0:
+		return false
+
+	if ["rod", "line", "hook"].has(slot):
+		return get_tackle_condition(slot) > 0.05
+
+	return true
+
+func _has_usable_owned_tackle_item(category: String) -> bool:
+	for item in owned_items:
+		if typeof(item) != TYPE_DICTIONARY:
+			continue
+		var owned_item: Dictionary = item
+		if str(owned_item.get("category", "")) != category:
+			continue
+		if can_equip_item(owned_item):
+			return true
+
+	return false
+
+func _get_rescue_hook_id() -> String:
+	if not get_tackle_catalog_item(RESCUE_KIT_PRIMARY_HOOK_ID).is_empty():
+		return RESCUE_KIT_PRIMARY_HOOK_ID
+	return RESCUE_KIT_FALLBACK_HOOK_ID
+
+func _grant_rescue_item(item_id: String, quantity: int) -> void:
+	var item: Dictionary = _make_owned_catalog_item(item_id, quantity)
+	if item.is_empty():
+		return
+	add_owned_item(item, quantity)
+
+func _equip_rescue_items_if_needed(hook_id: String) -> void:
+	var rescue_slots: Dictionary = {
+		"rod": "simple_pole_rod_4m",
+		"line": RESCUE_KIT_LINE_ID,
+		"float": "light_float",
+		"hook": hook_id,
+		"bait": "worm"
+	}
+
+	for slot in TACKLE_SLOTS:
+		if _is_current_tackle_slot_usable(slot):
+			continue
+		equip_item(str(rescue_slots.get(slot, "")))
+
+func _get_current_game_day() -> int:
+	var time_manager: Node = get_node_or_null("/root/TimeManager")
+	if time_manager != null:
+		var day_value: Variant = time_manager.get("day_index")
+		if day_value != null:
+			return int(day_value)
+	return 1
+
+func _save_after_rescue_kit() -> void:
+	var save_manager: Node = get_node_or_null("/root/SaveManager")
+	if save_manager != null and save_manager.has_method("save_game"):
+		save_manager.call("save_game")
+
 func equip_item(item_id: String) -> bool:
 	var item := get_owned_item(item_id)
 
@@ -1151,22 +2456,83 @@ func get_tackle_condition(slot: String) -> float:
 	return clamp(float(current_tackle[slot].get("durability", 1.0)), 0.0, 1.0)
 
 func get_tackle_block_reason() -> String:
-	var rod_condition := get_tackle_condition("rod")
-	var line_condition := get_tackle_condition("line")
-	var hook_condition := get_tackle_condition("hook")
+	var issues := get_tackle_setup_issues()
+	if issues.is_empty():
+		return ""
 
-	if rod_condition <= 0.08:
-		return "Удочка повреждена. Экипируй другую удочку."
+	if issues.size() == 1:
+		return str(issues[0])
 
-	var line_id := str(current_tackle.get("line", {}).get("id", ""))
-	if _get_owned_item_quantity(line_id) <= 0 or line_condition <= 0.08:
-		return "Леска порвана. Купи или экипируй другую леску."
+	return "Проблемы сборки:\n- %s" % "\n- ".join(issues)
 
-	var hook_id := str(current_tackle.get("hook", {}).get("id", ""))
-	if _get_owned_item_quantity(hook_id) <= 0 or hook_condition <= 0.08:
-		return "Крючок потерян или поврежден. Экипируй другой крючок."
+func get_tackle_setup_issues() -> Array:
+	var issues: Array = []
+
+	for slot in TACKLE_SLOTS:
+		var issue := _get_tackle_slot_issue(slot)
+		if issue != "":
+			issues.append(issue)
+
+	return issues
+
+func get_tackle_setup_status_text() -> String:
+	var issues := get_tackle_setup_issues()
+	if issues.is_empty():
+		return "Сборка готова к ловле."
+
+	return "Не хватает/не работает:\n- %s" % "\n- ".join(issues)
+
+func _get_tackle_slot_issue(slot: String) -> String:
+	var title := _get_tackle_slot_title(slot)
+
+	if not current_tackle.has(slot):
+		return "%s не выбрана." % title
+
+	var raw_component: Variant = current_tackle.get(slot, {})
+	if typeof(raw_component) != TYPE_DICTIONARY:
+		return "%s не выбрана." % title
+
+	var component: Dictionary = raw_component
+	var item_id := str(component.get("id", ""))
+	var item_name := str(component.get("name", title))
+	if item_id == "":
+		return "%s не выбрана." % title
+
+	if slot == "bait":
+		if get_current_bait_quantity() <= 0:
+			return "Наживка закончилась: %s." % item_name
+		return ""
+
+	if _get_owned_item_quantity(item_id) <= 0:
+		return "%s отсутствует в инвентаре: %s." % [title, item_name]
+
+	if ["rod", "line", "hook"].has(slot):
+		var condition := get_tackle_condition(slot)
+		if condition <= 0.08:
+			match slot:
+				"rod":
+					return "Удочка повреждена: %s." % item_name
+				"line":
+					return "Леска порвана: %s." % item_name
+				"hook":
+					return "Крючок потерян или поврежден: %s." % item_name
 
 	return ""
+
+func _get_tackle_slot_title(slot: String) -> String:
+	match slot:
+		"rod":
+			return "Удочка"
+		"line":
+			return "Леска"
+		"float":
+			return "Поплавок"
+		"hook":
+			return "Крючок"
+		"bait":
+			return "Наживка"
+		_:
+			return "Слот"
 
 func _get_owned_item_quantity(item_id: String) -> int:
 	for item in owned_items:
@@ -1254,6 +2620,7 @@ func get_tackle_stats() -> Dictionary:
 	var float_part: Dictionary = current_tackle.get("float", {})
 	var hook: Dictionary = _normalize_equipment_stats(current_tackle.get("hook", {}).duplicate(true), "hook")
 	var bait: Dictionary = current_tackle.get("bait", {})
+	var skill_effects := get_skill_effects()
 	var rod_durability: float = clamp(float(rod.get("durability", 1.0)), 0.0, 1.0)
 	var line_durability: float = clamp(float(line.get("durability", 1.0)), 0.0, 1.0)
 	var hook_durability: float = clamp(float(hook.get("durability", 1.0)), 0.0, 1.0)
@@ -1261,11 +2628,14 @@ func get_tackle_stats() -> Dictionary:
 	var line_condition: float = lerp(0.45, 1.0, line_durability)
 	var hook_condition: float = lerp(0.35, 1.0, hook_durability)
 	var raw_rod_control: float = float(rod.get("control_bonus", rod.get("tension_bonus", 0.0)))
-	var rod_tension_bonus: float = raw_rod_control * rod_condition
+	var rod_handling_bonus: float = float(rod.get("handling_bonus", 0.0))
+	var rod_reach_bonus: float = float(rod.get("reach_bonus", 0.0)) * rod_condition
+	var rod_tension_bonus: float = (raw_rod_control + rod_handling_bonus) * rod_condition
 	var raw_rod_stiffness: float = float(rod.get("stiffness", rod.get("strength", 1.0)))
 	var rod_strength: float = raw_rod_stiffness * lerp(0.55, 1.0, rod_durability)
 	var raw_line_strength: float = float(line.get("max_load", line.get("max_load_kg", line.get("strength", 1.0))))
-	var line_strength: float = raw_line_strength * line_condition
+	var line_strength_bonus: float = max(float(skill_effects.get("line_strength_bonus", 0.0)), -0.95)
+	var line_strength: float = raw_line_strength * line_condition * (1.0 + line_strength_bonus)
 	var line_visibility: float = float(line.get("visibility", line.get("visibility_penalty", 0.0)))
 	var float_sensitivity: float = float(float_part.get("sensitivity", float_part.get("bite_detection_bonus", 0.0)))
 	var float_stability: float = float(float_part.get("stability", 0.0))
@@ -1273,10 +2643,19 @@ func get_tackle_stats() -> Dictionary:
 	var hook_chance: float = float(hook.get("hook_chance", hook.get("hook_success_bonus", 0.0))) * hook_condition
 	var hook_strength: float = float(hook.get("hook_strength", 1.0)) * hook_condition
 	var raw_escape_modifier: float = float(hook.get("fish_escape_modifier", 1.0))
+	var line_wear_reduction: float = clamp(float(skill_effects.get("line_wear_reduction", 0.0)), 0.0, 0.85)
+	var line_wear_rate: float = max(float(line.get("wear_rate", 0.022)) * (1.0 - line_wear_reduction), 0.001)
+	var bite_detection_bonus: float = float_sensitivity + float_bite_visibility * 0.50 + float(skill_effects.get("bite_detection_bonus", 0.0))
 
 	return {
 		"control_bonus": rod_tension_bonus,
 		"tension_bonus": rod_tension_bonus,
+		"base_control_bonus": raw_rod_control * rod_condition,
+		"handling_bonus": rod_handling_bonus * rod_condition,
+		"reach_bonus": rod_reach_bonus,
+		"length_m": float(rod.get("length_m", 4.0)),
+		"rod_length_m": float(rod.get("length_m", 4.0)),
+		"rod_class": str(rod.get("rod_class", "medium")),
 		"durability": rod_durability,
 		"rod_durability": rod_durability,
 		"line_durability": line_durability,
@@ -1291,13 +2670,14 @@ func get_tackle_stats() -> Dictionary:
 		"raw_line_strength": raw_line_strength,
 		"break_resistance": float(line.get("break_resistance", 1.0)) * lerp(0.35, 1.0, line_durability),
 		"break_chance": float(line.get("break_chance", 0.15)) / max(lerp(0.45, 1.0, line_durability), 0.1),
-		"line_wear_rate": float(line.get("wear_rate", 0.022)),
-		"wear_rate": float(line.get("wear_rate", 0.022)),
+		"line_wear_rate": line_wear_rate,
+		"wear_rate": line_wear_rate,
 		"visibility": line_visibility,
 		"visibility_penalty": line_visibility,
 		"sensitivity": float_sensitivity,
 		"bite_visibility": float_bite_visibility,
-		"bite_detection_bonus": float_sensitivity + float_bite_visibility * 0.50,
+		"bite_detection_bonus": bite_detection_bonus,
+		"green_zone_bonus": float(skill_effects.get("green_zone_bonus", 0.0)),
 		"stability": float_stability,
 		"hook_size": int(hook.get("hook_size", 12)),
 		"hook_chance": hook_chance,

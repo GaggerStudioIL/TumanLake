@@ -13,7 +13,9 @@ config_version=5
 config/name="TumanLake"
 run/main_scene="uid://cq4euut2bjyf5"
 config/features=PackedStringArray("4.6", "Mobile")
-config/icon="res://icon.svg"
+boot_splash/bg_color=Color(0.02, 0.025, 0.025, 1)
+boot_splash/image="res://assets/app/tuman_lake_splash.png"
+config/icon="res://assets/app/tuman_lake_icon.png"
 
 [autoload]
 
@@ -21,11 +23,13 @@ FishDatabase="*uid://dop3pbr3l2rm3"
 WaterbodyDatabase="*res://scripts/data/WaterbodyDatabase.gd"
 SpotDatabase="*uid://dp4ct65qmjs1a"
 TimeManager="*res://scripts/managers/TimeManager.gd"
+SkillDatabase="*res://scripts/data/SkillDatabase.gd"
 PlayerData="*uid://6s7d0jm8ic1c"
 InventoryManager="*uid://41dqjqi3kwa5"
 FishingManager="*uid://4dgapc06dnc1"
 SaveManager="*uid://bjm2ww6ncy078"
 GameManager="*uid://c5r742uysrpqj"
+AudioManager="*res://scripts/managers/AudioManager.gd"
 
 [display]
 

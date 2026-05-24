@@ -3,6 +3,9 @@ extends RefCounted
 
 var main
 var theme
+var progress_label: Label
+var progress_track: Panel
+var progress_fill: ColorRect
 signal catch_keep_requested
 signal catch_release_requested
 
@@ -48,6 +51,37 @@ const SMALL_FISH_ATLAS_REGIONS := {
 func setup(main_ref) -> void:
 	main = main_ref
 	theme = main.ui_theme
+	_ensure_progress_nodes()
+
+func _ensure_progress_nodes() -> void:
+	if progress_label != null:
+		return
+
+	progress_label = Label.new()
+	progress_label.name = "CatchRankProgressLabel"
+	progress_label.z_index = 5
+	progress_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	progress_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	progress_label.add_theme_font_size_override("font_size", 11)
+	progress_label.add_theme_color_override("font_color", Color(0.82, 0.94, 0.84, 0.92))
+	main.catch_popup_panel.add_child(progress_label)
+
+	progress_track = Panel.new()
+	progress_track.name = "CatchRankProgressTrack"
+	progress_track.z_index = 5
+	progress_track.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	progress_track.clip_contents = true
+	progress_track.add_theme_stylebox_override(
+		"panel",
+		main._make_panel_style(Color(0.028, 0.044, 0.042, 0.76), Color(0.74, 0.90, 0.78, 0.18), 5, 2, Color(0.0, 0.0, 0.0, 0.12))
+	)
+	main.catch_popup_panel.add_child(progress_track)
+
+	progress_fill = ColorRect.new()
+	progress_fill.name = "CatchRankProgressFill"
+	progress_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	progress_fill.color = Color(0.42, 0.72, 0.22, 0.96)
+	progress_track.add_child(progress_fill)
 
 func open(catch_data: Dictionary = {}) -> void:
 	if not catch_data.is_empty():
@@ -126,8 +160,8 @@ func _show_catch_reward_popup(catch_data: Dictionary) -> void:
 	main.catch_popup_panel.visible = true
 	main.catch_popup_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
 	main.catch_popup_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	main.catch_popup_backdrop.z_index = 40
-	main.catch_popup_panel.z_index = 41
+	main.catch_popup_backdrop.z_index = main.MENU_BACKDROP_Z + 60
+	main.catch_popup_panel.z_index = main.MENU_PANEL_Z + 60
 	main.catch_popup_backdrop.modulate = Color(1.0, 1.0, 1.0, 0.0)
 	main.catch_popup_panel.modulate = Color(1.0, 1.0, 1.0, 0.0)
 	main.catch_popup_panel.scale = Vector2(0.92, 0.92)
@@ -238,12 +272,21 @@ func _update_catch_reward_popup(catch_data: Dictionary) -> void:
 	var weight = float(catch_data.get("weight", 0.0))
 	var length_cm = _get_catch_length_cm(catch_data)
 	var price = int(catch_data.get("price", 0))
+	var catch_rank := str(catch_data.get("catch_rank", "normal"))
+	var trophy_weight := float(catch_data.get("trophy_weight", 0.0))
+	var rarity_weight := float(catch_data.get("rarity_weight", 0.0))
+	var record_messages: Array = []
+	if bool(catch_data.get("is_new_personal_record", false)):
+		record_messages.append("Новый личный рекорд!")
+	if bool(catch_data.get("is_new_species_record", false)):
+		record_messages.append("Новый рекорд вида!")
 	_set_reward_fish_texture(str(catch_data.get("id", "")))
 
 	main.catch_popup_title_label.text = "Поймана рыба"
-	main.catch_popup_badge_label.text = str(colors["label"])
+	main.catch_popup_badge_label.visible = catch_rank != "normal"
+	main.catch_popup_badge_label.text = _get_catch_rank_badge(catch_rank)
 	main.catch_popup_name_label.text = str(catch_data.get("name", "-"))
-	main.catch_trophy_banner_label.visible = tier == "trophy"
+	main.catch_trophy_banner_label.visible = catch_rank != "normal" or not record_messages.is_empty()
 	main.catch_trophy_banner_label.text = "ТРОФЕЙНЫЙ УЛОВ"
 	main.catch_popup_stats_label.text = "Вес: %.2f кг   Длина: %.1f см\nXP: +%d   Стоимость: %d мон." % [
 		weight,
@@ -251,6 +294,18 @@ func _update_catch_reward_popup(catch_data: Dictionary) -> void:
 		gained_xp,
 		price
 	]
+
+	main.catch_popup_stats_label.text = _build_catch_info_text(catch_data, weight, length_cm, price, gained_xp, trophy_weight, rarity_weight, catch_rank)
+	_update_rank_progress(catch_data, weight, trophy_weight, rarity_weight, catch_rank, colors)
+
+	var banner_lines: Array = []
+	if catch_rank == "trophy":
+		banner_lines.append("Трофейная рыба")
+	elif catch_rank == "rarity":
+		banner_lines.append("Раритетный экземпляр")
+	banner_lines.append_array(record_messages)
+	main.catch_trophy_banner_label.visible = not banner_lines.is_empty()
+	main.catch_trophy_banner_label.text = "\n".join(banner_lines)
 
 	main.catch_popup_badge_label.add_theme_color_override("font_color", colors["text"])
 	main.catch_popup_badge_label.add_theme_stylebox_override(
@@ -287,6 +342,107 @@ func _update_catch_reward_popup(catch_data: Dictionary) -> void:
 		fish_material.set_shader_parameter("shimmer_color", colors["fish_shimmer"])
 		fish_material.set_shader_parameter("shimmer_strength", float(colors["shimmer_strength"]))
 		fish_material.set_shader_parameter("shimmer_speed", float(feedback["shimmer_speed"]))
+
+
+func _build_catch_info_text(
+	catch_data: Dictionary,
+	weight: float,
+	length_cm: float,
+	price: int,
+	gained_xp: int,
+	trophy_weight: float,
+	rarity_weight: float,
+	catch_rank: String
+) -> String:
+	var lines: Array = []
+	lines.append("Вес: %s | Длина: %.1f см | XP: +%d | Цена: %d мон." % [
+		_format_weight(weight),
+		length_cm,
+		gained_xp,
+		price
+	])
+
+	if catch_rank == "normal":
+		if trophy_weight > 0.0:
+			lines.append("Трофей от: %s | До трофея: %s" % [
+				_format_weight(trophy_weight),
+				_format_weight(max(trophy_weight - weight, 0.0))
+			])
+	elif catch_rank == "trophy":
+		lines.append("Трофейная рыба!")
+		if rarity_weight > 0.0:
+			lines.append("Раритет от: %s | До раритета: %s" % [
+				_format_weight(rarity_weight),
+				_format_weight(max(rarity_weight - weight, 0.0))
+			])
+	elif catch_rank == "rarity":
+		lines.append("Раритетный экземпляр!")
+
+	lines.append_array(_get_species_record_info_lines(catch_data, weight))
+	return "\n".join(lines)
+
+
+func _get_species_record_info_lines(catch_data: Dictionary, current_weight: float) -> Array:
+	var previous_weight := float(catch_data.get("previous_species_record_weight", 0.0))
+	if previous_weight <= 0.0:
+		return ["Первый улов этого вида!"]
+
+	if bool(catch_data.get("is_new_species_record", false)):
+		var improvement: float = max(current_weight - previous_weight, 0.0)
+		return [
+			"Старый рекорд: %s | Новый: %s" % [
+				_format_weight(previous_weight),
+				_format_weight(current_weight)
+			],
+			"Улучшение: +%s" % _format_weight(improvement)
+		]
+
+	return ["Рекорд вида: %s | До рекорда: %s" % [
+		_format_weight(previous_weight),
+		_format_weight(max(previous_weight - current_weight, 0.0))
+	]]
+
+
+func _update_rank_progress(catch_data: Dictionary, weight: float, trophy_weight: float, rarity_weight: float, catch_rank: String, colors: Dictionary) -> void:
+	if progress_label == null or progress_track == null or progress_fill == null:
+		return
+
+	var label_text := ""
+	var progress := 0.0
+	if catch_rank == "normal" and trophy_weight > 0.0:
+		label_text = "Прогресс до трофея"
+		progress = clamp(weight / trophy_weight, 0.0, 1.0)
+	elif catch_rank == "trophy" and rarity_weight > 0.0:
+		label_text = "Прогресс до раритета"
+		progress = clamp(weight / rarity_weight, 0.0, 1.0)
+	elif catch_rank == "rarity":
+		label_text = "Раритет достигнут"
+		progress = 1.0
+
+	var should_show := label_text != ""
+	progress_label.visible = should_show
+	progress_track.visible = should_show
+	if not should_show:
+		return
+
+	var panel_size: Vector2 = main.catch_popup_panel.size
+	var track_width: float = min(panel_size.x - 96.0, 380.0)
+	var track_height := 7.0
+	var track_x: float = (panel_size.x - track_width) * 0.5
+	var track_y: float = panel_size.y - 176.0
+
+	progress_label.text = label_text
+	progress_label.position = Vector2(track_x, track_y - 20.0)
+	progress_label.size = Vector2(track_width, 18.0)
+	progress_track.position = Vector2(track_x, track_y)
+	progress_track.size = Vector2(track_width, track_height)
+	progress_fill.position = Vector2.ZERO
+	progress_fill.size = Vector2(track_width * progress, track_height)
+	progress_fill.color = colors.get("glow", Color(0.42, 0.72, 0.22, 0.96))
+
+
+func _format_weight(value: float) -> String:
+	return "%.2f кг" % value
 
 
 func _set_reward_fish_texture(fish_id: String) -> void:
@@ -336,7 +492,7 @@ func _play_catch_reward_sound(tier: String) -> void:
 	match tier:
 		"trophy":
 			main._play_audio_hook(main.catch_trophy_audio)
-		"rare":
+		"rarity", "rare":
 			main._play_audio_hook(main.catch_rare_audio)
 		_:
 			main._play_audio_hook(main.catch_reward_audio)
@@ -382,30 +538,48 @@ func _set_catch_popup_hidden() -> void:
 	main.catch_popup_stats_label.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	main.catch_keep_button.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	main.catch_release_button.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	if progress_label != null:
+		progress_label.visible = false
+	if progress_track != null:
+		progress_track.visible = false
 
 
 func _get_reward_tier(catch_data: Dictionary) -> String:
-	var rarity = str(catch_data.get("rarity", "common"))
-	var fish = FishDatabase.get_fish(str(catch_data.get("id", "")))
-	var weight_ratio = 0.0
-
-	if not fish.is_empty():
-		var min_weight = float(fish.get("min_weight", 0.0))
-		var max_weight = float(fish.get("max_weight", min_weight + 1.0))
-		weight_ratio = clamp((float(catch_data.get("weight", 0.0)) - min_weight) / max(max_weight - min_weight, 0.01), 0.0, 1.0)
-
-	if rarity == "legendary" or weight_ratio >= 0.88:
+	var catch_rank := str(catch_data.get("catch_rank", "normal"))
+	if catch_rank == "rarity":
+		return "rarity"
+	if catch_rank == "trophy":
 		return "trophy"
-	if rarity == "rare" or rarity == "very_rare" or weight_ratio >= 0.70:
-		return "rare"
-	if rarity == "uncommon" or weight_ratio >= 0.48:
-		return "uncommon"
-
 	return "common"
+
+func _get_catch_rank_badge(catch_rank: String) -> String:
+	match catch_rank:
+		"rarity":
+			return "Раритет"
+		"trophy":
+			return "Трофей"
+		_:
+			return ""
 
 
 func _get_reward_colors(tier: String) -> Dictionary:
 	match tier:
+		"rarity":
+			return {
+				"label": "Раритет",
+				"text": Color(0.88, 0.74, 1.0, 1.0),
+				"badge_bg": Color(0.18, 0.075, 0.28, 0.92),
+				"panel_bg": Color(0.075, 0.055, 0.115, 0.91),
+				"border": Color(0.86, 0.58, 1.0, 0.52),
+				"shadow": Color(0.54, 0.24, 0.86, 0.20),
+				"glow": Color(0.82, 0.42, 1.0, 1.0),
+				"focus_color": Color(0.045, 0.020, 0.070, 1.0),
+				"particle": Color(0.90, 0.76, 1.0, 1.0),
+				"sparkle_power": 0.34,
+				"fish_rim": Color(0.92, 0.72, 1.0, 1.0),
+				"fish_shimmer": Color(1.0, 0.90, 0.72, 1.0),
+				"shimmer_strength": 0.24
+			}
 		"trophy":
 			return {
 				"label": "Трофейная",
@@ -474,6 +648,25 @@ func _get_reward_colors(tier: String) -> Dictionary:
 
 func _get_reward_feedback_tuning(tier: String) -> Dictionary:
 	match tier:
+		"rarity":
+			return {
+				"panel_duration": 0.36,
+				"fish_delay": 0.20,
+				"fish_reveal_duration": 0.52,
+				"fish_start_scale": 0.58,
+				"fish_reveal_scale": 1.04,
+				"shadow_alpha": 0.34,
+				"float_y": 6.5,
+				"float_duration": 1.65,
+				"breath_scale": 0.020,
+				"focus_strength": 0.66,
+				"edge_strength": 0.26,
+				"glow_power": 0.60,
+				"pulse_speed": 0.82,
+				"particle_drift": 0.13,
+				"particle_scale": 1.25,
+				"shimmer_speed": 0.24
+			}
 		"trophy":
 			return {
 				"panel_duration": 0.36,
