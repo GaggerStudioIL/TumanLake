@@ -1304,6 +1304,7 @@ const TACKLE_CATALOG := {
 		"category": "bait",
 		"rarity": "common",
 		"price": 12,
+		"image_path": "res://assets/ui/shop/baits/cherv.png",
 		"description": "Универсальная наживка. Хорошо работает по плотве, окуню и карасю.",
 		"stats": {
 			"bait_type": "worm",
@@ -1327,6 +1328,7 @@ const TACKLE_CATALOG := {
 		"category": "bait",
 		"rarity": "common",
 		"price": 10,
+		"image_path": "res://assets/ui/shop/baits/hleb.png",
 		"description": "Дешёвая наживка для спокойной белой рыбы.",
 		"stats": {
 			"bait_type": "bread",
@@ -1349,6 +1351,7 @@ const TACKLE_CATALOG := {
 		"category": "bait",
 		"rarity": "common",
 		"price": 14,
+		"image_path": "res://assets/ui/shop/baits/yaichonoe_testo.png",
 		"description": "Мягкая наживка для карася, плотвы и краснопёрки.",
 		"stats": {
 			"bait_type": "dough",
@@ -1370,6 +1373,7 @@ const TACKLE_CATALOG := {
 		"category": "bait",
 		"rarity": "common",
 		"price": 18,
+		"image_path": "res://assets/ui/shop/baits/oparish.png",
 		"description": "Активная наживка. Лучше провоцирует окуня и мелкую рыбу.",
 		"stats": {
 			"bait_type": "maggot",
@@ -1382,6 +1386,756 @@ const TACKLE_CATALOG := {
 				"roach": 0.18,
 				"rudd": 0.16
 			},
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"cherv_moskovskiy": {
+		"id": "cherv_moskovskiy",
+		"name": "Московский червь",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "uncommon",
+		"price": 24,
+		"image_path": "res://assets/ui/shop/baits/cherv_moskovskiy.png",
+		"description": "Плотный универсальный червь для белой рыбы и окуня.",
+		"stats": {
+			"bait_type": "worm",
+			"fish_attraction": 0.15,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"cherv_surskiy": {
+		"id": "cherv_surskiy",
+		"name": "Сурский червь",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "uncommon",
+		"price": 28,
+		"image_path": "res://assets/ui/shop/baits/cherv_surskiy.png",
+		"description": "Мясистый речной червь с хорошей заметностью на дне.",
+		"stats": {
+			"bait_type": "worm",
+			"fish_attraction": 0.16,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"kaster": {
+		"id": "kaster",
+		"name": "Кастер",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "common",
+		"price": 20,
+		"image_path": "res://assets/ui/shop/baits/kaster.png",
+		"description": "Компактная личиночная наживка для осторожной мелкой рыбы.",
+		"stats": {
+			"bait_type": "maggot",
+			"fish_attraction": 0.13,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"lichinka_podenki": {
+		"id": "lichinka_podenki",
+		"name": "Личинка подёнки",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "uncommon",
+		"price": 34,
+		"image_path": "res://assets/ui/shop/baits/lichinka_podenki.png",
+		"description": "Речная личинка для аккуратной ловли в чистой воде.",
+		"stats": {
+			"bait_type": "maggot",
+			"fish_attraction": 0.16,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"lichinka_vesnyanki": {
+		"id": "lichinka_vesnyanki",
+		"name": "Личинка веснянки",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "uncommon",
+		"price": 36,
+		"image_path": "res://assets/ui/shop/baits/lichinka_vesnyanki.png",
+		"description": "Живая речная наживка для прохладной воды и течения.",
+		"stats": {
+			"bait_type": "maggot",
+			"fish_attraction": 0.16,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"motil": {
+		"id": "motil",
+		"name": "Мотыль",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "common",
+		"price": 18,
+		"image_path": "res://assets/ui/shop/baits/motil.png",
+		"description": "Мелкая яркая наживка для осторожного клёва.",
+		"stats": {
+			"bait_type": "maggot",
+			"fish_attraction": 0.14,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"krabovoe_myaso": {
+		"id": "krabovoe_myaso",
+		"name": "Крабовое мясо",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "rare",
+		"price": 64,
+		"image_path": "res://assets/ui/shop/baits/krabovoe_myaso.png",
+		"description": "Ароматная белковая наживка для более требовательной рыбы.",
+		"stats": {
+			"bait_type": "maggot",
+			"fish_attraction": 0.18,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"cherv_navozni": {
+		"id": "cherv_navozni",
+		"name": "Навозный червь",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "common",
+		"price": 16,
+		"image_path": "res://assets/ui/shop/baits/cherv_navozni.png",
+		"description": "Пахучий червь для донной и прибрежной рыбы.",
+		"stats": {
+			"bait_type": "worm",
+			"fish_attraction": 0.14,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"piyavka": {
+		"id": "piyavka",
+		"name": "Пиявка",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "rare",
+		"price": 54,
+		"image_path": "res://assets/ui/shop/baits/piyavka.png",
+		"description": "Живучая животная наживка для осторожной крупной рыбы.",
+		"stats": {
+			"bait_type": "worm",
+			"fish_attraction": 0.17,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"goroshek": {
+		"id": "goroshek",
+		"name": "Горошек",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "common",
+		"price": 14,
+		"image_path": "res://assets/ui/shop/baits/goroshek.png",
+		"description": "Растительная насадка для спокойной белой рыбы.",
+		"stats": {
+			"bait_type": "bread",
+			"fish_attraction": 0.10,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"kartofelniy_kubik": {
+		"id": "kartofelniy_kubik",
+		"name": "Картофельный кубик",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "common",
+		"price": 16,
+		"image_path": "res://assets/ui/shop/baits/kartofelniy_kubik.png",
+		"description": "Мягкая растительная насадка для тихой воды.",
+		"stats": {
+			"bait_type": "dough",
+			"fish_attraction": 0.10,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"cherv_astrahanskiy": {
+		"id": "cherv_astrahanskiy",
+		"name": "Астраханский червь",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "rare",
+		"price": 48,
+		"image_path": "res://assets/ui/shop/baits/cherv_astrahanskiy.png",
+		"description": "Крупный червь для уверенной донной подачи.",
+		"stats": {
+			"bait_type": "worm",
+			"fish_attraction": 0.18,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"myaso_dreiseni": {
+		"id": "myaso_dreiseni",
+		"name": "Мясо дрейсены",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "uncommon",
+		"price": 38,
+		"image_path": "res://assets/ui/shop/baits/myaso_dreiseni.png",
+		"description": "Мягкая ракушечная насадка с выраженным запахом.",
+		"stats": {
+			"bait_type": "maggot",
+			"fish_attraction": 0.16,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"rucheinik": {
+		"id": "rucheinik",
+		"name": "Ручейник",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "uncommon",
+		"price": 34,
+		"image_path": "res://assets/ui/shop/baits/rucheinik.png",
+		"description": "Естественная речная наживка для рыбы у дна.",
+		"stats": {
+			"bait_type": "maggot",
+			"fish_attraction": 0.16,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"puchok_vodorosley": {
+		"id": "puchok_vodorosley",
+		"name": "Пучок водорослей",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "common",
+		"price": 14,
+		"image_path": "res://assets/ui/shop/baits/puchok_vodorosley.png",
+		"description": "Растительная наживка для травянистых участков.",
+		"stats": {
+			"bait_type": "bread",
+			"fish_attraction": 0.09,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"ovsyanaya_kasha": {
+		"id": "ovsyanaya_kasha",
+		"name": "Овсяная каша",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "common",
+		"price": 15,
+		"image_path": "res://assets/ui/shop/baits/ovsyanaya_kasha.png",
+		"description": "Мягкая каша для карася, плотвы и другой мирной рыбы.",
+		"stats": {
+			"bait_type": "dough",
+			"fish_attraction": 0.11,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"sverchok": {
+		"id": "sverchok",
+		"name": "Сверчок",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "uncommon",
+		"price": 32,
+		"image_path": "res://assets/ui/shop/baits/sverchok.png",
+		"description": "Подвижная поверхностная наживка для активной рыбы.",
+		"stats": {
+			"bait_type": "maggot",
+			"fish_attraction": 0.15,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"syrni_kubik": {
+		"id": "syrni_kubik",
+		"name": "Сырный кубик",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "uncommon",
+		"price": 30,
+		"image_path": "res://assets/ui/shop/baits/syrni_kubik.png",
+		"description": "Плотная ароматная насадка для спокойной подачи.",
+		"stats": {
+			"bait_type": "dough",
+			"fish_attraction": 0.13,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"kuznechik": {
+		"id": "kuznechik",
+		"name": "Кузнечик",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "uncommon",
+		"price": 34,
+		"image_path": "res://assets/ui/shop/baits/kuznechik.png",
+		"description": "Заметная летняя наживка для активной рыбы у поверхности.",
+		"stats": {
+			"bait_type": "maggot",
+			"fish_attraction": 0.16,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"sladkoe_testo": {
+		"id": "sladkoe_testo",
+		"name": "Сладкое тесто",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "common",
+		"price": 18,
+		"image_path": "res://assets/ui/shop/baits/sladkoe_testo.png",
+		"description": "Сладкая мягкая насадка для мирной рыбы.",
+		"stats": {
+			"bait_type": "dough",
+			"fish_attraction": 0.12,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"lichinka_koroeda": {
+		"id": "lichinka_koroeda",
+		"name": "Личинка короеда",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "uncommon",
+		"price": 36,
+		"image_path": "res://assets/ui/shop/baits/lichinka_koroeda.png",
+		"description": "Плотная личинка для точечной ловли осторожной рыбы.",
+		"stats": {
+			"bait_type": "maggot",
+			"fish_attraction": 0.16,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"podenka": {
+		"id": "podenka",
+		"name": "Подёнка",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "uncommon",
+		"price": 38,
+		"image_path": "res://assets/ui/shop/baits/podenka.png",
+		"description": "Лёгкая природная наживка для аккуратной летней ловли.",
+		"stats": {
+			"bait_type": "maggot",
+			"fish_attraction": 0.15,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"chesnochnoye_testo": {
+		"id": "chesnochnoye_testo",
+		"name": "Чесночное тесто",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "uncommon",
+		"price": 28,
+		"image_path": "res://assets/ui/shop/baits/chesnochnoye_testo.png",
+		"description": "Ароматное тесто для пассивной белой рыбы.",
+		"stats": {
+			"bait_type": "dough",
+			"fish_attraction": 0.14,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"mannaya_kasha": {
+		"id": "mannaya_kasha",
+		"name": "Манная каша",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "common",
+		"price": 16,
+		"image_path": "res://assets/ui/shop/baits/mannaya_kasha.png",
+		"description": "Классическая мягкая каша для карася и плотвы.",
+		"stats": {
+			"bait_type": "dough",
+			"fish_attraction": 0.11,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"cherv_volhovskiy": {
+		"id": "cherv_volhovskiy",
+		"name": "Волховский червь",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "rare",
+		"price": 52,
+		"image_path": "res://assets/ui/shop/baits/cherv_volhovskiy.png",
+		"description": "Крупная речная наживка для глубины и донной рыбы.",
+		"stats": {
+			"bait_type": "worm",
+			"fish_attraction": 0.18,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"ikra": {
+		"id": "ikra",
+		"name": "Икра",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "rare",
+		"price": 72,
+		"image_path": "res://assets/ui/shop/baits/ikra.png",
+		"description": "Яркая деликатная насадка с сильным пищевым сигналом.",
+		"stats": {
+			"bait_type": "maggot",
+			"fish_attraction": 0.19,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"gorohovaya_kasha": {
+		"id": "gorohovaya_kasha",
+		"name": "Гороховая каша",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "uncommon",
+		"price": 24,
+		"image_path": "res://assets/ui/shop/baits/gorohovaya_kasha.png",
+		"description": "Питательная растительная насадка для мирной рыбы.",
+		"stats": {
+			"bait_type": "dough",
+			"fish_attraction": 0.13,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"bokoplav": {
+		"id": "bokoplav",
+		"name": "Бокоплав",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "uncommon",
+		"price": 40,
+		"image_path": "res://assets/ui/shop/baits/bokoplav.png",
+		"description": "Водная животная наживка для рыбы у дна и камней.",
+		"stats": {
+			"bait_type": "maggot",
+			"fish_attraction": 0.17,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"kukuruznaya_kasha": {
+		"id": "kukuruznaya_kasha",
+		"name": "Кукурузная каша",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "uncommon",
+		"price": 26,
+		"image_path": "res://assets/ui/shop/baits/kukuruznaya_kasha.png",
+		"description": "Сладковатая каша для спокойной белой рыбы.",
+		"stats": {
+			"bait_type": "dough",
+			"fish_attraction": 0.13,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"yaichonoe_testo": {
+		"id": "yaichonoe_testo",
+		"name": "Яичное тесто",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "uncommon",
+		"price": 28,
+		"image_path": "res://assets/ui/shop/baits/yaichonoe_testo.png",
+		"description": "Плотное питательное тесто, хорошо держится на крючке.",
+		"stats": {
+			"bait_type": "dough",
+			"fish_attraction": 0.14,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"muha": {
+		"id": "muha",
+		"name": "Муха",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "common",
+		"price": 18,
+		"image_path": "res://assets/ui/shop/baits/muha.png",
+		"description": "Лёгкая животная наживка для поверхностной активности.",
+		"stats": {
+			"bait_type": "maggot",
+			"fish_attraction": 0.13,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"maiskiy_zhuk": {
+		"id": "maiskiy_zhuk",
+		"name": "Майский жук",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "rare",
+		"price": 58,
+		"image_path": "res://assets/ui/shop/baits/maiskiy_zhuk.png",
+		"description": "Крупная сезонная наживка для уверенной поклёвки.",
+		"stats": {
+			"bait_type": "maggot",
+			"fish_attraction": 0.18,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"zerna_phenici": {
+		"id": "zerna_phenici",
+		"name": "Зёрна пшеницы",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "common",
+		"price": 14,
+		"image_path": "res://assets/ui/shop/baits/zerna_phenici.png",
+		"description": "Простая зерновая насадка для мирной рыбы.",
+		"stats": {
+			"bait_type": "bread",
+			"fish_attraction": 0.10,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"myaso_perlovici": {
+		"id": "myaso_perlovici",
+		"name": "Мясо перловицы",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "uncommon",
+		"price": 42,
+		"image_path": "res://assets/ui/shop/baits/myaso_perlovici.png",
+		"description": "Мягкое мясо моллюска для донной рыбы.",
+		"stats": {
+			"bait_type": "maggot",
+			"fish_attraction": 0.17,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"ovod": {
+		"id": "ovod",
+		"name": "Овод",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "uncommon",
+		"price": 34,
+		"image_path": "res://assets/ui/shop/baits/ovod.png",
+		"description": "Заметная животная наживка для активной рыбы.",
+		"stats": {
+			"bait_type": "maggot",
+			"fish_attraction": 0.15,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"lichinka_zhukanosoroga": {
+		"id": "lichinka_zhukanosoroga",
+		"name": "Личинка жука-носорога",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "rare",
+		"price": 68,
+		"image_path": "res://assets/ui/shop/baits/lichinka_zhukanosoroga.png",
+		"description": "Крупная питательная личинка для сильной рыбы.",
+		"stats": {
+			"bait_type": "maggot",
+			"fish_attraction": 0.19,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"slepen": {
+		"id": "slepen",
+		"name": "Слепень",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "uncommon",
+		"price": 34,
+		"image_path": "res://assets/ui/shop/baits/slepen.png",
+		"description": "Летняя наживка для заметной подачи у поверхности.",
+		"stats": {
+			"bait_type": "maggot",
+			"fish_attraction": 0.15,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"rakovaia_sheika": {
+		"id": "rakovaia_sheika",
+		"name": "Раковая шейка",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "rare",
+		"price": 76,
+		"image_path": "res://assets/ui/shop/baits/rakovaia_sheika.png",
+		"description": "Крупная белковая насадка для самой уверенной подачи.",
+		"stats": {
+			"bait_type": "maggot",
+			"fish_attraction": 0.20,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"zerna_kukuruzi": {
+		"id": "zerna_kukuruzi",
+		"name": "Зёрна кукурузы",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "common",
+		"price": 16,
+		"image_path": "res://assets/ui/shop/baits/zerna_kukuruzi.png",
+		"description": "Яркая сладкая насадка для мирной рыбы.",
+		"stats": {
+			"bait_type": "bread",
+			"fish_attraction": 0.11,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"cherv_leningradskiy": {
+		"id": "cherv_leningradskiy",
+		"name": "Ленинградский червь",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "rare",
+		"price": 56,
+		"image_path": "res://assets/ui/shop/baits/cherv_leningradskiy.png",
+		"description": "Крупный тёмный червь для прохладной воды и глубины.",
+		"stats": {
+			"bait_type": "worm",
+			"fish_attraction": 0.19,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"kapustni_list": {
+		"id": "kapustni_list",
+		"name": "Капустный лист",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "common",
+		"price": 12,
+		"image_path": "res://assets/ui/shop/baits/kapustni_list.png",
+		"description": "Лёгкая растительная насадка для травянистой воды.",
+		"stats": {
+			"bait_type": "bread",
+			"fish_attraction": 0.08,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"kusochki_ryby": {
+		"id": "kusochki_ryby",
+		"name": "Кусочки рыбы",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "rare",
+		"price": 70,
+		"image_path": "res://assets/ui/shop/baits/kusochki_ryby.png",
+		"description": "Белковая наживка с сильным запахом для активной рыбы.",
+		"stats": {
+			"bait_type": "worm",
+			"fish_attraction": 0.19,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"tvorozhnoye_testo": {
+		"id": "tvorozhnoye_testo",
+		"name": "Творожное тесто",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "uncommon",
+		"price": 30,
+		"image_path": "res://assets/ui/shop/baits/tvorozhnoye_testo.png",
+		"description": "Мягкая ароматная насадка для мирной рыбы.",
+		"stats": {
+			"bait_type": "dough",
+			"fish_attraction": 0.14,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"perlovaya_kasha": {
+		"id": "perlovaya_kasha",
+		"name": "Перловая каша",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "common",
+		"price": 18,
+		"image_path": "res://assets/ui/shop/baits/perlovaya_kasha.png",
+		"description": "Плотная зерновая каша для карася и плотвы.",
+		"stats": {
+			"bait_type": "dough",
+			"fish_attraction": 0.12,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"zhuk_navozni": {
+		"id": "zhuk_navozni",
+		"name": "Навозный жук",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "uncommon",
+		"price": 42,
+		"image_path": "res://assets/ui/shop/baits/zhuk_navozni.png",
+		"description": "Плотная животная наживка для заметной донной подачи.",
+		"stats": {
+			"bait_type": "maggot",
+			"fish_attraction": 0.16,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"medovoye_testo": {
+		"id": "medovoye_testo",
+		"name": "Медовое тесто",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "uncommon",
+		"price": 32,
+		"image_path": "res://assets/ui/shop/baits/medovoye_testo.png",
+		"description": "Сладкое ароматное тесто для пассивной мирной рыбы.",
+		"stats": {
+			"bait_type": "dough",
+			"fish_attraction": 0.15,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"medvedka": {
+		"id": "medvedka",
+		"name": "Медведка",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "rare",
+		"price": 62,
+		"image_path": "res://assets/ui/shop/baits/medvedka.png",
+		"description": "Крупная животная наживка для сильной рыбы.",
+		"stats": {
+			"bait_type": "maggot",
+			"fish_attraction": 0.18,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"lichinka_mayskogozhuka": {
+		"id": "lichinka_mayskogozhuka",
+		"name": "Личинка майского жука",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "rare",
+		"price": 66,
+		"image_path": "res://assets/ui/shop/baits/lichinka_mayskogozhuka.png",
+		"description": "Питательная крупная личинка для донной ловли.",
+		"stats": {
+			"bait_type": "maggot",
+			"fish_attraction": 0.19,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"zhuk_plavunec": {
+		"id": "zhuk_plavunec",
+		"name": "Жук-плавунец",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "rare",
+		"price": 60,
+		"image_path": "res://assets/ui/shop/baits/zhuk_plavunec.png",
+		"description": "Водная животная наживка для заметной подачи.",
+		"stats": {
+			"bait_type": "maggot",
+			"fish_attraction": 0.18,
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"vipolzok": {
+		"id": "vipolzok",
+		"name": "Выползок",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "rare",
+		"price": 58,
+		"image_path": "res://assets/ui/shop/baits/vipolzok.png",
+		"description": "Крупный червь для глубокой и уверенной подачи.",
+		"stats": {
+			"bait_type": "worm",
+			"fish_attraction": 0.19,
 			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
 		}
 	}
@@ -1942,6 +2696,7 @@ func _make_tackle_component(item_id: String) -> Dictionary:
 	component["category"] = category
 	component["rarity"] = item.get("rarity", "common")
 	component["price"] = float(item.get("price", 0.0))
+	component["image_path"] = str(item.get("image_path", ""))
 	component["description"] = str(item.get("description", ""))
 	return component
 
@@ -2098,6 +2853,7 @@ func _normalize_owned_item(item: Dictionary) -> Dictionary:
 		"rarity": str(item.get("rarity", catalog_item.get("rarity", "common"))),
 		"price": float(item.get("price", catalog_item.get("price", 0.0))),
 		"quantity": max(int(item.get("quantity", 1)), 0),
+		"image_path": str(item.get("image_path", catalog_item.get("image_path", ""))),
 		"description": str(item.get("description", catalog_item.get("description", ""))),
 		"stats": stats
 	}
@@ -2355,6 +3111,7 @@ func equip_item(item_id: String) -> bool:
 	component["category"] = category
 	component["rarity"] = item.get("rarity", "common")
 	component["price"] = float(item.get("price", 0.0))
+	component["image_path"] = str(item.get("image_path", ""))
 	component["description"] = str(item.get("description", ""))
 
 	if category == "bait":
@@ -2390,6 +3147,7 @@ func add_owned_item(item: Dictionary, amount: int = 1) -> void:
 		owned_item["category"] = str(normalized_item.get("category", owned_item.get("category", item_category)))
 		owned_item["rarity"] = str(normalized_item.get("rarity", owned_item.get("rarity", "common")))
 		owned_item["price"] = float(normalized_item.get("price", owned_item.get("price", 0.0)))
+		owned_item["image_path"] = str(normalized_item.get("image_path", owned_item.get("image_path", "")))
 		owned_item["description"] = str(normalized_item.get("description", owned_item.get("description", "")))
 
 		if ["rod", "line", "hook"].has(item_category):
@@ -2424,6 +3182,7 @@ func _refresh_current_tackle_from_owned_item(owned_item: Dictionary) -> void:
 	for key in stats.keys():
 		current_tackle[category][key] = stats[key]
 
+	current_tackle[category]["image_path"] = str(owned_item.get("image_path", current_tackle[category].get("image_path", "")))
 	current_tackle[category]["quantity"] = int(owned_item.get("quantity", 0))
 
 func _change_owned_item_quantity(item_id: String, delta: int) -> int:

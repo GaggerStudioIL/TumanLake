@@ -25,7 +25,7 @@ func open() -> void:
 	if main._is_catch_reward_open():
 		return
 
-	_close_other_panels()
+	main.open_modal("profile")
 	main._active_nav_tab = "profile"
 	backdrop.visible = true
 	panel.visible = true
@@ -40,12 +40,16 @@ func close(reset_nav: bool = true) -> void:
 	backdrop.visible = false
 	if skill_tree_ui != null:
 		skill_tree_ui.close()
+	main.close_modal("profile")
 	if reset_nav:
 		main._active_nav_tab = "fish"
 		main._refresh_bottom_nav_styles()
 
 func is_open() -> bool:
 	return panel != null and panel.visible
+
+func is_any_modal_open() -> bool:
+	return is_open() or (skill_tree_ui != null and skill_tree_ui.is_open())
 
 func refresh() -> void:
 	if content == null:
@@ -65,7 +69,7 @@ func _ensure_profile_ui_nodes() -> void:
 	if panel != null:
 		return
 
-	var parent: Node = main.ui_canvas_layer if main.ui_canvas_layer != null else main
+	var parent: Node = main.get_modal_content_root() if main.has_method("get_modal_content_root") else main
 
 	backdrop = ColorRect.new()
 	backdrop.name = "ProfileBackdrop"

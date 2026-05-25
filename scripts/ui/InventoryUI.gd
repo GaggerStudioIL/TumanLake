@@ -22,15 +22,8 @@ func open() -> void:
 	if main._is_catch_reward_open():
 		return
 
+	main.open_modal("inventory")
 	main._active_nav_tab = "inventory"
-	main.basket_panel.visible = false
-	main.basket_backdrop.visible = false
-	main.tackle_panel.visible = false
-	main.tackle_backdrop.visible = false
-	main.shop_panel.visible = false
-	main.shop_backdrop.visible = false
-	main.waterbody_panel.visible = false
-	main.waterbody_backdrop.visible = false
 	main.inventory_backdrop.visible = true
 	main.inventory_panel.visible = true
 	refresh()
@@ -42,6 +35,7 @@ func close() -> void:
 
 	main.inventory_panel.visible = false
 	main.inventory_backdrop.visible = false
+	main.close_modal("inventory")
 	main._active_nav_tab = "fish"
 	main._refresh_bottom_nav_styles()
 

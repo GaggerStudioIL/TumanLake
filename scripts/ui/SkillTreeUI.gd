@@ -25,6 +25,7 @@ func open() -> void:
 	_ensure_ui_nodes()
 	backdrop.visible = true
 	panel.visible = true
+	main._refresh_modal_input_blocker()
 	refresh()
 
 func close() -> void:
@@ -33,6 +34,7 @@ func close() -> void:
 
 	panel.visible = false
 	backdrop.visible = false
+	main._refresh_modal_input_blocker()
 
 func is_open() -> bool:
 	return panel != null and panel.visible
@@ -65,7 +67,7 @@ func _ensure_ui_nodes() -> void:
 	if panel != null:
 		return
 
-	var parent: Node = main.ui_canvas_layer if main.ui_canvas_layer != null else main
+	var parent: Node = main.get_modal_content_root() if main.has_method("get_modal_content_root") else main
 
 	backdrop = ColorRect.new()
 	backdrop.name = "SkillTreeBackdrop"

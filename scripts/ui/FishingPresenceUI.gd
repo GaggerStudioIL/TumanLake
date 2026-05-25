@@ -16,11 +16,12 @@ var _ripple_sprite: Sprite2D
 var _drop_splash_sprite: Sprite2D
 var _regular_splash_sprite: Sprite2D
 var _bobber_ripple: Node2D
+var _bobber_contact_waterline: Node2D
 var _cast_timer := 0.0
 var _drop_splash_timer := 0.0
 var _cast_landed := false
 var is_cast_animating := false
-@export var bobber_waterline_offset: Vector2 = Vector2(0.0, 11.0)
+@export var bobber_waterline_offset: Vector2 = Vector2(0.0, 34.0)
 const LAKE_BG_BASE_PATHS := [
 	"res://assets/environment/lake_bg_base.png",
 	"res://assets/environment/lake/lake_bg_base.png.png"
@@ -32,6 +33,9 @@ const RIPPLE_TEXTURE_PATH := "res://assets/art/fishing/water_ripple.png"
 const DROP_SPLASH_TEXTURE_PATH := "res://assets/art/fishing/splash_on_drop.png"
 const REGULAR_SPLASH_TEXTURE_PATH := "res://assets/art/fishing/regular_splash.png"
 const BOBBER_RIPPLE_SCRIPT := preload("res://scripts/bobber_ripple.gd")
+const BOBBER_CONTACT_WATERLINE_SCRIPT := preload("res://scripts/bobber_contact_waterline.gd")
+const DAY_NIGHT_CONTROLLER_SCRIPT := preload("res://scripts/environment/DayNightController.gd")
+const BOBBER_CONTACT_OFFSET_RATIO := 1.10
 const ROD_TEXTURE_SIZE := Vector2i(760, 104)
 const ROD_ASSET_TIP_RATIO := Vector2(0.294, 0.042)
 const ROD_ASSET_BUTT_RATIO := Vector2(0.843, 0.990)
@@ -50,7 +54,7 @@ const CAST_ROD_FORWARD_BASE := Vector2(900.0, 520.0)
 const CAST_ROD_FORWARD_TIP := Vector2(510.0, 290.0)
 const CAST_FLOAT_START := Vector2(835.0, 455.0)
 const CAST_FLOAT_PEAK := Vector2(620.0, 210.0)
-const CAST_FLOAT_TARGET := Vector2(500.0, 382.0)
+const CAST_FLOAT_TARGET := Vector2(500.0, 402.0)
 const BOBBER_LINE_ATTACH_OFFSET := Vector2(0.0, -8.0)
 
 enum FishingUiState {
@@ -87,6 +91,8 @@ func start_cast_visual() -> void:
 		_drop_splash_sprite.visible = false
 	if _bobber_ripple != null:
 		_bobber_ripple.visible = false
+	if _bobber_contact_waterline != null:
+		_bobber_contact_waterline.visible = false
 
 func stop_cast_visual() -> void:
 	_cast_timer = 0.0
@@ -97,6 +103,8 @@ func stop_cast_visual() -> void:
 		_drop_splash_sprite.visible = false
 	if _bobber_ripple != null:
 		_bobber_ripple.visible = false
+	if _bobber_contact_waterline != null:
+		_bobber_contact_waterline.visible = false
 
 func _ensure_environment_scene_nodes() -> void:
 	if main.environment_layer != null:
@@ -106,7 +114,11 @@ func _ensure_environment_scene_nodes() -> void:
 				child.visible = false
 
 	main.environment_sprites = {}
-	_ensure_lake_background_rect()
+	_ensure_day_night_controller()
+	if main.day_night_controller == null:
+		_ensure_lake_background_rect()
+	elif main.lake_bg_base_rect != null:
+		main.lake_bg_base_rect.visible = false
 
 
 func _resolve_lake_background_path() -> String:
@@ -120,11 +132,33 @@ func _resolve_lake_background_path() -> String:
 func _layout_environment_scene(screen_size: Vector2) -> void:
 	_ensure_environment_scene_nodes()
 	_hide_procedural_environment_layers()
-	_layout_lake_background_rect(screen_size)
+	if main.day_night_controller != null and main.day_night_controller.has_method("layout_environment"):
+		main.day_night_controller.call("layout_environment", screen_size)
+	else:
+		_layout_lake_background_rect(screen_size)
 
 
 func _layout_lake_art_background(screen_size: Vector2) -> void:
 	_layout_environment_scene(screen_size)
+
+
+func _ensure_day_night_controller() -> void:
+	if main.day_night_controller != null:
+		main.day_night_controller.visible = true
+		return
+
+	var controller := DAY_NIGHT_CONTROLLER_SCRIPT.new() as Node2D
+	if controller == null:
+		return
+
+	controller.name = "DayNightController"
+	controller.z_as_relative = false
+	controller.z_index = -110
+	main.add_child(controller)
+	main.day_night_controller = controller
+
+	if controller.has_method("set_time_manager"):
+		controller.call("set_time_manager", main._get_time_manager())
 
 
 func _ensure_lake_background_rect() -> void:
@@ -300,6 +334,8 @@ func _ensure_float_sprite_nodes() -> void:
 	if _drop_splash_sprite != null:
 		_drop_splash_sprite.texture = _drop_splash_texture
 
+	_ensure_bobber_contact_waterline_node()
+
 
 func _ensure_bobber_ripple_node() -> void:
 	if _bobber_ripple != null:
@@ -315,6 +351,22 @@ func _ensure_bobber_ripple_node() -> void:
 	_bobber_ripple.z_index = 24
 	_bobber_ripple.visible = false
 	main.fishing_presence_layer.add_child(_bobber_ripple)
+
+
+func _ensure_bobber_contact_waterline_node() -> void:
+	if _bobber_contact_waterline != null:
+		return
+
+	var contact_waterline := BOBBER_CONTACT_WATERLINE_SCRIPT.new() as Node2D
+	if contact_waterline == null:
+		return
+
+	_bobber_contact_waterline = contact_waterline
+	_bobber_contact_waterline.name = "BobberContactWaterline"
+	_bobber_contact_waterline.z_as_relative = false
+	_bobber_contact_waterline.z_index = 26
+	_bobber_contact_waterline.visible = false
+	main.fishing_presence_layer.add_child(_bobber_contact_waterline)
 
 
 func _load_rod_texture() -> Texture2D:
@@ -504,10 +556,14 @@ func _configure_fishing_presence_style() -> void:
 	main.fishing_line_glow.width = 0.55
 	main.fishing_line_glow.default_color = Color(0.66, 0.82, 0.78, 0.025)
 	main.fishing_line_glow.antialiased = true
+	main.fishing_line_glow.z_as_relative = false
+	main.fishing_line_glow.z_index = 26
 
 	main.fishing_line.width = 0.32
 	main.fishing_line.default_color = Color(0.76, 0.86, 0.82, 0.34)
 	main.fishing_line.antialiased = true
+	main.fishing_line.z_as_relative = false
+	main.fishing_line.z_index = 27
 
 
 func _update_rod_sprite(rod_butt: Vector2, rod_tip: Vector2, scene_scale: float, intensity: float) -> void:
@@ -755,6 +811,12 @@ func _get_bobber_waterline_offset_weight(state: String) -> float:
 func _get_bobber_visual_center(center: Vector2, state: String) -> Vector2:
 	return center + bobber_waterline_offset * _get_bobber_waterline_offset_weight(state)
 
+func _get_bobber_contact_point(center: Vector2, surface_y: float, state: String, marker_sink: float = 0.0) -> Vector2:
+	var offset_weight := _get_bobber_waterline_offset_weight(state)
+	var bobber_center := _get_bobber_visual_center(center, state)
+	var contact_y: float = surface_y + bobber_waterline_offset.y * BOBBER_CONTACT_OFFSET_RATIO * offset_weight + marker_sink * 0.32
+	return Vector2(bobber_center.x, contact_y)
+
 func _get_bobber_line_attach_point(center: Vector2, state: String, scene_scale: float) -> Vector2:
 	return _get_bobber_visual_center(center, state) + BOBBER_LINE_ATTACH_OFFSET * scene_scale
 
@@ -884,21 +946,22 @@ func _set_float_presence(center: Vector2, state: String, intensity: float) -> vo
 			glow_scale = 1.0 + sin(main._presence_time * 1.1) * 0.035
 			reflection_scale = 1.0 + sin(main._presence_time * 1.0) * 0.018
 
-	var ripple_size = Vector2(32.0, 11.5) * ripple_scale
+	var bobber_contact := _get_bobber_contact_point(center, surface_y, state, marker_sink)
+	var ripple_size = Vector2(34.0, 12.5) * ripple_scale
 	main.float_ripple.size = ripple_size
-	main.float_ripple.position = Vector2(center.x - ripple_size.x * 0.5, surface_y - ripple_size.y * 0.5)
+	main.float_ripple.position = Vector2(bobber_contact.x - ripple_size.x * 0.5, bobber_contact.y - ripple_size.y * 0.5)
 	main.float_ripple.modulate = Color(1.0, 1.0, 1.0, ripple_alpha)
 	main.float_ripple.visible = _ripple_sprite == null and _regular_splash_sprite == null and ripple_alpha > 0.01
 
 	var reflection_size = Vector2(23.0, 7.5) * reflection_scale
 	main.float_reflection.size = reflection_size
-	main.float_reflection.position = Vector2(center.x - reflection_size.x * 0.5, surface_y - reflection_size.y * 0.5 + 1.0)
+	main.float_reflection.position = Vector2(bobber_contact.x - reflection_size.x * 0.5, bobber_contact.y - reflection_size.y * 0.5 + 1.0)
 	main.float_reflection.modulate = Color(1.0, 1.0, 1.0, reflection_alpha)
 	main.float_reflection.visible = _ripple_sprite == null and _regular_splash_sprite == null and reflection_alpha > 0.01
 
 	var glow_size = Vector2(26.0, 26.0) * glow_scale
 	main.float_glow.size = glow_size
-	main.float_glow.position = Vector2(center.x - glow_size.x * 0.5, surface_y - glow_size.y * 0.5 - 1.0)
+	main.float_glow.position = Vector2(bobber_center.x - glow_size.x * 0.5, bobber_contact.y - glow_size.y * 0.5 - 2.0)
 	main.float_glow.modulate = Color(1.0, 1.0, 1.0, glow_alpha * 0.92)
 	main.float_glow.visible = true
 
@@ -911,27 +974,27 @@ func _set_float_presence(center: Vector2, state: String, intensity: float) -> vo
 
 	if _ripple_sprite != null:
 		var ripple_display_size := Vector2(ripple_size.x * 1.38, ripple_size.y * 1.56)
-		_ripple_sprite.position = Vector2(center.x, surface_y + 3.5)
+		_ripple_sprite.position = bobber_contact + Vector2(0.0, 1.0)
 		_ripple_sprite.scale = Vector2(
 			ripple_display_size.x / RIPPLE_TEXTURE_REGION.size.x,
 			ripple_display_size.y / RIPPLE_TEXTURE_REGION.size.y
 		)
 		_ripple_sprite.rotation = 0.0
 		_ripple_sprite.visible = _regular_splash_sprite == null and ripple_alpha > 0.01
-		_ripple_sprite.modulate = Color(0.90, 0.96, 0.98, clamp(ripple_alpha * 0.34, 0.12, 0.48))
+		_ripple_sprite.modulate = Color(0.90, 0.96, 0.98, clamp(ripple_alpha * 0.38, 0.16, 0.52))
 
 	if _regular_splash_sprite != null:
 		var regular_active: bool = (state != "idle" and state != "casting") or (state == "casting" and _cast_landed)
 		var regular_phase: float = sin(main._presence_time * 1.55)
 		var regular_display_size: Vector2 = Vector2(126.0, 58.0) * (ripple_scale + regular_phase * 0.03)
-		_regular_splash_sprite.position = Vector2(center.x, surface_y + 4.5)
+		_regular_splash_sprite.position = bobber_contact + Vector2(0.0, 1.5)
 		_regular_splash_sprite.scale = Vector2(
 			regular_display_size.x / max(_regular_splash_texture.get_width(), 1),
 			regular_display_size.y / max(_regular_splash_texture.get_height(), 1)
 		)
 		_regular_splash_sprite.rotation = sin(main._presence_time * 0.42) * 0.025
 		_regular_splash_sprite.visible = regular_active
-		_regular_splash_sprite.modulate = Color(0.54, 0.66, 0.70, clamp(ripple_alpha * 0.26, 0.16, 0.34) if regular_active else 0.0)
+		_regular_splash_sprite.modulate = Color(0.54, 0.66, 0.70, clamp(ripple_alpha * 0.30, 0.18, 0.38) if regular_active else 0.0)
 
 	if _float_sprite != null:
 		var float_display_size := Vector2(marker_width * 1.78, marker_height * 1.50)
@@ -945,11 +1008,12 @@ func _set_float_presence(center: Vector2, state: String, intensity: float) -> vo
 		_float_sprite.visible = true
 		_float_sprite.modulate = Color(1.0, 1.0, 1.0, 0.98)
 
-	_update_bobber_ripple_node(center, surface_y, state, ripple_scale, ripple_alpha)
-	_update_splash_sprites(center, surface_y)
+	_update_bobber_ripple_node(center, surface_y, state, ripple_scale, ripple_alpha, marker_sink)
+	_update_bobber_contact_waterline(bobber_contact, state, ripple_scale, ripple_alpha)
+	_update_splash_sprites(bobber_contact, bobber_contact.y)
 
 
-func _update_bobber_ripple_node(center: Vector2, surface_y: float, state: String, ripple_scale: float, ripple_alpha: float) -> void:
+func _update_bobber_ripple_node(center: Vector2, surface_y: float, state: String, ripple_scale: float, ripple_alpha: float, marker_sink: float = 0.0) -> void:
 	_ensure_bobber_ripple_node()
 	if _bobber_ripple == null:
 		return
@@ -959,12 +1023,27 @@ func _update_bobber_ripple_node(center: Vector2, surface_y: float, state: String
 	if not active:
 		return
 
-	var offset_weight := _get_bobber_waterline_offset_weight(state)
-	var bobber_center := _get_bobber_visual_center(center, state)
-	var waterline_y: float = surface_y + bobber_waterline_offset.y * 0.40 * offset_weight
-	_bobber_ripple.position = Vector2(bobber_center.x, waterline_y)
+	var contact_point := _get_bobber_contact_point(center, surface_y, state, marker_sink)
+	_bobber_ripple.position = contact_point
 	_bobber_ripple.rotation = 0.0
-	_bobber_ripple.scale = Vector2.ONE * clamp(0.88 + ripple_scale * 0.10, 0.86, 1.04)
+	_bobber_ripple.scale = Vector2.ONE * clamp(0.96 + ripple_scale * 0.14, 0.96, 1.16)
+	_bobber_ripple.modulate = Color(1.0, 1.0, 1.0, clamp(ripple_alpha * 1.10, 0.0, 1.0))
+
+
+func _update_bobber_contact_waterline(contact_point: Vector2, state: String, ripple_scale: float, ripple_alpha: float) -> void:
+	_ensure_bobber_contact_waterline_node()
+	if _bobber_contact_waterline == null:
+		return
+
+	var active: bool = ripple_alpha > 0.01 and (state != "casting" or _cast_landed)
+	_bobber_contact_waterline.visible = active
+	if not active:
+		return
+
+	_bobber_contact_waterline.position = contact_point + Vector2(0.0, -1.0)
+	_bobber_contact_waterline.rotation = 0.0
+	_bobber_contact_waterline.scale = Vector2.ONE * clamp(0.92 + ripple_scale * 0.12, 0.92, 1.14)
+	_bobber_contact_waterline.modulate = Color(1.0, 1.0, 1.0, clamp(ripple_alpha * 0.95, 0.0, 1.0))
 
 
 func _update_splash_sprites(center: Vector2, surface_y: float) -> void:

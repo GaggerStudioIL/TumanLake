@@ -108,10 +108,13 @@ func _is_catch_reward_open() -> bool:
 
 
 func _bring_catch_reward_to_front() -> void:
-	if main.catch_popup_backdrop != null and main.catch_popup_backdrop.get_parent() == main:
-		main.move_child(main.catch_popup_backdrop, main.get_child_count() - 1)
-	if main.catch_popup_panel != null and main.catch_popup_panel.get_parent() == main:
-		main.move_child(main.catch_popup_panel, main.get_child_count() - 1)
+	var parent: Node = main.catch_popup_panel.get_parent() if main.catch_popup_panel != null else null
+	if parent == null:
+		return
+	if main.catch_popup_backdrop != null and main.catch_popup_backdrop.get_parent() == parent:
+		parent.move_child(main.catch_popup_backdrop, parent.get_child_count() - 1)
+	if main.catch_popup_panel != null and main.catch_popup_panel.get_parent() == parent:
+		parent.move_child(main.catch_popup_panel, parent.get_child_count() - 1)
 
 
 func _close_secondary_popups_for_reward() -> void:
@@ -141,6 +144,7 @@ func _close_secondary_popups_for_reward() -> void:
 func _show_catch_reward_popup(catch_data: Dictionary) -> void:
 	main._pending_reward_catch = catch_data.duplicate(true)
 	_close_secondary_popups_for_reward()
+	main.open_modal("catch_reward")
 	_bring_catch_reward_to_front()
 	_update_catch_reward_popup(catch_data)
 	var tier = _get_reward_tier(catch_data)
@@ -542,6 +546,7 @@ func _set_catch_popup_hidden() -> void:
 		progress_label.visible = false
 	if progress_track != null:
 		progress_track.visible = false
+	main.close_modal("catch_reward")
 
 
 func _get_reward_tier(catch_data: Dictionary) -> String:

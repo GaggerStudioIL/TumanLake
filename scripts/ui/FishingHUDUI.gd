@@ -73,6 +73,7 @@ func _update_ui() -> void:
 		main.shop_panel.visible = false
 		main.shop_backdrop.visible = false
 		main._active_nav_tab = "fish"
+		main._refresh_modal_input_blocker()
 
 	match main._fishing_ui_state:
 		FishingUiState.WAITING:

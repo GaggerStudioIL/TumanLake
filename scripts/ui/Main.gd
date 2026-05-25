@@ -28,8 +28,8 @@ const ACTION_BAR_HEIGHT := 46.0
 const MENU_BACKDROP_Z := 300
 const MENU_PANEL_Z := 301
 const MODAL_TAP_GUARD_MSEC := 320
-const WATER_SURFACE_Y := 382.0
-const FLOAT_DEFAULT_POS := Vector2(500.0, 382.0)
+const WATER_SURFACE_Y := 402.0
+const FLOAT_DEFAULT_POS := Vector2(500.0, 402.0)
 const ROD_ANCHOR_POS := Vector2(1108.0, 646.0)
 const ROD_TARGET_POS := Vector2(590.0, 382.0)
 
@@ -228,7 +228,11 @@ var profile_ui
 var failure_popup_ui
 var ui_theme
 var ui_canvas_layer: CanvasLayer
+var modal_canvas_layer: CanvasLayer
+var modal_content_root: Control
 var modal_input_shield: ColorRect
+var is_modal_open := false
+var _current_modal_name := ""
 var cast_button_visual: TextureRect
 var rod_sprite: Sprite2D
 var rod_shadow_sprite: Sprite2D
@@ -238,6 +242,7 @@ var quick_actions_container: VBoxContainer
 var bottom_nav_container: VBoxContainer
 var environment_layer: Node2D
 var environment_sprites: Dictionary = {}
+var day_night_controller: Node2D
 var time_hud_panel: Panel
 var weather_hud_panel: Panel
 var money_hud_icon: TextureRect
@@ -368,6 +373,9 @@ func _process(delta: float) -> void:
 	_update_time_hud()
 
 func _input(event: InputEvent) -> void:
+	if is_modal_open or _is_modal_tap_guard_active():
+		return
+
 	if not _is_fish_button_pointer_event(event):
 		return
 
@@ -384,6 +392,13 @@ func _input(event: InputEvent) -> void:
 		_on_reel_button_up()
 
 	get_viewport().set_input_as_handled()
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not is_modal_open:
+		return
+	if event.is_action_pressed("ui_cancel"):
+		close_current_modal()
+		get_viewport().set_input_as_handled()
 
 func _setup_ui_controllers() -> void:
 	ui_theme = UIThemeScript.new()
@@ -473,24 +488,174 @@ func _ensure_ui_canvas_layer() -> void:
 			parent.remove_child(node)
 		ui_canvas_layer.add_child(node)
 
-	_ensure_modal_input_shield()
+	_ensure_modal_layer()
+	_move_modal_roots_to_layer()
+	_refresh_modal_input_blocker()
 
 func _ensure_modal_input_shield() -> void:
+	_ensure_modal_layer()
+
+func _ensure_modal_layer() -> void:
+	if modal_canvas_layer == null:
+		modal_canvas_layer = CanvasLayer.new()
+		modal_canvas_layer.name = "ModalLayer"
+		modal_canvas_layer.layer = 40
+		add_child(modal_canvas_layer)
+
 	if modal_input_shield != null:
+		_layout_modal_layer()
 		return
 
 	modal_input_shield = ColorRect.new()
-	modal_input_shield.name = "ModalInputShield"
+	modal_input_shield.name = "ModalInputBlocker"
 	modal_input_shield.visible = false
 	modal_input_shield.mouse_filter = Control.MOUSE_FILTER_STOP
-	modal_input_shield.color = Color(0.0, 0.0, 0.0, 0.01)
-	modal_input_shield.z_index = MENU_BACKDROP_Z - 1
-	modal_input_shield.set_anchors_preset(Control.PRESET_FULL_RECT)
-	modal_input_shield.offset_left = 0.0
-	modal_input_shield.offset_top = 0.0
-	modal_input_shield.offset_right = 0.0
-	modal_input_shield.offset_bottom = 0.0
-	ui_canvas_layer.add_child(modal_input_shield)
+	modal_input_shield.color = Color(0.0, 0.0, 0.0, 0.0)
+	modal_input_shield.z_index = 0
+	modal_canvas_layer.add_child(modal_input_shield)
+
+	modal_content_root = Control.new()
+	modal_content_root.name = "ModalContentRoot"
+	modal_content_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	modal_content_root.z_index = 1
+	modal_canvas_layer.add_child(modal_content_root)
+
+	_layout_modal_layer()
+
+func get_modal_content_root() -> Control:
+	_ensure_modal_layer()
+	return modal_content_root
+
+func _layout_modal_layer() -> void:
+	if modal_input_shield != null:
+		modal_input_shield.set_anchors_preset(Control.PRESET_FULL_RECT)
+		modal_input_shield.offset_left = 0.0
+		modal_input_shield.offset_top = 0.0
+		modal_input_shield.offset_right = 0.0
+		modal_input_shield.offset_bottom = 0.0
+	if modal_content_root != null:
+		modal_content_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+		modal_content_root.offset_left = 0.0
+		modal_content_root.offset_top = 0.0
+		modal_content_root.offset_right = 0.0
+		modal_content_root.offset_bottom = 0.0
+
+func _move_modal_roots_to_layer() -> void:
+	var root := get_modal_content_root()
+	for node in [
+		basket_backdrop,
+		basket_panel,
+		inventory_backdrop,
+		inventory_panel,
+		catch_popup_backdrop,
+		catch_popup_panel,
+		shop_backdrop,
+		shop_panel,
+		tackle_backdrop,
+		tackle_panel,
+		waterbody_backdrop,
+		waterbody_panel
+	]:
+		_reparent_node(node, root)
+		if node is Control:
+			(node as Control).mouse_filter = Control.MOUSE_FILTER_STOP
+
+func open_modal(modal_name: String) -> void:
+	_ensure_modal_layer()
+	_move_modal_roots_to_layer()
+	_hide_modal_roots_except(modal_name)
+	_current_modal_name = modal_name
+	is_modal_open = true
+	if modal_input_shield != null:
+		modal_input_shield.visible = true
+		modal_input_shield.mouse_filter = Control.MOUSE_FILTER_STOP
+
+func close_modal(modal_name: String = "") -> void:
+	if modal_name == "" or _current_modal_name == modal_name:
+		_current_modal_name = ""
+	_refresh_modal_input_blocker()
+
+func close_current_modal() -> void:
+	match _current_modal_name:
+		"shop":
+			shop_ui.close()
+		"inventory":
+			inventory_ui.close()
+		"keepnet":
+			keepnet_ui.close()
+		"tackle":
+			tackle_ui.close()
+		"map":
+			waterbody_ui.close()
+		"profile":
+			if profile_ui != null:
+				profile_ui.close()
+		"catch_reward":
+			_hide_catch_reward_popup()
+		_:
+			_hide_modal_roots_except("")
+			if profile_ui != null:
+				profile_ui.close()
+			_refresh_modal_input_blocker()
+
+func _hide_modal_roots_except(modal_name: String) -> void:
+	if modal_name == "":
+		_current_modal_name = ""
+	if modal_name != "keepnet":
+		if basket_panel != null:
+			basket_panel.visible = false
+		if basket_backdrop != null:
+			basket_backdrop.visible = false
+	if modal_name != "inventory":
+		if inventory_panel != null:
+			inventory_panel.visible = false
+		if inventory_backdrop != null:
+			inventory_backdrop.visible = false
+	if modal_name != "shop":
+		if shop_panel != null:
+			shop_panel.visible = false
+		if shop_backdrop != null:
+			shop_backdrop.visible = false
+	if modal_name != "tackle":
+		if tackle_panel != null:
+			tackle_panel.visible = false
+		if tackle_backdrop != null:
+			tackle_backdrop.visible = false
+	if modal_name != "map":
+		if waterbody_panel != null:
+			waterbody_panel.visible = false
+		if waterbody_backdrop != null:
+			waterbody_backdrop.visible = false
+	if modal_name != "catch_reward":
+		if catch_popup_panel != null:
+			catch_popup_panel.visible = false
+		if catch_popup_backdrop != null:
+			catch_popup_backdrop.visible = false
+	if modal_name != "profile" and profile_ui != null:
+		profile_ui.close(false)
+
+func _refresh_modal_input_blocker() -> void:
+	_ensure_modal_layer()
+	var has_open_modal := _is_any_modal_visible()
+	is_modal_open = has_open_modal
+	if modal_input_shield != null:
+		modal_input_shield.visible = has_open_modal or _is_modal_tap_guard_active()
+		modal_input_shield.mouse_filter = Control.MOUSE_FILTER_STOP
+
+func _is_any_modal_visible() -> bool:
+	for control in [
+		basket_panel,
+		inventory_panel,
+		shop_panel,
+		tackle_panel,
+		waterbody_panel,
+		catch_popup_panel
+	]:
+		if _is_visible_ui_control(control):
+			return true
+	if profile_ui != null and profile_ui.is_any_modal_open():
+		return true
+	return false
 
 func _ensure_gameplay_layer_names() -> void:
 	fishing_presence_layer.name = "gameplay_rod"
@@ -702,6 +867,10 @@ func _create_time_of_day_overlay(node_name: String, z: int, material: ShaderMate
 	return overlay
 
 func _ensure_time_of_day_layers() -> void:
+	if day_night_controller != null:
+		_hide_time_of_day_layers()
+		return
+
 	if time_color_overlay == null:
 		time_color_overlay = _create_time_of_day_overlay("TimeColorOverlay", -99, _make_time_color_material())
 	if time_stars_overlay == null:
@@ -712,6 +881,10 @@ func _ensure_time_of_day_layers() -> void:
 		time_vignette_overlay = _create_time_of_day_overlay("TimeVignetteOverlay", -96, _make_time_vignette_material())
 
 func _layout_time_of_day_layers(_screen_size: Vector2) -> void:
+	if day_night_controller != null:
+		_hide_time_of_day_layers()
+		return
+
 	for overlay in [
 		time_color_overlay,
 		time_stars_overlay,
@@ -727,6 +900,16 @@ func _layout_time_of_day_layers(_screen_size: Vector2) -> void:
 		overlay.offset_bottom = 0.0
 		overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		overlay.visible = true
+
+func _hide_time_of_day_layers() -> void:
+	for overlay in [
+		time_color_overlay,
+		time_stars_overlay,
+		time_celestial_overlay,
+		time_vignette_overlay
+	]:
+		if overlay != null:
+			overlay.visible = false
 
 func _make_time_color_material() -> ShaderMaterial:
 	return _make_scene_shader_material("""
@@ -1830,6 +2013,8 @@ func _update_cast_button_visual() -> void:
 	cast_button_visual.texture = ui_theme.get_pull_button_texture(texture_state) if use_pull_texture else ui_theme.get_cast_button_texture(texture_state)
 
 func _is_fish_button_pointer_event(event: InputEvent) -> bool:
+	if is_modal_open:
+		return false
 	if fish_button == null or not fish_button.visible or not fish_button.is_visible_in_tree():
 		return false
 	if not (event is InputEventMouseButton):
@@ -1850,7 +2035,6 @@ func _arm_modal_tap_guard() -> void:
 	_modal_tap_guard_until_msec = Time.get_ticks_msec() + MODAL_TAP_GUARD_MSEC
 	if modal_input_shield != null:
 		modal_input_shield.visible = true
-		modal_input_shield.z_index = MENU_BACKDROP_Z - 1
 	get_viewport().set_input_as_handled()
 
 func _is_modal_tap_guard_active() -> bool:
@@ -1860,7 +2044,7 @@ func _update_modal_tap_guard() -> void:
 	if modal_input_shield == null or not modal_input_shield.visible:
 		return
 	if not _is_modal_tap_guard_active():
-		modal_input_shield.visible = false
+		_refresh_modal_input_blocker()
 
 func _is_visible_ui_control(control: CanvasItem) -> bool:
 	return control != null and control.visible
@@ -1874,10 +2058,10 @@ func _is_menu_overlay_open() -> bool:
 		return true
 	if _is_visible_ui_control(waterbody_panel):
 		return true
-	return profile_ui != null and profile_ui.is_open()
+	return profile_ui != null and profile_ui.is_any_modal_open()
 
 func _should_ignore_base_ui_press() -> bool:
-	return _is_modal_tap_guard_active() or _is_catch_reward_open()
+	return is_modal_open or _is_modal_tap_guard_active() or _is_catch_reward_open()
 
 func _trigger_fish_button_action() -> void:
 	if _should_ignore_base_ui_press():
@@ -1958,6 +2142,9 @@ func _update_fishing_presence(delta: float) -> void:
 	fishing_presence_ui._update_fishing_presence(delta)
 
 func _setup_layout() -> void:
+	_ensure_modal_layer()
+	_move_modal_roots_to_layer()
+	_layout_modal_layer()
 	var screen_size := get_viewport_rect().size
 	var margin := 10.0
 	var top_height := 58.0
@@ -3073,14 +3260,15 @@ func _setup_layout() -> void:
 	var shop_height: float = screen_size.y
 	var shop_x := 0.0
 	var shop_y := 0.0
-	var shop_padding := 28.0
+	var shop_padding := 32.0
 	var shop_inner_width: float = shop_width - shop_padding * 2.0
 	var shop_category_y := 64.0
-	var shop_category_gap := 8.0
+	var shop_category_gap := 9.0
 	var shop_category_columns := 6
 	var shop_category_width: float = (shop_inner_width - shop_category_gap * float(shop_category_columns - 1)) / float(shop_category_columns)
-	var shop_items_y := 118.0
-	var shop_footer_height := 76.0
+	var shop_category_height := 42.0
+	var shop_items_y := 124.0
+	var shop_footer_height := 92.0
 
 	shop_panel.position = Vector2(shop_x, shop_y)
 	shop_panel.size = Vector2(shop_width, shop_height)
@@ -3096,27 +3284,27 @@ func _setup_layout() -> void:
 	shop_money_label.add_theme_color_override("font_color", Color(0.82, 0.94, 0.84, 0.92))
 
 	shop_bait_category_button.position = Vector2(shop_padding, shop_category_y)
-	shop_bait_category_button.size = Vector2(shop_category_width, 40.0)
+	shop_bait_category_button.size = Vector2(shop_category_width, shop_category_height)
 	shop_bait_category_button.add_theme_font_size_override("font_size", 12)
 
 	shop_consumable_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap), shop_category_y)
-	shop_consumable_category_button.size = Vector2(shop_category_width, 40.0)
+	shop_consumable_category_button.size = Vector2(shop_category_width, shop_category_height)
 	shop_consumable_category_button.add_theme_font_size_override("font_size", 12)
 
 	shop_tackle_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 2.0, shop_category_y)
-	shop_tackle_category_button.size = Vector2(shop_category_width, 40.0)
+	shop_tackle_category_button.size = Vector2(shop_category_width, shop_category_height)
 	shop_tackle_category_button.add_theme_font_size_override("font_size", 12)
 
 	shop_line_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 3.0, shop_category_y)
-	shop_line_category_button.size = Vector2(shop_category_width, 40.0)
+	shop_line_category_button.size = Vector2(shop_category_width, shop_category_height)
 	shop_line_category_button.add_theme_font_size_override("font_size", 12)
 
 	shop_hook_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 4.0, shop_category_y)
-	shop_hook_category_button.size = Vector2(shop_category_width, 40.0)
+	shop_hook_category_button.size = Vector2(shop_category_width, shop_category_height)
 	shop_hook_category_button.add_theme_font_size_override("font_size", 12)
 
 	shop_float_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 5.0, shop_category_y)
-	shop_float_category_button.size = Vector2(shop_category_width, 40.0)
+	shop_float_category_button.size = Vector2(shop_category_width, shop_category_height)
 	shop_float_category_button.add_theme_font_size_override("font_size", 12)
 
 	shop_items_scroll.position = Vector2(shop_padding, shop_items_y)
@@ -3278,6 +3466,7 @@ func _setup_layout() -> void:
 		_update_inventory_ui()
 	_update_inventory_ui()
 	_update_fishing_presence(0.0)
+	_refresh_modal_input_blocker()
 
 func _setup_spots() -> void:
 	spot_option_button.clear()
@@ -3395,6 +3584,12 @@ func _apply_time_atmosphere() -> void:
 	_apply_time_of_day_overlays()
 
 func _apply_time_of_day_overlays() -> void:
+	if day_night_controller != null:
+		_hide_time_of_day_layers()
+		if day_night_controller.has_method("update_day_night_visuals"):
+			day_night_controller.call("update_day_night_visuals")
+		return
+
 	_ensure_time_of_day_layers()
 	var visuals := _get_time_visual_settings()
 
@@ -4143,18 +4338,8 @@ func _on_fish_button_pressed() -> void:
 		_update_ui()
 		return
 
-	basket_panel.visible = false
-	basket_backdrop.visible = false
-	inventory_panel.visible = false
-	inventory_backdrop.visible = false
-	tackle_panel.visible = false
-	tackle_backdrop.visible = false
-	waterbody_panel.visible = false
-	waterbody_backdrop.visible = false
-	shop_panel.visible = false
-	shop_backdrop.visible = false
-	if profile_ui != null:
-		profile_ui.close(false)
+	_hide_modal_roots_except("")
+	_refresh_modal_input_blocker()
 	SaveManager.save_game()
 
 	_pending_cast_spot_id = PlayerData.current_spot
@@ -4220,18 +4405,8 @@ func _on_nav_fish_button_pressed() -> void:
 		return
 
 	_active_nav_tab = "fish"
-	basket_panel.visible = false
-	basket_backdrop.visible = false
-	inventory_panel.visible = false
-	inventory_backdrop.visible = false
-	tackle_panel.visible = false
-	tackle_backdrop.visible = false
-	waterbody_panel.visible = false
-	waterbody_backdrop.visible = false
-	shop_panel.visible = false
-	shop_backdrop.visible = false
-	if profile_ui != null:
-		profile_ui.close(false)
+	_hide_modal_roots_except("")
+	_refresh_modal_input_blocker()
 	_refresh_bottom_nav_styles()
 
 func _on_basket_button_pressed() -> void:

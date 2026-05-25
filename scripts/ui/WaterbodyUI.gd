@@ -24,15 +24,8 @@ func open() -> void:
 	if main._is_catch_reward_open() or main.map_button.disabled:
 		return
 
+	main.open_modal("map")
 	main._active_nav_tab = "map"
-	main.basket_panel.visible = false
-	main.basket_backdrop.visible = false
-	main.inventory_panel.visible = false
-	main.inventory_backdrop.visible = false
-	main.tackle_panel.visible = false
-	main.tackle_backdrop.visible = false
-	main.shop_panel.visible = false
-	main.shop_backdrop.visible = false
 	main.waterbody_backdrop.visible = true
 	main.waterbody_panel.visible = true
 	main._selected_waterbody_id = PlayerData.current_waterbody
@@ -46,6 +39,7 @@ func close() -> void:
 
 	main.waterbody_panel.visible = false
 	main.waterbody_backdrop.visible = false
+	main.close_modal("map")
 	main._active_nav_tab = "fish"
 	main._refresh_bottom_nav_styles()
 
