@@ -52,6 +52,9 @@ func save_game() -> void:
 func load_game() -> void:
 	if not FileAccess.file_exists(SAVE_PATH):
 		print("No save file yet")
+		var time_manager := _get_time_manager()
+		if time_manager != null and time_manager.has_method("initialize_new_game_time"):
+			time_manager.call("initialize_new_game_time", false)
 		return
 
 	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
