@@ -19,6 +19,9 @@ var _bobber_ripple: Node2D
 var _bobber_contact_waterline: Node2D
 var _cast_timer := 0.0
 var _drop_splash_timer := 0.0
+var _float_nudge_timer := 0.0
+var _float_nudge_duration := 0.0
+var _float_nudge_strength := 0.0
 var _cast_landed := false
 var is_cast_animating := false
 @export var bobber_waterline_offset: Vector2 = Vector2(0.0, 34.0)
@@ -97,6 +100,9 @@ func start_cast_visual() -> void:
 func stop_cast_visual() -> void:
 	_cast_timer = 0.0
 	_drop_splash_timer = 0.0
+	_float_nudge_timer = 0.0
+	_float_nudge_duration = 0.0
+	_float_nudge_strength = 0.0
 	_cast_landed = false
 	is_cast_animating = false
 	if _drop_splash_sprite != null:
@@ -105,6 +111,31 @@ func stop_cast_visual() -> void:
 		_bobber_ripple.visible = false
 	if _bobber_contact_waterline != null:
 		_bobber_contact_waterline.visible = false
+
+func play_float_nudge(data: Dictionary) -> void:
+	_float_nudge_duration = max(float(data.get("duration", 0.35)), 0.1)
+	_float_nudge_timer = _float_nudge_duration
+	_float_nudge_strength = clamp(float(data.get("strength", 0.25)), 0.0, 1.0)
+
+func play_bite_signal(data: Dictionary) -> void:
+	if main != null:
+		main._presence_bite_timer = max(float(data.get("bite_window_seconds", 1.4)), 0.8)
+	play_float_nudge({
+		"strength": float(data.get("strength", 0.75)),
+		"duration": min(float(data.get("bite_window_seconds", 1.4)), 0.9)
+	})
+
+func play_hook_result(success: bool, reason: String = "") -> void:
+	if success:
+		play_float_nudge({"strength": 0.75, "duration": 0.36})
+		return
+
+	var strength := 0.45
+	if reason == "too_early":
+		strength = 0.30
+	elif reason == "late_hook" or reason == "missed_bite":
+		strength = 0.62
+	play_float_nudge({"strength": strength, "duration": 0.44})
 
 func _ensure_environment_scene_nodes() -> void:
 	if main.environment_layer != null:
@@ -1074,6 +1105,7 @@ func _update_fishing_presence(delta: float) -> void:
 	main._presence_time += delta
 	main._presence_bite_timer = max(main._presence_bite_timer - delta, 0.0)
 	main._presence_caught_timer = max(main._presence_caught_timer - delta, 0.0)
+	_float_nudge_timer = max(_float_nudge_timer - delta, 0.0)
 	if _cast_timer > 0.0:
 		var was_casting := _cast_timer > 0.0
 		_cast_timer = max(_cast_timer - delta, 0.0)
@@ -1117,6 +1149,14 @@ func _update_fishing_presence(delta: float) -> void:
 			float_offset += Vector2(sin(main._presence_time * 7.7) * (2.0 + intensity * 3.5), sin(main._presence_time * 6.3) * (2.0 + intensity * 3.0))
 		"caught":
 			float_offset += Vector2(sin(main._presence_time * 1.8) * 1.4, -4.0 + sin(main._presence_time * 2.1) * 1.0)
+
+	if state == "waiting" and _float_nudge_timer > 0.0 and _float_nudge_duration > 0.0:
+		var nudge_t: float = clamp(1.0 - _float_nudge_timer / _float_nudge_duration, 0.0, 1.0)
+		var nudge_pulse: float = sin(nudge_t * PI)
+		float_offset += Vector2(
+			sin(main._presence_time * 25.0) * 5.0 * _float_nudge_strength,
+			(5.0 + _float_nudge_strength * 8.0) * nudge_pulse
+		)
 
 	var target_float_center = main._float_base_center + float_offset + scene_breath * 0.35
 	target_float_center.x = clamp(target_float_center.x, screen_size.x * 0.26, screen_size.x * 0.74)

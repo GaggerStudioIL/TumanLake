@@ -45,8 +45,9 @@ func _update_ui() -> void:
 		PlayerData.xp_to_next_level
 	]
 
+	var active_hook_input: bool = main._fishing_ui_state == FishingUiState.WAITING and bool(FishingManager.get("use_new_bite_system"))
 	var locked_for_result_or_fishing: bool = main._fishing_ui_state != FishingUiState.IDLE or main.is_cast_animating
-	main.fish_button.disabled = main._fishing_ui_state == FishingUiState.WAITING or main.is_cast_animating
+	main.fish_button.disabled = (main._fishing_ui_state == FishingUiState.WAITING and not active_hook_input) or main.is_cast_animating
 	main.spot_option_button.disabled = locked_for_result_or_fishing
 	main.basket_button.disabled = main._fishing_ui_state == FishingUiState.WAITING or main._fishing_ui_state == FishingUiState.FIGHTING or main.is_cast_animating
 	main.inventory_button.disabled = main._fishing_ui_state == FishingUiState.WAITING or main._fishing_ui_state == FishingUiState.FIGHTING or main.is_cast_animating
@@ -77,7 +78,7 @@ func _update_ui() -> void:
 
 	match main._fishing_ui_state:
 		FishingUiState.WAITING:
-			main.fish_button.text = "Ожидание"
+			main.fish_button.text = "Подсечь" if active_hook_input else "Ожидание"
 		FishingUiState.FIGHTING:
 			main.fish_button.text = "Тянуть"
 		FishingUiState.CAUGHT, FishingUiState.FAILED:

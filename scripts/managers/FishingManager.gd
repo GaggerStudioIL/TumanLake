@@ -7,11 +7,42 @@ signal reeling_updated(state: Dictionary)
 signal fish_caught(catch_data: Dictionary)
 signal fishing_failed(message: String)
 signal fishing_failed_detailed(failure_data: Dictionary)
+signal cast_started()
+signal waiting_for_bite_started()
+signal float_nudge(nudge_data: Dictionary)
+signal bite_started(bite_data: Dictionary)
+signal bite_window_updated(bite_data: Dictionary)
+signal hook_success(catch_data: Dictionary)
+signal hook_failed(reason: String, data: Dictionary)
+
+enum FishingState {
+	IDLE,
+	CASTING,
+	WAITING_FOR_BITE,
+	BITE_WINDOW,
+	HOOKED,
+	REELING,
+	CAUGHT,
+	FAILED
+}
 
 var is_fishing: bool = false
 var is_reeling: bool = false
+var use_new_bite_system := true
+var fishing_state: int = FishingState.IDLE
 
 var _current_catch: Dictionary = {}
+var _pending_catch: Dictionary = {}
+var _pending_bite_data: Dictionary = {}
+var _active_spot: Dictionary = {}
+var _active_spot_id: String = ""
+var _active_available_fish: Array = []
+var _active_spot_depth_modifier: float = 1.0
+var _bite_check_timer: float = 0.0
+var _bite_window_elapsed: float = 0.0
+var _bite_window_seconds: float = 0.0
+var _false_nudge_timer: float = 0.0
+var _hook_cooldown_timer: float = 0.0
 var _current_behavior: String = "calm"
 var _reel_input_active: bool = false
 var _tension: float = 0.5
@@ -55,6 +86,13 @@ var _high_fail_limit: float = 1.15
 var _low_fail_limit: float = 1.35
 var _target_progress_time: float = 6.0
 
+const USE_NEW_BITE_SYSTEM := true
+const BITE_CHECK_INTERVAL := 1.0
+const BASE_BITE_WINDOW_SECONDS := 1.4
+const EARLY_HOOK_COOLDOWN := 1.5
+const FALSE_NUDGE_MIN_DELAY := 1.0
+const FALSE_NUDGE_MAX_DELAY := 3.0
+const FALSE_NUDGE_CHANCE := 0.28
 const PLAYER_PULL_FORCE := 1.18
 const PLAYER_RELEASE_FORCE := -0.92
 const PLAYER_FORCE_RESPONSE := 3.05
@@ -109,11 +147,15 @@ func start_fishing(spot_id: String) -> void:
 
 	is_fishing = true
 	is_reeling = false
+	fishing_state = FishingState.CASTING
 	_reel_input_active = false
+	_clear_active_bite_data()
 	_tackle_stats = PlayerData.get_tackle_stats()
+	cast_started.emit()
 	var tackle_block_reason := PlayerData.get_tackle_block_reason()
 	if tackle_block_reason != "":
 		is_fishing = false
+		fishing_state = FishingState.FAILED
 		_emit_fishing_failure(
 			FAILURE_WEAK_TACKLE,
 			"Снасть не готова",
@@ -146,6 +188,10 @@ func start_fishing(spot_id: String) -> void:
 	var bait_bonus: float = _get_best_bait_bonus(available_fish)
 	var time_activity_modifier: float = _get_average_time_activity_modifier(available_fish)
 	var spot_bite_modifier: float = float(spot.get("bite_chance_modifier", 1.0)) * spot_depth_modifier
+
+	if use_new_bite_system:
+		_start_waiting_for_active_bite(spot, spot_id, available_fish, spot_depth_modifier)
+		return
 
 	var bite_speed: float = clamp(
 		(1.0 + float(_tackle_stats.get("bite_detection_bonus", 0.0)) + float(_tackle_stats.get("fish_attraction", 0.0)) + bait_bonus * 0.35 - float(_tackle_stats.get("visibility_penalty", 0.0))) * spot_bite_modifier * clamp(time_activity_modifier, 0.55, 1.35),
@@ -218,6 +264,291 @@ func start_fishing(spot_id: String) -> void:
 	catch_data = FishFreshnessManager.stamp_catch(catch_data)
 
 	_start_reeling(catch_data)
+
+func try_hook() -> void:
+	if not use_new_bite_system:
+		return
+
+	if not is_fishing or is_reeling:
+		return
+
+	if fishing_state == FishingState.WAITING_FOR_BITE:
+		_fail_hook("too_early", {
+			"message": "Рыба испугалась!",
+			"cooldown": EARLY_HOOK_COOLDOWN
+		})
+		return
+
+	if fishing_state != FishingState.BITE_WINDOW:
+		return
+
+	var elapsed := _bite_window_elapsed
+	var perfect_start := float(_pending_bite_data.get("perfect_start", 0.35))
+	var perfect_end := float(_pending_bite_data.get("perfect_end", 1.05))
+
+	if elapsed < perfect_start:
+		_fail_hook("early_hook", {
+			"elapsed": elapsed,
+			"perfect_start": perfect_start,
+			"message": "Рано!"
+		})
+		return
+
+	if elapsed > perfect_end:
+		_fail_hook("late_hook", {
+			"elapsed": elapsed,
+			"perfect_end": perfect_end,
+			"message": "Поздно!"
+		})
+		return
+
+	var catch_data := _pending_catch.duplicate(true)
+	_pending_catch.clear()
+	_pending_bite_data.clear()
+	_bite_window_elapsed = 0.0
+	_bite_window_seconds = 0.0
+	fishing_state = FishingState.HOOKED
+	hook_success.emit(catch_data.duplicate(true))
+	_start_reeling(catch_data)
+
+
+func _start_waiting_for_active_bite(spot: Dictionary, spot_id: String, available_fish: Array, spot_depth_modifier: float) -> void:
+	_active_spot = spot.duplicate(true)
+	_active_spot_id = spot_id
+	_active_available_fish = available_fish.duplicate()
+	_active_spot_depth_modifier = spot_depth_modifier
+	_pending_catch.clear()
+	_pending_bite_data.clear()
+	_bite_check_timer = BITE_CHECK_INTERVAL
+	_bite_window_elapsed = 0.0
+	_bite_window_seconds = 0.0
+	_false_nudge_timer = randf_range(FALSE_NUDGE_MIN_DELAY, FALSE_NUDGE_MAX_DELAY)
+	_hook_cooldown_timer = 0.0
+	fishing_state = FishingState.WAITING_FOR_BITE
+	waiting_for_bite_started.emit()
+	fishing_started.emit(0)
+
+
+func _update_active_bite_system(delta: float) -> void:
+	if not is_fishing or is_reeling:
+		return
+
+	if fishing_state == FishingState.WAITING_FOR_BITE:
+		_hook_cooldown_timer = max(_hook_cooldown_timer - delta, 0.0)
+		_update_false_nudge(delta)
+
+		if _hook_cooldown_timer > 0.0:
+			return
+
+		_bite_check_timer -= delta
+		if _bite_check_timer <= 0.0:
+			_bite_check_timer = BITE_CHECK_INTERVAL
+			_try_start_active_bite()
+	elif fishing_state == FishingState.BITE_WINDOW:
+		_bite_window_elapsed += delta
+		var updated_data := _pending_bite_data.duplicate(true)
+		updated_data["elapsed"] = _bite_window_elapsed
+		updated_data["remaining"] = max(_bite_window_seconds - _bite_window_elapsed, 0.0)
+		bite_window_updated.emit(updated_data)
+
+		if _bite_window_elapsed >= _bite_window_seconds:
+			_fail_hook("missed_bite", {
+				"elapsed": _bite_window_elapsed,
+				"message": "Рыба сорвалась!"
+			})
+
+
+func _update_false_nudge(delta: float) -> void:
+	_false_nudge_timer -= delta
+	if _false_nudge_timer > 0.0:
+		return
+
+	_false_nudge_timer = randf_range(FALSE_NUDGE_MIN_DELAY, FALSE_NUDGE_MAX_DELAY)
+	if randf() > FALSE_NUDGE_CHANCE:
+		return
+
+	float_nudge.emit(_build_false_nudge_data())
+
+
+func _build_false_nudge_data() -> Dictionary:
+	var roll := randf()
+	var kind := "small"
+	var strength := randf_range(0.18, 0.32)
+	var duration := randf_range(0.26, 0.42)
+
+	if roll > 0.82:
+		kind = "suspicious"
+		strength = randf_range(0.46, 0.62)
+		duration = randf_range(0.42, 0.62)
+	elif roll > 0.52:
+		kind = "medium"
+		strength = randf_range(0.30, 0.46)
+		duration = randf_range(0.34, 0.52)
+
+	return {
+		"kind": kind,
+		"strength": strength,
+		"duration": duration
+	}
+
+
+func _try_start_active_bite() -> void:
+	if _active_available_fish.is_empty() or _active_spot.is_empty():
+		is_fishing = false
+		fishing_state = FishingState.FAILED
+		_emit_no_candidate_failure(_active_spot, _active_spot_id)
+		return
+
+	var bite_data := _get_active_bite_balance_data()
+	var bite_chance := float(bite_data.get("bite_chance", 0.08))
+	if randf() > bite_chance:
+		return
+
+	var fish_id: String = _get_random_tackle_fish_id(
+		_active_available_fish,
+		float(_active_spot.get("rare_chance_modifier", 1.0))
+	)
+
+	if not PlayerData.consume_current_bait(1):
+		is_fishing = false
+		fishing_state = FishingState.FAILED
+		_emit_fishing_failure(
+			FAILURE_WEAK_TACKLE,
+			"Нет наживки",
+			"Наживка закончилась до поклёвки.",
+			"Пополните наживку или экипируйте другую.",
+			{"severity": "low", "spot_id": _active_spot_id}
+		)
+		return
+
+	var catch_data := _prepare_catch_data_for_bite(fish_id)
+	if catch_data.is_empty():
+		is_fishing = false
+		fishing_state = FishingState.FAILED
+		_emit_fishing_failure(
+			FAILURE_FISH_ESCAPED_HOOK,
+			"",
+			"Рыба сорвалась до подсечки.",
+			"Проверьте размер крючка, наживку и состояние снасти.",
+			{"severity": "medium", "fish_id": fish_id, "spot_id": _active_spot_id}
+		)
+		return
+
+	_pending_catch = catch_data
+	_pending_bite_data = _build_bite_window_data(fish_id, catch_data, bite_data)
+	_bite_window_seconds = float(_pending_bite_data.get("bite_window_seconds", BASE_BITE_WINDOW_SECONDS))
+	_bite_window_elapsed = 0.0
+	fishing_state = FishingState.BITE_WINDOW
+	bite_started.emit(_pending_bite_data.duplicate(true))
+
+
+func _get_active_bite_balance_data() -> Dictionary:
+	var bait_bonus: float = _get_best_bait_bonus(_active_available_fish)
+	var time_activity_modifier: float = _get_average_time_activity_modifier(_active_available_fish)
+	var spot_bite_modifier: float = float(_active_spot.get("bite_chance_modifier", 1.0)) * _active_spot_depth_modifier
+	var bite_chance: float = clamp(
+		(
+			0.085
+			+ float(_tackle_stats.get("bite_detection_bonus", 0.0)) * 0.10
+			+ float(_tackle_stats.get("fish_attraction", 0.0)) * 0.10
+			+ bait_bonus * 0.09
+			+ float(_tackle_stats.get("hook_success_bonus", 0.0)) * 0.06
+			- float(_tackle_stats.get("visibility_penalty", 0.0)) * 0.08
+		) * spot_bite_modifier * clamp(time_activity_modifier, 0.42, 1.38),
+		0.04,
+		0.22
+	)
+
+	return {
+		"bite_chance": bite_chance,
+		"spot_depth_modifier": _active_spot_depth_modifier,
+		"bait_bonus": bait_bonus,
+		"time_activity_modifier": time_activity_modifier,
+		"spot_bite_modifier": spot_bite_modifier
+	}
+
+
+func _prepare_catch_data_for_bite(fish_id: String) -> Dictionary:
+	var catch_fish := FishDatabase.get_fish(fish_id)
+	var catch_data: Dictionary = FishDatabase.create_catch(fish_id, _get_time_peak_modifier(catch_fish))
+	if catch_data.is_empty():
+		return {}
+
+	catch_data["spot_id"] = str(_active_spot.get("id", _active_spot_id))
+	catch_data["spot_name"] = str(_active_spot.get("name", "-"))
+	catch_data["waterbody_id"] = str(_active_spot.get("waterbody_id", PlayerData.current_waterbody))
+	catch_data["waterbody_name"] = str(_active_spot.get("waterbody_name", ""))
+	return FishFreshnessManager.stamp_catch(catch_data)
+
+
+func _build_bite_window_data(fish_id: String, catch_data: Dictionary, balance_data: Dictionary) -> Dictionary:
+	var fish := FishDatabase.get_fish(fish_id)
+	var rarity := str(catch_data.get("rarity", fish.get("rarity", "common")))
+	var behavior := str(catch_data.get("behavior_type", catch_data.get("behavior", fish.get("behavior_type", fish.get("behavior", "calm")))))
+	var weight := float(catch_data.get("weight", 0.0))
+	var max_weight: float = max(float(fish.get("max_weight", max(weight, 1.0))), 0.1)
+	var size_ratio: float = clamp(weight / max_weight, 0.0, 1.0)
+	var window := BASE_BITE_WINDOW_SECONDS
+
+	match rarity:
+		"rare":
+			window -= 0.08
+		"very_rare":
+			window -= 0.14
+		"legendary":
+			window -= 0.22
+
+	if behavior == "cautious" or behavior == "shy":
+		window -= 0.12
+	elif behavior == "aggressive":
+		window += 0.08
+
+	window = clamp(window - size_ratio * 0.12, 1.15, 1.8)
+	var perfect_start := window * 0.25
+	var perfect_end := window * 0.75
+	var strength: float = clamp(0.42 + size_ratio * 0.38 + float(balance_data.get("bite_chance", 0.08)) * 0.90, 0.35, 1.0)
+
+	return {
+		"fish_id": fish_id,
+		"bite_window_seconds": window,
+		"perfect_start": perfect_start,
+		"perfect_end": perfect_end,
+		"strength": strength,
+		"fish_name": str(catch_data.get("name", fish.get("name", "-"))),
+		"rarity": rarity,
+		"behavior": behavior,
+		"weight": weight
+	}
+
+
+func _fail_hook(reason: String, data: Dictionary = {}) -> void:
+	var failure_data := data.duplicate(true)
+	failure_data["reason"] = reason
+	failure_data["bite_data"] = _pending_bite_data.duplicate(true)
+	hook_failed.emit(reason, failure_data)
+	_pending_catch.clear()
+	_pending_bite_data.clear()
+	_bite_window_elapsed = 0.0
+	_bite_window_seconds = 0.0
+	fishing_state = FishingState.WAITING_FOR_BITE
+	_hook_cooldown_timer = float(failure_data.get("cooldown", EARLY_HOOK_COOLDOWN if reason == "too_early" or reason == "early_hook" else 0.65))
+	_bite_check_timer = max(_hook_cooldown_timer, BITE_CHECK_INTERVAL)
+	_false_nudge_timer = randf_range(FALSE_NUDGE_MIN_DELAY, FALSE_NUDGE_MAX_DELAY)
+
+
+func _clear_active_bite_data() -> void:
+	_pending_catch.clear()
+	_pending_bite_data.clear()
+	_active_spot.clear()
+	_active_spot_id = ""
+	_active_available_fish.clear()
+	_active_spot_depth_modifier = 1.0
+	_bite_check_timer = 0.0
+	_bite_window_elapsed = 0.0
+	_bite_window_seconds = 0.0
+	_false_nudge_timer = 0.0
+	_hook_cooldown_timer = 0.0
+
 
 func _get_tackle_available_fish(spot_fish: Array) -> Array:
 	var filtered_fish: Array = []
@@ -497,6 +828,9 @@ func set_reel_input(active: bool) -> void:
 	_reel_input_active = active and is_reeling
 
 func _process(delta: float) -> void:
+	if use_new_bite_system:
+		_update_active_bite_system(delta)
+
 	if not is_reeling:
 		return
 
@@ -514,7 +848,10 @@ func _process(delta: float) -> void:
 
 func _start_reeling(catch_data: Dictionary) -> void:
 	_current_catch = catch_data
+	_pending_catch.clear()
+	_pending_bite_data.clear()
 	is_reeling = true
+	fishing_state = FishingState.REELING
 	_reel_input_active = false
 	_tackle_stats = PlayerData.get_tackle_stats()
 
@@ -952,8 +1289,10 @@ func _finish_reeling_success() -> void:
 
 	is_fishing = false
 	is_reeling = false
+	fishing_state = FishingState.CAUGHT
 	_reel_input_active = false
 	_current_catch = {}
+	_clear_active_bite_data()
 
 	if added:
 		var signal_data: Dictionary = catch_data.duplicate(true)
@@ -990,7 +1329,9 @@ func _finish_reeling_failed(message: String, fail_kind: String = "escape", reaso
 
 	is_fishing = false
 	is_reeling = false
+	fishing_state = FishingState.FAILED
 	_reel_input_active = false
+	_clear_active_bite_data()
 	_emit_fishing_failure(
 		failure_reason,
 		"",
@@ -1022,6 +1363,7 @@ func _emit_fishing_failure(
 	hint: String = "",
 	extra_data: Dictionary = {}
 ) -> void:
+	fishing_state = FishingState.FAILED
 	var template: Dictionary = _get_failure_template(reason)
 	var failure_data: Dictionary = {
 		"reason": reason,

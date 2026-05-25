@@ -1957,7 +1957,8 @@ func _refresh_fish_button_presentation() -> void:
 	if target_size == Vector2.ZERO:
 		target_size = _scale_size(ui_theme.get_cast_button_size(), get_viewport_rect().size)
 
-	var use_cast_texture := _use_cast_png_button and (_fishing_ui_state == FishingUiState.IDLE or _fishing_ui_state == FishingUiState.WAITING)
+	var active_hook_input: bool = _fishing_ui_state == FishingUiState.WAITING and bool(FishingManager.get("use_new_bite_system"))
+	var use_cast_texture := _use_cast_png_button and (_fishing_ui_state == FishingUiState.IDLE or (_fishing_ui_state == FishingUiState.WAITING and not active_hook_input))
 	var use_pull_texture := _use_pull_png_button and (
 		_fishing_ui_state == FishingUiState.FIGHTING
 		or _fishing_ui_state == FishingUiState.CAUGHT
@@ -1991,7 +1992,8 @@ func _update_cast_button_visual() -> void:
 	if cast_button_visual == null or ui_theme == null:
 		return
 
-	var use_cast_texture := _use_cast_png_button and (_fishing_ui_state == FishingUiState.IDLE or _fishing_ui_state == FishingUiState.WAITING)
+	var active_hook_input: bool = _fishing_ui_state == FishingUiState.WAITING and bool(FishingManager.get("use_new_bite_system"))
+	var use_cast_texture := _use_cast_png_button and (_fishing_ui_state == FishingUiState.IDLE or (_fishing_ui_state == FishingUiState.WAITING and not active_hook_input))
 	var use_pull_texture := _use_pull_png_button and (
 		_fishing_ui_state == FishingUiState.FIGHTING
 		or _fishing_ui_state == FishingUiState.CAUGHT
@@ -3547,6 +3549,12 @@ func _connect_signals() -> void:
 	FishingManager.fish_caught.connect(_on_fish_caught)
 	FishingManager.fishing_failed_detailed.connect(_on_fishing_failed_detailed)
 	FishingManager.fishing_failed.connect(_on_fishing_failed)
+	FishingManager.waiting_for_bite_started.connect(_on_waiting_for_bite_started)
+	FishingManager.float_nudge.connect(_on_float_nudge)
+	FishingManager.bite_started.connect(_on_bite_started)
+	FishingManager.bite_window_updated.connect(_on_bite_window_updated)
+	FishingManager.hook_success.connect(_on_hook_success)
+	FishingManager.hook_failed.connect(_on_hook_failed)
 
 func _update_ui() -> void:
 	fishing_hud_ui._update_ui()
@@ -4313,6 +4321,10 @@ func _on_fish_button_pressed() -> void:
 		_return_to_idle_after_result()
 		return
 
+	if _fishing_ui_state == FishingUiState.WAITING and bool(FishingManager.get("use_new_bite_system")):
+		FishingManager.try_hook()
+		return
+
 	if _fishing_ui_state != FishingUiState.IDLE:
 		return
 
@@ -4633,15 +4645,81 @@ func _on_fishing_started(seconds: int) -> void:
 	_presence_caught_timer = 0.0
 	_fishing_ui_state = FishingUiState.WAITING
 	_reset_reeling_ui()
-	timer_label.text = "Клев через: %d сек." % seconds
-	fight_status_label.text = "Ожидание поклевки..."
+	if bool(FishingManager.get("use_new_bite_system")):
+		timer_label.text = "Следи за поплавком"
+		fight_status_label.text = "Ждём поклёвку. Нажимай только когда поплавок резко уйдёт."
+	else:
+		timer_label.text = "Клев через: %d сек." % seconds
+		fight_status_label.text = "Ожидание поклевки..."
 	_update_ui()
 
 func _on_fishing_tick(seconds_left: int) -> void:
 	timer_label.text = "Клев через: %d сек." % seconds_left
 
+func _on_waiting_for_bite_started() -> void:
+	_presence_bite_timer = 0.0
+	_presence_caught_timer = 0.0
+	_fishing_ui_state = FishingUiState.WAITING
+	_reset_reeling_ui()
+	timer_label.text = "Следи за поплавком"
+	result_label.text = "Поплавок в воде. Жди настоящую поклёвку и нажми “Подсечь”."
+	fight_status_label.text = "Ожидание поклёвки..."
+	_update_ui()
+
+func _on_float_nudge(nudge_data: Dictionary) -> void:
+	if fishing_presence_ui != null and fishing_presence_ui.has_method("play_float_nudge"):
+		fishing_presence_ui.play_float_nudge(nudge_data)
+
+	if str(nudge_data.get("kind", "small")) == "suspicious":
+		fight_status_label.text = "Поплавок подозрительно качнулся..."
+
+func _on_bite_started(bite_data: Dictionary) -> void:
+	_fishing_ui_state = FishingUiState.WAITING
+	_presence_bite_timer = max(float(bite_data.get("bite_window_seconds", 1.4)), 0.8)
+	timer_label.text = "Клюёт! Подсекай!"
+	result_label.text = "Поклёвка: %s\nЖми “Подсечь” в момент рывка." % str(bite_data.get("fish_name", "рыба"))
+	fight_status_label.text = "Окно подсечки открыто"
+	if fishing_presence_ui != null and fishing_presence_ui.has_method("play_bite_signal"):
+		fishing_presence_ui.play_bite_signal(bite_data)
+	_update_ui()
+
+func _on_bite_window_updated(bite_data: Dictionary) -> void:
+	if _fishing_ui_state != FishingUiState.WAITING:
+		return
+
+	var remaining := float(bite_data.get("remaining", 0.0))
+	timer_label.text = "Подсечь: %.1f" % remaining
+
+func _on_hook_success(catch_data: Dictionary) -> void:
+	timer_label.text = "Подсечка!"
+	result_label.text = "Подсечка! На крючке: %s" % str(catch_data.get("name", "-"))
+	if fishing_presence_ui != null and fishing_presence_ui.has_method("play_hook_result"):
+		fishing_presence_ui.play_hook_result(true)
+
+func _on_hook_failed(reason: String, data: Dictionary) -> void:
+	_fishing_ui_state = FishingUiState.WAITING
+	_presence_bite_timer = 0.0
+	var message := str(data.get("message", "Рыба сорвалась!"))
+	match reason:
+		"too_early":
+			message = "Рыба испугалась!"
+		"early_hook":
+			message = "Рано!"
+		"late_hook":
+			message = "Поздно!"
+		"missed_bite":
+			message = "Рыба сорвалась!"
+
+	timer_label.text = message
+	result_label.text = "%s\nСнасть всё ещё в воде. Жди следующую поклёвку." % message
+	fight_status_label.text = "Ожидание продолжается"
+	if fishing_presence_ui != null and fishing_presence_ui.has_method("play_hook_result"):
+		fishing_presence_ui.play_hook_result(false, reason)
+	_update_ui()
+
 func _on_reeling_started(catch_data: Dictionary, state: Dictionary) -> void:
-	_call_audio_manager("play_bite")
+	if not bool(FishingManager.get("use_new_bite_system")):
+		_call_audio_manager("play_bite")
 	_presence_bite_timer = 0.95
 	_presence_caught_timer = 0.0
 	_fishing_ui_state = FishingUiState.FIGHTING
