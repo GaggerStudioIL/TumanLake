@@ -118,8 +118,12 @@ func load_game() -> void:
 		)
 		should_save_after_time_load = true
 
+	var migrated_freshness := false
+	if InventoryManager.has_method("ensure_inventory_freshness_metadata"):
+		migrated_freshness = InventoryManager.ensure_inventory_freshness_metadata()
+
 	print("Game loaded")
-	if should_save_after_time_load:
+	if should_save_after_time_load or migrated_freshness:
 		save_game()
 
 func delete_save() -> void:

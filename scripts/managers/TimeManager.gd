@@ -151,6 +151,10 @@ func get_time_string() -> String:
 	return get_clock_text()
 
 
+func get_real_unix_time() -> float:
+	return _get_utc_unix_time()
+
+
 func get_time_state() -> Dictionary:
 	return {
 		"total_game_minutes": total_game_minutes,

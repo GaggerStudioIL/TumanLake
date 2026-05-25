@@ -126,7 +126,7 @@ func _get_keepnet_summary() -> Dictionary:
 			continue
 
 		total_weight += float(fish.get("weight", 0.0))
-		total_price += int(fish.get("price", 0))
+		total_price += InventoryManager.get_fish_sell_price(fish)
 
 	return {
 		"weight": total_weight,
@@ -226,9 +226,10 @@ func _create_keepnet_card(fish: Dictionary, fish_index: int, card_size: Vector2)
 
 	var weight = float(fish.get("weight", 0.0))
 	var length_cm = main._get_catch_length_cm(fish)
-	var price = int(fish.get("price", 0))
+	var price = InventoryManager.get_fish_sell_price(fish)
+	var freshness_title := FishFreshnessManager.get_freshness_title(fish)
 	var stats_label = Label.new()
-	stats_label.text = "%.2f кг  |  %.1f см\n%d мон." % [weight, length_cm, price]
+	stats_label.text = "%.2f кг  |  %.1f см\n%d мон.  |  %s" % [weight, length_cm, price, freshness_title]
 	stats_label.position = Vector2(12.0, 86.0)
 	stats_label.size = Vector2(card_size.x - 128.0, 34.0)
 	stats_label.add_theme_font_size_override("font_size", 12)

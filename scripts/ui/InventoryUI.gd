@@ -198,6 +198,7 @@ func _get_visible_inventory_items() -> Array:
 	if main._inventory_category == "all" or main._inventory_category == "fish":
 		for i in InventoryManager.inventory.size():
 			var fish: Dictionary = InventoryManager.inventory[i]
+			var base_price := int(fish.get("price", 0))
 			items.append({
 				"id": "basket_fish_%d" % i,
 				"name": str(fish.get("name", "-")),
@@ -206,7 +207,11 @@ func _get_visible_inventory_items() -> Array:
 				"description": "Рыба в садке.",
 				"stats": {
 					"weight": float(fish.get("weight", 0.0)),
-					"price": int(fish.get("price", 0)),
+					"price": base_price,
+					"sell_price": InventoryManager.get_fish_sell_price(fish),
+					"freshness_price": InventoryManager.get_fish_freshness_price(fish),
+					"freshness_title": FishFreshnessManager.get_freshness_title(fish),
+					"freshness_ratio": FishFreshnessManager.get_freshness_ratio(fish),
 					"rarity": str(fish.get("rarity", "-"))
 				}
 			})
@@ -230,7 +235,12 @@ func _get_inventory_item_display_text(item: Dictionary) -> String:
 
 	if category == "fish":
 		var stats: Dictionary = item.get("stats", {})
-		return "%s %.2f кг" % [name, float(stats.get("weight", 0.0))]
+		return "%s | %.2f кг | %d мон. | %s" % [
+			name,
+			float(stats.get("weight", 0.0)),
+			int(stats.get("sell_price", stats.get("price", 0))),
+			str(stats.get("freshness_title", "-"))
+		]
 
 	if quantity > 1:
 		return "%s x%d%s" % [name, quantity, equipped_marker]
@@ -246,9 +256,11 @@ func _get_inventory_item_details_text(item: Dictionary) -> String:
 	var stats: Dictionary = item.get("stats", {})
 
 	if category == "fish":
-		return "%s\nКатегория: Рыба / Садок\nВес: %.2f кг\nЦена: %d мон.\nРедкость: %s" % [
+		return "%s\nКатегория: Рыба / Садок\nВес: %.2f кг\nСвежесть: %s\nЦена продажи: %d мон.\nБазовая цена: %d мон.\nРедкость: %s" % [
 			name,
 			float(stats.get("weight", 0.0)),
+			str(stats.get("freshness_title", "-")),
+			int(stats.get("sell_price", stats.get("price", 0))),
 			int(stats.get("price", 0)),
 			str(stats.get("rarity", "-"))
 		]

@@ -215,6 +215,7 @@ func start_fishing(spot_id: String) -> void:
 	catch_data["spot_name"] = spot["name"]
 	catch_data["waterbody_id"] = str(spot.get("waterbody_id", PlayerData.current_waterbody))
 	catch_data["waterbody_name"] = str(spot.get("waterbody_name", ""))
+	catch_data = FishFreshnessManager.stamp_catch(catch_data)
 
 	_start_reeling(catch_data)
 
@@ -945,7 +946,7 @@ func _finish_reeling_success() -> void:
 	if not is_reeling:
 		return
 
-	var catch_data: Dictionary = PlayerData.prepare_record_info(_current_catch.duplicate(true))
+	var catch_data: Dictionary = FishFreshnessManager.stamp_catch(PlayerData.prepare_record_info(_current_catch.duplicate(true)))
 	var wear_result := _apply_reeling_wear("caught")
 	var added: bool = InventoryManager.add_fish(catch_data)
 

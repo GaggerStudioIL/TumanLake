@@ -4387,9 +4387,7 @@ func _on_keepnet_sell_fish_pressed(fish_index: int) -> void:
 		return
 
 	var fish: Dictionary = InventoryManager.inventory[fish_index]
-	var price := PlayerData.get_skill_adjusted_sell_price(int(fish.get("price", 0)))
-	InventoryManager.inventory.remove_at(fish_index)
-	PlayerData.money += price
+	var price := InventoryManager.sell_fish_at(fish_index)
 	result_label.text = "Рыба продана: %s +%d мон." % [
 		str(fish.get("name", "-")),
 		price
