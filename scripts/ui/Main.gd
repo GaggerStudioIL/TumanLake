@@ -3763,7 +3763,7 @@ func _get_current_game_minutes() -> float:
 		if raw_minutes != null:
 			return fposmod(float(raw_minutes), 1440.0)
 
-	return 460.0
+	return 525.0
 
 func _sample_time_color(minutes: float, anchors: Array) -> Color:
 	if anchors.is_empty():
@@ -3820,7 +3820,7 @@ func _get_clock_text() -> String:
 	if time_manager != null and time_manager.has_method("get_clock_text"):
 		return str(time_manager.call("get_clock_text"))
 
-	return "07:40"
+	return "08:45"
 
 func _get_time_of_day_title() -> String:
 	var time_manager := _get_time_manager()

@@ -3,6 +3,7 @@ extends Node
 const SAVE_PATH := "user://save_game.json"
 
 func save_game() -> void:
+	var time_save_data := _get_time_save_data()
 	var save_data := {
 		"money": PlayerData.money,
 		"level": PlayerData.level,
@@ -31,8 +32,11 @@ func save_game() -> void:
 		"current_tackle": PlayerData.current_tackle,
 		"inventory": InventoryManager.inventory,
 		"max_items": InventoryManager.max_items,
-		"current_game_minutes": _get_time_value("current_game_minutes", 460.0),
-		"day_index": int(_get_time_value("day_index", 1.0))
+		"game_time": time_save_data,
+		"total_game_minutes": float(time_save_data.get("total_game_minutes", 525.0)),
+		"current_game_minutes": float(time_save_data.get("current_game_minutes", 525.0)),
+		"day_index": int(time_save_data.get("day_index", 1)),
+		"last_real_utc_unix_time": float(time_save_data.get("last_real_utc_unix_time", 0.0))
 	}
 
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
@@ -99,22 +103,48 @@ func load_game() -> void:
 	InventoryManager.inventory = save_data.get("inventory", [])
 	InventoryManager.max_items = int(save_data.get("max_items", 20))
 	var time_manager := _get_time_manager()
-	if time_manager != null and time_manager.has_method("set_time"):
+	var should_save_after_time_load := false
+	if time_manager != null and time_manager.has_method("load_time_from_save"):
+		time_manager.call("load_time_from_save", save_data)
+		should_save_after_time_load = true
+	elif time_manager != null and time_manager.has_method("set_time"):
 		time_manager.call(
 			"set_time",
-			float(save_data.get("current_game_minutes", _get_time_value("current_game_minutes", 460.0))),
+			float(save_data.get("current_game_minutes", _get_time_value("current_game_minutes", 525.0))),
 			int(save_data.get("day_index", int(_get_time_value("day_index", 1.0))))
 		)
+		should_save_after_time_load = true
 
 	print("Game loaded")
+	if should_save_after_time_load:
+		save_game()
 
 func delete_save() -> void:
 	if FileAccess.file_exists(SAVE_PATH):
 		DirAccess.remove_absolute(SAVE_PATH)
 		print("Save deleted")
+	var time_manager := _get_time_manager()
+	if time_manager != null and time_manager.has_method("initialize_new_game_time"):
+		time_manager.call("initialize_new_game_time", false)
 
 func _get_time_manager() -> Node:
 	return get_node_or_null("/root/TimeManager")
+
+func _get_time_save_data() -> Dictionary:
+	var time_manager := _get_time_manager()
+
+	if time_manager != null and time_manager.has_method("get_time_save_data"):
+		var time_data = time_manager.call("get_time_save_data")
+		if time_data is Dictionary:
+			return time_data as Dictionary
+
+	return {
+		"initialized": false,
+		"total_game_minutes": 525.0,
+		"current_game_minutes": _get_time_value("current_game_minutes", 525.0),
+		"day_index": int(_get_time_value("day_index", 1.0)),
+		"last_real_utc_unix_time": 0.0
+	}
 
 func _get_time_value(property_name: String, fallback: float) -> float:
 	var time_manager := _get_time_manager()

@@ -430,7 +430,7 @@ func _get_current_game_minutes() -> float:
 	var time_manager := get_node_or_null("/root/TimeManager")
 
 	if time_manager == null:
-		return 460.0
+		return 525.0
 
 	return float(time_manager.get("current_game_minutes"))
 

@@ -532,7 +532,7 @@ func _on_period_changed(_time_of_day: String) -> void:
 
 func _get_current_game_minutes(time_state: Dictionary = {}) -> float:
 	if time_state.has("current_game_minutes"):
-		return fposmod(float(time_state.get("current_game_minutes", 460.0)), MINUTES_PER_DAY)
+		return fposmod(float(time_state.get("current_game_minutes", 525.0)), MINUTES_PER_DAY)
 	if time_state.has("day_progress"):
 		return fposmod(float(time_state.get("day_progress", 0.0)) * MINUTES_PER_DAY, MINUTES_PER_DAY)
 	if _time_manager != null:
@@ -542,7 +542,7 @@ func _get_current_game_minutes(time_state: Dictionary = {}) -> float:
 		var raw_progress: Variant = _time_manager.get("day_progress")
 		if raw_progress != null:
 			return fposmod(float(raw_progress) * MINUTES_PER_DAY, MINUTES_PER_DAY)
-	return 460.0
+	return 525.0
 
 func _get_sprite_uniform_scale(sprite: Sprite2D, target_size: float) -> Vector2:
 	if sprite == null or sprite.texture == null:
