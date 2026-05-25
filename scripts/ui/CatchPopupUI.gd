@@ -6,6 +6,7 @@ var theme
 var progress_label: Label
 var progress_track: Panel
 var progress_fill: ColorRect
+var _species_texture_cache: Dictionary = {}
 signal catch_keep_requested
 signal catch_release_requested
 
@@ -456,6 +457,10 @@ func _set_reward_fish_texture(fish_id: String) -> void:
 
 
 func _get_reward_fish_texture(fish_id: String) -> Texture2D:
+	var species_texture := _get_species_fish_texture(fish_id)
+	if species_texture != null:
+		return species_texture
+
 	if SMALL_FISH_ATLAS_REGIONS.has(fish_id):
 		if main._small_fish_atlas == null:
 			main._small_fish_atlas = load(SMALL_FISH_ATLAS_PATH) as Texture2D
@@ -488,6 +493,31 @@ func _get_reward_fish_texture(fish_id: String) -> Texture2D:
 	atlas_texture.region = atlas_region
 
 	return atlas_texture
+
+
+func _get_species_fish_texture(fish_id: String) -> Texture2D:
+	var fish: Dictionary = FishDatabase.get_fish(fish_id)
+	if fish.is_empty():
+		return null
+
+	var path := str(fish.get("icon_path", ""))
+	if path.is_empty():
+		return null
+
+	if _species_texture_cache.has(path):
+		return _species_texture_cache[path]
+
+	if not ResourceLoader.exists(path):
+		push_warning("CatchPopupUI: missing fish species image: " + path)
+		return null
+
+	var texture := load(path) as Texture2D
+	if texture == null:
+		push_warning("CatchPopupUI: cannot load fish species image: " + path)
+		return null
+
+	_species_texture_cache[path] = texture
+	return texture
 
 
 func _play_catch_reward_sound(tier: String) -> void:

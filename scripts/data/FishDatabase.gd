@@ -1034,6 +1034,41 @@ const CATCH_RANK_WEIGHTS := {
 	"moon_catfish": {"trophy_weight": 23.5, "rarity_weight": 29.0}
 }
 
+const FISH_ICON_PATHS := {
+	"bleak": "res://assets/fish/species/bleak.png",
+	"roach": "res://assets/fish/species/roach.png",
+	"rudd": "res://assets/fish/species/rudd.png",
+	"rotan": "res://assets/fish/species/rotan.png",
+	"ruffe": "res://assets/fish/species/ruffe.png",
+	"silver_crucian": "res://assets/fish/species/silver_crucian.png",
+	"golden_crucian": "res://assets/fish/species/golden_crucian.png",
+	"perch": "res://assets/fish/species/perch.png",
+	"white_bream": "res://assets/fish/species/white_bream.png",
+	"skimmer_bream": "res://assets/fish/species/skimmer_bream.png",
+	"tench": "res://assets/fish/species/tench.png",
+	"bream": "res://assets/fish/species/bream.png",
+	"topmouth_gudgeon": "res://assets/fish/species/topmouth_gudgeon.png",
+	"gudgeon": "res://assets/fish/species/gudgeon.png",
+	"young_chub": "res://assets/fish/species/young_chub.png",
+	"young_pike": "res://assets/fish/species/young_pike.png",
+	"ide": "res://assets/fish/species/ide.png",
+	"young_grass_carp": "res://assets/fish/species/young_grass_carp.png",
+	"young_mirror_carp": "res://assets/fish/species/young_mirror_carp.png",
+	"small_catfish": "res://assets/fish/species/small_catfish.png",
+	"frog": "res://assets/fish/species/frog.png",
+	"loach": "res://assets/fish/species/loach.png",
+	"goby": "res://assets/fish/species/goby.png",
+	"crayfish": "res://assets/fish/species/crayfish.png",
+	"water_turtle": "res://assets/fish/species/water_turtle.png",
+	"crucian": "res://assets/fish/species/crucian.png",
+	"pike": "res://assets/fish/species/pike.png",
+	"catfish": "res://assets/fish/species/catfish.png",
+	"eel": "res://assets/fish/species/eel.png",
+	"zander": "res://assets/fish/species/zander.png",
+	"mist_carp": "res://assets/fish/species/mist_carp.png",
+	"moon_catfish": "res://assets/fish/species/moon_catfish.png"
+}
+
 var _fish_rules_applied := false
 
 func _ensure_fish_rules() -> void:
@@ -1062,6 +1097,8 @@ func _ensure_fish_rules() -> void:
 			fish_entry["behavior_type"] = fish_entry.get("behavior", "calm")
 		if FISH_ACTIVITY.has(fish_id):
 			fish_entry.merge(FISH_ACTIVITY[fish_id], true)
+		if str(fish_entry.get("icon_path", "")).is_empty() and FISH_ICON_PATHS.has(fish_id):
+			fish_entry["icon_path"] = FISH_ICON_PATHS[fish_id]
 
 		var behavior := str(fish_entry.get("behavior_type", fish_entry.get("behavior", "calm")))
 		var base_fight_power: float = float(fish_entry.get("base_fight_power", 1.0))
@@ -1204,6 +1241,7 @@ func create_catch(fish_id: String, weight_bias: float = 0.0) -> Dictionary:
 		"weight": weight,
 		"length_cm": length_cm,
 		"price": price,
+		"icon_path": str(fish.get("icon_path", "")),
 		"description": fish["description"]
 	}
 
