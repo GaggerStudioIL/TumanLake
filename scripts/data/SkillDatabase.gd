@@ -31,6 +31,7 @@ const BRANCH_SKILLS := {
 		"basic_knot_1",
 		"basic_knot_2",
 		"careful_hookset",
+		"bait_sandwich",
 		"line_reserve"
 	],
 	"economy": [
@@ -172,6 +173,17 @@ const SKILLS := {
 		"requires": ["careful_hookset"],
 		"effects": {
 			"line_strength_bonus": 0.05
+		}
+	},
+	"bait_sandwich": {
+		"id": "bait_sandwich",
+		"name": "Бутерброд",
+		"branch": "tackle",
+		"description": "Позволяет использовать вторую наживку на крючке.",
+		"cost": 1,
+		"requires": ["careful_hookset"],
+		"effects": {
+			"second_bait_slot": 1.0
 		}
 	},
 	"good_deal_1": {

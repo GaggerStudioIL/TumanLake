@@ -84,6 +84,11 @@ func _ensure_tackle_ui_nodes() -> void:
 	main.tackle_line_button.text = "Лески"
 	main.tackle_panel.add_child(main.tackle_line_button)
 
+	main.tackle_leader_button = Button.new()
+	main.tackle_leader_button.name = "TackleLeaderButton"
+	main.tackle_leader_button.text = "Поводок"
+	main.tackle_panel.add_child(main.tackle_leader_button)
+
 	main.tackle_float_button = Button.new()
 	main.tackle_float_button.name = "TackleFloatButton"
 	main.tackle_float_button.text = "Поплавки"
@@ -98,6 +103,11 @@ func _ensure_tackle_ui_nodes() -> void:
 	main.tackle_bait_button.name = "TackleBaitButton"
 	main.tackle_bait_button.text = "Наживки"
 	main.tackle_panel.add_child(main.tackle_bait_button)
+
+	main.tackle_bait_2_button = Button.new()
+	main.tackle_bait_2_button.name = "TackleBait2Button"
+	main.tackle_bait_2_button.text = "Наживка 2"
+	main.tackle_panel.add_child(main.tackle_bait_2_button)
 
 	main.tackle_item_list = ItemList.new()
 	main.tackle_item_list.name = "TackleItemList"
@@ -208,9 +218,13 @@ func _update_tackle_ui() -> void:
 	if main.tackle_panel == null:
 		return
 
-	main._visible_tackle_items = PlayerData.get_owned_items_for_category(main._tackle_category)
+	var item_category := _get_item_category_for_slot(main._tackle_category)
+	if main._tackle_category == "bait_2" and not PlayerData.can_use_second_bait():
+		main._visible_tackle_items = []
+	else:
+		main._visible_tackle_items = PlayerData.get_owned_items_for_category(item_category)
 	main.tackle_title_label.text = "Сборка снасти"
-	main.tackle_current_label.text = main._get_tackle_build_summary_text()
+	main.tackle_current_label.text = _get_rod_assembly_summary_text()
 	main.tackle_depth_label.text = "Глубина: %.1f м" % PlayerData.fishing_depth
 	main.tackle_hint_label.text = _get_tackle_setup_status_or_hints_text()
 	main.tackle_item_list.clear()
@@ -255,7 +269,10 @@ func _update_tackle_ui() -> void:
 
 	var selected_item = _get_selected_tackle_item()
 	var hints_text = _get_tackle_setup_hints_text(4)
-	if selected_item.is_empty():
+	if main._tackle_category == "bait_2" and not PlayerData.can_use_second_bait():
+		main.tackle_details_label.text = "Наживка 2 закрыта."
+		main.tackle_compare_label.text = "Нужен навык «Бутерброд».\n\nПодсказки:\n%s" % hints_text
+	elif selected_item.is_empty():
 		main.tackle_details_label.text = "В этой категории пока нет предметов."
 		main.tackle_compare_label.text = "Купи снасть в магазине или выбери другую категорию.\n\nПодсказки:\n%s" % hints_text
 	else:
@@ -263,6 +280,8 @@ func _update_tackle_ui() -> void:
 		main.tackle_compare_label.text = "%s\n\nПодсказки:\n%s" % [_get_tackle_compare_text(selected_item), hints_text]
 
 	var can_equip = not selected_item.is_empty() and PlayerData.can_equip_item(selected_item)
+	if main._tackle_category == "bait_2" and not PlayerData.can_use_second_bait():
+		can_equip = false
 	main.tackle_equip_button.visible = can_equip
 	main.tackle_equip_button.disabled = not can_equip or _is_tackle_item_equipped(selected_item) or main._fishing_ui_state != FishingUiState.IDLE
 
@@ -276,9 +295,11 @@ func _update_tackle_ui() -> void:
 	var category_buttons: Array = [
 		[main.tackle_rod_button, "rod"],
 		[main.tackle_line_button, "line"],
-		[main.tackle_float_button, "float"],
+		[main.tackle_leader_button, "leader"],
 		[main.tackle_hook_button, "hook"],
-		[main.tackle_bait_button, "bait"]
+		[main.tackle_float_button, "float"],
+		[main.tackle_bait_button, "bait"],
+		[main.tackle_bait_2_button, "bait_2"]
 	]
 
 	for item in category_buttons:
@@ -293,9 +314,51 @@ func _update_tackle_ui() -> void:
 
 
 func _get_tackle_slot_button_text(category: String) -> String:
+	if category == "bait_2" and not PlayerData.can_use_second_bait():
+		return "%s\nНужен навык" % _get_tackle_slot_title(category)
 	return "%s\nНадето: %s" % [
 		_get_tackle_slot_title(category),
 		_get_tackle_slot_equipped_name(category)
+	]
+
+
+func _get_item_category_for_slot(slot_id: String) -> String:
+	if slot_id == "bait_2":
+		return "bait"
+	return slot_id
+
+
+func _get_rod_assembly_summary_text() -> String:
+	var rod: Dictionary = PlayerData.current_tackle.get("rod", {})
+	var stats := PlayerData.get_tackle_stats()
+	var second_bait_text := "закрыта"
+	if PlayerData.can_use_second_bait():
+		second_bait_text = "%s x%d" % [
+			str(PlayerData.current_tackle.get("bait_2", {}).get("name", "-")),
+			PlayerData.get_current_bait_quantity("bait_2")
+		]
+	var leader_name := str(PlayerData.current_tackle.get("leader", {}).get("name", "Не установлен"))
+	if leader_name == "":
+		leader_name = "Не установлен"
+
+	return "УДОЧКА\n%s\nРедкость: %s | Класс: %s | Длина: %.1f м | Макс. рыба: %.1f кг\nСостояние: %d%% | Контроль: %d%%\n\nСНАСТЬ\nЛеска: %s | Поводок: %s\nКрючок: %s | Поплавок: %s\nНаживка 1: %s x%d | Наживка 2: %s\nГлубина %.1f м | Видимость %d%% | Статус: %s" % [
+		str(rod.get("name", "-")),
+		_get_rarity_title(str(rod.get("rarity", "common"))),
+		_format_tackle_stat_value("rod_class", str(rod.get("rod_class", stats.get("rod_class", "medium")))),
+		float(rod.get("length_m", stats.get("rod_length_m", 4.0))),
+		float(rod.get("max_fish_weight", stats.get("max_fish_weight", 1.0))),
+		roundi(PlayerData.get_tackle_condition("rod") * 100.0),
+		roundi(float(stats.get("control_bonus", 0.0)) * 100.0),
+		str(PlayerData.current_tackle.get("line", {}).get("name", "-")),
+		leader_name,
+		str(PlayerData.current_tackle.get("hook", {}).get("name", "-")),
+		str(PlayerData.current_tackle.get("float", {}).get("name", "-")),
+		str(PlayerData.current_tackle.get("bait", {}).get("name", "-")),
+		PlayerData.get_current_bait_quantity("bait"),
+		second_bait_text,
+		PlayerData.fishing_depth,
+		roundi(float(stats.get("visibility_penalty", 0.0)) * 100.0),
+		"готова" if PlayerData.get_tackle_setup_issues().is_empty() else "проверьте"
 	]
 
 
@@ -305,22 +368,32 @@ func _get_tackle_slot_title(category: String) -> String:
 			return "Удочка"
 		"line":
 			return "Леска"
+		"leader":
+			return "Поводок"
 		"float":
 			return "Поплавок"
 		"hook":
 			return "Крючок"
 		"bait":
 			return "Наживка"
+		"bait_2":
+			return "Наживка 2"
 		_:
 			return "Слот"
 
 
 func _get_tackle_slot_equipped_name(category: String) -> String:
 	var current: Dictionary = PlayerData.current_tackle.get(category, {})
+	if category == "bait_2" and not PlayerData.can_use_second_bait():
+		return "Закрыта"
+	if category == "leader" and str(current.get("id", "")) == "":
+		return "Не установлен"
 	var equipped_name := str(current.get("name", "-"))
 
 	if category == "bait":
-		return "%s x%d" % [_short_tackle_slot_text(equipped_name, 17), PlayerData.get_current_bait_quantity()]
+		return "%s x%d" % [_short_tackle_slot_text(equipped_name, 17), PlayerData.get_current_bait_quantity("bait")]
+	if category == "bait_2":
+		return "%s x%d" % [_short_tackle_slot_text(equipped_name, 17), PlayerData.get_current_bait_quantity("bait_2")]
 
 	return _short_tackle_slot_text(equipped_name, 20)
 
@@ -370,7 +443,7 @@ func _on_tackle_prev_page_pressed() -> void:
 
 
 func _on_tackle_next_page_pressed() -> void:
-	var total_count: int = PlayerData.get_owned_items_for_category(main._tackle_category).size()
+	var total_count: int = PlayerData.get_owned_items_for_category(_get_item_category_for_slot(main._tackle_category)).size()
 	var page_count: int = max(ceili(float(total_count) / float(TACKLE_ITEMS_PER_PAGE)), 1)
 	if main._tackle_page >= page_count - 1:
 		return
@@ -438,7 +511,8 @@ func _get_tackle_stats_text(item: Dictionary) -> String:
 
 func _get_tackle_compare_text(item: Dictionary) -> String:
 	var category = str(item.get("category", "misc"))
-	var current: Dictionary = PlayerData.current_tackle.get(category, {})
+	var slot_id: String = str(main._tackle_category)
+	var current: Dictionary = PlayerData.current_tackle.get(slot_id, {})
 	var stats: Dictionary = item.get("stats", {})
 
 	if current.is_empty():
@@ -500,6 +574,7 @@ func _get_tackle_setup_hints() -> Array:
 	var hook_size: int = int(tackle_stats.get("hook_size", 12))
 	var line_strength: float = float(tackle_stats.get("line_strength", 1.0))
 	var bait_type = str(tackle_stats.get("bait_type", "worm"))
+	var bait_types: Array = tackle_stats.get("bait_types", [bait_type])
 	var depth_candidates: Array = []
 	var bait_match_names: Array = []
 	var too_big_hook_count = 0
@@ -543,7 +618,7 @@ func _get_tackle_setup_hints() -> Array:
 			line_warning = true
 
 		var preferred_baits = fish.get("preferred_baits", [])
-		if typeof(preferred_baits) == TYPE_ARRAY and preferred_baits.has(bait_type) and bait_match_names.size() < 4:
+		if typeof(preferred_baits) == TYPE_ARRAY and _any_bait_matches(preferred_baits, bait_types) and bait_match_names.size() < 4:
 			bait_match_names.append(str(fish.get("name", "-")))
 
 	if depth_candidates.is_empty():
@@ -580,6 +655,7 @@ func _get_no_bite_candidate_reason(spot_id: String) -> String:
 	var tackle_stats = PlayerData.get_tackle_stats()
 	var hook_size: int = int(tackle_stats.get("hook_size", 12))
 	var bait_type = str(tackle_stats.get("bait_type", "worm"))
+	var bait_types: Array = tackle_stats.get("bait_types", [bait_type])
 
 	for fish_id in spot_fish:
 		var fish = FishDatabase.get_fish(str(fish_id))
@@ -602,7 +678,7 @@ func _get_no_bite_candidate_reason(spot_id: String) -> String:
 			hook_fish.append(fish)
 
 		var preferred_baits = fish.get("preferred_baits", [])
-		if typeof(preferred_baits) == TYPE_ARRAY and preferred_baits.has(bait_type):
+		if typeof(preferred_baits) == TYPE_ARRAY and _any_bait_matches(preferred_baits, bait_types):
 			bait_fish.append(fish)
 
 	if min_available_depth < 999.0:
@@ -631,12 +707,21 @@ func _get_no_bite_candidate_reason(spot_id: String) -> String:
 	return "На этой глубине и снасти нет подходящей рыбы. Измени глубину, крючок или наживку."
 
 
+func _any_bait_matches(preferred_baits: Array, bait_types: Array) -> bool:
+	for bait_type in bait_types:
+		if preferred_baits.has(str(bait_type)):
+			return true
+	return false
+
+
 func _get_tackle_stat_keys(category: String) -> Array:
 	match category:
 		"rod":
 			return ["length_m", "rod_class", "max_fish_weight", "control_bonus", "handling_bonus", "reach_bonus", "stiffness", "durability", "durability_loss"]
 		"line":
 			return ["max_load", "break_resistance", "break_chance", "visibility", "durability", "wear_rate"]
+		"leader":
+			return ["leader_type", "strength", "visibility", "bite_protection", "durability", "wear_rate"]
 		"float":
 			return ["sensitivity", "stability", "bite_visibility"]
 		"hook":
@@ -657,6 +742,8 @@ func _get_tackle_stat_title(key: String) -> String:
 			return "Макс. рыба"
 		"strength":
 			return "Жёсткость"
+		"leader_type":
+			return "Тип поводка"
 		"stiffness":
 			return "Жёсткость"
 		"tension_bonus":
@@ -687,6 +774,8 @@ func _get_tackle_stat_title(key: String) -> String:
 			return "Чувствительность"
 		"stability":
 			return "Стабильность"
+		"bite_protection":
+			return "Защита от среза"
 		"bite_visibility":
 			return "Видимость клёва"
 		"hook_size":
@@ -715,8 +804,10 @@ func _format_tackle_stat_value(key: String, value) -> String:
 			return "%.1f м" % float(value)
 		"max_fish_weight", "max_load_kg", "max_load":
 			return "%.1f кг" % float(value)
-		"tension_bonus", "control_bonus", "handling_bonus", "reach_bonus", "break_resistance", "break_chance", "visibility", "sensitivity", "stability", "bite_visibility", "hook_chance", "fish_escape_modifier", "fish_attraction", "strength", "stiffness", "durability", "durability_loss", "wear_rate", "hook_strength":
+		"tension_bonus", "control_bonus", "handling_bonus", "reach_bonus", "break_resistance", "break_chance", "visibility", "sensitivity", "stability", "bite_visibility", "bite_protection", "hook_chance", "fish_escape_modifier", "fish_attraction", "strength", "stiffness", "durability", "durability_loss", "wear_rate", "hook_strength":
 			return "%d%%" % roundi(float(value) * 100.0)
+		"leader_type":
+			return str(value)
 		"rod_class":
 			match str(value):
 				"ultra_light":
@@ -813,7 +904,7 @@ func _get_rarity_color(rarity: String) -> Color:
 
 
 func _is_tackle_item_equipped(item: Dictionary) -> bool:
-	var category = str(item.get("category", ""))
+	var category = main._tackle_category
 
 	if not PlayerData.current_tackle.has(category):
 		return false

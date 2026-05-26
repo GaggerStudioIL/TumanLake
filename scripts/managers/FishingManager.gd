@@ -248,7 +248,7 @@ func start_fishing(spot_id: String) -> void:
 		spot["rare_chance_modifier"]
 	)
 
-	if not PlayerData.consume_current_bait(1):
+	if not PlayerData.consume_current_tackle_baits(1):
 		is_fishing = false
 		_emit_fishing_failure(
 			FAILURE_WEAK_TACKLE,
@@ -435,7 +435,7 @@ func _try_start_active_bite() -> void:
 		float(_active_spot.get("rare_chance_modifier", 1.0))
 	)
 
-	if not PlayerData.consume_current_bait(1):
+	if not PlayerData.consume_current_tackle_baits(1):
 		is_fishing = false
 		fishing_state = FishingState.FAILED
 		_emit_fishing_failure(
@@ -718,6 +718,9 @@ func _get_bait_match_multiplier(fish: Dictionary, fish_id: String) -> float:
 		return 0.0
 
 	var bait_type := str(_tackle_stats.get("bait_type", "worm"))
+	var bait_types: Array = _tackle_stats.get("bait_types", [bait_type])
+	if bait_types.is_empty():
+		bait_types = [bait_type]
 	var preferred_baits := _get_fish_preferred_baits(fish)
 	var attraction_by_id: Dictionary = _tackle_stats.get("fish_attraction_by_id", {})
 	var specific_attraction: float = float(attraction_by_id.get(fish_id, 0.0))
@@ -726,8 +729,13 @@ func _get_bait_match_multiplier(fish: Dictionary, fish_id: String) -> float:
 	if preferred_baits.is_empty():
 		return clamp(0.82 + general_attraction + specific_attraction, 0.45, 1.45)
 
-	if preferred_baits.has(bait_type):
-		return clamp(1.0 + general_attraction * 0.75 + specific_attraction, 0.75, 1.65)
+	var matched_baits := 0
+	for active_bait in bait_types:
+		if preferred_baits.has(str(active_bait)):
+			matched_baits += 1
+
+	if matched_baits > 0:
+		return clamp(1.0 + general_attraction * 0.75 + specific_attraction + min(float(matched_baits - 1) * 0.12, 0.18), 0.75, 1.72)
 
 	return clamp(0.18 + general_attraction * 0.35 + specific_attraction * 0.25, 0.08, 0.50)
 

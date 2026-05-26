@@ -301,6 +301,30 @@ func _get_inventory_stats_text(stats: Dictionary) -> String:
 
 
 func _get_current_tackle_inventory_text() -> String:
+	var bait_2_text := "закрыта"
+	if PlayerData.can_use_second_bait():
+		bait_2_text = "%s x%d" % [
+			PlayerData.current_tackle.get("bait_2", {}).get("name", "-"),
+			PlayerData.get_current_bait_quantity("bait_2")
+		]
+
+	return "ТЕКУЩАЯ СНАСТЬ\nУдочка: %s\nЛеска: %s | Поводок: %s | Поплавок: %s\nКрючок: %s | Наживка 1: %s x%d | Наживка 2: %s\nГлубина %.1f м | Состояние: уд.%d%% / леска %d%% / крючок %d%%\n%s" % [
+		PlayerData.current_tackle.get("rod", {}).get("name", "-"),
+		PlayerData.current_tackle.get("line", {}).get("name", "-"),
+		PlayerData.current_tackle.get("leader", {}).get("name", "-"),
+		PlayerData.current_tackle.get("float", {}).get("name", "-"),
+		PlayerData.current_tackle.get("hook", {}).get("name", "-"),
+		PlayerData.current_tackle.get("bait", {}).get("name", "-"),
+		PlayerData.get_current_bait_quantity("bait"),
+		bait_2_text,
+		PlayerData.fishing_depth,
+		roundi(PlayerData.get_tackle_condition("rod") * 100.0),
+		roundi(PlayerData.get_tackle_condition("line") * 100.0),
+		roundi(PlayerData.get_tackle_condition("hook") * 100.0),
+		_get_tackle_setup_status_inline()
+	]
+
+func _get_current_tackle_inventory_text_legacy() -> String:
 	return "СЕЙЧАС НАДЕТО В СБОРКЕ\nУдочка: %s\nЛеска: %s  |  Поплавок: %s\nКрючок: %s  |  Наживка: %s x%d\nГлубина %.1f м  |  Состояние: уд.%d%% / леска %d%% / крючок %d%%\n%s" % [
 		PlayerData.current_tackle.get("rod", {}).get("name", "-"),
 		PlayerData.current_tackle.get("line", {}).get("name", "-"),
@@ -317,6 +341,9 @@ func _get_current_tackle_inventory_text() -> String:
 
 
 func _get_tackle_build_summary_text() -> String:
+	return _get_current_tackle_inventory_text()
+
+func _get_tackle_build_summary_text_legacy() -> String:
 	return "СЕЙЧАС НАДЕТО В СБОРКЕ\nУдочка: %s\nЛеска: %s  |  Поплавок: %s\nКрючок: %s  |  Наживка: %s x%d\nГлубина %.1f м  |  Состояние: уд.%d%% / леска %d%% / крючок %d%%\n%s" % [
 		PlayerData.current_tackle.get("rod", {}).get("name", "-"),
 		PlayerData.current_tackle.get("line", {}).get("name", "-"),
@@ -356,6 +383,8 @@ func _get_inventory_category_title(category: String) -> String:
 			return "Удилища"
 		"line":
 			return "Лески"
+		"leader":
+			return "Поводки"
 		"float":
 			return "Поплавки"
 		"hook":

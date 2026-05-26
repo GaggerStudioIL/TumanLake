@@ -878,6 +878,57 @@ const TACKLE_CATALOG := {
 			"wear_rate": 0.022
 		}
 	},
+	"basic_mono_leader_1kg": {
+		"id": "basic_mono_leader_1kg",
+		"name": "Basic Mono Leader 1 kg",
+		"type": "leader",
+		"category": "leader",
+		"rarity": "common",
+		"price": 18,
+		"description": "Thin starter leader for cautious small fish.",
+		"stats": {
+			"leader_type": "mono",
+			"strength": 1.0,
+			"visibility": 0.04,
+			"bite_protection": 0.00,
+			"durability": 1.0,
+			"wear_rate": 0.020
+		}
+	},
+	"soft_fluoro_leader_2kg": {
+		"id": "soft_fluoro_leader_2kg",
+		"name": "Soft Fluoro Leader 2 kg",
+		"type": "leader",
+		"category": "leader",
+		"rarity": "uncommon",
+		"price": 48,
+		"description": "Low-visibility leader for clear water and delicate float rigs.",
+		"stats": {
+			"leader_type": "fluoro",
+			"strength": 2.0,
+			"visibility": 0.025,
+			"bite_protection": 0.03,
+			"durability": 1.0,
+			"wear_rate": 0.018
+		}
+	},
+	"strong_braid_leader_4kg": {
+		"id": "strong_braid_leader_4kg",
+		"name": "Strong Braid Leader 4 kg",
+		"type": "leader",
+		"category": "leader",
+		"rarity": "rare",
+		"price": 92,
+		"description": "Stronger leader for bigger fish. More visible, but safer under pressure.",
+		"stats": {
+			"leader_type": "braid",
+			"strength": 4.0,
+			"visibility": 0.08,
+			"bite_protection": 0.07,
+			"durability": 1.0,
+			"wear_rate": 0.016
+		}
+	},
 	"light_float": {
 		"id": "light_float",
 		"name": "Лёгкий поплавок",
@@ -2140,7 +2191,17 @@ const TACKLE_CATALOG := {
 		}
 	}
 }
-const TACKLE_SLOTS := ["rod", "line", "float", "hook", "bait"]
+const TACKLE_SLOTS := ["rod", "line", "leader", "hook", "float", "bait", "bait_2"]
+const REQUIRED_TACKLE_SLOTS := ["rod", "line", "hook", "float", "bait"]
+const TACKLE_SLOT_ITEM_CATEGORIES := {
+	"rod": "rod",
+	"line": "line",
+	"leader": "leader",
+	"hook": "hook",
+	"float": "float",
+	"bait": "bait",
+	"bait_2": "bait"
+}
 const RESCUE_KIT_MONEY_LIMIT := 10.0
 const RESCUE_KIT_LINE_ID := "lakeline_nylon_basic_1_5kg"
 const RESCUE_KIT_PRIMARY_HOOK_ID := "riverstart_basic_hook_16"
@@ -2646,7 +2707,7 @@ func get_tackle_catalog_items(type_filter: String = "all") -> Array:
 			items.append(item)
 
 	items.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		var category_order := {"rod": 0, "line": 1, "float": 2, "hook": 3, "bait": 4}
+		var category_order := {"rod": 0, "line": 1, "leader": 2, "hook": 3, "float": 4, "bait": 5}
 		var type_a := str(a.get("type", a.get("category", "misc")))
 		var type_b := str(b.get("type", b.get("category", "misc")))
 		var order_a: int = int(category_order.get(type_a, 9))
@@ -2663,6 +2724,7 @@ func get_tackle_shop_items() -> Array:
 	var starter_ids := {
 		"simple_pole_rod_4m": true,
 		"mono_1_2kg": true,
+		"basic_mono_leader_1kg": true,
 		"light_float": true,
 		"small_hook_12": true
 	}
@@ -2715,6 +2777,8 @@ func _get_item_icon(item_type: String) -> String:
 			return "R"
 		"line":
 			return "L"
+		"leader":
+			return "P"
 		"float":
 			return "F"
 		"hook":
@@ -2773,6 +2837,23 @@ func _normalize_equipment_stats(stats: Dictionary, category: String) -> Dictiona
 				normalized["visibility"] = 0.08
 			if not normalized.has("durability"):
 				normalized["durability"] = 1.0
+			normalized["durability"] = clamp(float(normalized["durability"]), 0.0, 1.0)
+		"leader":
+			if not normalized.has("leader_type"):
+				normalized["leader_type"] = "mono"
+			if not normalized.has("strength"):
+				normalized["strength"] = 1.0
+			if not normalized.has("visibility"):
+				normalized["visibility"] = 0.05
+			if not normalized.has("bite_protection"):
+				normalized["bite_protection"] = 0.0
+			if not normalized.has("durability"):
+				normalized["durability"] = 1.0
+			if not normalized.has("wear_rate"):
+				normalized["wear_rate"] = 0.020
+			normalized["strength"] = max(float(normalized["strength"]), 0.05)
+			normalized["visibility"] = clamp(float(normalized["visibility"]), 0.0, 0.45)
+			normalized["bite_protection"] = clamp(float(normalized["bite_protection"]), 0.0, 0.30)
 			normalized["durability"] = clamp(float(normalized["durability"]), 0.0, 1.0)
 		"hook":
 			if not normalized.has("hook_chance") and normalized.has("hook_success_bonus"):
@@ -2862,15 +2943,18 @@ func get_default_tackle() -> Dictionary:
 	return {
 		"rod": _make_tackle_component("simple_pole_rod_4m"),
 		"line": _make_tackle_component("mono_1_2kg"),
-		"float": _make_tackle_component("light_float"),
+		"leader": {},
 		"hook": _make_tackle_component("small_hook_12"),
-		"bait": _make_tackle_component("worm")
+		"float": _make_tackle_component("light_float"),
+		"bait": _make_tackle_component("worm"),
+		"bait_2": {}
 	}
 
 func get_default_owned_items() -> Array:
 	return [
 		_make_owned_catalog_item("simple_pole_rod_4m", 1),
 		_make_owned_catalog_item("mono_1_2kg", 1),
+		_make_owned_catalog_item("basic_mono_leader_1kg", 1),
 		_make_owned_catalog_item("light_float", 1),
 		_make_owned_catalog_item("small_hook_12", 1),
 		_make_owned_catalog_item("worm", 30)
@@ -2888,10 +2972,15 @@ func set_current_tackle(saved_tackle: Dictionary) -> void:
 		if typeof(saved_component) != TYPE_DICTIONARY:
 			continue
 
+		var slot_category := _get_tackle_slot_item_category(slot)
 		var merged_component: Dictionary = current_tackle[slot].duplicate(true)
 		merged_component.merge(saved_component, true)
-		merged_component["type"] = slot
-		merged_component["category"] = slot
+		if str(merged_component.get("id", "")) == "":
+			current_tackle[slot] = {}
+			continue
+		merged_component["slot"] = slot
+		merged_component["type"] = slot_category
+		merged_component["category"] = slot_category
 
 		if slot == "rod":
 			if not merged_component.has("tension_bonus") and merged_component.has("control_bonus"):
@@ -2914,7 +3003,7 @@ func set_current_tackle(saved_tackle: Dictionary) -> void:
 			if not merged_component.has("target_fish_size"):
 				merged_component["target_fish_size"] = "small"
 
-		merged_component = _normalize_equipment_stats(merged_component, slot)
+		merged_component = _normalize_equipment_stats(merged_component, slot_category)
 		current_tackle[slot] = merged_component
 
 func set_owned_items(saved_items: Array) -> void:
@@ -2950,20 +3039,74 @@ func get_owned_items_for_category(category_filter: String) -> Array:
 
 	return items
 
+func _get_tackle_slot_item_category(slot_id: String) -> String:
+	return str(TACKLE_SLOT_ITEM_CATEGORIES.get(slot_id, slot_id))
+
+func is_tackle_slot_supported(slot_id: String) -> bool:
+	return TACKLE_SLOTS.has(slot_id)
+
+func can_use_second_bait() -> bool:
+	return get_skill_effect_value("second_bait_slot") > 0.0 or has_skill("bait_sandwich")
+
+func get_current_tackle_slot(slot_id: String) -> Dictionary:
+	if not current_tackle.has(slot_id):
+		return {}
+
+	var raw_component = current_tackle.get(slot_id, {})
+	if typeof(raw_component) != TYPE_DICTIONARY:
+		return {}
+
+	return raw_component.duplicate(true)
+
+func set_current_tackle_slot(slot_id: String, item: Dictionary) -> bool:
+	if not is_tackle_slot_supported(slot_id):
+		return false
+	if slot_id == "bait_2" and not can_use_second_bait():
+		return false
+	if item.is_empty() or not can_equip_item(item):
+		return false
+
+	var slot_category := _get_tackle_slot_item_category(slot_id)
+	var item_category := str(item.get("category", item.get("type", "")))
+	if item_category != slot_category:
+		return false
+
+	var component: Dictionary = _normalize_equipment_stats(item.get("stats", {}).duplicate(true), slot_category)
+	component["id"] = str(item.get("id", ""))
+	component["name"] = str(item.get("name", "-"))
+	component["type"] = str(item.get("type", slot_category))
+	component["category"] = item_category
+	component["slot"] = slot_id
+	component["rarity"] = str(item.get("rarity", "common"))
+	component["price"] = float(item.get("price", 0.0))
+	component["image_path"] = str(item.get("image_path", ""))
+	component["description"] = str(item.get("description", ""))
+
+	if slot_category == "bait":
+		component["quantity"] = int(item.get("quantity", 0))
+
+	current_tackle[slot_id] = component
+	return true
+
+func clear_current_tackle_slot(slot_id: String) -> void:
+	if not is_tackle_slot_supported(slot_id):
+		return
+	current_tackle[slot_id] = {}
+
 func can_equip_item(item: Dictionary) -> bool:
 	var category := str(item.get("category", ""))
 
-	if not TACKLE_SLOTS.has(category) or int(item.get("quantity", 0)) <= 0:
+	if not TACKLE_SLOT_ITEM_CATEGORIES.values().has(category) or int(item.get("quantity", 0)) <= 0:
 		return false
 
-	if ["rod", "line", "hook"].has(category):
+	if ["rod", "line", "leader", "hook"].has(category):
 		var stats: Dictionary = item.get("stats", {})
 		return float(stats.get("durability", 1.0)) > 0.05
 
 	return true
 
 func has_usable_basic_tackle() -> bool:
-	for slot in TACKLE_SLOTS:
+	for slot in REQUIRED_TACKLE_SLOTS:
 		if _is_current_tackle_slot_usable(slot):
 			continue
 		if not _has_usable_owned_tackle_item(slot):
@@ -3024,6 +3167,17 @@ func claim_rescue_kit() -> Dictionary:
 	}
 
 func _is_current_tackle_slot_usable(slot: String) -> bool:
+	if slot == "leader":
+		var leader_component = current_tackle.get(slot, {})
+		if typeof(leader_component) == TYPE_DICTIONARY and str(leader_component.get("id", "")) == "":
+			return true
+	if slot == "bait_2":
+		if not can_use_second_bait():
+			return true
+		var second_bait_component = current_tackle.get(slot, {})
+		if typeof(second_bait_component) == TYPE_DICTIONARY and str(second_bait_component.get("id", "")) == "":
+			return true
+
 	if not current_tackle.has(slot):
 		return false
 
@@ -3037,12 +3191,14 @@ func _is_current_tackle_slot_usable(slot: String) -> bool:
 		return false
 
 	if slot == "bait":
-		return get_current_bait_quantity() > 0
+		return get_current_bait_quantity("bait") > 0
+	if slot == "bait_2":
+		return get_current_bait_quantity("bait_2") > 0
 
 	if _get_owned_item_quantity(item_id) <= 0:
 		return false
 
-	if ["rod", "line", "hook"].has(slot):
+	if ["rod", "line", "leader", "hook"].has(slot):
 		return get_tackle_condition(slot) > 0.05
 
 	return true
@@ -3074,12 +3230,13 @@ func _equip_rescue_items_if_needed(hook_id: String) -> void:
 	var rescue_slots: Dictionary = {
 		"rod": "simple_pole_rod_4m",
 		"line": RESCUE_KIT_LINE_ID,
+		"leader": "basic_mono_leader_1kg",
 		"float": "light_float",
 		"hook": hook_id,
 		"bait": "worm"
 	}
 
-	for slot in TACKLE_SLOTS:
+	for slot in REQUIRED_TACKLE_SLOTS:
 		if _is_current_tackle_slot_usable(slot):
 			continue
 		equip_item(str(rescue_slots.get(slot, "")))
@@ -3104,21 +3261,10 @@ func equip_item(item_id: String) -> bool:
 		return false
 
 	var category := str(item["category"])
-	var component: Dictionary = _normalize_equipment_stats(item.get("stats", {}).duplicate(true), category)
-	component["id"] = item["id"]
-	component["name"] = item["name"]
-	component["type"] = item.get("type", category)
-	component["category"] = category
-	component["rarity"] = item.get("rarity", "common")
-	component["price"] = float(item.get("price", 0.0))
-	component["image_path"] = str(item.get("image_path", ""))
-	component["description"] = str(item.get("description", ""))
+	if not TACKLE_SLOTS.has(category):
+		return false
 
-	if category == "bait":
-		component["quantity"] = int(item.get("quantity", 0))
-
-	current_tackle[category] = component
-	return true
+	return set_current_tackle_slot(category, item)
 
 func get_owned_item(item_id: String) -> Dictionary:
 	for item in owned_items:
@@ -3150,7 +3296,7 @@ func add_owned_item(item: Dictionary, amount: int = 1) -> void:
 		owned_item["image_path"] = str(normalized_item.get("image_path", owned_item.get("image_path", "")))
 		owned_item["description"] = str(normalized_item.get("description", owned_item.get("description", "")))
 
-		if ["rod", "line", "hook"].has(item_category):
+		if ["rod", "line", "leader", "hook"].has(item_category):
 			var refreshed_stats: Dictionary = normalized_item.get("stats", {}).duplicate(true)
 			var owned_stats: Dictionary = owned_item.get("stats", {})
 			refreshed_stats["durability"] = max(
@@ -3161,8 +3307,7 @@ func add_owned_item(item: Dictionary, amount: int = 1) -> void:
 		else:
 			owned_item["stats"] = normalized_item.get("stats", {}).duplicate(true)
 
-		if current_tackle.has(item_category) and str(current_tackle[item_category].get("id", "")) == item_id:
-			_refresh_current_tackle_from_owned_item(owned_item)
+		_refresh_current_tackle_from_owned_item(owned_item)
 
 		return
 
@@ -3171,19 +3316,22 @@ func add_owned_item(item: Dictionary, amount: int = 1) -> void:
 
 func _refresh_current_tackle_from_owned_item(owned_item: Dictionary) -> void:
 	var category := str(owned_item.get("category", ""))
+	var owned_id := str(owned_item.get("id", ""))
 
-	if not current_tackle.has(category):
-		return
+	for slot in TACKLE_SLOTS:
+		if _get_tackle_slot_item_category(slot) != category:
+			continue
+		if not current_tackle.has(slot):
+			continue
+		if str(current_tackle[slot].get("id", "")) != owned_id:
+			continue
 
-	if str(current_tackle[category].get("id", "")) != str(owned_item.get("id", "")):
-		return
+		var stats: Dictionary = _normalize_equipment_stats(owned_item.get("stats", {}).duplicate(true), category)
+		for key in stats.keys():
+			current_tackle[slot][key] = stats[key]
 
-	var stats: Dictionary = _normalize_equipment_stats(owned_item.get("stats", {}).duplicate(true), category)
-	for key in stats.keys():
-		current_tackle[category][key] = stats[key]
-
-	current_tackle[category]["image_path"] = str(owned_item.get("image_path", current_tackle[category].get("image_path", "")))
-	current_tackle[category]["quantity"] = int(owned_item.get("quantity", 0))
+		current_tackle[slot]["image_path"] = str(owned_item.get("image_path", current_tackle[slot].get("image_path", "")))
+		current_tackle[slot]["quantity"] = int(owned_item.get("quantity", 0))
 
 func _change_owned_item_quantity(item_id: String, delta: int) -> int:
 	for item in owned_items:
@@ -3227,10 +3375,15 @@ func get_tackle_block_reason() -> String:
 func get_tackle_setup_issues() -> Array:
 	var issues: Array = []
 
-	for slot in TACKLE_SLOTS:
+	for slot in REQUIRED_TACKLE_SLOTS:
 		var issue := _get_tackle_slot_issue(slot)
 		if issue != "":
 			issues.append(issue)
+
+	for slot in ["leader", "bait_2"]:
+		var optional_issue := _get_tackle_slot_issue(slot)
+		if optional_issue != "":
+			issues.append(optional_issue)
 
 	return issues
 
@@ -3243,6 +3396,14 @@ func get_tackle_setup_status_text() -> String:
 
 func _get_tackle_slot_issue(slot: String) -> String:
 	var title := _get_tackle_slot_title(slot)
+	var slot_is_optional := ["leader", "bait_2"].has(slot)
+
+	if slot == "bait_2" and not can_use_second_bait():
+		return ""
+	if slot_is_optional:
+		var optional_component = current_tackle.get(slot, {})
+		if typeof(optional_component) != TYPE_DICTIONARY or str(optional_component.get("id", "")) == "":
+			return ""
 
 	if not current_tackle.has(slot):
 		return "%s не выбрана." % title
@@ -3258,14 +3419,18 @@ func _get_tackle_slot_issue(slot: String) -> String:
 		return "%s не выбрана." % title
 
 	if slot == "bait":
-		if get_current_bait_quantity() <= 0:
+		if get_current_bait_quantity("bait") <= 0:
 			return "Наживка закончилась: %s." % item_name
+		return ""
+	if slot == "bait_2":
+		if get_current_bait_quantity("bait_2") <= 0:
+			return "Second bait is depleted: %s." % item_name
 		return ""
 
 	if _get_owned_item_quantity(item_id) <= 0:
 		return "%s отсутствует в инвентаре: %s." % [title, item_name]
 
-	if ["rod", "line", "hook"].has(slot):
+	if ["rod", "line", "leader", "hook"].has(slot):
 		var condition := get_tackle_condition(slot)
 		if condition <= 0.08:
 			match slot:
@@ -3279,6 +3444,10 @@ func _get_tackle_slot_issue(slot: String) -> String:
 	return ""
 
 func _get_tackle_slot_title(slot: String) -> String:
+	if slot == "leader":
+		return "Поводок"
+	if slot == "bait_2":
+		return "Наживка 2"
 	match slot:
 		"rod":
 			return "Удочка"
@@ -3344,8 +3513,8 @@ func get_owned_items_save_data() -> Array:
 
 	return items
 
-func get_current_bait_quantity() -> int:
-	var bait_id := str(current_tackle.get("bait", {}).get("id", ""))
+func get_current_bait_quantity(slot_id: String = "bait") -> int:
+	var bait_id := str(current_tackle.get(slot_id, {}).get("id", ""))
 
 	for item in owned_items:
 		if str(item.get("id", "")) == bait_id:
@@ -3354,9 +3523,44 @@ func get_current_bait_quantity() -> int:
 	return 0
 
 func has_current_bait() -> bool:
-	return get_current_bait_quantity() > 0
+	if get_current_bait_quantity("bait") <= 0:
+		return false
+	if _has_active_second_bait() and get_current_bait_quantity("bait_2") <= 0:
+		return false
+	return true
+
+func _has_active_second_bait() -> bool:
+	if not can_use_second_bait():
+		return false
+	var second_bait = current_tackle.get("bait_2", {})
+	return typeof(second_bait) == TYPE_DICTIONARY and str(second_bait.get("id", "")) != ""
 
 func consume_current_bait(amount: int = 1) -> bool:
+	return consume_current_tackle_baits(amount)
+
+func consume_current_tackle_baits(amount: int = 1) -> bool:
+	amount = max(amount, 1)
+	var bait_id := str(current_tackle.get("bait", {}).get("id", ""))
+	var second_bait_id := str(current_tackle.get("bait_2", {}).get("id", "")) if _has_active_second_bait() else ""
+
+	if bait_id == "":
+		return false
+	if _get_owned_item_quantity(bait_id) < amount:
+		return false
+	if second_bait_id != "":
+		var needed_second_amount := amount
+		if second_bait_id == bait_id:
+			needed_second_amount += amount
+		if _get_owned_item_quantity(second_bait_id) < needed_second_amount:
+			return false
+
+	_change_owned_item_quantity(bait_id, -amount)
+	if second_bait_id != "":
+		_change_owned_item_quantity(second_bait_id, -amount)
+
+	return true
+
+func consume_primary_bait(amount: int = 1) -> bool:
 	var bait_id := str(current_tackle.get("bait", {}).get("id", ""))
 
 	for item in owned_items:
@@ -3376,15 +3580,19 @@ func consume_current_bait(amount: int = 1) -> bool:
 func get_tackle_stats() -> Dictionary:
 	var rod: Dictionary = _normalize_equipment_stats(current_tackle.get("rod", {}).duplicate(true), "rod")
 	var line: Dictionary = _normalize_equipment_stats(current_tackle.get("line", {}).duplicate(true), "line")
+	var leader: Dictionary = _normalize_equipment_stats(current_tackle.get("leader", {}).duplicate(true), "leader")
 	var float_part: Dictionary = current_tackle.get("float", {})
 	var hook: Dictionary = _normalize_equipment_stats(current_tackle.get("hook", {}).duplicate(true), "hook")
 	var bait: Dictionary = current_tackle.get("bait", {})
+	var second_bait: Dictionary = current_tackle.get("bait_2", {}) if _has_active_second_bait() else {}
 	var skill_effects := get_skill_effects()
 	var rod_durability: float = clamp(float(rod.get("durability", 1.0)), 0.0, 1.0)
 	var line_durability: float = clamp(float(line.get("durability", 1.0)), 0.0, 1.0)
+	var leader_durability: float = clamp(float(leader.get("durability", 1.0)), 0.0, 1.0)
 	var hook_durability: float = clamp(float(hook.get("durability", 1.0)), 0.0, 1.0)
 	var rod_condition: float = lerp(0.45, 1.0, rod_durability)
 	var line_condition: float = lerp(0.45, 1.0, line_durability)
+	var leader_condition: float = lerp(0.45, 1.0, leader_durability)
 	var hook_condition: float = lerp(0.35, 1.0, hook_durability)
 	var raw_rod_control: float = float(rod.get("control_bonus", rod.get("tension_bonus", 0.0)))
 	var rod_handling_bonus: float = float(rod.get("handling_bonus", 0.0))
@@ -3396,6 +3604,13 @@ func get_tackle_stats() -> Dictionary:
 	var line_strength_bonus: float = max(float(skill_effects.get("line_strength_bonus", 0.0)), -0.95)
 	var line_strength: float = raw_line_strength * line_condition * (1.0 + line_strength_bonus)
 	var line_visibility: float = float(line.get("visibility", line.get("visibility_penalty", 0.0)))
+	var has_leader := str(current_tackle.get("leader", {}).get("id", "")) != ""
+	var leader_strength: float = float(leader.get("strength", line_strength)) * leader_condition
+	var leader_visibility: float = float(leader.get("visibility", 0.0)) if has_leader else 0.0
+	var leader_bite_protection: float = float(leader.get("bite_protection", 0.0)) * leader_condition if has_leader else 0.0
+	if has_leader:
+		line_strength = min(line_strength, max(leader_strength * 1.08, 0.05))
+		line_visibility = clamp(line_visibility + leader_visibility * 0.55 - leader_bite_protection * 0.25, 0.0, 0.65)
 	var float_sensitivity: float = float(float_part.get("sensitivity", float_part.get("bite_detection_bonus", 0.0)))
 	var float_stability: float = float(float_part.get("stability", 0.0))
 	var float_bite_visibility: float = float(float_part.get("bite_visibility", 0.0))
@@ -3405,6 +3620,25 @@ func get_tackle_stats() -> Dictionary:
 	var line_wear_reduction: float = clamp(float(skill_effects.get("line_wear_reduction", 0.0)), 0.0, 0.85)
 	var line_wear_rate: float = max(float(line.get("wear_rate", 0.022)) * (1.0 - line_wear_reduction), 0.001)
 	var bite_detection_bonus: float = float_sensitivity + float_bite_visibility * 0.50 + float(skill_effects.get("bite_detection_bonus", 0.0))
+	var bait_types: Array = [str(bait.get("bait_type", "worm"))]
+	var secondary_bait_type := ""
+	var fish_attraction: float = float(bait.get("fish_attraction", 0.0))
+	var fish_attraction_by_id: Dictionary = bait.get("fish_attraction_by_id", {}).duplicate(true) if typeof(bait.get("fish_attraction_by_id", {})) == TYPE_DICTIONARY else {}
+	var allowed_rarities: Array = bait.get("allowed_rarities", []).duplicate(true) if typeof(bait.get("allowed_rarities", [])) == TYPE_ARRAY else []
+	if not second_bait.is_empty():
+		secondary_bait_type = str(second_bait.get("bait_type", ""))
+		if secondary_bait_type != "" and not bait_types.has(secondary_bait_type):
+			bait_types.append(secondary_bait_type)
+		fish_attraction = clamp(fish_attraction + float(second_bait.get("fish_attraction", 0.0)) * 0.45 + 0.03, 0.0, 0.42)
+		var second_attraction_by_id = second_bait.get("fish_attraction_by_id", {})
+		if typeof(second_attraction_by_id) == TYPE_DICTIONARY:
+			for fish_id in second_attraction_by_id.keys():
+				fish_attraction_by_id[str(fish_id)] = float(fish_attraction_by_id.get(str(fish_id), 0.0)) + float(second_attraction_by_id[fish_id]) * 0.45
+		var second_allowed = second_bait.get("allowed_rarities", [])
+		if typeof(second_allowed) == TYPE_ARRAY:
+			for rarity in second_allowed:
+				if not allowed_rarities.has(rarity):
+					allowed_rarities.append(rarity)
 
 	return {
 		"control_bonus": rod_tension_bonus,
@@ -3418,6 +3652,7 @@ func get_tackle_stats() -> Dictionary:
 		"durability": rod_durability,
 		"rod_durability": rod_durability,
 		"line_durability": line_durability,
+		"leader_durability": leader_durability if has_leader else 1.0,
 		"hook_durability": hook_durability,
 		"max_fish_weight": float(rod.get("max_fish_weight", 1.0)) * lerp(0.60, 1.0, rod_durability),
 		"rod_strength": rod_strength,
@@ -3427,12 +3662,15 @@ func get_tackle_stats() -> Dictionary:
 		"max_load_kg": line_strength,
 		"max_load": line_strength,
 		"raw_line_strength": raw_line_strength,
-		"break_resistance": float(line.get("break_resistance", 1.0)) * lerp(0.35, 1.0, line_durability),
-		"break_chance": float(line.get("break_chance", 0.15)) / max(lerp(0.45, 1.0, line_durability), 0.1),
+		"break_resistance": float(line.get("break_resistance", 1.0)) * lerp(0.35, 1.0, line_durability) * (1.0 + leader_bite_protection),
+		"break_chance": float(line.get("break_chance", 0.15)) / max(lerp(0.45, 1.0, line_durability) * (1.0 + leader_bite_protection), 0.1),
 		"line_wear_rate": line_wear_rate,
 		"wear_rate": line_wear_rate,
 		"visibility": line_visibility,
 		"visibility_penalty": line_visibility,
+		"leader_strength": leader_strength if has_leader else 0.0,
+		"leader_visibility": leader_visibility,
+		"leader_bite_protection": leader_bite_protection,
 		"sensitivity": float_sensitivity,
 		"bite_visibility": float_bite_visibility,
 		"bite_detection_bonus": bite_detection_bonus,
@@ -3446,10 +3684,12 @@ func get_tackle_stats() -> Dictionary:
 		"target_fish_size": str(hook.get("target_fish_size", "small")),
 		"fish_escape_modifier": raw_escape_modifier * lerp(1.45, 1.0, hook_durability),
 		"bait_type": str(bait.get("bait_type", "worm")),
+		"secondary_bait_type": secondary_bait_type,
+		"bait_types": bait_types,
 		"fishing_depth": fishing_depth,
-		"fish_attraction": float(bait.get("fish_attraction", 0.0)),
-		"fish_attraction_by_id": bait.get("fish_attraction_by_id", {}),
-		"allowed_rarities": bait.get("allowed_rarities", [])
+		"fish_attraction": fish_attraction,
+		"fish_attraction_by_id": fish_attraction_by_id,
+		"allowed_rarities": allowed_rarities
 	}
 
 func get_tackle_text() -> String:

@@ -24,6 +24,7 @@ const SHOP_CATEGORY_CONSUMABLE := "consumable"
 const SHOP_CATEGORY_TACKLE := "tackle"
 const SHOP_CATEGORY_ROD := "rod"
 const SHOP_CATEGORY_LINE := "line"
+const SHOP_CATEGORY_LEADER := "leader"
 const SHOP_CATEGORY_HOOK := "hook"
 const SHOP_CATEGORY_FLOAT := "float"
 const SHOP_CATEGORIES := [
@@ -31,6 +32,7 @@ const SHOP_CATEGORIES := [
 	SHOP_CATEGORY_CONSUMABLE,
 	SHOP_CATEGORY_ROD,
 	SHOP_CATEGORY_LINE,
+	SHOP_CATEGORY_LEADER,
 	SHOP_CATEGORY_HOOK,
 	SHOP_CATEGORY_FLOAT
 ]
@@ -192,7 +194,7 @@ func _on_shop_buy_pressed(item_id: String) -> void:
 func _get_shop_items_for_category(category: String) -> Array:
 	if category == SHOP_CATEGORY_TACKLE:
 		return _get_tackle_shop_items_for_type(SHOP_CATEGORY_ROD)
-	if [SHOP_CATEGORY_ROD, SHOP_CATEGORY_LINE, SHOP_CATEGORY_HOOK, SHOP_CATEGORY_FLOAT].has(category):
+	if [SHOP_CATEGORY_ROD, SHOP_CATEGORY_LINE, SHOP_CATEGORY_LEADER, SHOP_CATEGORY_HOOK, SHOP_CATEGORY_FLOAT].has(category):
 		return _get_tackle_shop_items_for_type(category)
 	if category == SHOP_CATEGORY_BAIT:
 		return _get_bait_shop_items()
@@ -332,6 +334,11 @@ func _ensure_shop_ui_nodes() -> void:
 	main.shop_line_category_button.name = "ShopLineCategoryButton"
 	main.shop_line_category_button.text = "Лески"
 	main.shop_panel.add_child(main.shop_line_category_button)
+
+	main.shop_leader_category_button = Button.new()
+	main.shop_leader_category_button.name = "ShopLeaderCategoryButton"
+	main.shop_leader_category_button.text = "Поводки"
+	main.shop_panel.add_child(main.shop_leader_category_button)
 
 	main.shop_hook_category_button = Button.new()
 	main.shop_hook_category_button.name = "ShopHookCategoryButton"
@@ -587,6 +594,7 @@ func _update_shop_ui() -> void:
 	theme.apply_tab_button_style(main.shop_consumable_category_button, main._shop_category == SHOP_CATEGORY_CONSUMABLE)
 	theme.apply_tab_button_style(main.shop_tackle_category_button, main._shop_category == SHOP_CATEGORY_ROD)
 	theme.apply_tab_button_style(main.shop_line_category_button, main._shop_category == SHOP_CATEGORY_LINE)
+	theme.apply_tab_button_style(main.shop_leader_category_button, main._shop_category == SHOP_CATEGORY_LEADER)
 	theme.apply_tab_button_style(main.shop_hook_category_button, main._shop_category == SHOP_CATEGORY_HOOK)
 	theme.apply_tab_button_style(main.shop_float_category_button, main._shop_category == SHOP_CATEGORY_FLOAT)
 	_rebuild_shop_cards()
