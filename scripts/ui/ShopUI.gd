@@ -666,9 +666,9 @@ func _create_shop_card(item: Dictionary, card_size: Vector2) -> Panel:
 
 	if true:
 		var compact_has_texture := card_texture != null
-		var compact_icon_size := 44.0 if compact_has_texture else 30.0
+		var compact_icon_size := 28.0 if compact_has_texture else 30.0
 		var compact_icon_y := (card_size.y - compact_icon_size) * 0.5
-		var compact_content_x := 68.0 if compact_has_texture else 50.0
+		var compact_content_x := 52.0 if compact_has_texture else 50.0
 		var compact_buy_width := 58.0
 		var compact_buy_height := 28.0
 		var compact_details_width := 86.0
@@ -684,10 +684,10 @@ func _create_shop_card(item: Dictionary, card_size: Vector2) -> Panel:
 		if compact_has_texture:
 			var compact_icon_rect := TextureRect.new()
 			compact_icon_rect.texture = card_texture
-			compact_icon_rect.position = Vector2(10.0, compact_icon_y)
+			compact_icon_rect.position = Vector2(13.0, compact_icon_y)
 			compact_icon_rect.size = Vector2(compact_icon_size, compact_icon_size)
 			compact_icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			compact_icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			compact_icon_rect.stretch_mode = TextureRect.STRETCH_SCALE
 			compact_icon_rect.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 			compact_icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			card.add_child(compact_icon_rect)

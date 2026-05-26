@@ -3050,7 +3050,7 @@ func _setup_layout() -> void:
 	inventory_item_list.size = Vector2(list_width, inventory_list_height)
 	inventory_item_list.max_columns = 1
 	inventory_item_list.icon_mode = ItemList.ICON_MODE_LEFT
-	inventory_item_list.fixed_icon_size = Vector2i(34, 34)
+	inventory_item_list.fixed_icon_size = Vector2i(28, 28)
 	ui_theme.apply_item_list_style(inventory_item_list)
 
 	if inventory_prev_page_button != null and inventory_next_page_button != null and inventory_page_label != null:
@@ -3249,7 +3249,7 @@ func _setup_layout() -> void:
 	tackle_item_list.size = Vector2(tackle_list_width, tackle_list_height)
 	tackle_item_list.max_columns = 1
 	tackle_item_list.icon_mode = ItemList.ICON_MODE_LEFT
-	tackle_item_list.fixed_icon_size = Vector2i(38, 38)
+	tackle_item_list.fixed_icon_size = Vector2i(30, 30)
 	ui_theme.apply_item_list_style(tackle_item_list)
 	tackle_item_list.add_theme_font_size_override("font_size", 13)
 	tackle_item_list.add_theme_color_override("font_color", Color(0.84, 0.94, 0.90, 0.96))
