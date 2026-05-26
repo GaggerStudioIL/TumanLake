@@ -4576,7 +4576,7 @@ func _on_catch_keep_button_pressed() -> void:
 		result_label.text = "Рыба в садке: %s\nНажми “Вытянуть”, чтобы закончить цикл." % str(catch_data.get("name", "-"))
 
 	SaveManager.save_game()
-	_update_ui()
+	_return_to_idle_after_result()
 
 func _on_catch_release_button_pressed() -> void:
 	if not _catch_reward_buttons_ready:
@@ -4592,7 +4592,7 @@ func _on_catch_release_button_pressed() -> void:
 		result_label.text = "Рыба отпущена.\nНажми “Вытянуть”, чтобы закончить цикл."
 
 	SaveManager.save_game()
-	_update_ui()
+	_return_to_idle_after_result()
 
 func _set_inventory_category(category: String) -> void:
 	inventory_ui._set_inventory_category(category)
@@ -4622,7 +4622,10 @@ func _return_to_idle_after_result() -> void:
 	is_cast_animating = false
 	_hide_catch_reward_popup(false)
 	if fishing_presence_ui != null:
-		fishing_presence_ui.stop_cast_visual()
+		if fishing_presence_ui.has_method("set_rod_uncasted"):
+			fishing_presence_ui.set_rod_uncasted()
+		else:
+			fishing_presence_ui.stop_cast_visual()
 	if failure_popup_ui != null:
 		failure_popup_ui.close()
 	if FishingManager.has_method("reset_after_result"):
@@ -4648,6 +4651,8 @@ func _on_cast_visual_finished() -> void:
 		return
 
 	_fishing_ui_state = FishingUiState.WAITING
+	if fishing_presence_ui != null and fishing_presence_ui.has_method("set_float_in_water"):
+		fishing_presence_ui.set_float_in_water(true)
 	result_label.text = "Туман сгущается. Ждем клев..."
 	FishingManager.start_fishing(spot_id)
 	_update_ui()
@@ -4656,6 +4661,8 @@ func _on_fishing_started(seconds: int) -> void:
 	_presence_bite_timer = 0.0
 	_presence_caught_timer = 0.0
 	_fishing_ui_state = FishingUiState.WAITING
+	if fishing_presence_ui != null and fishing_presence_ui.has_method("set_float_in_water"):
+		fishing_presence_ui.set_float_in_water(true)
 	_reset_reeling_ui()
 	if bool(FishingManager.get("use_new_bite_system")):
 		timer_label.text = "Следи за поплавком"
@@ -4672,6 +4679,8 @@ func _on_waiting_for_bite_started() -> void:
 	_presence_bite_timer = 0.0
 	_presence_caught_timer = 0.0
 	_fishing_ui_state = FishingUiState.WAITING
+	if fishing_presence_ui != null and fishing_presence_ui.has_method("set_float_in_water"):
+		fishing_presence_ui.set_float_in_water(true)
 	_reset_reeling_ui()
 	timer_label.text = "Следи за поплавком"
 	result_label.text = "Поплавок в воде. Жди настоящую поклёвку и нажми “Подсечь”."
@@ -4735,6 +4744,8 @@ func _on_reeling_started(catch_data: Dictionary, state: Dictionary) -> void:
 	_presence_bite_timer = 0.95
 	_presence_caught_timer = 0.0
 	_fishing_ui_state = FishingUiState.FIGHTING
+	if fishing_presence_ui != null and fishing_presence_ui.has_method("set_rod_visual_state"):
+		fishing_presence_ui.set_rod_visual_state("reeling")
 	timer_label.text = "Поклевка!"
 	result_label.text = "На крючке: %s\nВес: %.2f кг\nРедкость: %s\nПоведение: %s" % [
 		catch_data["name"],
@@ -4755,6 +4766,8 @@ func _on_fish_caught(catch_data: Dictionary) -> void:
 	_presence_bite_timer = 0.0
 	_presence_caught_timer = 1.1
 	_fishing_ui_state = FishingUiState.CAUGHT
+	if fishing_presence_ui != null and fishing_presence_ui.has_method("reset_after_landing"):
+		fishing_presence_ui.reset_after_landing()
 	timer_label.text = "Рыба поймана"
 
 	var xp_result: Dictionary = catch_data.get("xp_result", {})
@@ -4785,6 +4798,8 @@ func _on_fishing_failed_detailed(failure_data: Dictionary) -> void:
 	_presence_bite_timer = 0.0
 	_presence_caught_timer = 0.0
 	_fishing_ui_state = FishingUiState.FAILED
+	if fishing_presence_ui != null and fishing_presence_ui.has_method("reset_after_landing"):
+		fishing_presence_ui.reset_after_landing()
 	timer_label.text = "Неудача"
 
 	var title := str(failure_data.get("title", "Неудачная попытка"))
@@ -4813,6 +4828,8 @@ func _on_fishing_failed(message: String) -> void:
 	_presence_bite_timer = 0.0
 	_presence_caught_timer = 0.0
 	_fishing_ui_state = FishingUiState.FAILED
+	if fishing_presence_ui != null and fishing_presence_ui.has_method("reset_after_landing"):
+		fishing_presence_ui.reset_after_landing()
 	timer_label.text = "Неудача"
 	result_label.text = "%s\nНажми “Вытянуть удочку”." % message
 	_reset_reeling_ui()

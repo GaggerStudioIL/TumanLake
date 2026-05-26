@@ -1327,6 +1327,7 @@ func _finish_reeling_success() -> void:
 	if not is_reeling:
 		return
 
+	_fishing_cycle_id += 1
 	var catch_data: Dictionary = FishFreshnessManager.stamp_catch(PlayerData.prepare_record_info(_current_catch.duplicate(true)))
 	var wear_result := _apply_reeling_wear("caught")
 	var added: bool = InventoryManager.add_fish(catch_data)
@@ -1356,6 +1357,7 @@ func _finish_reeling_failed(message: String, fail_kind: String = "escape", reaso
 	if not is_reeling:
 		return
 
+	_fishing_cycle_id += 1
 	_last_fail_kind = fail_kind
 	var wear_result := _apply_reeling_wear(fail_kind)
 	var final_message := message

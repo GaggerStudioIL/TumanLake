@@ -24,6 +24,7 @@ var _float_nudge_duration := 0.0
 var _float_nudge_strength := 0.0
 var _cast_landed := false
 var is_cast_animating := false
+var rod_visual_state: int = 0
 @export var bobber_waterline_offset: Vector2 = Vector2(0.0, 34.0)
 const LAKE_BG_BASE_PATHS := [
 	"res://assets/environment/lake_bg_base.png",
@@ -68,9 +69,19 @@ enum FishingUiState {
 	FAILED
 }
 
+enum RodVisualState {
+	UNCASTED,
+	CASTING,
+	FLOAT_IN_WATER,
+	BITE,
+	REELING,
+	LANDED
+}
+
 func setup(main_ref) -> void:
 	main = main_ref
 	theme = main.ui_theme
+	rod_visual_state = RodVisualState.UNCASTED
 	_ensure_environment_scene_nodes()
 
 func open() -> void:
@@ -86,8 +97,12 @@ func is_open() -> bool:
 	return main != null
 
 func start_cast_visual() -> void:
+	rod_visual_state = RodVisualState.CASTING
 	_cast_timer = CAST_VISUAL_DURATION
 	_drop_splash_timer = 0.0
+	_float_nudge_timer = 0.0
+	_float_nudge_duration = 0.0
+	_float_nudge_strength = 0.0
 	_cast_landed = false
 	is_cast_animating = true
 	if _drop_splash_sprite != null:
@@ -98,6 +113,7 @@ func start_cast_visual() -> void:
 		_bobber_contact_waterline.visible = false
 
 func stop_cast_visual() -> void:
+	rod_visual_state = RodVisualState.UNCASTED
 	_cast_timer = 0.0
 	_drop_splash_timer = 0.0
 	_float_nudge_timer = 0.0
@@ -111,13 +127,80 @@ func stop_cast_visual() -> void:
 		_bobber_ripple.visible = false
 	if _bobber_contact_waterline != null:
 		_bobber_contact_waterline.visible = false
+	_hide_float_and_line_visuals()
+
+func set_rod_uncasted() -> void:
+	rod_visual_state = RodVisualState.UNCASTED
+	reset_float_visuals()
+
+func set_float_in_water(active: bool) -> void:
+	if active:
+		rod_visual_state = RodVisualState.FLOAT_IN_WATER
+	else:
+		set_rod_uncasted()
+
+func set_rod_visual_state(state_name: String) -> void:
+	match state_name:
+		"casting":
+			rod_visual_state = RodVisualState.CASTING
+		"float_in_water", "waiting":
+			rod_visual_state = RodVisualState.FLOAT_IN_WATER
+		"bite":
+			rod_visual_state = RodVisualState.BITE
+		"reeling":
+			rod_visual_state = RodVisualState.REELING
+		"landed":
+			rod_visual_state = RodVisualState.LANDED
+			reset_float_visuals()
+		_:
+			set_rod_uncasted()
+
+func reset_float_visuals() -> void:
+	_cast_timer = 0.0
+	_drop_splash_timer = 0.0
+	_float_nudge_timer = 0.0
+	_float_nudge_duration = 0.0
+	_float_nudge_strength = 0.0
+	_cast_landed = false
+	is_cast_animating = false
+	if main != null:
+		main._presence_bite_timer = 0.0
+		main._presence_caught_timer = 0.0
+	_hide_float_and_line_visuals()
+
+func reset_after_landing() -> void:
+	rod_visual_state = RodVisualState.LANDED
+	reset_float_visuals()
+
+func _hide_float_and_line_visuals() -> void:
+	if main == null:
+		return
+	for node in [
+		main.float_marker,
+		main.float_glow,
+		main.float_ripple,
+		main.float_reflection,
+		main.fishing_line,
+		main.fishing_line_glow,
+		_float_sprite,
+		_ripple_sprite,
+		_drop_splash_sprite,
+		_regular_splash_sprite,
+		_bobber_ripple,
+		_bobber_contact_waterline
+	]:
+		if node != null:
+			node.visible = false
 
 func play_float_nudge(data: Dictionary) -> void:
+	if rod_visual_state == RodVisualState.UNCASTED or rod_visual_state == RodVisualState.LANDED:
+		return
 	_float_nudge_duration = max(float(data.get("duration", 0.35)), 0.1)
 	_float_nudge_timer = _float_nudge_duration
 	_float_nudge_strength = clamp(float(data.get("strength", 0.25)), 0.0, 1.0)
 
 func play_bite_signal(data: Dictionary) -> void:
+	rod_visual_state = RodVisualState.BITE
 	if main != null:
 		main._presence_bite_timer = max(float(data.get("bite_window_seconds", 1.4)), 0.8)
 	play_float_nudge({
@@ -127,9 +210,11 @@ func play_bite_signal(data: Dictionary) -> void:
 
 func play_hook_result(success: bool, reason: String = "") -> void:
 	if success:
+		rod_visual_state = RodVisualState.REELING
 		play_float_nudge({"strength": 0.75, "duration": 0.36})
 		return
 
+	rod_visual_state = RodVisualState.FLOAT_IN_WATER
 	var strength := 0.45
 	if reason == "too_early":
 		strength = 0.30
@@ -744,6 +829,15 @@ func _get_presence_state() -> String:
 	if _cast_timer > 0.0:
 		return "casting"
 
+	if rod_visual_state == RodVisualState.UNCASTED or rod_visual_state == RodVisualState.LANDED:
+		return "uncasted"
+	if rod_visual_state == RodVisualState.CASTING:
+		return "casting"
+	if rod_visual_state == RodVisualState.BITE:
+		return "bite"
+	if rod_visual_state == RodVisualState.REELING:
+		return "reeling"
+
 	if main._presence_bite_timer > 0.0:
 		return "bite"
 
@@ -914,6 +1008,10 @@ func _trigger_drop_splash() -> void:
 
 
 func _set_float_presence(center: Vector2, state: String, intensity: float) -> void:
+	if state == "uncasted":
+		_hide_float_and_line_visuals()
+		return
+
 	_ensure_float_sprite_nodes()
 	var ripple_scale = 1.0
 	var glow_scale = 1.0
@@ -1113,6 +1211,7 @@ func _update_fishing_presence(delta: float) -> void:
 			_trigger_drop_splash()
 		if was_casting and _cast_timer <= 0.0:
 			is_cast_animating = false
+			rod_visual_state = RodVisualState.FLOAT_IN_WATER
 			cast_visual_finished.emit()
 	_drop_splash_timer = max(_drop_splash_timer - delta, 0.0)
 
@@ -1127,6 +1226,8 @@ func _update_fishing_presence(delta: float) -> void:
 		intensity = max(intensity, 0.35 + main._presence_caught_timer * 0.15)
 	elif state == "idle":
 		intensity *= 0.2
+	elif state == "uncasted":
+		intensity *= 0.12
 	elif state == "waiting":
 		intensity *= 0.35
 
@@ -1223,6 +1324,8 @@ func _update_fishing_presence(delta: float) -> void:
 		main._rod_tip_visual = main._rod_tip_visual.lerp(rod_tip_target, clamp(delta * rod_tip_follow, 0.0, 1.0))
 
 	var line_end = _get_bobber_line_attach_point(main._float_visual_center, state, scene_scale)
+	if state == "uncasted":
+		line_end = main._rod_tip_visual
 	var line_pull_direction = (line_end - main._rod_tip_visual).normalized()
 
 	if line_pull_direction == Vector2.ZERO:
@@ -1233,7 +1336,7 @@ func _update_fishing_presence(delta: float) -> void:
 	if rod_bend_direction.dot(line_pull_direction) < 0.0:
 		rod_bend_direction = -rod_bend_direction
 
-	if state == "idle" or state == "waiting":
+	if state == "idle" or state == "waiting" or state == "uncasted":
 		rod_bend_direction = rod_bend_direction.lerp(Vector2.DOWN, 0.34).normalized()
 
 	var bend_direction_follow = 3.8
@@ -1372,6 +1475,10 @@ func _update_fishing_presence(delta: float) -> void:
 		line_alpha = 0.06 if cast_progress < CAST_FORWARD_END_PROGRESS else 0.34
 		glow_alpha = 0.0 if cast_progress < CAST_FORWARD_END_PROGRESS else 0.018
 		line_width = 0.28 if cast_progress < CAST_FORWARD_END_PROGRESS else 0.34
+	elif state == "uncasted":
+		line_alpha = 0.0
+		glow_alpha = 0.0
+		line_width = 0.0
 	elif state == "waiting":
 		line_alpha = 0.34
 		glow_alpha = 0.016
@@ -1393,3 +1500,5 @@ func _update_fishing_presence(delta: float) -> void:
 	main.fishing_line_glow.width = line_width + 0.22
 	main.fishing_line.default_color = Color(0.74, 0.84, 0.82, line_alpha)
 	main.fishing_line_glow.default_color = Color(0.58, 0.76, 0.72, glow_alpha)
+	main.fishing_line.visible = line_alpha > 0.01
+	main.fishing_line_glow.visible = glow_alpha > 0.001
