@@ -20,6 +20,7 @@ const SHOP_ITEMS_PER_PAGE := 8
 const SHOP_ROD_ITEMS_PER_PAGE := 4
 const SHOP_BAIT_ITEMS_PER_PAGE := 4
 const SHOP_LINE_ITEMS_PER_PAGE := 6
+const SHOP_LINE_IMAGE_SIZE := Vector2(75.0, 75.0)
 const SHOP_CATEGORY_BAIT := "bait"
 const SHOP_CATEGORY_CONSUMABLE := "consumable"
 const SHOP_CATEGORY_TACKLE := "tackle"
@@ -632,8 +633,8 @@ func _rebuild_shop_cards() -> void:
 	var card_min_height := 148.0 if is_image_category else 60.0
 	var card_max_height := 160.0 if is_image_category else 68.0
 	if is_line_category:
-		card_min_height = 88.0
-		card_max_height = 96.0
+		card_min_height = 100.0
+		card_max_height = 104.0
 
 	var card_height: float = min(max((main.shop_items_container.size.y - gap * float(rows - 1)) / float(rows), card_min_height), card_max_height)
 	var content_height: float = max(viewport_size.y, float(rows) * card_height + gap * float(max(rows - 1, 0)))
@@ -667,6 +668,10 @@ func _create_shop_card(item: Dictionary, card_size: Vector2) -> Panel:
 
 	var card_texture := _get_shop_card_texture(item)
 	var category := str(item.get("category", item.get("type", "misc")))
+	if category == SHOP_CATEGORY_LINE:
+		_populate_line_shop_card(card, item, card_size, card_texture, rarity_color)
+		return card
+
 	if card_texture != null and [SHOP_CATEGORY_ROD, SHOP_CATEGORY_BAIT].has(category):
 		_populate_rod_image_card(card, item, card_size, card_texture, rarity_color)
 		return card
@@ -764,6 +769,96 @@ func _create_shop_card(item: Dictionary, card_size: Vector2) -> Panel:
 		return card
 
 	return card
+
+func _populate_line_shop_card(card: Panel, item: Dictionary, card_size: Vector2, texture: Texture2D, rarity_color: Color) -> void:
+	var item_id := str(item.get("id", ""))
+	var image_pos := Vector2(14.0, (card_size.y - SHOP_LINE_IMAGE_SIZE.y) * 0.5)
+	var content_x := image_pos.x + SHOP_LINE_IMAGE_SIZE.x + 14.0
+	var buy_width := 66.0
+	var buy_height := 32.0
+	var right_padding := 12.0
+	var buy_x := card_size.x - right_padding - buy_width
+	var text_right := buy_x - 76.0
+	var text_width: float = maxf(text_right - content_x, 150.0)
+	var title_y := 10.0
+
+	if texture != null:
+		_add_compact_shop_texture(card, texture, Rect2(image_pos, SHOP_LINE_IMAGE_SIZE))
+	else:
+		var fallback_icon_label := Label.new()
+		fallback_icon_label.text = str(item.get("icon", "L"))
+		fallback_icon_label.position = image_pos + Vector2(11.0, 11.0)
+		fallback_icon_label.size = Vector2(53.0, 53.0)
+		fallback_icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		fallback_icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		fallback_icon_label.add_theme_font_size_override("font_size", 20)
+		fallback_icon_label.add_theme_color_override("font_color", Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.98))
+		fallback_icon_label.add_theme_stylebox_override(
+			"normal",
+			main._make_panel_style(Color(0.10, 0.22, 0.17, 0.72), Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.32), 11, 3, Color(0.0, 0.0, 0.0, 0.10))
+		)
+		card.add_child(fallback_icon_label)
+
+	var name_label := Label.new()
+	name_label.text = str(item.get("name", "-"))
+	name_label.position = Vector2(content_x, title_y)
+	name_label.size = Vector2(text_width, 20.0)
+	name_label.clip_text = true
+	name_label.add_theme_font_size_override("font_size", 12)
+	name_label.add_theme_color_override("font_color", Color(0.94, 1.0, 0.91, 1.0))
+	card.add_child(name_label)
+
+	var line_values := _get_line_display_values(item)
+	var stat_line_a := Label.new()
+	stat_line_a.text = "Длина: %s   Диаметр: %s" % [
+		str(line_values.get("length", "100 м")),
+		str(line_values.get("diameter", "-"))
+	]
+	stat_line_a.position = Vector2(content_x, title_y + 24.0)
+	stat_line_a.size = Vector2(text_width, 18.0)
+	stat_line_a.clip_text = true
+	stat_line_a.add_theme_font_size_override("font_size", 10)
+	stat_line_a.add_theme_color_override("font_color", Color(0.76, 0.90, 0.80, 0.92))
+	card.add_child(stat_line_a)
+
+	var stat_line_b := Label.new()
+	stat_line_b.text = "Прочность: %s   Материал: %s" % [
+		str(line_values.get("strength", "-")),
+		str(line_values.get("material", "нейлон"))
+	]
+	stat_line_b.position = Vector2(content_x, title_y + 43.0)
+	stat_line_b.size = Vector2(text_width, 18.0)
+	stat_line_b.clip_text = true
+	stat_line_b.add_theme_font_size_override("font_size", 10)
+	stat_line_b.add_theme_color_override("font_color", Color(0.70, 0.84, 0.76, 0.86))
+	card.add_child(stat_line_b)
+
+	var price_label := Label.new()
+	price_label.text = PlayerData.format_money(float(item.get("price", 0.0)))
+	price_label.position = Vector2(content_x, title_y + 63.0)
+	price_label.size = Vector2(text_width, 17.0)
+	price_label.clip_text = true
+	price_label.add_theme_font_size_override("font_size", 10)
+	price_label.add_theme_color_override("font_color", Color(0.88, 0.96, 0.80, 0.90))
+	card.add_child(price_label)
+
+	var owned_label := Label.new()
+	owned_label.text = "Есть: %d" % _get_owned_shop_item_quantity(item_id)
+	owned_label.position = Vector2(buy_x - 68.0, title_y + 4.0)
+	owned_label.size = Vector2(58.0, 18.0)
+	owned_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	owned_label.clip_text = true
+	owned_label.add_theme_font_size_override("font_size", 9)
+	owned_label.add_theme_color_override("font_color", Color(0.62, 0.76, 0.68, 0.78))
+	card.add_child(owned_label)
+
+	var buy_button := Button.new()
+	buy_button.text = "Купить"
+	buy_button.position = Vector2(buy_x, (card_size.y - buy_height) * 0.5)
+	buy_button.size = Vector2(buy_width, buy_height)
+	_apply_shop_buy_button_style(buy_button)
+	buy_button.pressed.connect(_on_shop_buy_pressed.bind(item_id))
+	card.add_child(buy_button)
 
 func _add_compact_shop_texture(parent: Control, texture: Texture2D, slot_rect: Rect2) -> void:
 	var slot := Control.new()
@@ -929,6 +1024,93 @@ func _apply_shop_details_button_style(button: Button) -> void:
 	button.add_theme_font_size_override("font_size", 10)
 	button.add_theme_constant_override("h_separation", 0)
 
+func _get_line_display_values(item: Dictionary) -> Dictionary:
+	var stats: Dictionary = item.get("stats", {})
+	var length_m := float(stats.get("length_m", 100.0))
+	var strength_kg := float(stats.get("max_load_kg", stats.get("strength", stats.get("max_load", 0.0))))
+	return {
+		"length": "%d м" % roundi(length_m),
+		"diameter": "%.2f мм" % _get_line_diameter_mm(item),
+		"strength": "%.1f кг" % strength_kg,
+		"material": _get_line_material_name(item)
+	}
+
+func _get_line_diameter_mm(item: Dictionary) -> float:
+	var stats: Dictionary = item.get("stats", {})
+	if stats.has("diameter_mm"):
+		return float(stats.get("diameter_mm", 0.0))
+	if stats.has("diameter"):
+		return float(stats.get("diameter", 0.0))
+
+	match str(item.get("id", "")):
+		"lakeline_nylon_basic_1_5kg":
+			return 0.15
+		"lakeline_nylon_basic_2kg":
+			return 0.17
+		"lakeline_nylon_basic_2_5kg":
+			return 0.19
+		"lakeline_nylon_basic_3kg":
+			return 0.20
+		"lakeline_nylon_basic_4kg":
+			return 0.22
+		"lakeline_nylon_basic_5kg":
+			return 0.25
+		"lakeline_nylon_basic_6kg":
+			return 0.28
+		"lakeline_nylon_basic_8kg":
+			return 0.30
+		"lakeline_nylon_basic_10kg":
+			return 0.35
+		"lakeline_nylon_basic_12kg":
+			return 0.37
+		"lakeline_nylon_basic_15kg":
+			return 0.40
+		"lakeline_nylon_basic_18kg":
+			return 0.45
+		"lakeline_nylon_basic_20kg":
+			return 0.50
+		"mono_2_5kg", "mono_5kg":
+			return 0.20
+
+	var strength_kg := float(stats.get("max_load_kg", stats.get("strength", stats.get("max_load", 0.0))))
+	if strength_kg <= 1.5:
+		return 0.15
+	if strength_kg <= 2.0:
+		return 0.17
+	if strength_kg <= 3.0:
+		return 0.20
+	if strength_kg <= 5.0:
+		return 0.25
+	if strength_kg <= 8.0:
+		return 0.30
+	if strength_kg <= 12.0:
+		return 0.37
+	if strength_kg <= 18.0:
+		return 0.45
+	return 0.50
+
+func _get_line_material_name(item: Dictionary) -> String:
+	var stats: Dictionary = item.get("stats", {})
+	var line_type := str(stats.get("line_type", "nylon")).to_lower()
+	match line_type:
+		"nylon", "mono", "monofilament":
+			return "нейлон"
+		"fluoro", "fluorocarbon":
+			return "флюорокарбон"
+		"braid", "braided":
+			return "плетёнка"
+		_:
+			return line_type if line_type != "" else "нейлон"
+
+func _get_line_details_stats_text(item: Dictionary) -> String:
+	var line_values := _get_line_display_values(item)
+	return "Длина: %s\nДиаметр: %s\nПрочность: %s\nМатериал: %s\nЦена: %s" % [
+		str(line_values.get("length", "100 м")),
+		str(line_values.get("diameter", "-")),
+		str(line_values.get("strength", "-")),
+		str(line_values.get("material", "нейлон")),
+		PlayerData.format_money(float(item.get("price", 0.0)))
+	]
 
 func _get_shop_compact_stat_text(item: Dictionary) -> String:
 	var stats: Dictionary = item.get("stats", {})
@@ -942,9 +1124,11 @@ func _get_shop_compact_stat_text(item: Dictionary) -> String:
 				roundi((float(stats.get("tension_bonus", stats.get("control_bonus", 0.0))) + float(stats.get("handling_bonus", 0.0))) * 100.0)
 			]
 		"line":
-			return "Нагрузка %.1f кг / обрыв %d%%" % [
-				float(stats.get("max_load_kg", stats.get("strength", 0.0))),
-				roundi(float(stats.get("break_resistance", 1.0)) * 100.0)
+			var line_values := _get_line_display_values(item)
+			return "%s / %s / %s" % [
+				str(line_values.get("length", "100 м")),
+				str(line_values.get("diameter", "-")),
+				str(line_values.get("strength", "-"))
 			]
 		"float":
 			return "Клёв +%d%% / стабильн. +%d%%" % [
@@ -994,6 +1178,8 @@ func _get_shop_details_stats_text(item: Dictionary) -> String:
 				int(item.get("quantity", 1)),
 				PlayerData.format_money(float(item.get("price", 0.0)))
 			]
+		"line":
+			return _get_line_details_stats_text(item)
 		_:
 			return "%s\nЦена: %s" % [
 				_get_shop_key_stat_text(item),
@@ -1080,9 +1266,12 @@ func _get_shop_key_stat_text(item: Dictionary) -> String:
 				roundi((float(stats.get("tension_bonus", stats.get("control_bonus", 0.0))) + float(stats.get("handling_bonus", 0.0))) * 100.0)
 			]
 		"line":
-			return "Нагрузка %.1f кг  |  обрыв %d%%" % [
-				float(stats.get("max_load_kg", stats.get("strength", 0.0))),
-				roundi(float(stats.get("break_resistance", 1.0)) * 100.0)
+			var line_values := _get_line_display_values(item)
+			return "Длина: %s  |  Диаметр: %s  |  Прочность: %s  |  Материал: %s" % [
+				str(line_values.get("length", "100 м")),
+				str(line_values.get("diameter", "-")),
+				str(line_values.get("strength", "-")),
+				str(line_values.get("material", "нейлон"))
 			]
 		"float":
 			return "Клёв +%d%%  |  стабильн. +%d%%" % [
