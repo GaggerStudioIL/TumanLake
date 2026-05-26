@@ -1578,9 +1578,9 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	var ui_scale: float = min(sx, sy)
 	var chip_gap: float = 10.0 * ui_scale
 	var top_height: float = HUD_HEIGHT * sy
-	var cast_button_size := Vector2(88.0, 88.0) * ui_scale
-	var quick_button_width: float = 82.0 * sx
-	var quick_button_height: float = 34.0 * sy
+	var cast_button_size := Vector2(92.0, 92.0) * ui_scale
+	var quick_button_width: float = 112.0 * sx
+	var quick_button_height: float = 38.0 * sy
 	_water_surface_y = WATER_SURFACE_Y * sy
 	_water_zone_top = _water_surface_y - 12.0 * sy
 	_water_zone_bottom = _water_surface_y + 12.0 * sy
@@ -1674,7 +1674,7 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	spot_option_button.add_theme_font_size_override("font_size", 13)
 
 	action_panel.visible = true
-	var action_panel_rect := _scale_rect(Rect2(186.0, 482.0, 392.0, 40.0), screen_size)
+	var action_panel_rect := _scale_rect(Rect2(174.0, 476.0, 520.0, 48.0), screen_size)
 	_anchor_control(action_panel, 0.0, 0.0, 0.0, 0.0, action_panel_rect.position.x, action_panel_rect.position.y, action_panel_rect.end.x, action_panel_rect.end.y)
 	action_panel.z_index = 100
 	action_panel.add_theme_stylebox_override(
@@ -1684,7 +1684,7 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 
 	quick_actions_container.visible = false
 
-	var cast_center := _scale_point(Vector2(858.0, 456.0), screen_size)
+	var cast_center := _scale_point(Vector2(902.0, 400.0), screen_size)
 	var cast_rect := Rect2(cast_center - cast_button_size * 0.5, cast_button_size)
 	var glow_rect := cast_rect.grow(12.0 * ui_scale)
 	_anchor_control(action_glow, 0.0, 0.0, 0.0, 0.0, glow_rect.position.x, glow_rect.position.y, glow_rect.end.x, glow_rect.end.y)
@@ -1697,10 +1697,10 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 
 	var quick_size := Vector2(quick_button_width, quick_button_height)
 
-	_layout_action_button(feed_button, "Прикормка", _scale_point(Vector2(198.0, 485.0), screen_size), quick_size, false)
-	_layout_action_button(bait_button, "Наживка", _scale_point(Vector2(292.0, 485.0), screen_size), quick_size, true)
-	_layout_action_button(tackle_button, "Снасти", _scale_point(Vector2(386.0, 485.0), screen_size), quick_size, true)
-	_layout_action_button(auto_button, "Авто", _scale_point(Vector2(480.0, 485.0), screen_size), quick_size, false)
+	_layout_action_button(feed_button, "Прикормка", _scale_point(Vector2(188.0, 481.0), screen_size), quick_size, false)
+	_layout_action_button(bait_button, "Наживка", _scale_point(Vector2(314.0, 481.0), screen_size), quick_size, true)
+	_layout_action_button(tackle_button, "Снасти", _scale_point(Vector2(440.0, 481.0), screen_size), quick_size, true)
+	_layout_action_button(auto_button, "Авто", _scale_point(Vector2(566.0, 481.0), screen_size), quick_size, false)
 
 	_anchor_control(fish_button, 0.0, 0.0, 0.0, 0.0, cast_rect.position.x, cast_rect.position.y, cast_rect.end.x, cast_rect.end.y)
 	fish_button.z_index = 104
@@ -1716,11 +1716,11 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 		cast_button_visual.z_index = 103
 		cast_button_visual.size = cast_button_size
 
-	_set_button_icon(feed_button, "bait", 12.0)
-	_set_button_icon(bait_button, "bait", 12.0)
-	_set_button_icon(fish_button, "hook", 18.0)
-	_set_button_icon(tackle_button, "rod", 12.0)
-	_set_button_icon(auto_button, "auto", 12.0)
+	_set_action_button_icon(feed_button, "hud_feed", 19.0)
+	_set_action_button_icon(bait_button, "hud_bait", 19.0)
+	_set_primary_fishing_button_icon(fish_button, _get_primary_fishing_action_icon(), 26.0)
+	_set_action_button_icon(tackle_button, "hud_tackle", 19.0)
+	_set_action_button_icon(auto_button, "hud_auto", 19.0)
 	_refresh_fish_button_presentation()
 
 	bottom_nav_panel.visible = true
@@ -1901,12 +1901,12 @@ func _layout_action_button(button: Button, label: String, pos: Vector2, button_s
 	button.z_index = 102
 	button.disabled = not enabled
 	button.clip_text = true
-	button.add_theme_font_size_override("font_size", 10)
-	_apply_action_button_style(button, false)
+	button.add_theme_font_size_override("font_size", 11)
+	_apply_action_button_style(button, enabled)
 	button.custom_minimum_size = button_size
 	if not (button.get_parent() is Container):
 		button.size = button_size
-	button.add_theme_font_size_override("font_size", 10)
+	button.add_theme_font_size_override("font_size", 11)
 
 func _layout_nav_button(button: Button, label: String, pos: Vector2, button_size: Vector2, active: bool) -> void:
 	button.text = label
@@ -2041,6 +2041,41 @@ func _set_button_icon(button: Button, icon_name: String, icon_size: float = 20.0
 	button.add_theme_constant_override("icon_max_width", int(icon_size))
 	button.add_theme_constant_override("h_separation", 4)
 
+func _set_action_button_icon(button: Button, icon_name: String, icon_size: float = 18.0) -> void:
+	if ui_theme == null or icon_name.is_empty():
+		button.icon = null
+		return
+
+	button.icon = ui_theme.get_icon(icon_name)
+	button.expand_icon = true
+	button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
+	button.add_theme_constant_override("icon_max_width", int(icon_size))
+	button.add_theme_constant_override("h_separation", 7)
+
+func _set_primary_fishing_button_icon(button: Button, icon_name: String, icon_size: float = 26.0) -> void:
+	if ui_theme == null or icon_name.is_empty():
+		button.icon = null
+		return
+
+	button.icon = ui_theme.get_icon(icon_name)
+	button.expand_icon = true
+	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
+	button.add_theme_constant_override("icon_max_width", int(icon_size))
+	button.add_theme_constant_override("h_separation", 2)
+
+func _get_primary_fishing_action_icon() -> String:
+	match _fishing_ui_state:
+		FishingUiState.WAITING:
+			return "hud_hook"
+		FishingUiState.FIGHTING:
+			return "hud_pull"
+		FishingUiState.CAUGHT, FishingUiState.FAILED:
+			return "hud_pull"
+		_:
+			return "hud_cast"
+
 func _refresh_fish_button_presentation() -> void:
 	if fish_button == null or ui_theme == null:
 		return
@@ -2049,7 +2084,7 @@ func _refresh_fish_button_presentation() -> void:
 	if target_size == Vector2.ZERO:
 		var viewport_size := get_viewport_rect().size
 		var button_scale: float = min(viewport_size.x / BASE_SCREEN_SIZE.x, viewport_size.y / BASE_SCREEN_SIZE.y)
-		target_size = Vector2(88.0, 88.0) * button_scale
+		target_size = Vector2(92.0, 92.0) * button_scale
 
 	var active_hook_input: bool = _fishing_ui_state == FishingUiState.WAITING and bool(FishingManager.get("use_new_bite_system"))
 	var use_cast_texture := _use_cast_png_button and (_fishing_ui_state == FishingUiState.IDLE or (_fishing_ui_state == FishingUiState.WAITING and not active_hook_input))
@@ -2082,7 +2117,7 @@ func _refresh_fish_button_presentation() -> void:
 	_apply_primary_fishing_action_style(fish_button, target_size)
 	fish_button.add_theme_font_size_override("font_size", 12)
 	fish_button.clip_text = true
-	_set_button_icon(fish_button, "hook", 18.0)
+	_set_primary_fishing_button_icon(fish_button, _get_primary_fishing_action_icon(), 26.0)
 
 func _update_cast_button_visual() -> void:
 	if cast_button_visual == null or ui_theme == null:
