@@ -331,8 +331,8 @@ var _cast_button_pressed := false
 var _fish_button_action_guard_msec := 0
 var _fish_button_pointer_action_active := false
 var _modal_tap_guard_until_msec := 0
-var _use_cast_png_button := true
-var _use_pull_png_button := true
+var _use_cast_png_button := false
+var _use_pull_png_button := false
 var _float_base_center := Vector2.ZERO
 var _float_visual_center := Vector2.ZERO
 var _rod_tip_visual := Vector2.ZERO
@@ -886,14 +886,55 @@ func _apply_action_button_style(button: Button, active: bool = false) -> void:
 		border = Color(0.70, 1.0, 0.72, 0.54)
 		shadow = Color(0.18, 0.66, 0.24, 0.20)
 
-	button.add_theme_stylebox_override("normal", _make_panel_style(normal_bg, border, 8, 4, shadow))
-	button.add_theme_stylebox_override("hover", _make_panel_style(hover_bg, Color(border.r, border.g, border.b, min(border.a + 0.12, 1.0)), 8, 5, shadow))
-	button.add_theme_stylebox_override("pressed", _make_panel_style(pressed_bg, Color(border.r, border.g, border.b, min(border.a + 0.16, 1.0)), 8, 2, Color(0.0, 0.0, 0.0, 0.12)))
-	button.add_theme_stylebox_override("disabled", _make_panel_style(Color(0.040, 0.050, 0.052, 0.48), Color(0.58, 0.64, 0.62, 0.14), 8, 1, Color.TRANSPARENT))
+	button.add_theme_stylebox_override("normal", _make_panel_style(normal_bg, border, 18, 4, shadow))
+	button.add_theme_stylebox_override("hover", _make_panel_style(hover_bg, Color(border.r, border.g, border.b, min(border.a + 0.12, 1.0)), 18, 5, shadow))
+	button.add_theme_stylebox_override("pressed", _make_panel_style(pressed_bg, Color(border.r, border.g, border.b, min(border.a + 0.16, 1.0)), 18, 2, Color(0.0, 0.0, 0.0, 0.12)))
+	button.add_theme_stylebox_override("disabled", _make_panel_style(Color(0.040, 0.050, 0.052, 0.48), Color(0.58, 0.64, 0.62, 0.14), 18, 1, Color.TRANSPARENT))
 	button.add_theme_color_override("font_color", Color(0.94, 1.0, 0.92, 1.0))
 	button.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 0.94, 1.0))
 	button.add_theme_color_override("font_pressed_color", Color(0.86, 1.0, 0.84, 1.0))
 	button.add_theme_color_override("font_disabled_color", Color(0.62, 0.68, 0.66, 0.62))
+	button.add_theme_constant_override("h_separation", 4)
+
+func _apply_primary_fishing_action_style(button: Button, target_size: Vector2) -> void:
+	var radius := roundi(max(target_size.x, target_size.y) * 0.5)
+	var normal_bg := Color(0.085, 0.205, 0.150, 0.96)
+	var hover_bg := Color(0.115, 0.285, 0.190, 1.0)
+	var pressed_bg := Color(0.052, 0.140, 0.108, 1.0)
+	var border := Color(0.72, 1.0, 0.66, 0.64)
+	var shadow := Color(0.20, 0.68, 0.22, 0.24)
+
+	if _fishing_ui_state == FishingUiState.WAITING:
+		normal_bg = Color(0.48, 0.330, 0.105, 0.96)
+		hover_bg = Color(0.62, 0.430, 0.140, 1.0)
+		pressed_bg = Color(0.34, 0.225, 0.075, 1.0)
+		border = Color(1.0, 0.78, 0.34, 0.78)
+		shadow = Color(0.90, 0.55, 0.12, 0.24)
+	elif _fishing_ui_state == FishingUiState.FIGHTING:
+		normal_bg = Color(0.055, 0.150, 0.190, 0.96)
+		hover_bg = Color(0.075, 0.205, 0.255, 1.0)
+		pressed_bg = Color(0.040, 0.105, 0.150, 1.0)
+		border = Color(0.60, 0.90, 1.0, 0.60)
+		shadow = Color(0.12, 0.44, 0.64, 0.22)
+	elif _fishing_ui_state == FishingUiState.CAUGHT or _fishing_ui_state == FishingUiState.FAILED:
+		normal_bg = Color(0.090, 0.180, 0.120, 0.92)
+		hover_bg = Color(0.130, 0.250, 0.160, 0.98)
+		pressed_bg = Color(0.065, 0.130, 0.095, 1.0)
+		border = Color(0.80, 0.96, 0.62, 0.52)
+		shadow = Color(0.24, 0.54, 0.18, 0.18)
+
+	button.custom_minimum_size = target_size
+	button.size = target_size
+	button.add_theme_stylebox_override("normal", _make_panel_style(normal_bg, border, radius, 9, shadow))
+	button.add_theme_stylebox_override("hover", _make_panel_style(hover_bg, Color(border.r, border.g, border.b, min(border.a + 0.12, 1.0)), radius, 11, shadow))
+	button.add_theme_stylebox_override("pressed", _make_panel_style(pressed_bg, Color(border.r, border.g, border.b, min(border.a + 0.16, 1.0)), radius, 4, Color(0.0, 0.0, 0.0, 0.16)))
+	button.add_theme_stylebox_override("disabled", _make_panel_style(Color(0.045, 0.058, 0.060, 0.58), Color(0.62, 0.68, 0.64, 0.20), radius, 1, Color.TRANSPARENT))
+	button.add_theme_color_override("font_color", Color(0.98, 1.0, 0.92, 1.0))
+	button.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 0.96, 1.0))
+	button.add_theme_color_override("font_pressed_color", Color(0.88, 1.0, 0.84, 1.0))
+	button.add_theme_color_override("font_disabled_color", Color(0.62, 0.68, 0.66, 0.62))
+	button.add_theme_font_size_override("font_size", 12)
+	button.add_theme_constant_override("h_separation", 2)
 
 func _apply_label_style(label: Label, primary: bool = false) -> void:
 	ui_theme.apply_label_style(label, "title" if primary else "body")
@@ -1260,7 +1301,7 @@ func _setup_atmosphere_materials() -> void:
 		shader_type canvas_item;
 		void fragment() {
 			vec2 uv = UV - vec2(0.5);
-			uv.x *= 1.75;
+			uv.x *= 1.0;
 			float pulse = 0.64 + sin(TIME * 0.95) * 0.08;
 			float glow = 1.0 - smoothstep(0.10, 0.58, length(uv));
 			COLOR = vec4(0.30, 0.78, 0.40, glow * 0.14 * pulse);
@@ -1537,9 +1578,9 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	var ui_scale: float = min(sx, sy)
 	var chip_gap: float = 10.0 * ui_scale
 	var top_height: float = HUD_HEIGHT * sy
-	var cast_button_size := _scale_size(ui_theme.get_cast_button_size(), screen_size)
-	var quick_button_width: float = 86.0 * sx
-	var quick_button_height: float = 36.0 * sy
+	var cast_button_size := Vector2(88.0, 88.0) * ui_scale
+	var quick_button_width: float = 82.0 * sx
+	var quick_button_height: float = 34.0 * sy
 	_water_surface_y = WATER_SURFACE_Y * sy
 	_water_zone_top = _water_surface_y - 12.0 * sy
 	_water_zone_bottom = _water_surface_y + 12.0 * sy
@@ -1633,19 +1674,19 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	spot_option_button.add_theme_font_size_override("font_size", 13)
 
 	action_panel.visible = true
-	var action_panel_rect := _scale_rect(Rect2(174.0, 472.0, 612.0, ACTION_BAR_HEIGHT), screen_size)
+	var action_panel_rect := _scale_rect(Rect2(186.0, 482.0, 392.0, 40.0), screen_size)
 	_anchor_control(action_panel, 0.0, 0.0, 0.0, 0.0, action_panel_rect.position.x, action_panel_rect.position.y, action_panel_rect.end.x, action_panel_rect.end.y)
 	action_panel.z_index = 100
 	action_panel.add_theme_stylebox_override(
 		"panel",
-		_make_panel_style(Color(0.026, 0.052, 0.055, 0.46), Color(0.74, 0.96, 0.86, 0.22), 9, 2, Color(0.0, 0.0, 0.0, 0.10))
+		_make_panel_style(Color(0.026, 0.052, 0.055, 0.46), Color(0.74, 0.96, 0.86, 0.22), 20, 2, Color(0.0, 0.0, 0.0, 0.10))
 	)
 
 	quick_actions_container.visible = false
 
-	var cast_center := _scale_point(Vector2(480.0, 495.0), screen_size)
+	var cast_center := _scale_point(Vector2(858.0, 456.0), screen_size)
 	var cast_rect := Rect2(cast_center - cast_button_size * 0.5, cast_button_size)
-	var glow_rect := cast_rect.grow(3.0 * ui_scale)
+	var glow_rect := cast_rect.grow(12.0 * ui_scale)
 	_anchor_control(action_glow, 0.0, 0.0, 0.0, 0.0, glow_rect.position.x, glow_rect.position.y, glow_rect.end.x, glow_rect.end.y)
 	action_glow.z_index = 99
 	action_glow.visible = true
@@ -1656,20 +1697,20 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 
 	var quick_size := Vector2(quick_button_width, quick_button_height)
 
-	_layout_action_button(feed_button, "Прикормка", _scale_point(Vector2(190.0, 477.0), screen_size), quick_size, false)
-	_layout_action_button(bait_button, "Наживка", _scale_point(Vector2(284.0, 477.0), screen_size), quick_size, true)
-	_layout_action_button(tackle_button, "Снасти", _scale_point(Vector2(596.0, 477.0), screen_size), quick_size, true)
-	_layout_action_button(auto_button, "Авто", _scale_point(Vector2(690.0, 477.0), screen_size), quick_size, false)
+	_layout_action_button(feed_button, "Прикормка", _scale_point(Vector2(198.0, 485.0), screen_size), quick_size, false)
+	_layout_action_button(bait_button, "Наживка", _scale_point(Vector2(292.0, 485.0), screen_size), quick_size, true)
+	_layout_action_button(tackle_button, "Снасти", _scale_point(Vector2(386.0, 485.0), screen_size), quick_size, true)
+	_layout_action_button(auto_button, "Авто", _scale_point(Vector2(480.0, 485.0), screen_size), quick_size, false)
 
 	_anchor_control(fish_button, 0.0, 0.0, 0.0, 0.0, cast_rect.position.x, cast_rect.position.y, cast_rect.end.x, cast_rect.end.y)
 	fish_button.z_index = 104
 	fish_button.custom_minimum_size = cast_button_size
-	fish_button.add_theme_font_size_override("font_size", 16)
+	fish_button.add_theme_font_size_override("font_size", 12)
 	fish_button.clip_text = true
-	_apply_button_style(fish_button, STYLE_PRIMARY_BUTTON)
+	_apply_primary_fishing_action_style(fish_button, cast_button_size)
 	fish_button.custom_minimum_size = cast_button_size
 	fish_button.size = cast_button_size
-	fish_button.add_theme_font_size_override("font_size", 16)
+	fish_button.add_theme_font_size_override("font_size", 12)
 	if cast_button_visual != null:
 		_anchor_control(cast_button_visual, 0.0, 0.0, 0.0, 0.0, cast_rect.position.x, cast_rect.position.y, cast_rect.end.x, cast_rect.end.y)
 		cast_button_visual.z_index = 103
@@ -1677,7 +1718,7 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 
 	_set_button_icon(feed_button, "bait", 12.0)
 	_set_button_icon(bait_button, "bait", 12.0)
-	_set_button_icon(fish_button, "hook", 16.0)
+	_set_button_icon(fish_button, "hook", 18.0)
 	_set_button_icon(tackle_button, "rod", 12.0)
 	_set_button_icon(auto_button, "auto", 12.0)
 	_refresh_fish_button_presentation()
@@ -1725,10 +1766,10 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 		_presence_has_layout = true
 	_layout_float_visuals(water_anchor, clamp(screen_size.y / 540.0, 0.86, 1.22))
 
-	var reel_width: float = 520.0 * sx
+	var reel_width: float = 500.0 * sx
 	var reel_height: float = 64.0 * sy
-	var reel_y: float = max(16.0 * sy + top_height + 10.0 * sy, action_panel_rect.position.y - reel_height - 10.0 * sy)
-	var reel_x: float = (screen_size.x - reel_width) * 0.5
+	var reel_y: float = max(16.0 * sy + top_height + 10.0 * sy, action_panel_rect.position.y - reel_height - 18.0 * sy)
+	var reel_x: float = max(170.0 * sx, (screen_size.x - reel_width) * 0.5 - 62.0 * sx)
 	_anchor_control(reeling_panel, 0.0, 0.0, 0.0, 0.0, reel_x, reel_y, reel_x + reel_width, reel_y + reel_height)
 	reeling_panel.color = Color(0.020, 0.040, 0.042, 0.78)
 	reeling_panel.z_index = 103
@@ -2006,7 +2047,9 @@ func _refresh_fish_button_presentation() -> void:
 
 	var target_size: Vector2 = fish_button.size
 	if target_size == Vector2.ZERO:
-		target_size = _scale_size(ui_theme.get_cast_button_size(), get_viewport_rect().size)
+		var viewport_size := get_viewport_rect().size
+		var button_scale: float = min(viewport_size.x / BASE_SCREEN_SIZE.x, viewport_size.y / BASE_SCREEN_SIZE.y)
+		target_size = Vector2(88.0, 88.0) * button_scale
 
 	var active_hook_input: bool = _fishing_ui_state == FishingUiState.WAITING and bool(FishingManager.get("use_new_bite_system"))
 	var use_cast_texture := _use_cast_png_button and (_fishing_ui_state == FishingUiState.IDLE or (_fishing_ui_state == FishingUiState.WAITING and not active_hook_input))
@@ -2036,8 +2079,10 @@ func _refresh_fish_button_presentation() -> void:
 		cast_button_visual.visible = false
 	_cast_button_hovered = false
 	_cast_button_pressed = false
-	_apply_button_style(fish_button, STYLE_PRIMARY_BUTTON)
-	_set_button_icon(fish_button, "hook", 16.0)
+	_apply_primary_fishing_action_style(fish_button, target_size)
+	fish_button.add_theme_font_size_override("font_size", 12)
+	fish_button.clip_text = true
+	_set_button_icon(fish_button, "hook", 18.0)
 
 func _update_cast_button_visual() -> void:
 	if cast_button_visual == null or ui_theme == null:
