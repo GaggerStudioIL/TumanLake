@@ -3,7 +3,8 @@ extends Node2D
 const StarsLayerScript := preload("res://scripts/environment/StarsLayer.gd")
 
 @export var sun_size: float = 44.0
-@export var show_dynamic_sun: bool = false
+@export var show_dynamic_sun: bool = true
+@export var remove_static_sun_from_art: bool = true
 @export var moon_size: float = 54.0
 @export var sun_arc_height: float = 0.48
 @export var moon_arc_height: float = 0.34
@@ -376,6 +377,13 @@ func _ensure_nodes() -> void:
 	_night_tint_overlay = _ensure_color_layer(_night_tint_overlay, "NightTintOverlay", 9)
 	if _mist_layer.material == null:
 		_mist_layer.material = _make_mist_material()
+	if remove_static_sun_from_art:
+		if _mountains_layer.material == null:
+			_mountains_layer.material = _make_static_sun_removal_material("mountains")
+		if _water_layer.material == null:
+			_water_layer.material = _make_static_sun_removal_material("water")
+		if _light_overlay_layer.material == null:
+			_light_overlay_layer.material = _make_static_sun_removal_material("light")
 	if _sunset_tint_overlay.material == null:
 		_sunset_tint_overlay.material = _make_sunset_tint_material()
 	if _night_tint_overlay.material == null:
@@ -467,6 +475,64 @@ func _make_mist_material() -> ShaderMaterial:
 			COLOR = vec4(mist_color, alpha);
 		}
 	"""
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	return material
+
+func _make_static_sun_removal_material(layer_kind: String) -> ShaderMaterial:
+	var shader := Shader.new()
+	match layer_kind:
+		"mountains":
+			shader.code = """
+				shader_type canvas_item;
+
+				void fragment() {
+					vec4 vertex_color = COLOR;
+					vec4 tex = texture(TEXTURE, UV);
+					vec2 sun_uv = vec2(0.225, 0.620);
+					vec2 to_sun = (UV - sun_uv) * vec2(1.0, 1.45);
+					float disk = 1.0 - smoothstep(0.014, 0.055, length(to_sun));
+					float glow = 1.0 - smoothstep(0.030, 0.180, length(to_sun));
+					float horizon_wash = 1.0 - smoothstep(0.0, 0.230, abs(UV.x - sun_uv.x));
+					horizon_wash *= 1.0 - smoothstep(0.0, 0.070, abs(UV.y - sun_uv.y));
+					float mask = clamp(max(disk, glow * 0.72) + horizon_wash * 0.34, 0.0, 1.0);
+					tex.a *= 1.0 - mask * 0.96;
+					COLOR = tex * vertex_color;
+				}
+			"""
+		"water":
+			shader.code = """
+				shader_type canvas_item;
+
+				void fragment() {
+					vec4 vertex_color = COLOR;
+					vec4 tex = texture(TEXTURE, UV);
+					float lane = 1.0 - smoothstep(0.0, 0.155, abs(UV.x - 0.205));
+					lane *= smoothstep(0.610, 0.700, UV.y) * (1.0 - smoothstep(0.920, 1.0, UV.y));
+					float source_glow = 1.0 - smoothstep(0.0, 0.170, distance((UV - vec2(0.200, 0.705)) * vec2(1.0, 0.55)));
+					float mask = clamp(max(lane * 0.70, source_glow * 0.56), 0.0, 1.0);
+					vec3 cooled = tex.rgb * vec3(0.72, 0.82, 0.92);
+					tex.rgb = mix(tex.rgb, cooled, mask * 0.58);
+					tex.a *= 1.0 - mask * 0.18;
+					COLOR = tex * vertex_color;
+				}
+			"""
+		_:
+			shader.code = """
+				shader_type canvas_item;
+
+				void fragment() {
+					vec4 vertex_color = COLOR;
+					vec4 tex = texture(TEXTURE, UV);
+					float source = 1.0 - smoothstep(0.0, 0.330, distance(UV, vec2(0.055, 0.080)));
+					float ray_band = 1.0 - smoothstep(0.0, 0.250, abs((UV.y - 0.08) - UV.x * 0.28));
+					ray_band *= 1.0 - smoothstep(0.0, 0.520, UV.x);
+					float mask = clamp(max(source * 0.90, ray_band * 0.34), 0.0, 1.0);
+					tex.a *= 1.0 - mask * 0.78;
+					COLOR = tex * vertex_color;
+				}
+			"""
+
 	var material := ShaderMaterial.new()
 	material.shader = shader
 	return material
