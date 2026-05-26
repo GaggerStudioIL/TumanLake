@@ -411,7 +411,7 @@ func _update_tackle_ui() -> void:
 	main.tackle_equip_button.disabled = not can_equip or _is_tackle_item_equipped(selected_item) or main._fishing_ui_state != FishingUiState.IDLE
 
 	if not _picker_open:
-		main.tackle_equip_button.text = "Экипировать"
+		main.tackle_equip_button.text = "Сейчас используется"
 	elif main._fishing_ui_state != FishingUiState.IDLE and can_equip:
 		main.tackle_equip_button.text = "Только вне ловли"
 	elif _is_tackle_item_equipped(selected_item):
@@ -441,7 +441,7 @@ func _update_tackle_ui() -> void:
 		button.clip_text = true
 		button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		theme.apply_tackle_slot_button_style(button, _get_tackle_slot_state(category))
-		button.add_theme_font_size_override("font_size", 10)
+		button.add_theme_font_size_override("font_size", 12)
 
 
 func _get_tackle_slot_button_text(category: String) -> String:
@@ -646,9 +646,9 @@ func _update_tackle_visual_scheme() -> void:
 func _get_rod_description_text() -> String:
 	var rod: Dictionary = PlayerData.current_tackle.get("rod", {})
 	var description := str(rod.get("description", "Надёжная базовая удочка для спокойной ловли у берега."))
-	description = _short_tackle_slot_text(description, 120)
+	description = _short_tackle_slot_text(description, 88)
 	var fit_names := _get_fit_fish_names()
-	return "Описание\n%s\n\nПодходит для\n%s" % [
+	return "Описание\n%s\nПодходит для: %s" % [
 		description,
 		"  •  ".join(fit_names) if not fit_names.is_empty() else "Подберите место и глубину"
 	]

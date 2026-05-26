@@ -3069,20 +3069,20 @@ func _setup_layout() -> void:
 	inventory_close_button.size = close_button_size
 	ui_theme.apply_close_button_style(inventory_close_button)
 
-	var tackle_width: float = min(max(screen_size.x * 0.92, 840.0), screen_size.x - 12.0)
-	var tackle_panel_height: float = min(max(screen_size.y * 0.88, 462.0), screen_size.y - 10.0)
+	var tackle_width: float = min(max(screen_size.x * 0.96, 900.0), screen_size.x - 16.0)
+	var tackle_panel_height: float = min(max(screen_size.y * 0.94, 490.0), screen_size.y - 12.0)
 	var tackle_x: float = (screen_size.x - tackle_width) * 0.5
 	var tackle_y_pos: float = (screen_size.y - tackle_panel_height) * 0.5
-	var tackle_padding := 14.0
-	var tackle_gap := 12.0
+	var tackle_padding := 12.0
+	var tackle_gap := 10.0
 	var tackle_inner_width: float = tackle_width - tackle_padding * 2.0
-	var tackle_header_height := 52.0
-	var tackle_action_height := 64.0
+	var tackle_header_height := 48.0
+	var tackle_action_height := 68.0
 	var tackle_content_y: float = tackle_header_height + 6.0
 	var tackle_action_y: float = tackle_panel_height - tackle_padding - tackle_action_height
-	var tackle_content_height: float = max(tackle_action_y - tackle_content_y - 10.0, 286.0)
-	var tackle_left_width: float = clamp(tackle_inner_width * 0.27, 220.0, 245.0)
-	var tackle_center_width: float = clamp(tackle_inner_width * 0.35, 285.0, 312.0)
+	var tackle_content_height: float = max(tackle_action_y - tackle_content_y - 8.0, 320.0)
+	var tackle_left_width: float = clamp(tackle_inner_width * 0.27, 235.0, 255.0)
+	var tackle_center_width: float = clamp(tackle_inner_width * 0.36, 305.0, 330.0)
 	var tackle_right_width: float = tackle_inner_width - tackle_left_width - tackle_center_width - tackle_gap * 2.0
 	var tackle_left_x := tackle_padding
 	var tackle_center_x: float = tackle_left_x + tackle_left_width + tackle_gap
@@ -3092,18 +3092,18 @@ func _setup_layout() -> void:
 	tackle_panel.size = Vector2(tackle_width, tackle_panel_height)
 	ui_theme.apply_tackle_panel_style(tackle_panel, true)
 
-	tackle_title_label.position = Vector2(tackle_padding, 10.0)
+	tackle_title_label.position = Vector2(tackle_padding, 8.0)
 	tackle_title_label.size = Vector2(tackle_inner_width, 32.0)
 	tackle_title_label.add_theme_font_size_override("font_size", 24)
 	tackle_title_label.add_theme_color_override("font_color", Color(0.96, 0.88, 0.68, 1.0))
 	tackle_title_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.38))
 	tackle_title_label.add_theme_constant_override("shadow_offset_y", 1)
 
-	tackle_title_divider_left.position = Vector2(tackle_width * 0.5 - 128.0, 43.0)
-	tackle_title_divider_left.size = Vector2(112.0, 2.0)
+	tackle_title_divider_left.position = Vector2(tackle_width * 0.5 - 136.0, 41.0)
+	tackle_title_divider_left.size = Vector2(120.0, 2.0)
 	tackle_title_divider_left.color = Color(0.82, 0.58, 0.24, 0.72)
-	tackle_title_divider_right.position = Vector2(tackle_width * 0.5 + 16.0, 43.0)
-	tackle_title_divider_right.size = Vector2(112.0, 2.0)
+	tackle_title_divider_right.position = Vector2(tackle_width * 0.5 + 16.0, 41.0)
+	tackle_title_divider_right.size = Vector2(120.0, 2.0)
 	tackle_title_divider_right.color = Color(0.82, 0.58, 0.24, 0.72)
 
 	tackle_left_panel.position = Vector2(tackle_left_x, tackle_content_y)
@@ -3123,73 +3123,73 @@ func _setup_layout() -> void:
 	ui_theme.apply_tackle_panel_style(tackle_action_bar_panel)
 
 	var tackle_category_buttons: Array = [tackle_line_button, tackle_leader_button, tackle_hook_button, tackle_float_button, tackle_bait_button, tackle_bait_2_button]
-	var slot_gap := 7.0
-	var tackle_slot_height: float = clamp((tackle_content_height - 20.0 - slot_gap * 5.0) / 6.0, 48.0, 58.0)
+	var slot_gap := 6.0
+	var tackle_slot_height: float = clamp((tackle_content_height - 16.0 - slot_gap * 5.0) / 6.0, 52.0, 60.0)
 	for i in tackle_category_buttons.size():
 		var tackle_category_button: Button = tackle_category_buttons[i]
-		tackle_category_button.position = Vector2(tackle_left_x + 10.0, tackle_content_y + 10.0 + float(i) * (tackle_slot_height + slot_gap))
-		tackle_category_button.size = Vector2(tackle_left_width - 20.0, tackle_slot_height)
-		tackle_category_button.add_theme_font_size_override("font_size", 11)
+		tackle_category_button.position = Vector2(tackle_left_x + 9.0, tackle_content_y + 8.0 + float(i) * (tackle_slot_height + slot_gap))
+		tackle_category_button.size = Vector2(tackle_left_width - 18.0, tackle_slot_height)
+		tackle_category_button.add_theme_font_size_override("font_size", 12)
 		tackle_category_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 
 	tackle_visual_title_label.position = Vector2(tackle_center_x + 14.0, tackle_content_y + 8.0)
-	tackle_visual_title_label.size = Vector2(tackle_center_width - 28.0, 26.0)
-	tackle_visual_title_label.add_theme_font_size_override("font_size", 15)
+	tackle_visual_title_label.size = Vector2(tackle_center_width - 28.0, 28.0)
+	tackle_visual_title_label.add_theme_font_size_override("font_size", 16)
 	tackle_visual_title_label.add_theme_color_override("font_color", Color(0.96, 0.88, 0.62, 1.0))
 
-	var visual_top: float = tackle_content_y + 40.0
-	var visual_bottom: float = tackle_content_y + tackle_content_height - 20.0
-	var line_x: float = tackle_center_x + tackle_center_width * 0.54
-	var rod_tip := Vector2(line_x + 8.0, visual_top)
-	var rod_base := Vector2(tackle_center_x + tackle_center_width * 0.86, visual_bottom - 4.0)
-	var line_bottom := Vector2(line_x, visual_bottom - 12.0)
+	var visual_top: float = tackle_content_y + 38.0
+	var visual_bottom: float = tackle_content_y + tackle_content_height - 18.0
+	var line_x: float = tackle_center_x + tackle_center_width * 0.55
+	var rod_tip := Vector2(line_x + 10.0, visual_top)
+	var rod_base := Vector2(tackle_center_x + tackle_center_width * 0.88, visual_bottom - 4.0)
+	var line_bottom := Vector2(line_x, visual_bottom - 20.0)
 	tackle_visual_rod_line.points = PackedVector2Array([rod_tip, rod_base])
 	tackle_visual_main_line.points = PackedVector2Array([rod_tip + Vector2(0.0, 5.0), line_bottom])
-	tackle_visual_leader_line.points = PackedVector2Array([line_bottom - Vector2(0.0, 48.0), line_bottom])
-	tackle_visual_rod_line.width = 6.0
-	tackle_visual_main_line.width = 2.4
-	tackle_visual_leader_line.width = 2.4
+	tackle_visual_leader_line.points = PackedVector2Array([line_bottom - Vector2(0.0, 54.0), line_bottom])
+	tackle_visual_rod_line.width = 7.0
+	tackle_visual_main_line.width = 2.8
+	tackle_visual_leader_line.width = 2.8
 	tackle_visual_rod_line.z_index = MENU_PANEL_Z + 2
 	tackle_visual_main_line.z_index = MENU_PANEL_Z + 2
 	tackle_visual_leader_line.z_index = MENU_PANEL_Z + 2
 
-	tackle_visual_float_marker.position = Vector2(line_x - 7.0, visual_top + tackle_content_height * 0.30)
-	tackle_visual_float_marker.size = Vector2(14.0, 36.0)
+	tackle_visual_float_marker.position = Vector2(line_x - 9.0, visual_top + tackle_content_height * 0.31)
+	tackle_visual_float_marker.size = Vector2(18.0, 44.0)
 	tackle_visual_float_marker.color = Color(0.92, 0.32, 0.22, 0.96)
 	tackle_visual_float_marker.z_index = MENU_PANEL_Z + 3
 
-	tackle_visual_hook_marker.position = Vector2(line_x - 18.0, line_bottom.y - 14.0)
-	tackle_visual_hook_marker.size = Vector2(34.0, 32.0)
-	tackle_visual_hook_marker.add_theme_font_size_override("font_size", 25)
+	tackle_visual_hook_marker.position = Vector2(line_x - 20.0, line_bottom.y - 16.0)
+	tackle_visual_hook_marker.size = Vector2(38.0, 36.0)
+	tackle_visual_hook_marker.add_theme_font_size_override("font_size", 29)
 	tackle_visual_hook_marker.add_theme_color_override("font_color", Color(0.78, 0.88, 0.90, 1.0))
 	tackle_visual_hook_marker.z_index = MENU_PANEL_Z + 3
 
-	tackle_visual_bait_marker.position = Vector2(line_x + 14.0, line_bottom.y - 4.0)
-	tackle_visual_bait_marker.size = Vector2(30.0, 26.0)
-	tackle_visual_bait_marker.add_theme_font_size_override("font_size", 23)
+	tackle_visual_bait_marker.position = Vector2(line_x + 15.0, line_bottom.y - 5.0)
+	tackle_visual_bait_marker.size = Vector2(34.0, 30.0)
+	tackle_visual_bait_marker.add_theme_font_size_override("font_size", 26)
 	tackle_visual_bait_marker.add_theme_color_override("font_color", Color(0.86, 0.42, 0.26, 1.0))
 	tackle_visual_bait_marker.z_index = MENU_PANEL_Z + 3
 
-	tackle_visual_bait_2_marker.position = Vector2(line_x + 40.0, line_bottom.y - 4.0)
-	tackle_visual_bait_2_marker.size = Vector2(30.0, 26.0)
-	tackle_visual_bait_2_marker.add_theme_font_size_override("font_size", 18)
+	tackle_visual_bait_2_marker.position = Vector2(line_x + 44.0, line_bottom.y - 5.0)
+	tackle_visual_bait_2_marker.size = Vector2(34.0, 30.0)
+	tackle_visual_bait_2_marker.add_theme_font_size_override("font_size", 20)
 	tackle_visual_bait_2_marker.add_theme_color_override("font_color", Color(0.90, 0.70, 0.32, 1.0))
 	tackle_visual_bait_2_marker.z_index = MENU_PANEL_Z + 3
 
-	var label_width: float = max(tackle_center_width * 0.36, 96.0)
+	var label_width: float = max(tackle_center_width * 0.37, 112.0)
 	tackle_visual_line_label.position = Vector2(tackle_center_x + 16.0, visual_top + 24.0)
-	tackle_visual_float_label.position = Vector2(tackle_center_x + 16.0, visual_top + tackle_content_height * 0.30 - 2.0)
-	tackle_visual_leader_label.position = Vector2(tackle_center_x + 16.0, line_bottom.y - 70.0)
-	tackle_visual_hook_label.position = Vector2(tackle_center_x + 16.0, line_bottom.y - 27.0)
-	tackle_visual_bait_label.position = Vector2(tackle_center_x + 16.0, line_bottom.y + 13.0)
-	tackle_visual_bait_2_label.position = Vector2(tackle_center_x + tackle_center_width - label_width - 14.0, line_bottom.y + 13.0)
+	tackle_visual_float_label.position = Vector2(tackle_center_x + 16.0, visual_top + tackle_content_height * 0.31 + 2.0)
+	tackle_visual_leader_label.position = Vector2(tackle_center_x + 16.0, line_bottom.y - 76.0)
+	tackle_visual_hook_label.position = Vector2(tackle_center_x + 16.0, line_bottom.y - 34.0)
+	tackle_visual_bait_label.position = Vector2(tackle_center_x + 16.0, line_bottom.y + 4.0)
+	tackle_visual_bait_2_label.position = Vector2(tackle_center_x + tackle_center_width - label_width - 12.0, line_bottom.y + 4.0)
 	for visual_label in [tackle_visual_line_label, tackle_visual_float_label, tackle_visual_leader_label, tackle_visual_hook_label, tackle_visual_bait_label, tackle_visual_bait_2_label]:
 		visual_label.size = Vector2(label_width, 38.0)
-		visual_label.add_theme_font_size_override("font_size", 11)
+		visual_label.add_theme_font_size_override("font_size", 12)
 
 	tackle_picker_title_label.position = Vector2(tackle_center_x + 14.0, tackle_content_y + 8.0)
 	tackle_picker_title_label.size = Vector2(tackle_center_width - 28.0, 28.0)
-	tackle_picker_title_label.add_theme_font_size_override("font_size", 14)
+	tackle_picker_title_label.add_theme_font_size_override("font_size", 15)
 	tackle_picker_title_label.add_theme_color_override("font_color", Color(0.96, 0.88, 0.62, 1.0))
 
 	var tackle_pager_height := 36.0
@@ -3202,7 +3202,7 @@ func _setup_layout() -> void:
 	tackle_item_list.size = Vector2(tackle_list_width, tackle_list_height)
 	tackle_item_list.max_columns = 1
 	ui_theme.apply_item_list_style(tackle_item_list)
-	tackle_item_list.add_theme_font_size_override("font_size", 12)
+	tackle_item_list.add_theme_font_size_override("font_size", 13)
 	tackle_item_list.add_theme_color_override("font_color", Color(0.84, 0.94, 0.90, 0.96))
 	tackle_item_list.add_theme_color_override("font_selected_color", Color(0.98, 1.0, 0.94, 1.0))
 
@@ -3227,41 +3227,41 @@ func _setup_layout() -> void:
 		tackle_page_label.add_theme_font_size_override("font_size", 11)
 		tackle_page_label.add_theme_color_override("font_color", Color(0.82, 0.94, 0.90, 0.92))
 
-	tackle_rod_button.position = Vector2(tackle_right_x + 10.0, tackle_content_y + 10.0)
-	tackle_rod_button.size = Vector2(tackle_right_width - 20.0, 58.0)
+	tackle_rod_button.position = Vector2(tackle_right_x + 9.0, tackle_content_y + 8.0)
+	tackle_rod_button.size = Vector2(tackle_right_width - 18.0, 66.0)
 	tackle_rod_button.add_theme_font_size_override("font_size", 12)
 	tackle_rod_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 
-	tackle_rod_stats_panel.position = Vector2(tackle_right_x + 10.0, tackle_rod_button.position.y + tackle_rod_button.size.y + 8.0)
-	tackle_rod_stats_panel.size = Vector2(tackle_right_width - 20.0, 80.0)
+	tackle_rod_stats_panel.position = Vector2(tackle_right_x + 9.0, tackle_rod_button.position.y + tackle_rod_button.size.y + 8.0)
+	tackle_rod_stats_panel.size = Vector2(tackle_right_width - 18.0, 88.0)
 	ui_theme.apply_tackle_panel_style(tackle_rod_stats_panel)
 
-	tackle_current_label.position = Vector2(tackle_right_x + 20.0, tackle_rod_stats_panel.position.y + 7.0)
-	tackle_current_label.size = Vector2(tackle_right_width - 40.0, tackle_rod_stats_panel.size.y - 14.0)
-	tackle_current_label.add_theme_font_size_override("font_size", 10)
+	tackle_current_label.position = Vector2(tackle_right_x + 19.0, tackle_rod_stats_panel.position.y + 8.0)
+	tackle_current_label.size = Vector2(tackle_right_width - 38.0, tackle_rod_stats_panel.size.y - 16.0)
+	tackle_current_label.add_theme_font_size_override("font_size", 11)
 	tackle_current_label.add_theme_color_override("font_color", Color(0.88, 0.96, 0.92, 0.96))
 	tackle_current_label.clip_text = true
 
 	var details_panel_y: float = tackle_rod_stats_panel.position.y + tackle_rod_stats_panel.size.y + 8.0
-	tackle_rod_description_panel.position = Vector2(tackle_right_x + 10.0, details_panel_y)
-	tackle_rod_description_panel.size = Vector2(tackle_right_width - 20.0, 68.0)
+	tackle_rod_description_panel.position = Vector2(tackle_right_x + 9.0, details_panel_y)
+	tackle_rod_description_panel.size = Vector2(tackle_right_width - 18.0, 78.0)
 	ui_theme.apply_tackle_panel_style(tackle_rod_description_panel)
 
-	tackle_details_label.position = Vector2(tackle_right_x + 20.0, details_panel_y + 7.0)
-	tackle_details_label.size = Vector2(tackle_right_width - 40.0, tackle_rod_description_panel.size.y - 14.0)
-	tackle_details_label.add_theme_font_size_override("font_size", 10)
+	tackle_details_label.position = Vector2(tackle_right_x + 19.0, details_panel_y + 8.0)
+	tackle_details_label.size = Vector2(tackle_right_width - 38.0, tackle_rod_description_panel.size.y - 16.0)
+	tackle_details_label.add_theme_font_size_override("font_size", 11)
 	tackle_details_label.add_theme_color_override("font_color", Color(0.78, 0.88, 0.86, 0.96))
 	tackle_details_label.clip_text = true
 
 	var final_panel_y: float = tackle_rod_description_panel.position.y + tackle_rod_description_panel.size.y + 8.0
-	var final_panel_height: float = max(tackle_content_y + tackle_content_height - final_panel_y - 8.0, 60.0)
-	tackle_final_stats_panel.position = Vector2(tackle_right_x + 10.0, final_panel_y)
-	tackle_final_stats_panel.size = Vector2(tackle_right_width - 20.0, final_panel_height)
+	var final_panel_height: float = max(tackle_content_y + tackle_content_height - final_panel_y - 8.0, 78.0)
+	tackle_final_stats_panel.position = Vector2(tackle_right_x + 9.0, final_panel_y)
+	tackle_final_stats_panel.size = Vector2(tackle_right_width - 18.0, final_panel_height)
 	ui_theme.apply_tackle_panel_style(tackle_final_stats_panel)
 
-	tackle_compare_label.position = Vector2(tackle_right_x + 20.0, final_panel_y + 7.0)
-	tackle_compare_label.size = Vector2(tackle_right_width - 40.0, max(tackle_final_stats_panel.size.y - 14.0, 46.0))
-	tackle_compare_label.add_theme_font_size_override("font_size", 10)
+	tackle_compare_label.position = Vector2(tackle_right_x + 19.0, final_panel_y + 8.0)
+	tackle_compare_label.size = Vector2(tackle_right_width - 38.0, max(tackle_final_stats_panel.size.y - 16.0, 58.0))
+	tackle_compare_label.add_theme_font_size_override("font_size", 11)
 	tackle_compare_label.add_theme_color_override("font_color", Color(0.78, 0.90, 0.86, 0.94))
 	tackle_compare_label.clip_text = true
 
@@ -3271,30 +3271,30 @@ func _setup_layout() -> void:
 	tackle_hint_label.add_theme_color_override("font_color", Color(0.82, 0.72, 0.48, 0.92))
 	tackle_hint_label.clip_text = true
 
-	tackle_depth_label.position = Vector2(tackle_padding + 18.0, tackle_action_y + 13.0)
-	tackle_depth_label.size = Vector2(166.0, 38.0)
-	tackle_depth_label.add_theme_font_size_override("font_size", 14)
+	tackle_depth_label.position = Vector2(tackle_padding + 16.0, tackle_action_y + 14.0)
+	tackle_depth_label.size = Vector2(174.0, 40.0)
+	tackle_depth_label.add_theme_font_size_override("font_size", 15)
 	tackle_depth_label.add_theme_color_override("font_color", Color(0.92, 0.96, 0.90, 0.96))
 
-	tackle_depth_minus_button.position = Vector2(tackle_depth_label.position.x + tackle_depth_label.size.x + 10.0, tackle_action_y + 10.0)
-	tackle_depth_minus_button.size = Vector2(44.0, 44.0)
-	tackle_depth_minus_button.add_theme_font_size_override("font_size", 18)
+	tackle_depth_minus_button.position = Vector2(tackle_depth_label.position.x + tackle_depth_label.size.x + 8.0, tackle_action_y + 10.0)
+	tackle_depth_minus_button.size = Vector2(48.0, 48.0)
+	tackle_depth_minus_button.add_theme_font_size_override("font_size", 20)
 	_apply_button_style(tackle_depth_minus_button, STYLE_SECONDARY_BUTTON)
 
-	tackle_depth_plus_button.position = Vector2(tackle_depth_minus_button.position.x + 50.0, tackle_action_y + 10.0)
-	tackle_depth_plus_button.size = Vector2(44.0, 44.0)
-	tackle_depth_plus_button.add_theme_font_size_override("font_size", 18)
+	tackle_depth_plus_button.position = Vector2(tackle_depth_minus_button.position.x + 54.0, tackle_action_y + 10.0)
+	tackle_depth_plus_button.size = Vector2(48.0, 48.0)
+	tackle_depth_plus_button.add_theme_font_size_override("font_size", 20)
 	_apply_button_style(tackle_depth_plus_button, STYLE_SECONDARY_BUTTON)
 
-	var equip_width: float = min(286.0, tackle_inner_width * 0.34)
+	var equip_width: float = min(304.0, tackle_inner_width * 0.34)
 	tackle_equip_button.position = Vector2(tackle_padding + tackle_inner_width * 0.5 - equip_width * 0.5, tackle_action_y + 9.0)
-	tackle_equip_button.size = Vector2(equip_width, 46.0)
+	tackle_equip_button.size = Vector2(equip_width, 50.0)
 	ui_theme.apply_tackle_primary_action_style(tackle_equip_button)
 
-	var close_width: float = min(184.0, tackle_inner_width * 0.22)
-	tackle_close_button.position = Vector2(tackle_padding + tackle_inner_width - close_width - 18.0, tackle_action_y + 10.0)
-	tackle_close_button.size = Vector2(close_width, 44.0)
-	tackle_close_button.add_theme_font_size_override("font_size", 14)
+	var close_width: float = min(194.0, tackle_inner_width * 0.22)
+	tackle_close_button.position = Vector2(tackle_padding + tackle_inner_width - close_width - 16.0, tackle_action_y + 10.0)
+	tackle_close_button.size = Vector2(close_width, 48.0)
+	tackle_close_button.add_theme_font_size_override("font_size", 15)
 	ui_theme.apply_close_button_style(tackle_close_button)
 
 	var waterbody_width: float = screen_size.x
