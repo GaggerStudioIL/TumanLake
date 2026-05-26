@@ -556,15 +556,35 @@ func get_modal_content_root() -> Control:
 	_ensure_modal_layer()
 	return modal_content_root
 
+func _get_full_ui_viewport_size() -> Vector2:
+	var viewport_size: Vector2 = get_viewport_rect().size
+	var root_size: Vector2 = get_tree().root.get_visible_rect().size
+	var project_size := Vector2(
+		float(ProjectSettings.get_setting("display/window/size/viewport_width", viewport_size.x)),
+		float(ProjectSettings.get_setting("display/window/size/viewport_height", viewport_size.y))
+	)
+	return Vector2(
+		max(max(viewport_size.x, root_size.x), project_size.x),
+		max(max(viewport_size.y, root_size.y), project_size.y)
+	)
+
 func _layout_modal_layer() -> void:
+	var screen_size := _get_full_ui_viewport_size()
 	if modal_input_shield != null:
 		modal_input_shield.set_anchors_preset(Control.PRESET_FULL_RECT)
+		modal_input_shield.position = Vector2.ZERO
+		modal_input_shield.size = screen_size
+		modal_input_shield.scale = Vector2.ONE
 		modal_input_shield.offset_left = 0.0
 		modal_input_shield.offset_top = 0.0
 		modal_input_shield.offset_right = 0.0
 		modal_input_shield.offset_bottom = 0.0
 	if modal_content_root != null:
 		modal_content_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+		modal_content_root.position = Vector2.ZERO
+		modal_content_root.size = screen_size
+		modal_content_root.custom_minimum_size = screen_size
+		modal_content_root.scale = Vector2.ONE
 		modal_content_root.offset_left = 0.0
 		modal_content_root.offset_top = 0.0
 		modal_content_root.offset_right = 0.0
@@ -2438,6 +2458,9 @@ func _setup_layout() -> void:
 	shop_backdrop.color = Color(0.0, 0.0, 0.0, 0.84)
 
 	tackle_backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	tackle_backdrop.position = Vector2.ZERO
+	tackle_backdrop.size = _get_full_ui_viewport_size()
+	tackle_backdrop.scale = Vector2.ONE
 	tackle_backdrop.offset_left = 0.0
 	tackle_backdrop.offset_top = 0.0
 	tackle_backdrop.offset_right = 0.0
@@ -3069,10 +3092,19 @@ func _setup_layout() -> void:
 	inventory_close_button.size = close_button_size
 	ui_theme.apply_close_button_style(inventory_close_button)
 
-	var tackle_width: float = min(max(screen_size.x * 0.96, 900.0), screen_size.x - 16.0)
-	var tackle_panel_height: float = min(max(screen_size.y * 0.94, 490.0), screen_size.y - 12.0)
-	var tackle_x: float = (screen_size.x - tackle_width) * 0.5
-	var tackle_y_pos: float = (screen_size.y - tackle_panel_height) * 0.5
+	var tackle_screen_size := _get_full_ui_viewport_size()
+	var tackle_margin_x: float = clamp(tackle_screen_size.x * 0.02, 14.0, 24.0)
+	var tackle_margin_y: float = clamp(tackle_screen_size.y * 0.03, 14.0, 24.0)
+	var tackle_available_width: float = max(tackle_screen_size.x - tackle_margin_x * 2.0, 1.0)
+	var tackle_available_height: float = max(tackle_screen_size.y - tackle_margin_y * 2.0, 1.0)
+	var tackle_width: float = min(tackle_available_width, 930.0)
+	if tackle_available_width >= 900.0:
+		tackle_width = max(tackle_width, 900.0)
+	var tackle_panel_height: float = min(tackle_available_height, 510.0)
+	if tackle_available_height >= 480.0:
+		tackle_panel_height = max(tackle_panel_height, 480.0)
+	var tackle_x: float = (tackle_screen_size.x - tackle_width) * 0.5
+	var tackle_y_pos: float = (tackle_screen_size.y - tackle_panel_height) * 0.5
 	var tackle_padding := 12.0
 	var tackle_gap := 10.0
 	var tackle_inner_width: float = tackle_width - tackle_padding * 2.0
@@ -3088,8 +3120,21 @@ func _setup_layout() -> void:
 	var tackle_center_x: float = tackle_left_x + tackle_left_width + tackle_gap
 	var tackle_right_x: float = tackle_center_x + tackle_center_width + tackle_gap
 
+	tackle_backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	tackle_backdrop.position = Vector2.ZERO
+	tackle_backdrop.size = tackle_screen_size
+	tackle_backdrop.scale = Vector2.ONE
+	tackle_backdrop.offset_left = 0.0
+	tackle_backdrop.offset_top = 0.0
+	tackle_backdrop.offset_right = 0.0
+	tackle_backdrop.offset_bottom = 0.0
+
+	tackle_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	tackle_panel.position = Vector2(tackle_x, tackle_y_pos)
 	tackle_panel.size = Vector2(tackle_width, tackle_panel_height)
+	tackle_panel.custom_minimum_size = Vector2(tackle_width, tackle_panel_height)
+	tackle_panel.scale = Vector2.ONE
+	tackle_panel.pivot_offset = Vector2.ZERO
 	ui_theme.apply_tackle_panel_style(tackle_panel, true)
 
 	tackle_title_label.position = Vector2(tackle_padding, 8.0)
