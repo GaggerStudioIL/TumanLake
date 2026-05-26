@@ -612,6 +612,7 @@ const TACKLE_CATALOG := {
 		"category": "line",
 		"rarity": "common",
 		"price": 4,
+		"image_path": "res://assets/ui/shop/lines/lakelinenylon1_5kg.png",
 		"description": "Бюджетная нейлоновая леска 100 м. Стартовый вариант для мелкой рыбы.",
 		"stats": {
 			"line_type": "nylon",
@@ -633,6 +634,7 @@ const TACKLE_CATALOG := {
 		"category": "line",
 		"rarity": "common",
 		"price": 5,
+		"image_path": "res://assets/ui/shop/lines/lakelinenylon2kg.png",
 		"description": "Бюджетная нейлоновая леска 100 м. Дешёвая и заметная, но доступная с начала игры.",
 		"stats": {
 			"line_type": "nylon",
@@ -654,6 +656,7 @@ const TACKLE_CATALOG := {
 		"category": "line",
 		"rarity": "common",
 		"price": 6,
+		"image_path": "res://assets/ui/shop/lines/lakelinenylon2_5kg.png",
 		"description": "Бюджетная нейлоновая леска 100 м для лёгкой маховой снасти.",
 		"stats": {
 			"line_type": "nylon",
@@ -675,6 +678,7 @@ const TACKLE_CATALOG := {
 		"category": "line",
 		"rarity": "common",
 		"price": 8,
+		"image_path": "res://assets/ui/shop/lines/lakelinenylon3kg.png",
 		"description": "Бюджетная нейлоновая леска 100 м для начальной ловли на озере.",
 		"stats": {
 			"line_type": "nylon",
@@ -696,6 +700,7 @@ const TACKLE_CATALOG := {
 		"category": "line",
 		"rarity": "common",
 		"price": 11,
+		"image_path": "res://assets/ui/shop/lines/lakelinenylon4kg.png",
 		"description": "Недорогая нейлоновая леска 100 м. Подходит для осторожного апгрейда снасти.",
 		"stats": {
 			"line_type": "nylon",
@@ -717,6 +722,7 @@ const TACKLE_CATALOG := {
 		"category": "line",
 		"rarity": "common",
 		"price": 14,
+		"image_path": "res://assets/ui/shop/lines/lakelinenylon5kg.png",
 		"description": "Бюджетная нейлоновая леска 100 м. Более прочная, но заметнее в воде.",
 		"stats": {
 			"line_type": "nylon",
@@ -738,6 +744,7 @@ const TACKLE_CATALOG := {
 		"category": "line",
 		"rarity": "common",
 		"price": 18,
+		"image_path": "res://assets/ui/shop/lines/lakelinenylon6kg.png",
 		"description": "Бюджетная нейлоновая леска 100 м для рыбы покрупнее.",
 		"stats": {
 			"line_type": "nylon",
@@ -759,6 +766,7 @@ const TACKLE_CATALOG := {
 		"category": "line",
 		"rarity": "common",
 		"price": 25,
+		"image_path": "res://assets/ui/shop/lines/lakelinenylon8kg.png",
 		"description": "Бюджетная нейлоновая леска 100 м. Сильнее, но уже заметно грубее.",
 		"stats": {
 			"line_type": "nylon",
@@ -780,6 +788,7 @@ const TACKLE_CATALOG := {
 		"category": "line",
 		"rarity": "common",
 		"price": 32,
+		"image_path": "res://assets/ui/shop/lines/lakelinenylon10kg.png",
 		"description": "Простая нейлоновая леска 100 м для тяжёлой бюджетной оснастки.",
 		"stats": {
 			"line_type": "nylon",
@@ -801,6 +810,7 @@ const TACKLE_CATALOG := {
 		"category": "line",
 		"rarity": "common",
 		"price": 40,
+		"image_path": "res://assets/ui/shop/lines/lakelinenylon12kg.png",
 		"description": "Бюджетная нейлоновая леска 100 м. Прочная, но грубая для осторожной рыбы.",
 		"stats": {
 			"line_type": "nylon",
@@ -822,6 +832,7 @@ const TACKLE_CATALOG := {
 		"category": "line",
 		"rarity": "common",
 		"price": 52,
+		"image_path": "res://assets/ui/shop/lines/lakelinenylon15kg.png",
 		"description": "Толстая бюджетная нейлоновая леска 100 м для силовой ловли.",
 		"stats": {
 			"line_type": "nylon",
@@ -843,6 +854,7 @@ const TACKLE_CATALOG := {
 		"category": "line",
 		"rarity": "common",
 		"price": 62,
+		"image_path": "res://assets/ui/shop/lines/lakelinenylon18kg.png",
 		"description": "Толстая бюджетная нейлоновая леска 100 м. Дешёвая сила ценой заметности.",
 		"stats": {
 			"line_type": "nylon",
@@ -864,6 +876,7 @@ const TACKLE_CATALOG := {
 		"category": "line",
 		"rarity": "common",
 		"price": 70,
+		"image_path": "res://assets/ui/shop/lines/lakelinenylon20kg.png",
 		"description": "Самая прочная леска LakeLine Nylon Basic 100 м. Бюджетная, толстая и хорошо заметная.",
 		"stats": {
 			"line_type": "nylon",

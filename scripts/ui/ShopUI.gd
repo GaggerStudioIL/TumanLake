@@ -658,15 +658,17 @@ func _create_shop_card(item: Dictionary, card_size: Vector2) -> Panel:
 	var rarity_color = main._get_rarity_color(rarity)
 	theme.apply_shop_row_style(card, rarity)
 
-	var rod_card_texture := _get_shop_card_texture(item)
-	if rod_card_texture != null:
-		_populate_rod_image_card(card, item, card_size, rod_card_texture, rarity_color)
+	var card_texture := _get_shop_card_texture(item)
+	var category := str(item.get("category", item.get("type", "misc")))
+	if card_texture != null and [SHOP_CATEGORY_ROD, SHOP_CATEGORY_BAIT].has(category):
+		_populate_rod_image_card(card, item, card_size, card_texture, rarity_color)
 		return card
 
 	if true:
-		var compact_icon_size := 30.0
+		var compact_has_texture := card_texture != null
+		var compact_icon_size := 44.0 if compact_has_texture else 30.0
 		var compact_icon_y := (card_size.y - compact_icon_size) * 0.5
-		var compact_content_x := 50.0
+		var compact_content_x := 68.0 if compact_has_texture else 50.0
 		var compact_buy_width := 58.0
 		var compact_buy_height := 28.0
 		var compact_details_width := 86.0
@@ -679,19 +681,30 @@ func _create_shop_card(item: Dictionary, card_size: Vector2) -> Panel:
 		var compact_text_y := maxf(7.0, (card_size.y - 43.0) * 0.5)
 		var compact_text_width: float = maxf(compact_action_x - compact_content_x - 18.0, 140.0)
 
-		var compact_icon_label = Label.new()
-		compact_icon_label.text = str(item.get("icon", "?"))
-		compact_icon_label.position = Vector2(10.0, compact_icon_y)
-		compact_icon_label.size = Vector2(compact_icon_size, compact_icon_size)
-		compact_icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		compact_icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		compact_icon_label.add_theme_font_size_override("font_size", 15)
-		compact_icon_label.add_theme_color_override("font_color", Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.98))
-		compact_icon_label.add_theme_stylebox_override(
-			"normal",
-			main._make_panel_style(Color(0.10, 0.22, 0.17, 0.72), Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.32), 10, 3, Color(0.0, 0.0, 0.0, 0.10))
-		)
-		card.add_child(compact_icon_label)
+		if compact_has_texture:
+			var compact_icon_rect := TextureRect.new()
+			compact_icon_rect.texture = card_texture
+			compact_icon_rect.position = Vector2(10.0, compact_icon_y)
+			compact_icon_rect.size = Vector2(compact_icon_size, compact_icon_size)
+			compact_icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			compact_icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			compact_icon_rect.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+			compact_icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			card.add_child(compact_icon_rect)
+		else:
+			var compact_icon_label = Label.new()
+			compact_icon_label.text = str(item.get("icon", "?"))
+			compact_icon_label.position = Vector2(10.0, compact_icon_y)
+			compact_icon_label.size = Vector2(compact_icon_size, compact_icon_size)
+			compact_icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			compact_icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			compact_icon_label.add_theme_font_size_override("font_size", 15)
+			compact_icon_label.add_theme_color_override("font_color", Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.98))
+			compact_icon_label.add_theme_stylebox_override(
+				"normal",
+				main._make_panel_style(Color(0.10, 0.22, 0.17, 0.72), Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.32), 10, 3, Color(0.0, 0.0, 0.0, 0.10))
+			)
+			card.add_child(compact_icon_label)
 
 		var compact_name_label = Label.new()
 		compact_name_label.text = str(item.get("name", "-"))

@@ -5,6 +5,7 @@ var main
 var theme
 const TACKLE_ITEMS_PER_PAGE := 7
 var _picker_open := false
+var _texture_cache: Dictionary = {}
 
 enum FishingUiState {
 	IDLE,
@@ -373,7 +374,7 @@ func _update_tackle_ui() -> void:
 
 	for i in range(page_start, page_end):
 		var item: Dictionary = main._visible_tackle_items[i]
-		main.tackle_item_list.add_item(_get_tackle_item_display_text(item))
+		main.tackle_item_list.add_item(_get_tackle_item_display_text(item), _get_item_texture(item))
 		var list_index = main.tackle_item_list.item_count - 1
 
 		if _is_tackle_item_equipped(item):
@@ -437,6 +438,11 @@ func _update_tackle_ui() -> void:
 		var button: Button = item[0]
 		var category: String = item[1]
 		button.text = _get_tackle_slot_button_text(category)
+		button.icon = _get_tackle_slot_texture(category)
+		button.expand_icon = button.icon != null
+		button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
+		button.add_theme_constant_override("icon_max_width", 42 if button.icon != null else 0)
 		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		button.clip_text = true
 		button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -459,6 +465,39 @@ func _get_tackle_slot_button_text(category: String) -> String:
 		_get_tackle_slot_equipped_name(category),
 		_get_tackle_slot_param_text(category)
 	]
+
+
+func _get_tackle_slot_texture(category: String) -> Texture2D:
+	if category == "bait_2" and not PlayerData.can_use_second_bait():
+		return null
+	var current: Dictionary = PlayerData.current_tackle.get(category, {})
+	return _get_item_texture(current)
+
+
+func _get_item_texture(item: Dictionary) -> Texture2D:
+	var path := str(item.get("image_path", ""))
+	if path == "":
+		return null
+	if _texture_cache.has(path):
+		return _texture_cache[path]
+
+	var texture := _load_texture_resource(path)
+	_texture_cache[path] = texture
+	return texture
+
+
+func _load_texture_resource(path: String) -> Texture2D:
+	if ResourceLoader.exists(path):
+		var resource: Resource = load(path)
+		if resource is Texture2D:
+			return resource
+
+	if FileAccess.file_exists(path):
+		var image := Image.load_from_file(path)
+		if image != null and not image.is_empty():
+			return ImageTexture.create_from_image(image)
+
+	return null
 
 
 func _get_tackle_slot_icon(category: String) -> String:

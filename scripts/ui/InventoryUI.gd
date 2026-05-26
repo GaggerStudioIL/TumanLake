@@ -4,6 +4,7 @@ extends RefCounted
 var main
 var theme
 const INVENTORY_ITEMS_PER_PAGE := 8
+var _texture_cache: Dictionary = {}
 
 enum FishingUiState {
 	IDLE,
@@ -75,7 +76,7 @@ func _update_inventory_ui() -> void:
 
 	for i in range(page_start, page_end):
 		var item: Dictionary = main._visible_inventory_items[i]
-		main.inventory_item_list.add_item(_get_inventory_item_display_text(item))
+		main.inventory_item_list.add_item(_get_inventory_item_display_text(item), _get_item_texture(item))
 		var list_index = main.inventory_item_list.item_count - 1
 		if _is_inventory_item_equipped(item):
 			main.inventory_item_list.set_item_custom_bg_color(list_index, Color(0.12, 0.34, 0.22, 0.66))
@@ -281,6 +282,32 @@ func _get_inventory_item_details_text(item: Dictionary) -> String:
 		details += "\n\n%s" % stats_text
 
 	return details
+
+
+func _get_item_texture(item: Dictionary) -> Texture2D:
+	var path := str(item.get("image_path", ""))
+	if path == "":
+		return null
+	if _texture_cache.has(path):
+		return _texture_cache[path]
+
+	var texture := _load_texture_resource(path)
+	_texture_cache[path] = texture
+	return texture
+
+
+func _load_texture_resource(path: String) -> Texture2D:
+	if ResourceLoader.exists(path):
+		var resource: Resource = load(path)
+		if resource is Texture2D:
+			return resource
+
+	if FileAccess.file_exists(path):
+		var image := Image.load_from_file(path)
+		if image != null and not image.is_empty():
+			return ImageTexture.create_from_image(image)
+
+	return null
 
 
 func _get_inventory_stats_text(stats: Dictionary) -> String:
