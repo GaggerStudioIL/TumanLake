@@ -3,6 +3,7 @@ extends Node2D
 const StarsLayerScript := preload("res://scripts/environment/StarsLayer.gd")
 
 @export var sun_size: float = 44.0
+@export var show_dynamic_sun: bool = false
 @export var moon_size: float = 54.0
 @export var sun_arc_height: float = 0.48
 @export var moon_arc_height: float = 0.34
@@ -105,6 +106,10 @@ func update_day_night_visuals(_time_state: Dictionary = {}) -> void:
 	update_scene_tint(minutes, phase)
 
 func update_sun_position(minutes: float) -> void:
+	if not show_dynamic_sun:
+		_sun_sprite.visible = false
+		return
+
 	var sun_t: float = clampf((minutes - DAWN_START) / maxf(NIGHT_START - DAWN_START, 1.0), 0.0, 1.0)
 	var sun_arc: float = sin(sun_t * PI)
 	var sun_alpha: float = _fade_between(minutes, DAWN_START, DAWN_START + 65.0) * (1.0 - _fade_between(minutes, NIGHT_START - 80.0, NIGHT_START))
