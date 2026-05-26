@@ -229,6 +229,68 @@ func get_button_style(kind: String = "secondary", state: String = "normal") -> S
 
 	return make_style(bg, border, radius, shadow_size, shadow)
 
+func get_tackle_panel_style(strong := false) -> StyleBoxFlat:
+	var bg := Color(0.022, 0.060, 0.082, 0.90) if strong else Color(0.028, 0.083, 0.110, 0.72)
+	var border := Color(0.46, 0.73, 0.82, 0.28)
+	var style := make_style(bg, border, 8, 8, Color(0.0, 0.0, 0.0, 0.28))
+	style.content_margin_left = 12.0
+	style.content_margin_top = 10.0
+	style.content_margin_right = 12.0
+	style.content_margin_bottom = 10.0
+	return style
+
+func get_tackle_slot_style(state: String = "empty") -> StyleBoxFlat:
+	var bg := Color(0.030, 0.095, 0.125, 0.72)
+	var border := Color(0.46, 0.73, 0.82, 0.26)
+	var shadow := Color(0.0, 0.0, 0.0, 0.22)
+	var shadow_size := 5
+
+	match state:
+		"selected":
+			bg = Color(0.050, 0.145, 0.165, 0.88)
+			border = Color(0.84, 0.66, 0.30, 0.78)
+			shadow = Color(0.85, 0.55, 0.12, 0.18)
+			shadow_size = 8
+		"filled":
+			bg = Color(0.030, 0.120, 0.112, 0.78)
+			border = Color(0.48, 0.82, 0.48, 0.52)
+			shadow = Color(0.18, 0.65, 0.34, 0.14)
+		"locked":
+			bg = Color(0.035, 0.044, 0.050, 0.58)
+			border = Color(0.46, 0.50, 0.52, 0.24)
+			shadow = Color(0.0, 0.0, 0.0, 0.12)
+			shadow_size = 2
+		"hover":
+			bg = Color(0.050, 0.135, 0.150, 0.84)
+			border = Color(0.76, 0.90, 0.80, 0.44)
+		"pressed":
+			bg = Color(0.035, 0.100, 0.096, 0.90)
+			border = Color(0.84, 0.66, 0.30, 0.68)
+
+	var style := make_style(bg, border, 8, shadow_size, shadow)
+	style.content_margin_left = 10.0
+	style.content_margin_top = 7.0
+	style.content_margin_right = 10.0
+	style.content_margin_bottom = 7.0
+	return style
+
+func get_tackle_primary_action_style(state: String = "normal") -> StyleBoxFlat:
+	var bg := Color(0.52, 0.36, 0.10, 0.95)
+	var border := Color(0.95, 0.73, 0.28, 0.78)
+	var shadow := Color(0.82, 0.50, 0.10, 0.24)
+	var shadow_size := 9
+	if state == "hover":
+		bg = Color(0.66, 0.45, 0.13, 1.0)
+		border = Color(1.0, 0.82, 0.34, 0.92)
+	elif state == "pressed":
+		bg = Color(0.38, 0.26, 0.08, 1.0)
+		shadow_size = 4
+	elif state == "disabled":
+		bg = Color(0.11, 0.14, 0.14, 0.62)
+		border = Color(0.58, 0.62, 0.58, 0.16)
+		shadow = Color.TRANSPARENT
+	return make_style(bg, border, 8, shadow_size, shadow)
+
 func get_icon(icon_name: String) -> Texture2D:
 	match icon_name:
 		"hook", "cast":
@@ -492,6 +554,37 @@ func apply_item_list_style(item_list: ItemList) -> void:
 	item_list.add_theme_color_override("font_selected_color", TEXT_PRIMARY)
 	item_list.add_theme_color_override("guide_color", Color(0.76, 0.88, 0.82, 0.10))
 	item_list.add_theme_font_size_override("font_size", 13)
+
+func apply_tackle_panel_style(control, strong := false) -> void:
+	if control is Panel:
+		control.add_theme_stylebox_override("panel", get_tackle_panel_style(strong))
+	elif control is ColorRect:
+		control.color = Color(0.022, 0.060, 0.082, 0.90) if strong else Color(0.028, 0.083, 0.110, 0.72)
+
+func apply_tackle_slot_button_style(button: Button, state: String = "empty") -> void:
+	button.add_theme_stylebox_override("normal", get_tackle_slot_style(state))
+	button.add_theme_stylebox_override("hover", get_tackle_slot_style("hover" if state != "locked" else "locked"))
+	button.add_theme_stylebox_override("pressed", get_tackle_slot_style("pressed" if state != "locked" else "locked"))
+	button.add_theme_stylebox_override("disabled", get_tackle_slot_style("locked"))
+	button.add_theme_stylebox_override("focus", get_tackle_slot_style("selected"))
+	button.add_theme_color_override("font_color", TEXT_PRIMARY if state != "locked" else Color(0.58, 0.64, 0.66, 0.88))
+	button.add_theme_color_override("font_hover_color", Color(1.0, 0.91, 0.66, 1.0))
+	button.add_theme_color_override("font_pressed_color", Color(0.92, 0.78, 0.46, 1.0))
+	button.add_theme_color_override("font_disabled_color", Color(0.50, 0.56, 0.58, 0.78))
+	button.add_theme_constant_override("h_separation", 6)
+	_bind_button_feedback(button)
+
+func apply_tackle_primary_action_style(button: Button) -> void:
+	button.add_theme_stylebox_override("normal", get_tackle_primary_action_style("normal"))
+	button.add_theme_stylebox_override("hover", get_tackle_primary_action_style("hover"))
+	button.add_theme_stylebox_override("pressed", get_tackle_primary_action_style("pressed"))
+	button.add_theme_stylebox_override("disabled", get_tackle_primary_action_style("disabled"))
+	button.add_theme_color_override("font_color", Color(1.0, 0.96, 0.86, 1.0))
+	button.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 0.92, 1.0))
+	button.add_theme_color_override("font_pressed_color", Color(0.95, 0.86, 0.66, 1.0))
+	button.add_theme_color_override("font_disabled_color", Color(0.62, 0.66, 0.64, 0.70))
+	button.add_theme_font_size_override("font_size", 15)
+	_bind_button_feedback(button)
 
 func apply_meter_track_style(track: ColorRect, fill: ColorRect = null, accent: Color = GREEN_HOVER) -> void:
 	track.color = Color(0.10, 0.145, 0.145, 0.92)
