@@ -576,6 +576,7 @@ const TACKLE_CATALOG := {
 		"category": "line",
 		"rarity": "uncommon",
 		"price": 145,
+		"image_path": "res://assets/ui/shop/lines/basiclinenylon2_5kg.png",
 		"description": "Универсальная леска для средней рыбы. Чуть заметнее, но надёжнее.",
 		"stats": {
 			"max_load_kg": 2.5,
@@ -594,6 +595,7 @@ const TACKLE_CATALOG := {
 		"category": "line",
 		"rarity": "rare",
 		"price": 360,
+		"image_path": "res://assets/ui/shop/lines/basiclinenylon5kg.png",
 		"description": "Прочная леска для крупной рыбы. Заметнее в воде, зато прощает ошибки.",
 		"stats": {
 			"max_load_kg": 5.0,
