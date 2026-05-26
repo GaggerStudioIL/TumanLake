@@ -4,6 +4,8 @@ const TARGET_SCENE_PATH := "res://scenes/main/Main.tscn"
 const DESIGN_SIZE := Vector2(1920.0, 1080.0)
 const FADE_DURATION := 1.7
 const TITLE_FADE_DURATION := 1.4
+const INTRO_INPUT_ARM_DELAY := 0.35
+const FINAL_INPUT_ARM_DELAY := 0.85
 const IntroFxLayerScript := preload("res://scripts/intro/IntroFxLayer.gd")
 
 @export var change_scene_on_finish := true
@@ -24,6 +26,8 @@ var presents_label: Label
 var final_text_label: Label
 var logo_layer: TextureRect
 var press_label: Label
+var skip_button: Button
+var start_button: Button
 var fade_rect: ColorRect
 var animation_player: AnimationPlayer
 var final_start_enabled := false
@@ -31,6 +35,8 @@ var finishing := false
 var intro_running := false
 var active_scene_index := 0
 var active_scene_time := 0.0
+var input_armed_at_msec := 0
+var final_input_armed_at_msec := 0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -62,22 +68,24 @@ func _unhandled_input(event: InputEvent) -> void:
 func _handle_intro_input(event: InputEvent) -> bool:
 	if finishing:
 		return false
+	if not _is_input_armed():
+		return false
 	if event is InputEventKey:
 		var key_event := event as InputEventKey
 		if key_event.pressed and not key_event.echo:
-			_request_skip()
-			return true
-	elif event is InputEventMouseButton:
-		var mouse_event := event as InputEventMouseButton
-		if mouse_event.pressed:
-			_request_skip()
-			return true
-	elif event is InputEventScreenTouch:
-		var touch_event := event as InputEventScreenTouch
-		if touch_event.pressed:
-			_request_skip()
-			return true
+			if _is_final_scene() and final_start_enabled and (key_event.keycode == KEY_ENTER or key_event.keycode == KEY_SPACE):
+				_finish_intro()
+				return true
+			if not _is_final_scene() and key_event.keycode == KEY_ESCAPE:
+				_request_skip()
+				return true
 	return false
+
+func _is_input_armed() -> bool:
+	return Time.get_ticks_msec() >= input_armed_at_msec
+
+func _arm_input(delay_seconds: float) -> void:
+	input_armed_at_msec = Time.get_ticks_msec() + int(delay_seconds * 1000.0)
 
 func _build_scene_defs() -> void:
 	scene_defs = [
@@ -227,6 +235,28 @@ func _build_nodes() -> void:
 	press_label.modulate = Color(1.0, 0.90, 0.72, 0.0)
 	overlay_canvas.add_child(press_label)
 
+	skip_button = Button.new()
+	skip_button.name = "SkipButton"
+	skip_button.text = "Пропустить"
+	skip_button.focus_mode = Control.FOCUS_NONE
+	skip_button.visible = false
+	skip_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	_apply_intro_button_style(skip_button, false)
+	skip_button.pressed.connect(_on_skip_button_pressed)
+	overlay_canvas.add_child(skip_button)
+
+	start_button = Button.new()
+	start_button.name = "StartButton"
+	start_button.text = "Начать игру"
+	start_button.focus_mode = Control.FOCUS_NONE
+	start_button.visible = false
+	start_button.disabled = true
+	start_button.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	start_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	_apply_intro_button_style(start_button, true)
+	start_button.pressed.connect(_on_start_button_pressed)
+	overlay_canvas.add_child(start_button)
+
 	fade_rect = ColorRect.new()
 	fade_rect.name = "FadeRect"
 	fade_rect.color = Color.BLACK
@@ -239,6 +269,53 @@ func _build_nodes() -> void:
 	add_child(animation_player)
 
 	_apply_fullscreen_layout()
+
+func _apply_intro_button_style(button: Button, primary: bool) -> void:
+	var normal_bg := Color(0.035, 0.060, 0.060, 0.72)
+	var hover_bg := Color(0.060, 0.110, 0.095, 0.88)
+	var pressed_bg := Color(0.025, 0.070, 0.060, 0.94)
+	var border := Color(0.84, 0.94, 0.82, 0.28)
+	var shadow := Color(0.0, 0.0, 0.0, 0.22)
+	var radius := 18
+	var font_size := 16
+	if primary:
+		normal_bg = Color(0.135, 0.290, 0.145, 0.94)
+		hover_bg = Color(0.185, 0.390, 0.190, 1.0)
+		pressed_bg = Color(0.090, 0.210, 0.115, 1.0)
+		border = Color(0.96, 0.76, 0.32, 0.62)
+		shadow = Color(0.82, 0.54, 0.12, 0.20)
+		radius = 22
+		font_size = 18
+
+	button.add_theme_stylebox_override("normal", _make_button_style(normal_bg, border, radius, 6, shadow))
+	button.add_theme_stylebox_override("hover", _make_button_style(hover_bg, Color(border.r, border.g, border.b, minf(border.a + 0.14, 1.0)), radius, 8, shadow))
+	button.add_theme_stylebox_override("pressed", _make_button_style(pressed_bg, Color(border.r, border.g, border.b, minf(border.a + 0.18, 1.0)), radius, 3, Color(0.0, 0.0, 0.0, 0.18)))
+	button.add_theme_stylebox_override("disabled", _make_button_style(Color(0.040, 0.045, 0.045, 0.46), Color(0.60, 0.65, 0.62, 0.16), radius, 1, Color.TRANSPARENT))
+	button.add_theme_color_override("font_color", Color(0.98, 1.0, 0.92, 1.0))
+	button.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 0.95, 1.0))
+	button.add_theme_color_override("font_pressed_color", Color(0.86, 1.0, 0.82, 1.0))
+	button.add_theme_color_override("font_disabled_color", Color(0.72, 0.76, 0.72, 0.54))
+	button.add_theme_font_size_override("font_size", font_size)
+
+func _make_button_style(
+	bg_color: Color,
+	border_color: Color,
+	radius: int,
+	shadow_size: int,
+	shadow_color: Color
+) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = bg_color
+	style.border_color = border_color
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(radius)
+	style.shadow_size = shadow_size
+	style.shadow_color = shadow_color
+	style.content_margin_left = 16.0
+	style.content_margin_right = 16.0
+	style.content_margin_top = 8.0
+	style.content_margin_bottom = 8.0
+	return style
 
 func _make_label(label_name: String, font_size: int, h_align: int, v_align: int) -> Label:
 	var label := Label.new()
@@ -294,6 +371,16 @@ func _apply_fullscreen_layout() -> void:
 	press_label.size = Vector2(420.0, 42.0)
 	press_label.position = viewport_size * 0.5 - press_label.size * 0.5 + Vector2(0.0, minf(viewport_size.y * 0.34, 250.0))
 
+	if skip_button != null:
+		skip_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		skip_button.size = Vector2(152.0, 42.0)
+		skip_button.position = Vector2(viewport_size.x - skip_button.size.x - 24.0, 22.0)
+
+	if start_button != null:
+		start_button.set_anchors_preset(Control.PRESET_CENTER)
+		start_button.size = Vector2(260.0, 52.0)
+		start_button.position = viewport_size * 0.5 - start_button.size * 0.5 + Vector2(0.0, minf(viewport_size.y * 0.34, 250.0))
+
 func _get_layout_size() -> Vector2:
 	var viewport_size := get_viewport_rect().size
 	if viewport_size.x <= 1.0 or viewport_size.y <= 1.0:
@@ -325,6 +412,9 @@ func _start_intro_sequence() -> void:
 	intro_running = true
 	finishing = false
 	final_start_enabled = false
+	final_input_armed_at_msec = 0
+	_arm_input(INTRO_INPUT_ARM_DELAY)
+	_update_intro_buttons()
 	_enter_active_scene()
 
 func _update_intro_sequence(delta: float) -> void:
@@ -344,6 +434,7 @@ func _update_intro_sequence(delta: float) -> void:
 
 func _enter_active_scene() -> void:
 	active_scene_time = 0.0
+	_arm_input(INTRO_INPUT_ARM_DELAY)
 	var scene_def: Dictionary = scene_defs[active_scene_index]
 
 	if active_scene_index == 0:
@@ -353,10 +444,12 @@ func _enter_active_scene() -> void:
 		studio_label.modulate.a = 0.0
 		presents_label.modulate.a = 0.0
 		fade_rect.modulate.a = 1.0
+		_update_intro_buttons()
 		return
 
 	if str(scene_def.get("kind", "")) == "final":
 		final_start_enabled = false
+		final_input_armed_at_msec = Time.get_ticks_msec() + int(FINAL_INPUT_ARM_DELAY * 1000.0)
 		_set_intro_ambient(str(scene_def.get("ambient", "")))
 		_setup_image_scene({
 			"image": str(scene_def.get("image", "res://assets/intro/logo_final.png")),
@@ -366,12 +459,14 @@ func _enter_active_scene() -> void:
 			"drift": Vector2(6.0, -8.0)
 		})
 		image_layer.modulate.a = 0.0
+		_update_intro_buttons()
 		return
 
 	final_start_enabled = false
 	_set_intro_ambient(str(scene_def.get("ambient", "")))
 	_setup_image_scene(scene_def)
 	subtitle_label.text = str(scene_def.get("subtitle", ""))
+	_update_intro_buttons()
 
 func _update_studio_scene(duration: float) -> void:
 	fade_rect.modulate.a = _get_scene_fade_alpha(duration)
@@ -399,8 +494,12 @@ func _update_final_scene(scene_def: Dictionary, duration: float) -> void:
 	image_layer.modulate.a = _smooth01((active_scene_time - 4.2) / 1.35)
 	var press_base := _smooth01((active_scene_time - 5.4) / 1.2)
 	var pulse := 0.72 + sin(active_scene_time * 3.1) * 0.28
-	press_label.modulate.a = clampf(press_base * pulse, 0.0, 1.0)
-	final_start_enabled = active_scene_time >= 6.0
+	press_label.modulate.a = 0.0
+	final_start_enabled = active_scene_time >= 6.0 and Time.get_ticks_msec() >= final_input_armed_at_msec
+	if start_button != null:
+		start_button.visible = true
+		start_button.disabled = not final_start_enabled
+		start_button.modulate.a = clampf(press_base * pulse, 0.0, 1.0)
 	_apply_camera_progress({
 		"zoom_from": 1.045,
 		"zoom_to": 1.065,
@@ -492,9 +591,15 @@ func _clear_scene_visuals() -> void:
 func _reset_overlay_text() -> void:
 	subtitle_label.text = ""
 	subtitle_label.modulate.a = 0.0
+	studio_label.modulate.a = 0.0
+	presents_label.modulate.a = 0.0
 	final_text_label.modulate.a = 0.0
 	logo_layer.modulate.a = 0.0
 	press_label.modulate.a = 0.0
+	if start_button != null:
+		start_button.visible = false
+		start_button.disabled = true
+		start_button.modulate.a = 0.0
 
 func _get_color_grade_for_effect(effect_name: String) -> Color:
 	match effect_name:
@@ -516,6 +621,25 @@ func _request_skip() -> void:
 		return
 	_jump_to_final_scene()
 
+func _on_skip_button_pressed() -> void:
+	if finishing or _is_final_scene():
+		return
+	_request_skip()
+
+func _on_start_button_pressed() -> void:
+	if finishing or not _is_final_scene() or not final_start_enabled:
+		return
+	_finish_intro()
+
+func _update_intro_buttons() -> void:
+	if skip_button != null:
+		skip_button.visible = intro_running and not finishing and not _is_final_scene()
+		skip_button.disabled = finishing or _is_final_scene()
+	if start_button != null and not _is_final_scene():
+		start_button.visible = false
+		start_button.disabled = true
+		start_button.modulate.a = 0.0
+
 func _finish_intro() -> void:
 	if finishing:
 		return
@@ -523,6 +647,11 @@ func _finish_intro() -> void:
 	intro_running = false
 	subtitle_label.modulate.a = 0.0
 	press_label.modulate.a = 0.0
+	if skip_button != null:
+		skip_button.visible = false
+	if start_button != null:
+		start_button.disabled = true
+		start_button.visible = false
 	fade_rect.modulate.a = 1.0
 	if not change_scene_on_finish:
 		queue_free()
