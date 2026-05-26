@@ -302,6 +302,7 @@ var _presence_has_layout := false
 var _cast_button_hovered := false
 var _cast_button_pressed := false
 var _fish_button_action_guard_msec := 0
+var _fish_button_pointer_action_active := false
 var _modal_tap_guard_until_msec := 0
 var _use_cast_png_button := true
 var _use_pull_png_button := true
@@ -385,11 +386,13 @@ func _input(event: InputEvent) -> void:
 		_update_cast_button_visual()
 		_on_reel_button_down()
 		if not fish_button.disabled:
-			_trigger_fish_button_action()
+			_fish_button_pointer_action_active = true
+			_trigger_fish_button_action(true)
 	else:
 		_cast_button_pressed = false
 		_update_cast_button_visual()
 		_on_reel_button_up()
+		call_deferred("_clear_fish_button_pointer_action_active")
 
 	get_viewport().set_input_as_handled()
 
@@ -745,6 +748,7 @@ func _ensure_cast_button_visual() -> void:
 	fish_button.mouse_exited.connect(func() -> void:
 		_cast_button_hovered = false
 		_cast_button_pressed = false
+		_fish_button_pointer_action_active = false
 		_update_cast_button_visual()
 	)
 	fish_button.button_down.connect(func() -> void:
@@ -2065,8 +2069,11 @@ func _is_menu_overlay_open() -> bool:
 func _should_ignore_base_ui_press() -> bool:
 	return is_modal_open or _is_modal_tap_guard_active() or _is_catch_reward_open()
 
-func _trigger_fish_button_action() -> void:
+func _trigger_fish_button_action(from_pointer_event: bool = false) -> void:
 	if _should_ignore_base_ui_press():
+		return
+
+	if _fish_button_pointer_action_active and not from_pointer_event:
 		return
 
 	var now := Time.get_ticks_msec()
@@ -2075,6 +2082,9 @@ func _trigger_fish_button_action() -> void:
 
 	_fish_button_action_guard_msec = now
 	_on_fish_button_pressed()
+
+func _clear_fish_button_pointer_action_active() -> void:
+	_fish_button_pointer_action_active = false
 
 func _layout_float_visuals(center: Vector2, scene_scale: float) -> void:
 	var surface_y: float = clamp(center.y, _water_zone_top, _water_zone_bottom)
@@ -4615,6 +4625,8 @@ func _return_to_idle_after_result() -> void:
 		fishing_presence_ui.stop_cast_visual()
 	if failure_popup_ui != null:
 		failure_popup_ui.close()
+	if FishingManager.has_method("reset_after_result"):
+		FishingManager.reset_after_result()
 	_presence_bite_timer = 0.0
 	_presence_caught_timer = 0.0
 	_fishing_ui_state = FishingUiState.IDLE

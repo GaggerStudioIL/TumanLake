@@ -43,6 +43,8 @@ var _bite_window_elapsed: float = 0.0
 var _bite_window_seconds: float = 0.0
 var _false_nudge_timer: float = 0.0
 var _hook_cooldown_timer: float = 0.0
+var _fishing_cycle_id := 0
+var _last_hook_attempt_msec := 0
 var _current_behavior: String = "calm"
 var _reel_input_active: bool = false
 var _tension: float = 0.5
@@ -90,9 +92,10 @@ const USE_NEW_BITE_SYSTEM := true
 const BITE_CHECK_INTERVAL := 1.0
 const BASE_BITE_WINDOW_SECONDS := 1.4
 const EARLY_HOOK_COOLDOWN := 1.5
-const FALSE_NUDGE_MIN_DELAY := 1.0
-const FALSE_NUDGE_MAX_DELAY := 3.0
+const FALSE_NUDGE_MIN_DELAY := 1.2
+const FALSE_NUDGE_MAX_DELAY := 3.2
 const FALSE_NUDGE_CHANCE := 0.28
+const HOOK_INPUT_GUARD_MSEC := 260
 const PLAYER_PULL_FORCE := 1.18
 const PLAYER_RELEASE_FORCE := -0.92
 const PLAYER_FORCE_RESPONSE := 3.05
@@ -133,6 +136,8 @@ func start_fishing(spot_id: String) -> void:
 	if is_fishing:
 		return
 
+	_fishing_cycle_id += 1
+	var cycle_id := _fishing_cycle_id
 	var spot: Dictionary = SpotDatabase.get_spot(spot_id)
 
 	if spot.is_empty():
@@ -149,6 +154,7 @@ func start_fishing(spot_id: String) -> void:
 	is_reeling = false
 	fishing_state = FishingState.CASTING
 	_reel_input_active = false
+	_last_hook_attempt_msec = 0
 	_clear_active_bite_data()
 	_tackle_stats = PlayerData.get_tackle_stats()
 	cast_started.emit()
@@ -169,18 +175,23 @@ func start_fishing(spot_id: String) -> void:
 	var spot_depth_modifier: float = _get_spot_depth_match_multiplier(spot)
 
 	if available_fish.is_empty():
+		if use_new_bite_system:
+			is_fishing = false
+			fishing_state = FishingState.FAILED
+			_emit_no_candidate_failure(spot, spot_id)
+			return
+
 		var slow_seconds: int = randi_range(10, 16)
 		fishing_started.emit(slow_seconds)
 
 		for time_left in range(slow_seconds, 0, -1):
+			if not _is_fishing_cycle_current(cycle_id):
+				return
 			fishing_tick.emit(time_left)
 			await get_tree().create_timer(1.0).timeout
+			if not _is_fishing_cycle_current(cycle_id):
+				return
 
-		is_fishing = false
-		_emit_no_candidate_failure(spot, spot_id)
-		return
-
-	if available_fish.is_empty():
 		is_fishing = false
 		_emit_no_candidate_failure(spot, spot_id)
 		return
@@ -202,8 +213,12 @@ func start_fishing(spot_id: String) -> void:
 	fishing_started.emit(seconds)
 
 	for time_left in range(seconds, 0, -1):
+		if not _is_fishing_cycle_current(cycle_id):
+			return
 		fishing_tick.emit(time_left)
 		await get_tree().create_timer(1.0).timeout
+		if not _is_fishing_cycle_current(cycle_id):
+			return
 
 	var bite_chance: float = clamp(
 		(0.64 + float(_tackle_stats.get("bite_detection_bonus", 0.0)) + float(_tackle_stats.get("fish_attraction", 0.0)) + bait_bonus + float(_tackle_stats.get("hook_success_bonus", 0.0)) - float(_tackle_stats.get("visibility_penalty", 0.0))) * spot_bite_modifier * clamp(time_activity_modifier, 0.42, 1.38),
@@ -272,7 +287,18 @@ func try_hook() -> void:
 	if not is_fishing or is_reeling:
 		return
 
+	if fishing_state != FishingState.WAITING_FOR_BITE and fishing_state != FishingState.BITE_WINDOW:
+		return
+
+	var now := Time.get_ticks_msec()
+	if now - _last_hook_attempt_msec < HOOK_INPUT_GUARD_MSEC:
+		return
+	_last_hook_attempt_msec = now
+
 	if fishing_state == FishingState.WAITING_FOR_BITE:
+		if _hook_cooldown_timer > 0.0:
+			return
+
 		_fail_hook("too_early", {
 			"message": "Рыба испугалась!",
 			"cooldown": EARLY_HOOK_COOLDOWN
@@ -548,6 +574,24 @@ func _clear_active_bite_data() -> void:
 	_bite_window_seconds = 0.0
 	_false_nudge_timer = 0.0
 	_hook_cooldown_timer = 0.0
+
+
+func reset_after_result() -> void:
+	if is_reeling:
+		return
+
+	_fishing_cycle_id += 1
+	is_fishing = false
+	is_reeling = false
+	fishing_state = FishingState.IDLE
+	_reel_input_active = false
+	_last_hook_attempt_msec = 0
+	_current_catch.clear()
+	_clear_active_bite_data()
+
+
+func _is_fishing_cycle_current(cycle_id: int) -> bool:
+	return is_fishing and cycle_id == _fishing_cycle_id
 
 
 func _get_tackle_available_fish(spot_fish: Array) -> Array:
