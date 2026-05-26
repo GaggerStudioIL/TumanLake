@@ -666,9 +666,9 @@ func _create_shop_card(item: Dictionary, card_size: Vector2) -> Panel:
 
 	if true:
 		var compact_has_texture := card_texture != null
-		var compact_icon_size := 28.0 if compact_has_texture else 30.0
+		var compact_icon_size := 40.0 if compact_has_texture else 30.0
 		var compact_icon_y := (card_size.y - compact_icon_size) * 0.5
-		var compact_content_x := 52.0 if compact_has_texture else 50.0
+		var compact_content_x := 68.0 if compact_has_texture else 50.0
 		var compact_buy_width := 58.0
 		var compact_buy_height := 28.0
 		var compact_details_width := 86.0
@@ -682,15 +682,7 @@ func _create_shop_card(item: Dictionary, card_size: Vector2) -> Panel:
 		var compact_text_width: float = maxf(compact_action_x - compact_content_x - 18.0, 140.0)
 
 		if compact_has_texture:
-			var compact_icon_rect := TextureRect.new()
-			compact_icon_rect.texture = card_texture
-			compact_icon_rect.position = Vector2(13.0, compact_icon_y)
-			compact_icon_rect.size = Vector2(compact_icon_size, compact_icon_size)
-			compact_icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			compact_icon_rect.stretch_mode = TextureRect.STRETCH_SCALE
-			compact_icon_rect.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-			compact_icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			card.add_child(compact_icon_rect)
+			_add_compact_shop_texture(card, card_texture, Rect2(Vector2(14.0, compact_icon_y), Vector2(compact_icon_size, compact_icon_size)))
 		else:
 			var compact_icon_label = Label.new()
 			compact_icon_label.text = str(item.get("icon", "?"))
@@ -764,6 +756,28 @@ func _create_shop_card(item: Dictionary, card_size: Vector2) -> Panel:
 		return card
 
 	return card
+
+func _add_compact_shop_texture(parent: Control, texture: Texture2D, slot_rect: Rect2) -> void:
+	var slot := Control.new()
+	slot.name = "ShopCompactImageSlot"
+	slot.position = slot_rect.position
+	slot.size = slot_rect.size
+	slot.clip_contents = true
+	slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(slot)
+
+	var texture_size := texture.get_size()
+	if texture_size.x <= 0.0 or texture_size.y <= 0.0:
+		return
+
+	var sprite := Sprite2D.new()
+	sprite.name = "ShopCompactImage"
+	sprite.texture = texture
+	sprite.centered = true
+	sprite.position = slot_rect.size * 0.5
+	sprite.scale = Vector2.ONE * minf(slot_rect.size.x / texture_size.x, slot_rect.size.y / texture_size.y)
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	slot.add_child(sprite)
 
 func _populate_rod_image_card(card: Panel, item: Dictionary, card_size: Vector2, texture: Texture2D, rarity_color: Color) -> void:
 	var item_id := str(item.get("id", ""))
