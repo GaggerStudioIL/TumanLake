@@ -88,6 +88,18 @@ func _ensure_tackle_ui_nodes() -> void:
 	main.tackle_action_bar_panel.name = "TackleActionBarPanel"
 	main.tackle_panel.add_child(main.tackle_action_bar_panel)
 
+	main.tackle_rod_stats_panel = Panel.new()
+	main.tackle_rod_stats_panel.name = "TackleRodStatsPanel"
+	main.tackle_panel.add_child(main.tackle_rod_stats_panel)
+
+	main.tackle_rod_description_panel = Panel.new()
+	main.tackle_rod_description_panel.name = "TackleRodDescriptionPanel"
+	main.tackle_panel.add_child(main.tackle_rod_description_panel)
+
+	main.tackle_final_stats_panel = Panel.new()
+	main.tackle_final_stats_panel.name = "TackleFinalStatsPanel"
+	main.tackle_panel.add_child(main.tackle_final_stats_panel)
+
 	main.tackle_title_divider_left = ColorRect.new()
 	main.tackle_title_divider_left.name = "TackleTitleDividerLeft"
 	main.tackle_panel.add_child(main.tackle_title_divider_left)
@@ -380,8 +392,8 @@ func _update_tackle_ui() -> void:
 	var selected_item = _get_selected_tackle_item()
 	var hints_text = _get_tackle_setup_hints_text(4)
 	if main._tackle_category == "bait_2" and not PlayerData.can_use_second_bait():
-		main.tackle_details_label.text = "Наживка 2 закрыта."
-		main.tackle_compare_label.text = "Нужен навык «Бутерброд».\n\n%s" % _get_final_tackle_stats_text()
+		main.tackle_details_label.text = "Наживка 2\nНужен навык «Бутерброд»."
+		main.tackle_compare_label.text = _get_final_tackle_stats_text()
 	elif not _picker_open:
 		main.tackle_details_label.text = _get_rod_description_text()
 		main.tackle_compare_label.text = _get_final_tackle_stats_text()
@@ -524,7 +536,7 @@ func _get_item_category_for_slot(slot_id: String) -> String:
 func _get_rod_assembly_summary_text() -> String:
 	var rod: Dictionary = PlayerData.current_tackle.get("rod", {})
 	var stats := PlayerData.get_tackle_stats()
-	return "Редкость: %s        Класс: %s\nДлина: %.1f м         Макс. рыба: %.1f кг\nСостояние: %d%%      Контроль: %d%%" % [
+	return "Характеристики\nРедкость: %s      Класс: %s\nДлина: %.1f м       Макс.: %.1f кг\nСостояние: %d%%    Контроль: %d%%" % [
 		_get_rarity_title(str(rod.get("rarity", "common"))),
 		_format_tackle_stat_value("rod_class", str(rod.get("rod_class", stats.get("rod_class", "medium")))),
 		float(rod.get("length_m", stats.get("rod_length_m", 4.0))),
@@ -582,7 +594,7 @@ func _update_tackle_picker_visibility() -> void:
 	var picker_visible: bool = _picker_open and not locked_second_bait
 	main.tackle_item_list.visible = picker_visible
 	main.tackle_picker_title_label.visible = picker_visible
-	main.tackle_hint_label.visible = picker_visible
+	main.tackle_hint_label.visible = false
 	main.tackle_picker_title_label.text = "Выберите: %s" % _get_tackle_slot_title(main._tackle_category)
 
 	var visual_visible: bool = not picker_visible
@@ -646,17 +658,15 @@ func _get_final_tackle_stats_text() -> String:
 	var stats := PlayerData.get_tackle_stats()
 	var issues: Array = PlayerData.get_tackle_setup_issues()
 	var status := "Снасть готова" if issues.is_empty() else "Проверьте снасть"
-	var bait_2_text := "закрыта"
+	var bait_2_text := "нужен навык"
 	if PlayerData.can_use_second_bait():
 		bait_2_text = _get_tackle_slot_equipped_name("bait_2")
 
-	return "Итоговые характеристики снасти\nПрочность лески: %s\nРазмер крючка: %s\nНаживка: %s\nНаживка 2: %s\nВидимость: %s\nКонтроль: %s\nСтатус: %s" % [
+	return "Итоговая снасть\nЛеска: %s   Крючок: %s\nНаживка: %s\nНаживка 2: %s\nСтатус: %s" % [
 		_format_tackle_stat_value("max_load", stats.get("line_strength", 0.0)),
 		_format_tackle_stat_value("hook_size", stats.get("hook_size", 12)),
 		_get_tackle_slot_equipped_name("bait"),
 		bait_2_text,
-		_format_visibility_title(float(stats.get("visibility_penalty", 0.0))),
-		_format_tackle_stat_value("control_bonus", stats.get("control_bonus", 0.0)),
 		status
 	]
 

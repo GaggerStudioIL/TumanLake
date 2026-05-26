@@ -230,9 +230,9 @@ func get_button_style(kind: String = "secondary", state: String = "normal") -> S
 	return make_style(bg, border, radius, shadow_size, shadow)
 
 func get_tackle_panel_style(strong := false) -> StyleBoxFlat:
-	var bg := Color(0.022, 0.060, 0.082, 0.90) if strong else Color(0.028, 0.083, 0.110, 0.72)
-	var border := Color(0.46, 0.73, 0.82, 0.28)
-	var style := make_style(bg, border, 8, 8, Color(0.0, 0.0, 0.0, 0.28))
+	var bg := Color(0.020, 0.070, 0.098, 0.94) if strong else Color(0.030, 0.100, 0.130, 0.78)
+	var border := Color(0.52, 0.78, 0.86, 0.34)
+	var style := make_style(bg, border, 8, 8, Color(0.0, 0.0, 0.0, 0.30))
 	style.content_margin_left = 12.0
 	style.content_margin_top = 10.0
 	style.content_margin_right = 12.0
@@ -240,23 +240,23 @@ func get_tackle_panel_style(strong := false) -> StyleBoxFlat:
 	return style
 
 func get_tackle_slot_style(state: String = "empty") -> StyleBoxFlat:
-	var bg := Color(0.030, 0.095, 0.125, 0.72)
-	var border := Color(0.46, 0.73, 0.82, 0.26)
+	var bg := Color(0.034, 0.105, 0.136, 0.80)
+	var border := Color(0.52, 0.78, 0.86, 0.32)
 	var shadow := Color(0.0, 0.0, 0.0, 0.22)
 	var shadow_size := 5
 
 	match state:
 		"selected":
-			bg = Color(0.050, 0.145, 0.165, 0.88)
-			border = Color(0.84, 0.66, 0.30, 0.78)
+			bg = Color(0.050, 0.150, 0.166, 0.92)
+			border = Color(0.86, 0.68, 0.30, 0.84)
 			shadow = Color(0.85, 0.55, 0.12, 0.18)
 			shadow_size = 8
 		"filled":
-			bg = Color(0.030, 0.120, 0.112, 0.78)
-			border = Color(0.48, 0.82, 0.48, 0.52)
+			bg = Color(0.034, 0.128, 0.116, 0.84)
+			border = Color(0.50, 0.86, 0.52, 0.62)
 			shadow = Color(0.18, 0.65, 0.34, 0.14)
 		"locked":
-			bg = Color(0.035, 0.044, 0.050, 0.58)
+			bg = Color(0.034, 0.045, 0.052, 0.66)
 			border = Color(0.46, 0.50, 0.52, 0.24)
 			shadow = Color(0.0, 0.0, 0.0, 0.12)
 			shadow_size = 2
@@ -268,10 +268,10 @@ func get_tackle_slot_style(state: String = "empty") -> StyleBoxFlat:
 			border = Color(0.84, 0.66, 0.30, 0.68)
 
 	var style := make_style(bg, border, 8, shadow_size, shadow)
-	style.content_margin_left = 10.0
-	style.content_margin_top = 7.0
-	style.content_margin_right = 10.0
-	style.content_margin_bottom = 7.0
+	style.content_margin_left = 12.0
+	style.content_margin_top = 8.0
+	style.content_margin_right = 12.0
+	style.content_margin_bottom = 8.0
 	return style
 
 func get_tackle_primary_action_style(state: String = "normal") -> StyleBoxFlat:
