@@ -19,6 +19,7 @@ signal buy_requested(item_id: String)
 const SHOP_ITEMS_PER_PAGE := 8
 const SHOP_ROD_ITEMS_PER_PAGE := 4
 const SHOP_BAIT_ITEMS_PER_PAGE := 4
+const SHOP_LINE_ITEMS_PER_PAGE := 6
 const SHOP_CATEGORY_BAIT := "bait"
 const SHOP_CATEGORY_CONSUMABLE := "consumable"
 const SHOP_CATEGORY_TACKLE := "tackle"
@@ -210,6 +211,8 @@ func _get_shop_items_per_page(category: String) -> int:
 		return SHOP_ROD_ITEMS_PER_PAGE
 	if category == SHOP_CATEGORY_BAIT:
 		return SHOP_BAIT_ITEMS_PER_PAGE
+	if category == SHOP_CATEGORY_LINE:
+		return SHOP_LINE_ITEMS_PER_PAGE
 
 	return SHOP_ITEMS_PER_PAGE
 
@@ -621,12 +624,16 @@ func _rebuild_shop_cards() -> void:
 	var columns := 2
 	var gap := 12.0
 	var is_rod_category: bool = str(main._shop_category) == SHOP_CATEGORY_ROD
+	var is_line_category: bool = str(main._shop_category) == SHOP_CATEGORY_LINE
 	var is_image_category: bool = is_rod_category or str(main._shop_category) == SHOP_CATEGORY_BAIT
 
 	var card_width: float = (content_width - gap * float(columns - 1)) / float(columns)
 	var rows: int = max(ceil(float(items.size()) / float(columns)), 1)
 	var card_min_height := 148.0 if is_image_category else 60.0
 	var card_max_height := 160.0 if is_image_category else 68.0
+	if is_line_category:
+		card_min_height = 88.0
+		card_max_height = 96.0
 
 	var card_height: float = min(max((main.shop_items_container.size.y - gap * float(rows - 1)) / float(rows), card_min_height), card_max_height)
 	var content_height: float = max(viewport_size.y, float(rows) * card_height + gap * float(max(rows - 1, 0)))
@@ -666,9 +673,10 @@ func _create_shop_card(item: Dictionary, card_size: Vector2) -> Panel:
 
 	if true:
 		var compact_has_texture := card_texture != null
-		var compact_icon_size := 40.0 if compact_has_texture else 30.0
+		var is_line_item := category == SHOP_CATEGORY_LINE
+		var compact_icon_size := 64.0 if compact_has_texture and is_line_item else (40.0 if compact_has_texture else 30.0)
 		var compact_icon_y := (card_size.y - compact_icon_size) * 0.5
-		var compact_content_x := 68.0 if compact_has_texture else 50.0
+		var compact_content_x := 92.0 if compact_has_texture and is_line_item else (68.0 if compact_has_texture else 50.0)
 		var compact_buy_width := 58.0
 		var compact_buy_height := 28.0
 		var compact_details_width := 86.0
