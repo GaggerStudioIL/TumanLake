@@ -145,7 +145,7 @@ func _rebuild_keepnet_cards() -> void:
 	var columns = 3 if main.basket_scroll.size.x >= 820.0 else 2
 	var gap = 10.0
 	var card_width: float = (main.basket_scroll.size.x - gap * float(columns - 1)) / float(columns)
-	var card_height = 128.0
+	var card_height = 148.0
 	main.basket_cards_grid.columns = columns
 	main.basket_cards_grid.custom_minimum_size = Vector2(main.basket_scroll.size.x, 0.0)
 
@@ -228,10 +228,22 @@ func _create_keepnet_card(fish: Dictionary, fish_index: int, card_size: Vector2)
 	var length_cm = main._get_catch_length_cm(fish)
 	var price = InventoryManager.get_fish_sell_price(fish)
 	var freshness_title := FishFreshnessManager.get_freshness_title(fish)
+	var status_title := _get_fish_status_title(fish)
+	var market_demand := _get_market_demand(fish)
+	var supplier_name := _get_best_supplier_name(fish)
 	var stats_label = Label.new()
-	stats_label.text = "%.2f кг  |  %.1f см\n%d мон.  |  %s" % [weight, length_cm, price, freshness_title]
-	stats_label.position = Vector2(12.0, 86.0)
-	stats_label.size = Vector2(card_size.x - 128.0, 34.0)
+	stats_label.text = "%.2f кг | %.1f см | %s\n%d мон. | спрос x%.2f | %s\n%s" % [
+		weight,
+		length_cm,
+		status_title,
+		price,
+		market_demand,
+		freshness_title,
+		supplier_name
+	]
+	stats_label.position = Vector2(12.0, 82.0)
+	stats_label.size = Vector2(card_size.x - 128.0, 56.0)
+	stats_label.clip_text = true
 	stats_label.add_theme_font_size_override("font_size", 12)
 	stats_label.add_theme_color_override("font_color", Color(0.76, 0.88, 0.80, 0.92))
 	card.add_child(stats_label)
@@ -277,6 +289,35 @@ func _get_keepnet_tier_label(tier: String) -> String:
 			return "Необычная"
 		_:
 			return "Обычная"
+
+
+func _get_fish_status_title(fish: Dictionary) -> String:
+	if fish.has("fish_status_title"):
+		return str(fish.get("fish_status_title", "Незачет"))
+
+	var status_system: Node = main.get_node_or_null("/root/FishStatusSystem")
+	if status_system != null and status_system.has_method("get_status_title"):
+		return str(status_system.call("get_status_title", str(fish.get("fish_status", "undersized"))))
+
+	return "Незачет"
+
+
+func _get_market_demand(fish: Dictionary) -> float:
+	var market_manager: Node = main.get_node_or_null("/root/DynamicMarketManager")
+	if market_manager != null and market_manager.has_method("get_demand_multiplier"):
+		return float(market_manager.call("get_demand_multiplier", str(fish.get("id", "")), str(fish.get("waterbody_id", ""))))
+	return 1.0
+
+
+func _get_best_supplier_name(fish: Dictionary) -> String:
+	var supplier_manager: Node = main.get_node_or_null("/root/SupplierManager")
+	if supplier_manager == null or not supplier_manager.has_method("get_best_supplier_for_catch"):
+		return "Местный рынок"
+
+	var supplier_id := str(supplier_manager.call("get_best_supplier_for_catch", fish))
+	if supplier_manager.has_method("get_supplier_title"):
+		return str(supplier_manager.call("get_supplier_title", supplier_id))
+	return supplier_id
 
 
 func _show_basket_notice(message: String, success: bool = true) -> void:

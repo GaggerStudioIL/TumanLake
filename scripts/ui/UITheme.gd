@@ -47,9 +47,10 @@ const ICON_AUTO := preload("res://assets/ui/icons/icon_auto.png")
 const ICON_LOCATION := preload("res://assets/ui/icons/icon_location.png")
 const ICON_SETTINGS := preload("res://assets/ui/icons/icon_settings.png")
 const ICON_LINE := preload("res://assets/ui/icons/icon_line.png")
-const HUD_ICON_ACTION_CAST := preload("res://assets/ui/icons/hud/action_cast.svg")
-const HUD_ICON_ACTION_HOOK := preload("res://assets/ui/icons/hud/action_hook.svg")
-const HUD_ICON_ACTION_PULL := preload("res://assets/ui/icons/hud/action_pull.svg")
+const HUD_ICON_ACTION_CAST := preload("res://assets/ui/icons/hud/action_throw_away.png")
+const HUD_ICON_ACTION_HOOK := preload("res://assets/ui/icons/hud/action_hook_new.png")
+const HUD_ICON_ACTION_PULL := preload("res://assets/ui/icons/hud/action_pull_fish.png")
+const HUD_ICON_ACTION_PULL_OUT := preload("res://assets/ui/icons/hud/action_pull_out.png")
 const HUD_ICON_FEED := preload("res://assets/ui/icons/hud/feed.svg")
 const HUD_ICON_BAIT := preload("res://assets/ui/icons/hud/bait.svg")
 const HUD_ICON_TACKLE := preload("res://assets/ui/icons/hud/tackle.svg")
@@ -306,6 +307,8 @@ func get_icon(icon_name: String) -> Texture2D:
 			return HUD_ICON_ACTION_HOOK
 		"hud_pull":
 			return HUD_ICON_ACTION_PULL
+		"hud_pull_out":
+			return HUD_ICON_ACTION_PULL_OUT
 		"hud_feed":
 			return HUD_ICON_FEED
 		"hud_bait":
@@ -316,7 +319,7 @@ func get_icon(icon_name: String) -> Texture2D:
 			return HUD_ICON_AUTO
 		"hook", "cast":
 			return ICON_HOOK
-		"fish", "fishing":
+		"fish", "fishing", "encyclopedia", "atlas":
 			return ICON_FISH
 		"basket", "keepnet":
 			return ICON_KEEPNET
@@ -433,6 +436,8 @@ func get_side_menu_icon(icon_name: String) -> Texture2D:
 			return SIDE_MENU_ICON_MAP
 		"profile":
 			return SIDE_MENU_ICON_PROFILE
+		"encyclopedia", "atlas":
+			return ICON_FISH
 		_:
 			return null
 

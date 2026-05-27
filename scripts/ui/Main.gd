@@ -9,6 +9,7 @@ const CatchPopupUIScript := preload("res://scripts/ui/CatchPopupUI.gd")
 const FishingHUDUIScript := preload("res://scripts/ui/FishingHUDUI.gd")
 const FishingPresenceUIScript := preload("res://scripts/ui/FishingPresenceUI.gd")
 const ProfileUIScript := preload("res://scripts/ui/ProfileUI.gd")
+const EncyclopediaUIScript := preload("res://scripts/ui/EncyclopediaUI.gd")
 const FailurePopupUIScript := preload("res://scripts/ui/FailurePopupUI.gd")
 const UIThemeScript := preload("res://scripts/ui/UITheme.gd")
 const TUMAN_LAKE_THEME := preload("res://themes/TumanLakeUI.tres")
@@ -23,7 +24,7 @@ const STYLE_BOTTOM_NAV_ACTIVE := "BottomNavActive"
 const BASE_SCREEN_SIZE := Vector2(960.0, 540.0)
 const HUD_HEIGHT := 44.0
 const LEFT_NAV_WIDTH := 140.0
-const LEFT_NAV_HEIGHT := 282.0
+const LEFT_NAV_HEIGHT := 340.0
 const ACTION_BAR_HEIGHT := 46.0
 const MENU_BACKDROP_Z := 300
 const MENU_PANEL_Z := 301
@@ -252,6 +253,7 @@ var catch_popup_ui
 var fishing_hud_ui
 var fishing_presence_ui
 var profile_ui
+var encyclopedia_ui
 var failure_popup_ui
 var ui_theme
 var ui_canvas_layer: CanvasLayer
@@ -267,6 +269,7 @@ var top_hud_container: HBoxContainer
 var top_hud_spacer: Control
 var quick_actions_container: VBoxContainer
 var bottom_nav_container: VBoxContainer
+var encyclopedia_button: Button
 var environment_layer: Node2D
 var environment_sprites: Dictionary = {}
 var day_night_controller: Node2D
@@ -344,6 +347,12 @@ var _water_zone_bottom := 0.0
 var _rod_anchor_pos := Vector2.ZERO
 var _rod_target_pos := Vector2.ZERO
 var _last_detailed_failure_msec := -100000
+var reeling_panel_frame: Panel
+var tension_slack_zone: ColorRect
+var tension_warning_zone: ColorRect
+var tension_critical_zone: ColorRect
+var tension_marker_glow: ColorRect
+var _last_reeling_visual_key := ""
 
 var _last_reeling_state := {
 	"fish_name": "-",
@@ -381,6 +390,7 @@ func _ready() -> void:
 	_ensure_ui_canvas_layer()
 	failure_popup_ui.setup(self)
 	profile_ui.setup(self)
+	encyclopedia_ui.setup(self)
 	_ensure_gameplay_layer_names()
 
 	resized.connect(_on_resized)
@@ -441,7 +451,14 @@ func _setup_ui_controllers() -> void:
 	fishing_hud_ui = FishingHUDUIScript.new()
 	fishing_presence_ui = FishingPresenceUIScript.new()
 	profile_ui = ProfileUIScript.new()
+	encyclopedia_ui = EncyclopediaUIScript.new()
 	failure_popup_ui = FailurePopupUIScript.new()
+
+	encyclopedia_button = Button.new()
+	encyclopedia_button.name = "EncyclopediaButton"
+	encyclopedia_button.text = "Атлас рыб"
+	encyclopedia_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(encyclopedia_button)
 
 	shop_ui.setup(self)
 	keepnet_ui.setup(self)
@@ -487,6 +504,7 @@ func _ensure_ui_canvas_layer() -> void:
 		shop_button,
 		map_button,
 		profile_button,
+		encyclopedia_button,
 		feed_button,
 		auto_button,
 		bait_button,
@@ -640,12 +658,17 @@ func close_current_modal() -> void:
 		"profile":
 			if profile_ui != null:
 				profile_ui.close()
+		"encyclopedia":
+			if encyclopedia_ui != null:
+				encyclopedia_ui.close()
 		"catch_reward":
 			_hide_catch_reward_popup()
 		_:
 			_hide_modal_roots_except("")
 			if profile_ui != null:
 				profile_ui.close()
+			if encyclopedia_ui != null:
+				encyclopedia_ui.close()
 			_refresh_modal_input_blocker()
 
 func _hide_modal_roots_except(modal_name: String) -> void:
@@ -683,6 +706,8 @@ func _hide_modal_roots_except(modal_name: String) -> void:
 			catch_popup_backdrop.visible = false
 	if modal_name != "profile" and profile_ui != null:
 		profile_ui.close(false)
+	if modal_name != "encyclopedia" and encyclopedia_ui != null:
+		encyclopedia_ui.close(false)
 
 func _refresh_modal_input_blocker() -> void:
 	_ensure_modal_layer()
@@ -704,6 +729,8 @@ func _is_any_modal_visible() -> bool:
 		if _is_visible_ui_control(control):
 			return true
 	if profile_ui != null and profile_ui.is_any_modal_open():
+		return true
+	if encyclopedia_ui != null and encyclopedia_ui.is_any_modal_open():
 		return true
 	return false
 
@@ -766,13 +793,14 @@ func _ensure_mobile_ui_containers() -> void:
 		_reparent_node(nav_fish_button, ui_canvas_layer)
 	nav_fish_button.visible = false
 
-	for node in [basket_button, inventory_button, shop_button, map_button, profile_button]:
+	for node in [basket_button, inventory_button, shop_button, encyclopedia_button, map_button, profile_button]:
 		_reparent_node(node, bottom_nav_container)
 	bottom_nav_container.move_child(basket_button, 0)
 	bottom_nav_container.move_child(inventory_button, 1)
 	bottom_nav_container.move_child(shop_button, 2)
-	bottom_nav_container.move_child(map_button, 3)
-	bottom_nav_container.move_child(profile_button, 4)
+	bottom_nav_container.move_child(encyclopedia_button, 3)
+	bottom_nav_container.move_child(map_button, 4)
+	bottom_nav_container.move_child(profile_button, 5)
 
 func _ensure_cast_button_visual() -> void:
 	if cast_button_visual != null:
@@ -806,6 +834,82 @@ func _ensure_cast_button_visual() -> void:
 		_cast_button_pressed = false
 		_update_cast_button_visual()
 	)
+
+func _make_reeling_color_rect(node_name: String, parent: Node, z: int) -> ColorRect:
+	var rect := ColorRect.new()
+	rect.name = node_name
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rect.z_index = z
+	parent.add_child(rect)
+	return rect
+
+func _ensure_reeling_visual_nodes() -> void:
+	if reeling_panel == null or tension_track == null:
+		return
+
+	reeling_panel.color = Color.TRANSPARENT
+	reeling_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tension_track.clip_contents = false
+	tension_track.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	if reeling_panel_frame == null:
+		reeling_panel_frame = Panel.new()
+		reeling_panel_frame.name = "ReelingPanelFrame"
+		reeling_panel_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		reeling_panel_frame.z_index = 0
+		reeling_panel.add_child(reeling_panel_frame)
+		reeling_panel.move_child(reeling_panel_frame, 0)
+
+	if tension_slack_zone == null:
+		tension_slack_zone = _make_reeling_color_rect("SlackZone", tension_track, 0)
+	if tension_warning_zone == null:
+		tension_warning_zone = _make_reeling_color_rect("WarningZone", tension_track, 0)
+	if tension_critical_zone == null:
+		tension_critical_zone = _make_reeling_color_rect("CriticalZone", tension_track, 0)
+	if tension_marker_glow == null:
+		tension_marker_glow = _make_reeling_color_rect("TensionMarkerGlow", tension_track, 3)
+
+	if safe_zone != null:
+		safe_zone.z_index = 0
+		safe_zone.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if tension_fill != null:
+		tension_fill.z_index = 2
+		tension_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if tension_marker != null:
+		tension_marker.z_index = 4
+		tension_marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if progress_track != null:
+		progress_track.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if progress_fill != null:
+		progress_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+func _layout_reeling_panel_frame() -> void:
+	_ensure_reeling_visual_nodes()
+	if reeling_panel_frame == null:
+		return
+
+	reeling_panel_frame.position = Vector2.ZERO
+	reeling_panel_frame.size = reeling_panel.size
+
+func _set_reeling_panel_visual_state(state_key: String, accent: Color) -> void:
+	_ensure_reeling_visual_nodes()
+	if reeling_panel_frame == null:
+		return
+	if _last_reeling_visual_key == state_key:
+		return
+
+	_last_reeling_visual_key = state_key
+	var critical := state_key == "critical"
+	var bg := Color(0.018, 0.032, 0.036, 0.70)
+	var border := Color(accent.r, accent.g, accent.b, 0.56 if critical else 0.34)
+	var shadow := Color(accent.r, accent.g, accent.b, 0.18 if critical else 0.08)
+	var style := _make_panel_style(bg, border, 18, 7 if critical else 4, shadow)
+	style.set_border_width_all(1)
+	style.content_margin_left = 0.0
+	style.content_margin_top = 0.0
+	style.content_margin_right = 0.0
+	style.content_margin_bottom = 0.0
+	reeling_panel_frame.add_theme_stylebox_override("panel", style)
 
 func _reparent_node(node: Node, new_parent: Node) -> void:
 	if node == null or new_parent == null or node.get_parent() == new_parent:
@@ -896,45 +1000,65 @@ func _apply_action_button_style(button: Button, active: bool = false) -> void:
 	button.add_theme_color_override("font_disabled_color", Color(0.62, 0.68, 0.66, 0.62))
 	button.add_theme_constant_override("h_separation", 4)
 
+func _make_primary_action_circle_style(
+	bg_color: Color,
+	border_color: Color,
+	radius: int,
+	shadow_size: int,
+	shadow_color: Color
+) -> StyleBoxFlat:
+	var style := _make_panel_style(bg_color, border_color, radius, shadow_size, shadow_color)
+	style.set_border_width_all(2)
+	style.content_margin_left = 0.0
+	style.content_margin_top = 0.0
+	style.content_margin_right = 0.0
+	style.content_margin_bottom = 0.0
+	return style
+
 func _apply_primary_fishing_action_style(button: Button, target_size: Vector2) -> void:
 	var radius := roundi(max(target_size.x, target_size.y) * 0.5)
-	var normal_bg := Color(0.085, 0.205, 0.150, 0.96)
-	var hover_bg := Color(0.115, 0.285, 0.190, 1.0)
-	var pressed_bg := Color(0.052, 0.140, 0.108, 1.0)
-	var border := Color(0.72, 1.0, 0.66, 0.64)
-	var shadow := Color(0.20, 0.68, 0.22, 0.24)
+	var normal_bg := Color(1.0, 1.0, 1.0, 0.045)
+	var hover_bg := Color(1.0, 1.0, 1.0, 0.095)
+	var pressed_bg := Color(1.0, 1.0, 1.0, 0.155)
+	var border := Color(1.0, 1.0, 1.0, 0.74)
+	var shadow := Color(0.0, 0.0, 0.0, 0.24)
 
 	if _fishing_ui_state == FishingUiState.WAITING:
-		normal_bg = Color(0.48, 0.330, 0.105, 0.96)
-		hover_bg = Color(0.62, 0.430, 0.140, 1.0)
-		pressed_bg = Color(0.34, 0.225, 0.075, 1.0)
-		border = Color(1.0, 0.78, 0.34, 0.78)
-		shadow = Color(0.90, 0.55, 0.12, 0.24)
+		normal_bg = Color(1.0, 1.0, 1.0, 0.055)
+		hover_bg = Color(1.0, 1.0, 1.0, 0.115)
+		pressed_bg = Color(1.0, 1.0, 1.0, 0.175)
+		border = Color(1.0, 1.0, 1.0, 0.84)
+		shadow = Color(0.0, 0.0, 0.0, 0.28)
 	elif _fishing_ui_state == FishingUiState.FIGHTING:
-		normal_bg = Color(0.055, 0.150, 0.190, 0.96)
-		hover_bg = Color(0.075, 0.205, 0.255, 1.0)
-		pressed_bg = Color(0.040, 0.105, 0.150, 1.0)
-		border = Color(0.60, 0.90, 1.0, 0.60)
-		shadow = Color(0.12, 0.44, 0.64, 0.22)
+		normal_bg = Color(1.0, 1.0, 1.0, 0.060)
+		hover_bg = Color(1.0, 1.0, 1.0, 0.125)
+		pressed_bg = Color(1.0, 1.0, 1.0, 0.190)
+		border = Color(1.0, 1.0, 1.0, 0.88)
+		shadow = Color(0.0, 0.0, 0.0, 0.30)
 	elif _fishing_ui_state == FishingUiState.CAUGHT or _fishing_ui_state == FishingUiState.FAILED:
-		normal_bg = Color(0.090, 0.180, 0.120, 0.92)
-		hover_bg = Color(0.130, 0.250, 0.160, 0.98)
-		pressed_bg = Color(0.065, 0.130, 0.095, 1.0)
-		border = Color(0.80, 0.96, 0.62, 0.52)
-		shadow = Color(0.24, 0.54, 0.18, 0.18)
+		normal_bg = Color(1.0, 1.0, 1.0, 0.055)
+		hover_bg = Color(1.0, 1.0, 1.0, 0.110)
+		pressed_bg = Color(1.0, 1.0, 1.0, 0.170)
+		border = Color(1.0, 1.0, 1.0, 0.80)
+		shadow = Color(0.0, 0.0, 0.0, 0.26)
 
 	button.custom_minimum_size = target_size
 	button.size = target_size
-	button.add_theme_stylebox_override("normal", _make_panel_style(normal_bg, border, radius, 9, shadow))
-	button.add_theme_stylebox_override("hover", _make_panel_style(hover_bg, Color(border.r, border.g, border.b, min(border.a + 0.12, 1.0)), radius, 11, shadow))
-	button.add_theme_stylebox_override("pressed", _make_panel_style(pressed_bg, Color(border.r, border.g, border.b, min(border.a + 0.16, 1.0)), radius, 4, Color(0.0, 0.0, 0.0, 0.16)))
-	button.add_theme_stylebox_override("disabled", _make_panel_style(Color(0.045, 0.058, 0.060, 0.58), Color(0.62, 0.68, 0.64, 0.20), radius, 1, Color.TRANSPARENT))
-	button.add_theme_color_override("font_color", Color(0.98, 1.0, 0.92, 1.0))
-	button.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 0.96, 1.0))
-	button.add_theme_color_override("font_pressed_color", Color(0.88, 1.0, 0.84, 1.0))
-	button.add_theme_color_override("font_disabled_color", Color(0.62, 0.68, 0.66, 0.62))
+	button.add_theme_stylebox_override("normal", _make_primary_action_circle_style(normal_bg, border, radius, 5, shadow))
+	button.add_theme_stylebox_override("hover", _make_primary_action_circle_style(hover_bg, Color(border.r, border.g, border.b, min(border.a + 0.10, 1.0)), radius, 7, shadow))
+	button.add_theme_stylebox_override("pressed", _make_primary_action_circle_style(pressed_bg, Color(border.r, border.g, border.b, min(border.a + 0.16, 1.0)), radius, 2, Color(0.0, 0.0, 0.0, 0.16)))
+	button.add_theme_stylebox_override("disabled", _make_primary_action_circle_style(Color(1.0, 1.0, 1.0, 0.020), Color(1.0, 1.0, 1.0, 0.34), radius, 1, Color.TRANSPARENT))
+	button.add_theme_stylebox_override("focus", _make_primary_action_circle_style(Color(1.0, 1.0, 1.0, 0.075), Color(1.0, 1.0, 1.0, 0.92), radius, 6, shadow))
+	button.add_theme_color_override("font_color", Color.TRANSPARENT)
+	button.add_theme_color_override("font_hover_color", Color.TRANSPARENT)
+	button.add_theme_color_override("font_pressed_color", Color.TRANSPARENT)
+	button.add_theme_color_override("font_disabled_color", Color.TRANSPARENT)
+	button.add_theme_color_override("icon_normal_color", Color(1.0, 1.0, 1.0, 0.95))
+	button.add_theme_color_override("icon_hover_color", Color(1.0, 1.0, 1.0, 1.0))
+	button.add_theme_color_override("icon_pressed_color", Color(1.0, 1.0, 1.0, 0.88))
+	button.add_theme_color_override("icon_disabled_color", Color(1.0, 1.0, 1.0, 0.44))
 	button.add_theme_font_size_override("font_size", 12)
-	button.add_theme_constant_override("h_separation", 2)
+	button.add_theme_constant_override("h_separation", 0)
 
 func _apply_label_style(label: Label, primary: bool = false) -> void:
 	ui_theme.apply_label_style(label, "title" if primary else "body")
@@ -1304,7 +1428,7 @@ func _setup_atmosphere_materials() -> void:
 			uv.x *= 1.0;
 			float pulse = 0.64 + sin(TIME * 0.95) * 0.08;
 			float glow = 1.0 - smoothstep(0.10, 0.58, length(uv));
-			COLOR = vec4(0.30, 0.78, 0.40, glow * 0.14 * pulse);
+			COLOR = vec4(1.0, 1.0, 1.0, glow * 0.075 * pulse);
 		}
 	""")
 
@@ -1578,7 +1702,8 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	var ui_scale: float = min(sx, sy)
 	var chip_gap: float = 10.0 * ui_scale
 	var top_height: float = HUD_HEIGHT * sy
-	var cast_button_size := Vector2(92.0, 92.0) * ui_scale
+	var cast_button_edge: float = clamp(126.0 * ui_scale, 104.0, 136.0)
+	var cast_button_size := Vector2(cast_button_edge, cast_button_edge)
 	var quick_button_width: float = 112.0 * sx
 	var quick_button_height: float = 38.0 * sy
 	_water_surface_y = WATER_SURFACE_Y * sy
@@ -1685,8 +1810,15 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	quick_actions_container.visible = false
 
 	var cast_center := _scale_point(Vector2(902.0, 400.0), screen_size)
+	var cast_margin: float = 8.0 * ui_scale
+	var cast_min_x: float = cast_button_size.x * 0.5 + cast_margin
+	var cast_max_x: float = max(cast_min_x, screen_size.x - cast_button_size.x * 0.5 - cast_margin)
+	var cast_min_y: float = cast_button_size.y * 0.5 + cast_margin
+	var cast_max_y: float = max(cast_min_y, screen_size.y - cast_button_size.y * 0.5 - cast_margin)
+	cast_center.x = clamp(cast_center.x, cast_min_x, cast_max_x)
+	cast_center.y = clamp(cast_center.y, cast_min_y, cast_max_y)
 	var cast_rect := Rect2(cast_center - cast_button_size * 0.5, cast_button_size)
-	var glow_rect := cast_rect.grow(12.0 * ui_scale)
+	var glow_rect := cast_rect.grow(8.0 * ui_scale)
 	_anchor_control(action_glow, 0.0, 0.0, 0.0, 0.0, glow_rect.position.x, glow_rect.position.y, glow_rect.end.x, glow_rect.end.y)
 	action_glow.z_index = 99
 	action_glow.visible = true
@@ -1718,7 +1850,8 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 
 	_set_action_button_icon(feed_button, "hud_feed", 19.0)
 	_set_action_button_icon(bait_button, "hud_bait", 19.0)
-	_set_primary_fishing_button_icon(fish_button, _get_primary_fishing_action_icon(), 26.0)
+	var primary_icon_size: float = clamp(cast_button_size.x * 0.88, 88.0, 110.0)
+	_set_primary_fishing_button_icon(fish_button, _get_primary_fishing_action_icon(), primary_icon_size)
 	_set_action_button_icon(tackle_button, "hud_tackle", 19.0)
 	_set_action_button_icon(auto_button, "hud_auto", 19.0)
 	_refresh_fish_button_presentation()
@@ -1734,25 +1867,26 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	bottom_nav_container.mouse_filter = Control.MOUSE_FILTER_PASS
 	bottom_nav_container.add_theme_constant_override("separation", int(9.0 * ui_scale))
 
-	var nav_buttons: Array = [nav_fish_button, basket_button, inventory_button, shop_button, map_button, profile_button]
-	var nav_labels: Array = ["Ловля", "Садок", "Инвентарь", "Магазин", "Карта", "Профиль"]
+	var nav_buttons: Array = [nav_fish_button, basket_button, inventory_button, shop_button, encyclopedia_button, map_button, profile_button]
+	var nav_labels: Array = ["Ловля", "Садок", "Инвентарь", "Магазин", "Атлас", "Карта", "Профиль"]
 	var nav_button_size := _scale_size(Vector2(LEFT_NAV_WIDTH - 18.0, 42.0), screen_size)
 	for i in nav_buttons.size():
 		_layout_nav_button(nav_buttons[i], nav_labels[i], Vector2.ZERO, nav_button_size, i == 0)
-	var nav_icons: Array = ["fish", "keepnet", "inventory", "shop", "map", "profile"]
+	var nav_icons: Array = ["fish", "keepnet", "inventory", "shop", "encyclopedia", "map", "profile"]
 	for i in nav_buttons.size():
 		_set_button_icon(nav_buttons[i], nav_icons[i], 12.0)
 
 	nav_fish_button.visible = false
-	var side_menu_buttons: Array = [basket_button, inventory_button, shop_button, map_button, profile_button]
-	var side_menu_labels: Array = ["Садок", "Инвентарь", "Магазин", "Карта", "Профиль"]
-	var side_menu_icons: Array = ["keepnet", "inventory", "shop", "map", "profile"]
+	var side_menu_buttons: Array = [basket_button, inventory_button, shop_button, encyclopedia_button, map_button, profile_button]
+	var side_menu_labels: Array = ["Садок", "Инвентарь", "Магазин", "Атлас рыб", "Карта", "Профиль"]
+	var side_menu_icons: Array = ["keepnet", "inventory", "shop", "encyclopedia", "map", "profile"]
 	var side_menu_button_size := _scale_size(Vector2(LEFT_NAV_WIDTH, 48.0), screen_size)
 	for i in side_menu_buttons.size():
 		_layout_side_menu_button(side_menu_buttons[i], side_menu_labels[i], side_menu_icons[i], side_menu_button_size, false)
 
 	basket_button.visible = true
 
+	encyclopedia_button.disabled = false
 	map_button.disabled = false
 	profile_button.disabled = false
 
@@ -1766,35 +1900,37 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 		_presence_has_layout = true
 	_layout_float_visuals(water_anchor, clamp(screen_size.y / 540.0, 0.86, 1.22))
 
-	var reel_width: float = 500.0 * sx
-	var reel_height: float = 64.0 * sy
-	var reel_y: float = max(16.0 * sy + top_height + 10.0 * sy, action_panel_rect.position.y - reel_height - 18.0 * sy)
-	var reel_x: float = max(170.0 * sx, (screen_size.x - reel_width) * 0.5 - 62.0 * sx)
+	var reel_width: float = clamp(screen_size.x * 0.42, 340.0 * sx, 420.0 * sx)
+	var reel_height: float = clamp(74.0 * sy, 64.0, 78.0)
+	var reel_y: float = max(16.0 * sy + top_height + 10.0 * sy, action_panel_rect.position.y - reel_height - 14.0 * sy)
+	var reel_x: float = clamp((screen_size.x - reel_width) * 0.5 - 40.0 * sx, 16.0 * sx, screen_size.x - reel_width - 148.0 * sx)
 	_anchor_control(reeling_panel, 0.0, 0.0, 0.0, 0.0, reel_x, reel_y, reel_x + reel_width, reel_y + reel_height)
-	reeling_panel.color = Color(0.020, 0.040, 0.042, 0.78)
+	reeling_panel.color = Color.TRANSPARENT
 	reeling_panel.z_index = 103
+	_layout_reeling_panel_frame()
+	_set_reeling_panel_visual_state("green", Color(0.36, 0.86, 0.46, 1.0))
 
 	var reel_padding := 14.0
 	var reel_inner_width: float = reel_width - reel_padding * 2.0
-	fight_title_label.position = Vector2(reel_padding, 6.0)
+	fight_title_label.position = Vector2(reel_padding, 7.0)
 	fight_title_label.size = Vector2(142.0, 18.0)
 	fight_title_label.add_theme_font_size_override("font_size", 11)
-	fight_status_label.position = Vector2(reel_padding + 150.0, 6.0)
+	fight_status_label.position = Vector2(reel_padding + 150.0, 7.0)
 	fight_status_label.size = Vector2(max(reel_inner_width - 150.0, 80.0), 18.0)
 	fight_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	fight_status_label.add_theme_font_size_override("font_size", 11)
-	tension_label.position = Vector2(reel_padding, 26.0)
+	tension_label.position = Vector2(reel_padding, 25.0)
 	tension_label.size = Vector2(reel_inner_width * 0.5, 14.0)
-	tension_label.add_theme_font_size_override("font_size", 10)
-	progress_label.position = Vector2(reel_padding + reel_inner_width * 0.5, 26.0)
+	tension_label.add_theme_font_size_override("font_size", 11)
+	progress_label.position = Vector2(reel_padding + reel_inner_width * 0.5, 25.0)
 	progress_label.size = Vector2(reel_inner_width * 0.5, 14.0)
 	progress_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	progress_label.add_theme_font_size_override("font_size", 10)
+	progress_label.add_theme_font_size_override("font_size", 11)
 	tension_track.position = Vector2(reel_padding, 43.0)
-	tension_track.size = Vector2(reel_inner_width, 11.0)
-	progress_track.position = Vector2(reel_padding, 58.0)
+	tension_track.size = Vector2(reel_inner_width, 16.0)
+	progress_track.position = Vector2(reel_padding, 65.0)
 	progress_track.size = Vector2(reel_inner_width, 4.0)
-	ui_theme.apply_meter_track_style(tension_track, tension_fill)
+	tension_track.color = Color(0.94, 1.0, 0.96, 0.16)
 	ui_theme.apply_meter_track_style(progress_track, progress_fill, Color(0.58, 0.82, 0.28, 1.0))
 	fight_hint_label.visible = false
 
@@ -2061,9 +2197,9 @@ func _set_primary_fishing_button_icon(button: Button, icon_name: String, icon_si
 	button.icon = ui_theme.get_icon(icon_name)
 	button.expand_icon = true
 	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
+	button.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
 	button.add_theme_constant_override("icon_max_width", int(icon_size))
-	button.add_theme_constant_override("h_separation", 2)
+	button.add_theme_constant_override("h_separation", 0)
 
 func _get_primary_fishing_action_icon() -> String:
 	match _fishing_ui_state:
@@ -2072,7 +2208,7 @@ func _get_primary_fishing_action_icon() -> String:
 		FishingUiState.FIGHTING:
 			return "hud_pull"
 		FishingUiState.CAUGHT, FishingUiState.FAILED:
-			return "hud_pull"
+			return "hud_pull_out"
 		_:
 			return "hud_cast"
 
@@ -2084,15 +2220,8 @@ func _refresh_fish_button_presentation() -> void:
 	if target_size == Vector2.ZERO:
 		var viewport_size := get_viewport_rect().size
 		var button_scale: float = min(viewport_size.x / BASE_SCREEN_SIZE.x, viewport_size.y / BASE_SCREEN_SIZE.y)
-		target_size = Vector2(92.0, 92.0) * button_scale
-
-	var active_hook_input: bool = _fishing_ui_state == FishingUiState.WAITING and bool(FishingManager.get("use_new_bite_system"))
-	var use_cast_texture := _use_cast_png_button and (_fishing_ui_state == FishingUiState.IDLE or (_fishing_ui_state == FishingUiState.WAITING and not active_hook_input))
-	var use_pull_texture := _use_pull_png_button and (
-		_fishing_ui_state == FishingUiState.FIGHTING
-		or _fishing_ui_state == FishingUiState.CAUGHT
-		or _fishing_ui_state == FishingUiState.FAILED
-	)
+		var button_edge: float = clamp(126.0 * button_scale, 104.0, 136.0)
+		target_size = Vector2(button_edge, button_edge)
 
 	fish_button.visible = true
 	fish_button.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -2101,23 +2230,17 @@ func _refresh_fish_button_presentation() -> void:
 	fish_button.size = target_size
 	if cast_button_visual != null:
 		cast_button_visual.z_index = fish_button.z_index - 1
-
-	if use_cast_texture or use_pull_texture:
-		if use_pull_texture:
-			ui_theme.apply_pull_button_hitbox_style(fish_button, target_size)
-		else:
-			ui_theme.apply_cast_button_hitbox_style(fish_button, target_size)
-		_update_cast_button_visual()
-		return
-
-	if cast_button_visual != null:
 		cast_button_visual.visible = false
 	_cast_button_hovered = false
 	_cast_button_pressed = false
 	_apply_primary_fishing_action_style(fish_button, target_size)
 	fish_button.add_theme_font_size_override("font_size", 12)
 	fish_button.clip_text = true
-	_set_primary_fishing_button_icon(fish_button, _get_primary_fishing_action_icon(), 26.0)
+	if not fish_button.text.is_empty():
+		fish_button.tooltip_text = fish_button.text
+	fish_button.text = ""
+	var icon_size: float = clamp(min(target_size.x, target_size.y) * 0.88, 88.0, 110.0)
+	_set_primary_fishing_button_icon(fish_button, _get_primary_fishing_action_icon(), icon_size)
 
 func _update_cast_button_visual() -> void:
 	if cast_button_visual == null or ui_theme == null:
@@ -2191,7 +2314,9 @@ func _is_menu_overlay_open() -> bool:
 		return true
 	if _is_visible_ui_control(waterbody_panel):
 		return true
-	return profile_ui != null and profile_ui.is_any_modal_open()
+	if profile_ui != null and profile_ui.is_any_modal_open():
+		return true
+	return encyclopedia_ui != null and encyclopedia_ui.is_any_modal_open()
 
 func _should_ignore_base_ui_press() -> bool:
 	return is_modal_open or _is_modal_tap_guard_active() or _is_catch_reward_open()
@@ -2339,6 +2464,7 @@ func _setup_layout() -> void:
 		shop_button,
 		map_button,
 		profile_button,
+		encyclopedia_button,
 		feed_button,
 		auto_button,
 		bait_button,
@@ -2840,6 +2966,7 @@ func _setup_layout() -> void:
 		nav_fish_button,
 		inventory_button,
 		shop_button,
+		encyclopedia_button,
 		basket_button,
 		map_button,
 		profile_button
@@ -2853,7 +2980,7 @@ func _setup_layout() -> void:
 		"⌖ Карта",
 		"◎ Профиль"
 	]
-	nav_texts = ["Ловля", "Инвентарь", "Магазин", "Садок", "Карта", "Профиль"]
+	nav_texts = ["Ловля", "Инвентарь", "Магазин", "Атлас", "Садок", "Карта", "Профиль"]
 	var nav_gap := 6.0
 	var nav_x := bottom_nav_panel.position.x + 10.0
 	var nav_y := bottom_nav_y + 3.0
@@ -2867,6 +2994,7 @@ func _setup_layout() -> void:
 		nav_button.add_theme_font_size_override("font_size", 11)
 		_apply_button_style(nav_button, STYLE_BOTTOM_NAV_ACTIVE if i == 0 else STYLE_BOTTOM_NAV_BUTTON)
 
+	encyclopedia_button.disabled = false
 	map_button.disabled = false
 	profile_button.disabled = true
 
@@ -3791,6 +3919,7 @@ func _connect_signals() -> void:
 	inventory_button.pressed.connect(_on_inventory_button_pressed)
 	tackle_button.pressed.connect(_on_tackle_button_pressed)
 	shop_button.pressed.connect(_on_shop_button_pressed)
+	encyclopedia_button.pressed.connect(_on_encyclopedia_button_pressed)
 	map_button.pressed.connect(_on_map_button_pressed)
 	profile_button.pressed.connect(_on_profile_button_pressed)
 	bait_button.pressed.connect(_on_bait_button_pressed)
@@ -4673,9 +4802,14 @@ func _on_sell_all_button_pressed() -> void:
 		return
 
 	var earned := InventoryManager.sell_all()
+	var sale_summary: Dictionary = InventoryManager.get_last_sale_summary()
+	var contract_reward: int = int(sale_summary.get("contract_reward_total", 0))
+	var sale_total: int = int(sale_summary.get("sale_total", max(earned - contract_reward, 0)))
 
 	if earned > 0:
 		result_label.text = "Рыба продана. Получено: %d мон." % earned
+		if contract_reward > 0:
+			result_label.text += " Контракты: +%d мон." % contract_reward
 	else:
 		result_label.text = "Садок пуст. Продавать пока нечего."
 
@@ -4683,7 +4817,10 @@ func _on_sell_all_button_pressed() -> void:
 	_update_ui()
 
 	if earned > 0:
-		_show_basket_notice("Рыба продана: +%d мон." % earned, true)
+		var notice := "Рыба продана: +%d мон." % sale_total
+		if contract_reward > 0:
+			notice += " Контракты: +%d мон." % contract_reward
+		_show_basket_notice(notice, true)
 	else:
 		_show_basket_notice("Садок пуст.", false)
 
@@ -4698,11 +4835,17 @@ func _on_keepnet_sell_fish_pressed(fish_index: int) -> void:
 
 	var fish: Dictionary = InventoryManager.inventory[fish_index]
 	var price := InventoryManager.sell_fish_at(fish_index)
+	var sale_summary: Dictionary = InventoryManager.get_last_sale_summary()
+	var supplier_name := str(sale_summary.get("supplier_name", "Местный рынок"))
+	var contract_reward := int(sale_summary.get("contract_reward_total", 0))
+	var sale_total := int(sale_summary.get("sale_total", max(price - contract_reward, 0)))
 	result_label.text = "Рыба продана: %s +%d мон." % [
 		str(fish.get("name", "-")),
-		price
+		sale_total
 	]
-	_show_basket_notice("Продано: +%d мон." % price, true)
+	if contract_reward > 0:
+		result_label.text += " Контракт: +%d мон." % contract_reward
+	_show_basket_notice("Продано: +%d мон. | %s" % [sale_total, supplier_name], true)
 	SaveManager.save_game()
 	_update_ui()
 
@@ -4717,12 +4860,17 @@ func _on_nav_fish_button_pressed() -> void:
 	_refresh_modal_input_blocker()
 	_refresh_bottom_nav_styles()
 
+func _close_profile_and_encyclopedia(reset_nav: bool = false) -> void:
+	if profile_ui != null:
+		profile_ui.close(reset_nav)
+	if encyclopedia_ui != null:
+		encyclopedia_ui.close(reset_nav)
+
 func _on_basket_button_pressed() -> void:
 	if _should_ignore_base_ui_press():
 		return
 
-	if profile_ui != null:
-		profile_ui.close(false)
+	_close_profile_and_encyclopedia(false)
 	keepnet_ui.open()
 
 func _on_basket_close_button_pressed() -> void:
@@ -4736,8 +4884,7 @@ func _on_inventory_button_pressed() -> void:
 	if _should_ignore_base_ui_press():
 		return
 
-	if profile_ui != null:
-		profile_ui.close(false)
+	_close_profile_and_encyclopedia(false)
 	_inventory_category = "all"
 	_selected_inventory_item_id = ""
 	inventory_ui.open()
@@ -4746,30 +4893,37 @@ func _on_tackle_button_pressed() -> void:
 	if _should_ignore_base_ui_press():
 		return
 
-	if profile_ui != null:
-		profile_ui.close(false)
+	_close_profile_and_encyclopedia(false)
 	tackle_ui.open()
 
 func _on_shop_button_pressed() -> void:
 	if _should_ignore_base_ui_press():
 		return
 
-	if profile_ui != null:
-		profile_ui.close(false)
+	_close_profile_and_encyclopedia(false)
 	shop_ui.open()
 
-func _on_map_button_pressed() -> void:
+func _on_encyclopedia_button_pressed() -> void:
 	if _should_ignore_base_ui_press():
 		return
 
 	if profile_ui != null:
 		profile_ui.close(false)
+	encyclopedia_ui.open()
+
+func _on_map_button_pressed() -> void:
+	if _should_ignore_base_ui_press():
+		return
+
+	_close_profile_and_encyclopedia(false)
 	waterbody_ui.open()
 
 func _on_profile_button_pressed() -> void:
 	if _should_ignore_base_ui_press():
 		return
 
+	if encyclopedia_ui != null:
+		encyclopedia_ui.close(false)
 	profile_ui.open()
 	return
 	if _is_catch_reward_open():
@@ -4796,8 +4950,7 @@ func _on_bait_button_pressed() -> void:
 	if _is_catch_reward_open():
 		return
 
-	if profile_ui != null:
-		profile_ui.close(false)
+	_close_profile_and_encyclopedia(false)
 	_active_nav_tab = "inventory"
 	_inventory_category = "bait"
 	_selected_inventory_item_id = ""

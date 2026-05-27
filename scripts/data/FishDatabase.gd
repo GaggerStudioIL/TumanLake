@@ -1071,6 +1071,26 @@ const FISH_ICON_PATHS := {
 
 var _fish_rules_applied := false
 
+const SPECIES_RARITY_TYPES := {
+	"young_pike": "rare",
+	"ide": "rare",
+	"young_grass_carp": "rare",
+	"young_mirror_carp": "rare",
+	"small_catfish": "rare",
+	"water_turtle": "rare",
+	"pike": "rare",
+	"catfish": "rare",
+	"eel": "rare",
+	"zander": "rare",
+	"mist_carp": "legendary_species",
+	"moon_catfish": "legendary_species"
+}
+
+const PREDATOR_FISH_IDS := ["rotan", "perch", "young_pike", "small_catfish", "pike", "catfish", "eel", "zander", "moon_catfish"]
+const VEGETATION_FISH_IDS := ["rudd", "tench", "young_grass_carp", "water_turtle", "mist_carp"]
+const SURFACE_FISH_IDS := ["bleak", "topmouth_gudgeon", "young_chub", "rudd"]
+const BOTTOM_FISH_IDS := ["ruffe", "gudgeon", "loach", "goby", "crayfish", "bream", "skimmer_bream", "white_bream"]
+
 func _ensure_fish_rules() -> void:
 	if _fish_rules_applied:
 		return
@@ -1130,6 +1150,26 @@ func _ensure_fish_rules() -> void:
 			if not fish_entry.has("rarity_weight"):
 				fish_entry["rarity_weight"] = max_weight * 0.92
 
+		var min_weight: float = float(fish_entry.get("min_weight", 0.01))
+		var trophy_weight: float = float(fish_entry.get("trophy_weight", max_weight * 0.80))
+		var record_weight: float = float(fish_entry.get("rarity_weight", max_weight * 0.92))
+		var keeper_weight: float = _get_default_keeper_weight(fish_id, fish_entry, min_weight, max_weight, trophy_weight)
+		var rarity_type: String = _get_default_species_rarity_type(fish_id, fish_entry)
+
+		fish_entry["minWeight"] = min_weight
+		fish_entry["maxWeight"] = max_weight
+		fish_entry["keeper_weight"] = keeper_weight
+		fish_entry["keeperWeight"] = keeper_weight
+		fish_entry["trophyWeight"] = trophy_weight
+		fish_entry["record_weight"] = record_weight
+		fish_entry["recordWeight"] = record_weight
+		fish_entry["basePricePerKg"] = float(fish_entry.get("basePricePerKg", fish_entry.get("price_per_kg", 1.0)))
+		fish_entry["rarityType"] = rarity_type
+		fish_entry["difficulty"] = _get_default_difficulty(fish_entry)
+		fish_entry["habitat"] = str(fish_entry.get("habitat", _get_default_habitat(fish_id, fish_entry)))
+		fish_entry["activityTime"] = _get_activity_time(fish_entry)
+		fish_entry["preferredWeather"] = _get_preferred_weather(fish_id, fish_entry)
+
 		fish_data[fish_id] = fish_entry
 
 	_fish_rules_applied = true
@@ -1156,9 +1196,93 @@ func _get_strength_label(strength: float) -> String:
 		return "high"
 	return "very_high"
 
+func _get_default_keeper_weight(fish_id: String, fish_entry: Dictionary, min_weight: float, max_weight: float, trophy_weight: float) -> float:
+	if fish_entry.has("keeperWeight"):
+		return max(float(fish_entry.get("keeperWeight", min_weight)), min_weight)
+	if fish_entry.has("keeper_weight"):
+		return max(float(fish_entry.get("keeper_weight", min_weight)), min_weight)
+
+	var ratio := 0.30
+	if fish_id in ["bleak", "topmouth_gudgeon", "ruffe", "gudgeon", "goby", "loach", "crayfish", "frog"]:
+		ratio = 0.22
+	elif fish_id in ["pike", "catfish", "zander", "mist_carp", "moon_catfish"]:
+		ratio = 0.34
+
+	var default_weight: float = max(min_weight, trophy_weight * ratio)
+	var upper_limit: float = max(min_weight, min(trophy_weight - 0.01, max_weight))
+	return snappedf(clamp(default_weight, min_weight, upper_limit), 0.01)
+
+
+func _get_default_species_rarity_type(fish_id: String, fish_entry: Dictionary) -> String:
+	if fish_entry.has("rarityType"):
+		return str(fish_entry.get("rarityType", "common"))
+	if SPECIES_RARITY_TYPES.has(fish_id):
+		return str(SPECIES_RARITY_TYPES[fish_id])
+
+	var old_rarity: String = str(fish_entry.get("rarity", "common"))
+	if old_rarity == "rare" or old_rarity == "very_rare" or old_rarity == "trophy":
+		return "rare"
+	if old_rarity == "legendary" or old_rarity == "mythic":
+		return "legendary_species"
+	return "common"
+
+
+func _get_default_difficulty(fish_entry: Dictionary) -> float:
+	var base_fight_power: float = float(fish_entry.get("base_fight_power", 1.0))
+	var strength: float = float(fish_entry.get("strength", 1.0))
+	var aggression: float = float(fish_entry.get("aggression", 0.3))
+	var max_weight: float = float(fish_entry.get("max_weight", 1.0))
+	return snappedf(clamp(base_fight_power * 0.42 + strength * 0.34 + aggression * 0.16 + pow(max(max_weight, 0.05), 0.22) * 0.18, 0.20, 5.0), 0.01)
+
+
+func _get_default_habitat(fish_id: String, fish_entry: Dictionary) -> String:
+	if fish_id in PREDATOR_FISH_IDS:
+		return "predator"
+	if fish_id in VEGETATION_FISH_IDS:
+		return "vegetation"
+	if fish_id in SURFACE_FISH_IDS:
+		return "surface"
+	if fish_id in BOTTOM_FISH_IDS:
+		return "bottom"
+
+	var preferred_depth: float = float(fish_entry.get("preferred_depth", 1.0))
+	if preferred_depth >= 2.4:
+		return "deep"
+	if preferred_depth <= 0.7:
+		return "surface"
+	return "lake"
+
+
+func _get_activity_time(fish_entry: Dictionary) -> Dictionary:
+	return {
+		"start": int(fish_entry.get("active_time_start", 300)),
+		"end": int(fish_entry.get("active_time_end", 1320)),
+		"peak": int(fish_entry.get("peak_time", 720))
+	}
+
+
+func _get_preferred_weather(fish_id: String, fish_entry: Dictionary) -> Array:
+	if fish_entry.has("preferredWeather") and fish_entry.get("preferredWeather", []) is Array:
+		return fish_entry.get("preferredWeather", [])
+	if fish_id in ["catfish", "eel", "loach", "moon_catfish"]:
+		return ["overcast", "rain", "night_mist"]
+	if fish_id in ["pike", "zander", "perch", "young_pike"]:
+		return ["overcast", "wind", "cool"]
+	if fish_id in ["young_grass_carp", "rudd", "bleak", "topmouth_gudgeon"]:
+		return ["clear", "warm"]
+	return ["clear", "overcast"]
+
 func get_fish(fish_id: String) -> Dictionary:
 	_ensure_fish_rules()
 	return fish_data.get(fish_id, {})
+
+func get_all_fish_ids() -> Array:
+	_ensure_fish_rules()
+	return fish_data.keys()
+
+func get_all_fish() -> Dictionary:
+	_ensure_fish_rules()
+	return fish_data.duplicate(true)
 
 func get_catch_rank(fish: Dictionary, weight: float) -> String:
 	var rarity_weight := float(fish.get("rarity_weight", fish.get("max_weight", 999.0) * 0.92))
@@ -1215,15 +1339,27 @@ func create_catch(fish_id: String, weight_bias: float = 0.0) -> Dictionary:
 	var trophy_weight := float(fish.get("trophy_weight", fish.get("max_weight", 999.0) * 0.80))
 	var rarity_weight := float(fish.get("rarity_weight", fish.get("max_weight", 999.0) * 0.92))
 
-	return {
+	var catch_data := {
 		"id": fish["id"],
 		"name": fish["name"],
 		"rarity": fish["rarity"],
+		"rarityType": str(fish.get("rarityType", "common")),
 		"catch_rank": catch_rank,
 		"is_trophy": catch_rank == "trophy" or catch_rank == "rarity",
 		"is_rarity": catch_rank == "rarity",
+		"minWeight": float(fish.get("minWeight", fish.get("min_weight", 0.0))),
+		"maxWeight": float(fish.get("maxWeight", fish.get("max_weight", 0.0))),
+		"keeper_weight": float(fish.get("keeper_weight", fish.get("keeperWeight", 0.0))),
+		"keeperWeight": float(fish.get("keeperWeight", fish.get("keeper_weight", 0.0))),
 		"trophy_weight": trophy_weight,
 		"rarity_weight": rarity_weight,
+		"trophyWeight": float(fish.get("trophyWeight", trophy_weight)),
+		"recordWeight": float(fish.get("recordWeight", rarity_weight)),
+		"basePricePerKg": float(fish.get("basePricePerKg", fish.get("price_per_kg", 1.0))),
+		"difficulty": float(fish.get("difficulty", 1.0)),
+		"habitat": str(fish.get("habitat", "lake")),
+		"activityTime": fish.get("activityTime", {}),
+		"preferredWeather": fish.get("preferredWeather", []),
 		"behavior": fish.get("behavior_type", fish.get("behavior", "calm")),
 		"behavior_type": fish.get("behavior_type", fish.get("behavior", "calm")),
 		"base_fight_power": fish.get("base_fight_power", 1.0),
@@ -1244,6 +1380,28 @@ func create_catch(fish_id: String, weight_bias: float = 0.0) -> Dictionary:
 		"icon_path": str(fish.get("icon_path", "")),
 		"description": fish["description"]
 	}
+
+	var status_system: Node = get_node_or_null("/root/FishStatusSystem")
+	if status_system != null and status_system.has_method("decorate_catch"):
+		var status_value = status_system.call("decorate_catch", fish, catch_data)
+		if status_value is Dictionary:
+			catch_data = status_value as Dictionary
+
+	var trophy_system: Node = get_node_or_null("/root/TrophySystem")
+	if trophy_system != null and trophy_system.has_method("decorate_catch"):
+		var trophy_value = trophy_system.call("decorate_catch", catch_data)
+		if trophy_value is Dictionary:
+			catch_data = trophy_value as Dictionary
+
+	var price_calculator: Node = get_node_or_null("/root/FishPriceCalculator")
+	if price_calculator != null and price_calculator.has_method("calculate_catch_base_price"):
+		catch_data["price"] = int(price_calculator.call("calculate_catch_base_price", catch_data))
+		if price_calculator.has_method("calculate_breakdown"):
+			var breakdown_value = price_calculator.call("calculate_breakdown", catch_data, "", false)
+			if breakdown_value is Dictionary:
+				catch_data["economy_price_breakdown"] = breakdown_value
+
+	return catch_data
 
 func _roll_catch_weight_ratio(weight_bias: float = 0.0) -> float:
 	var roll: float = pow(randf(), CATCH_WEIGHT_CURVE)

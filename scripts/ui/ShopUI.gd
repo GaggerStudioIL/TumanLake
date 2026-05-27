@@ -466,6 +466,7 @@ func _ensure_shop_details_nodes() -> void:
 	_details_description_label = Label.new()
 	_details_description_label.name = "ShopRodDetailsDescription"
 	_details_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_details_description_label.clip_text = true
 	_details_description_label.add_theme_font_size_override("font_size", 12)
 	_details_description_label.add_theme_color_override("font_color", Color(0.78, 0.89, 0.80, 0.90))
 	_details_panel.add_child(_details_description_label)
@@ -473,6 +474,7 @@ func _ensure_shop_details_nodes() -> void:
 	_details_stats_label = Label.new()
 	_details_stats_label.name = "ShopRodDetailsStats"
 	_details_stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_details_stats_label.clip_text = true
 	_details_stats_label.add_theme_font_size_override("font_size", 12)
 	_details_stats_label.add_theme_color_override("font_color", Color(0.88, 0.98, 0.88, 0.95))
 	_details_panel.add_child(_details_stats_label)
@@ -508,9 +510,15 @@ func _layout_shop_details_nodes() -> void:
 	_details_backdrop.position = Vector2.ZERO
 	_details_backdrop.size = root_size
 
+	var item := _get_shop_item(_details_item_id)
+	var category := str(item.get("category", item.get("type", "misc")))
+	var is_bait := category == SHOP_CATEGORY_BAIT
 	var panel_width := minf(maxf(root_size.x - 74.0, 460.0), 680.0)
 	var panel_height := minf(maxf(root_size.y - 70.0, 340.0), 430.0)
-	_details_panel.position = Vector2((root_size.x - panel_width) * 0.5, (root_size.y - panel_height) * 0.5)
+	if is_bait:
+		panel_width = minf(maxf(root_size.x - 150.0, 480.0), 560.0)
+		panel_height = minf(maxf(root_size.y - 120.0, 352.0), 372.0)
+	_details_panel.position = Vector2((root_size.x - panel_width) * 0.5, maxf((root_size.y - panel_height) * 0.5 - (10.0 if is_bait else 0.0), 16.0))
 	_details_panel.size = Vector2(panel_width, panel_height)
 
 	var padding := 22.0
@@ -524,21 +532,29 @@ func _layout_shop_details_nodes() -> void:
 
 	var image_y := 62.0
 	var image_height := minf(inner_width / 3.69, 148.0) if _details_image.visible else 0.0
-	_details_image.position = Vector2(padding, image_y)
-	_details_image.size = Vector2(inner_width, image_height)
+	var image_width := inner_width
+	if is_bait and _details_image.visible:
+		image_width = minf(inner_width, 132.0)
+		image_height = 78.0
+	_details_image.position = Vector2(padding + (inner_width - image_width) * 0.5, image_y)
+	_details_image.size = Vector2(image_width, image_height)
 
-	var description_y := image_y + image_height + (14.0 if _details_image.visible else 4.0)
+	var description_y := image_y + image_height + (10.0 if _details_image.visible else 4.0)
+	var description_height := 38.0 if is_bait else 54.0
 	_details_description_label.position = Vector2(padding, description_y)
-	_details_description_label.size = Vector2(inner_width, 54.0)
+	_details_description_label.size = Vector2(inner_width, description_height)
+	_details_description_label.add_theme_font_size_override("font_size", 11 if is_bait else 12)
 
-	var stats_y := description_y + 64.0
+	var action_y := panel_height - 50.0
+	var stats_y := description_y + description_height + 10.0
 	_details_stats_label.position = Vector2(padding, stats_y)
-	_details_stats_label.size = Vector2(inner_width, maxf(panel_height - stats_y - 70.0, 50.0))
+	_details_stats_label.size = Vector2(inner_width, maxf(action_y - stats_y - 12.0, 46.0))
+	_details_stats_label.add_theme_font_size_override("font_size", 11 if is_bait else 12)
 
 	_details_owned_label.position = Vector2(padding, panel_height - 45.0)
 	_details_owned_label.size = Vector2(180.0, 26.0)
 
-	_details_buy_button.position = Vector2(panel_width - padding - 104.0, panel_height - 50.0)
+	_details_buy_button.position = Vector2(panel_width - padding - 104.0, action_y)
 	_details_buy_button.size = Vector2(104.0, 36.0)
 	_details_buy_button.add_theme_font_size_override("font_size", 12)
 
@@ -678,7 +694,11 @@ func _create_shop_card(item: Dictionary, card_size: Vector2) -> Panel:
 		_populate_line_shop_card(card, item, card_size, card_texture, rarity_color)
 		return card
 
-	if card_texture != null and [SHOP_CATEGORY_ROD, SHOP_CATEGORY_BAIT].has(category):
+	if category == SHOP_CATEGORY_BAIT:
+		_populate_rod_image_card(card, item, card_size, card_texture, rarity_color)
+		return card
+
+	if card_texture != null and category == SHOP_CATEGORY_ROD:
 		_populate_rod_image_card(card, item, card_size, card_texture, rarity_color)
 		return card
 
@@ -921,20 +941,21 @@ func _populate_rod_image_card(card: Panel, item: Dictionary, card_size: Vector2,
 	image.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	image_area.add_child(image)
 
-	var badge := Label.new()
-	badge.name = "ShopCardBadge"
-	badge.text = str(ROD_CARD_BADGE_NUMBERS.get(item_id, 1)) if category == SHOP_CATEGORY_ROD else str(item.get("icon", "B")).substr(0, 1).to_upper()
-	badge.position = Vector2(8.0, image_area_size.y - 39.0)
-	badge.size = Vector2(34.0, 34.0)
-	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	badge.add_theme_font_size_override("font_size", 16)
-	badge.add_theme_color_override("font_color", Color(rarity_color.r, rarity_color.g, rarity_color.b, 1.0))
-	badge.add_theme_stylebox_override(
-		"normal",
-		main._make_panel_style(Color(0.025, 0.052, 0.047, 0.86), Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.64), 7, 3, Color(0.0, 0.0, 0.0, 0.18))
-	)
-	image_area.add_child(badge)
+	if category == SHOP_CATEGORY_ROD:
+		var badge := Label.new()
+		badge.name = "ShopCardBadge"
+		badge.text = str(ROD_CARD_BADGE_NUMBERS.get(item_id, 1))
+		badge.position = Vector2(8.0, image_area_size.y - 39.0)
+		badge.size = Vector2(34.0, 34.0)
+		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		badge.add_theme_font_size_override("font_size", 16)
+		badge.add_theme_color_override("font_color", Color(rarity_color.r, rarity_color.g, rarity_color.b, 1.0))
+		badge.add_theme_stylebox_override(
+			"normal",
+			main._make_panel_style(Color(0.025, 0.052, 0.047, 0.86), Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.64), 7, 3, Color(0.0, 0.0, 0.0, 0.18))
+		)
+		image_area.add_child(badge)
 
 	var info_area := Panel.new()
 	info_area.name = "RodCardInfoArea"
@@ -1179,14 +1200,16 @@ func _get_shop_details_stats_text(item: Dictionary) -> String:
 		"rod":
 			return _get_rod_details_stats_text(item)
 		"bait":
+			var target_text := PlayerData.get_bait_target_fish_names(str(item.get("id", "")), 4).replace("Лучше для:", "Лучше:")
+			var secondary_text := PlayerData.get_bait_secondary_fish_names(str(item.get("id", "")), 3).replace("Также берёт:", "Также:")
 			var lines: Array = [
-				"Тип: %s" % _format_bait_type_name(str(stats.get("bait_type", "worm"))),
-				"Общий бонус: +%d%%" % roundi(float(stats.get("fish_attraction", 0.0)) * 100.0),
-				"Пачка: x%d" % int(item.get("quantity", 1)),
+				"Тип: %s   Бонус: +%d%%   Пачка: x%d" % [
+					_format_bait_type_name(str(stats.get("bait_type", "worm"))),
+					roundi(float(stats.get("fish_attraction", 0.0)) * 100.0),
+					int(item.get("quantity", 1))
+				],
 				"Цена: %s" % PlayerData.format_money(float(item.get("price", 0.0)))
 			]
-			var target_text := PlayerData.get_bait_target_fish_names(str(item.get("id", "")), 5)
-			var secondary_text := PlayerData.get_bait_secondary_fish_names(str(item.get("id", "")), 4)
 			if target_text != "":
 				lines.append(target_text)
 			if secondary_text != "":

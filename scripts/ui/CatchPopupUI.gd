@@ -366,6 +366,7 @@ func _build_catch_info_text(
 		gained_xp,
 		price
 	])
+	lines.append(_get_catch_economy_line(catch_data))
 
 	if catch_rank == "normal":
 		if trophy_weight > 0.0:
@@ -385,6 +386,23 @@ func _build_catch_info_text(
 
 	lines.append_array(_get_species_record_info_lines(catch_data, weight))
 	return "\n".join(lines)
+
+
+func _get_catch_economy_line(catch_data: Dictionary) -> String:
+	var status_title := str(catch_data.get("fish_status_title", "Незачет"))
+	var demand := 1.0
+	var supplier_name := "Местный рынок"
+	var market_manager: Node = main.get_node_or_null("/root/DynamicMarketManager")
+	if market_manager != null and market_manager.has_method("get_demand_multiplier"):
+		demand = float(market_manager.call("get_demand_multiplier", str(catch_data.get("id", "")), str(catch_data.get("waterbody_id", ""))))
+
+	var supplier_manager: Node = main.get_node_or_null("/root/SupplierManager")
+	if supplier_manager != null and supplier_manager.has_method("get_best_supplier_for_catch"):
+		var supplier_id := str(supplier_manager.call("get_best_supplier_for_catch", catch_data))
+		if supplier_manager.has_method("get_supplier_title"):
+			supplier_name = str(supplier_manager.call("get_supplier_title", supplier_id))
+
+	return "Статус: %s | Спрос x%.2f | %s" % [status_title, demand, supplier_name]
 
 
 func _get_species_record_info_lines(catch_data: Dictionary, current_weight: float) -> Array:

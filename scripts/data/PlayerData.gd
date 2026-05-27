@@ -3992,6 +3992,59 @@ func get_bait_secondary_fish_names(bait_id: String, limit: int = 4) -> String:
 		return ""
 	return "Также берёт: %s" % ", ".join(names)
 
+func get_fish_bait_names(fish_id: String, limit: int = 8) -> String:
+	var names := _get_fish_bait_names(fish_id, limit)
+	if names.is_empty():
+		return ""
+	return ", ".join(names)
+
+func _get_fish_bait_names(fish_id: String, limit: int) -> Array:
+	var matches: Array = []
+	var capped_limit: int = max(limit, 1)
+
+	for item in get_tackle_catalog_items("bait"):
+		var stats: Dictionary = item.get("stats", {}) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
+		var target_ids: Array = stats.get("target_fish_ids", []) if typeof(stats.get("target_fish_ids", [])) == TYPE_ARRAY else []
+		var secondary_ids: Array = stats.get("secondary_fish_ids", []) if typeof(stats.get("secondary_fish_ids", [])) == TYPE_ARRAY else []
+		var attraction_by_id: Dictionary = stats.get("fish_attraction_by_id", {}) if typeof(stats.get("fish_attraction_by_id", {})) == TYPE_DICTIONARY else {}
+		var attraction: float = float(attraction_by_id.get(fish_id, 0.0))
+		var score := 0.0
+
+		if target_ids.has(fish_id):
+			score = 3.0 + attraction
+		elif attraction > 0.0:
+			score = 2.6 + attraction
+		elif secondary_ids.has(fish_id):
+			score = 1.8 + attraction
+
+		if score <= 0.0:
+			continue
+
+		matches.append({
+			"name": str(item.get("name", item.get("id", ""))),
+			"score": score,
+			"price": float(item.get("price", 0.0))
+		})
+
+	matches.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var score_a := float(a.get("score", 0.0))
+		var score_b := float(b.get("score", 0.0))
+		if is_equal_approx(score_a, score_b):
+			return float(a.get("price", 0.0)) < float(b.get("price", 0.0))
+		return score_a > score_b
+	)
+
+	var names: Array = []
+	for item in matches:
+		names.append(str(item.get("name", "")))
+		if names.size() >= capped_limit:
+			break
+
+	if matches.size() > names.size():
+		names.append("...")
+
+	return names
+
 func _get_bait_fish_names(bait_id: String, field: String, limit: int) -> Array:
 	var item := get_tackle_catalog_item(bait_id)
 	var stats: Dictionary = item.get("stats", {})

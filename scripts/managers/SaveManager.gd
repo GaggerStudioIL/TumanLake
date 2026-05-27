@@ -32,6 +32,7 @@ func save_game() -> void:
 		"current_tackle": PlayerData.current_tackle,
 		"inventory": InventoryManager.inventory,
 		"max_items": InventoryManager.max_items,
+		"economy": _get_economy_save_data(),
 		"game_time": time_save_data,
 		"total_game_minutes": float(time_save_data.get("total_game_minutes", 525.0)),
 		"current_game_minutes": float(time_save_data.get("current_game_minutes", 525.0)),
@@ -105,6 +106,7 @@ func load_game() -> void:
 
 	InventoryManager.inventory = save_data.get("inventory", [])
 	InventoryManager.max_items = int(save_data.get("max_items", 20))
+	_load_economy_save_data(save_data.get("economy", {}))
 	var time_manager := _get_time_manager()
 	var should_save_after_time_load := false
 	if time_manager != null and time_manager.has_method("load_time_from_save"):
@@ -152,6 +154,47 @@ func _get_time_save_data() -> Dictionary:
 		"day_index": int(_get_time_value("day_index", 1.0)),
 		"last_real_utc_unix_time": 0.0
 	}
+
+func _get_economy_save_data() -> Dictionary:
+	var result: Dictionary = {}
+	var reputation_system: Node = get_node_or_null("/root/ReputationSystem")
+	if reputation_system != null and reputation_system.has_method("get_save_data"):
+		var reputation_data = reputation_system.call("get_save_data")
+		if reputation_data is Dictionary:
+			result["reputation"] = reputation_data
+
+	var contract_manager: Node = get_node_or_null("/root/ContractManager")
+	if contract_manager != null and contract_manager.has_method("get_save_data"):
+		var contract_data = contract_manager.call("get_save_data")
+		if contract_data is Dictionary:
+			result["contracts"] = contract_data
+
+	var market_manager: Node = get_node_or_null("/root/DynamicMarketManager")
+	if market_manager != null and market_manager.has_method("get_save_data"):
+		var market_data = market_manager.call("get_save_data")
+		if market_data is Dictionary:
+			result["market"] = market_data
+
+	return result
+
+
+func _load_economy_save_data(value) -> void:
+	if typeof(value) != TYPE_DICTIONARY:
+		return
+
+	var economy_data: Dictionary = value
+	var reputation_system: Node = get_node_or_null("/root/ReputationSystem")
+	if reputation_system != null and reputation_system.has_method("load_save_data"):
+		reputation_system.call("load_save_data", economy_data.get("reputation", {}))
+
+	var contract_manager: Node = get_node_or_null("/root/ContractManager")
+	if contract_manager != null and contract_manager.has_method("load_save_data"):
+		contract_manager.call("load_save_data", economy_data.get("contracts", {}))
+
+	var market_manager: Node = get_node_or_null("/root/DynamicMarketManager")
+	if market_manager != null and market_manager.has_method("load_save_data"):
+		market_manager.call("load_save_data", economy_data.get("market", {}))
+
 
 func _get_time_value(property_name: String, fallback: float) -> float:
 	var time_manager := _get_time_manager()

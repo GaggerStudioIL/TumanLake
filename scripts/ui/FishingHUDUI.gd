@@ -11,6 +11,14 @@ enum FishingUiState {
 	FAILED
 }
 
+const TENSION_VISUAL_SLACK_MAX := 0.25
+const TENSION_VISUAL_WARNING_MIN := 0.70
+const TENSION_VISUAL_CRITICAL_MIN := 0.90
+const TENSION_COLOR_SLACK := Color(0.34, 0.58, 0.72, 1.0)
+const TENSION_COLOR_SAFE := Color(0.30, 0.88, 0.42, 1.0)
+const TENSION_COLOR_WARNING := Color(0.95, 0.70, 0.24, 1.0)
+const TENSION_COLOR_CRITICAL := Color(0.95, 0.25, 0.22, 1.0)
+
 func setup(main_ref) -> void:
 	main = main_ref
 	theme = main.ui_theme
@@ -53,6 +61,7 @@ func _update_ui() -> void:
 	main.inventory_button.disabled = main._fishing_ui_state == FishingUiState.WAITING or main._fishing_ui_state == FishingUiState.FIGHTING or main.is_cast_animating
 	main.tackle_button.disabled = main.inventory_button.disabled
 	main.shop_button.disabled = main.inventory_button.disabled
+	main.encyclopedia_button.disabled = main.inventory_button.disabled
 	main.map_button.disabled = main.inventory_button.disabled
 	main.bait_button.disabled = main.inventory_button.disabled
 	main.reeling_panel.visible = main._fishing_ui_state == FishingUiState.FIGHTING
@@ -73,6 +82,8 @@ func _update_ui() -> void:
 		main.waterbody_backdrop.visible = false
 		main.shop_panel.visible = false
 		main.shop_backdrop.visible = false
+		if main.encyclopedia_ui != null:
+			main.encyclopedia_ui.close(false)
 		main._active_nav_tab = "fish"
 		main._refresh_modal_input_blocker()
 
@@ -115,11 +126,16 @@ func _refresh_bottom_nav_styles() -> void:
 		active_tab = "shop"
 	elif main.waterbody_panel != null and main.waterbody_panel.visible:
 		active_tab = "map"
+	elif main.encyclopedia_ui != null and main.encyclopedia_ui.is_open():
+		active_tab = "encyclopedia"
+	elif main.profile_ui != null and main.profile_ui.is_open():
+		active_tab = "profile"
 
 	var nav_data: Array = [
 		[main.basket_button, "sell"],
 		[main.inventory_button, "inventory"],
 		[main.shop_button, "shop"],
+		[main.encyclopedia_button, "encyclopedia"],
 		[main.map_button, "map"],
 		[main.profile_button, "profile"]
 	]
@@ -220,6 +236,56 @@ func _reset_reeling_ui() -> void:
 	main.fight_hint_label.text = "Во время вываживания удерживай кнопку, чтобы поднять натяжение. Отпускай, чтобы дать слабину."
 
 
+func _get_tension_visual_state(
+	tension: float,
+	green_min: float,
+	green_max: float,
+	status: String,
+	high_danger: float,
+	critical_break_risk: float
+) -> Dictionary:
+	var critical_min: float = clamp(max(TENSION_VISUAL_CRITICAL_MIN, green_max), green_max, 1.0)
+	if tension >= critical_min or high_danger > 0.60 or critical_break_risk > 0.24:
+		return {
+			"key": "critical",
+			"label": "Критично",
+			"color": TENSION_COLOR_CRITICAL
+		}
+	if status == "high" or tension >= max(TENSION_VISUAL_WARNING_MIN, green_max):
+		return {
+			"key": "warning",
+			"label": "Опасно",
+			"color": TENSION_COLOR_WARNING
+		}
+	if status == "low" or tension <= min(TENSION_VISUAL_SLACK_MAX, green_min):
+		return {
+			"key": "slack",
+			"label": "Слабина",
+			"color": TENSION_COLOR_SLACK
+		}
+	return {
+		"key": "green",
+		"label": "Норма",
+		"color": TENSION_COLOR_SAFE
+	}
+
+func _layout_tension_zone(zone: ColorRect, start_value: float, end_value: float, track_width: float, track_height: float, color: Color) -> void:
+	if zone == null:
+		return
+
+	var start: float = clamp(start_value, 0.0, 1.0)
+	var finish: float = clamp(end_value, start, 1.0)
+	var zone_x: float = floor(track_width * start)
+	var zone_end: float = ceil(track_width * finish)
+	var inset: float = 1.0
+	var left_inset: float = inset if start <= 0.0 else 0.0
+	var right_inset: float = inset if finish >= 1.0 else 0.0
+	var width: float = max(zone_end - zone_x, 0.0)
+	zone.visible = width > 1.0
+	zone.position = Vector2(zone_x + left_inset, inset)
+	zone.size = Vector2(max(width - left_inset - right_inset, 1.0), max(track_height - inset * 2.0, 1.0))
+	zone.color = color
+
 func _update_reeling_ui(state: Dictionary) -> void:
 	main._last_reeling_state = state.duplicate(true)
 
@@ -251,22 +317,41 @@ func _update_reeling_ui(state: Dictionary) -> void:
 	var fish_name = str(state.get("fish_name", "-"))
 	var struggle_event = str(state.get("struggle_event", "пауза"))
 	var feedback_message = str(state.get("feedback_message", "Держи зеленую зону."))
+	var critical_min: float = clamp(max(TENSION_VISUAL_CRITICAL_MIN, green_max), green_max, 1.0)
+	var visual_state: Dictionary = _get_tension_visual_state(tension, green_min, green_max, status, high_danger, critical_break_risk)
+	var visual_key := str(visual_state.get("key", "green"))
+	var visual_label := str(visual_state.get("label", "Норма"))
+	var visual_color: Color = visual_state.get("color", TENSION_COLOR_SAFE)
 
-	main.safe_zone.position = Vector2(track_width * green_min, 0.0)
-	main.safe_zone.size = Vector2(max(track_width * (green_max - green_min), 4.0), track_height)
-	main.safe_zone.color = Color("#2fc466")
+	main._ensure_reeling_visual_nodes()
+	main._set_reeling_panel_visual_state(visual_key, visual_color)
+	main.tension_track.color = Color(0.94, 1.0, 0.96, 0.16)
+	main.progress_track.color = Color(0.94, 1.0, 0.96, 0.10)
+
+	_layout_tension_zone(main.tension_slack_zone, 0.0, green_min, track_width, track_height, Color(0.18, 0.36, 0.48, 0.72))
+	_layout_tension_zone(main.safe_zone, green_min, green_max, track_width, track_height, Color(0.18, 0.74, 0.34, 0.78))
+	_layout_tension_zone(main.tension_warning_zone, green_max, critical_min, track_width, track_height, Color(0.88, 0.58, 0.16, 0.80))
+	_layout_tension_zone(main.tension_critical_zone, critical_min, 1.0, track_width, track_height, Color(0.82, 0.18, 0.16, 0.88))
 
 	main.tension_fill.position = Vector2.ZERO
 	main.tension_fill.size = Vector2(track_width * tension, track_height)
+	main.tension_fill.color = Color(visual_color.r, visual_color.g, visual_color.b, 0.22 if visual_key == "green" else 0.30)
 
-	main.tension_marker.position = Vector2(clamp(track_width * tension - 3.0, 0.0, max(track_width - 6.0, 0.0)), -5.0)
-	main.tension_marker.size = Vector2(6.0, track_height + 10.0)
+	var marker_width: float = clamp(track_width * 0.016, 4.0, 7.0)
+	var marker_x: float = clamp(track_width * tension - marker_width * 0.5, 0.0, max(track_width - marker_width, 0.0))
+	main.tension_marker_glow.visible = false
+	main.tension_marker.position = Vector2(marker_x, -4.0)
+	main.tension_marker.size = Vector2(marker_width, track_height + 8.0)
+	main.tension_marker.color = Color(1.0, 1.0, 1.0, 0.96)
 
 	main.progress_fill.position = Vector2.ZERO
 	main.progress_fill.size = Vector2(progress_width * progress, main.progress_track.size.y)
+	main.progress_fill.color = Color(0.62, 0.92, 0.34, 0.72)
 
-	main.tension_label.text = "Натяжение: %d%%" % roundi(tension * 100.0)
+	main.tension_label.text = "Натяжение: %d%% — %s" % [roundi(tension * 100.0), visual_label]
+	main.tension_label.add_theme_color_override("font_color", Color(0.94, 0.98, 0.94, 1.0))
 	main.progress_label.text = "Прогресс: %d%%" % roundi(catch_progress * 100.0)
+	main.progress_label.add_theme_color_override("font_color", Color(0.72, 0.82, 0.78, 0.96))
 	main.debug_label.text = "fish: %s %.2fkg | behavior: %s\nfight: %.2f | strength: %.2f | aggr: %.2f\nload: %.2fkg | line %.0f%% | rod %.0f%%\ntension: %d%% | green: %d-%d%%\nbreak risk: %d%% | escape risk: %d%%\ndurability: rod %d%% | line %d%% | hook %d%%\ncatch progress: %d%% | event: %s" % [
 		fish_name,
 		fish_weight,
@@ -293,18 +378,14 @@ func _update_reeling_ui(state: Dictionary) -> void:
 		main.fight_hint_label.text = feedback_message
 
 	var overload_warning: float = max(max(line_load_ratio - 1.0, rod_load_ratio - 1.0), critical_break_risk)
-	match status:
-		"high":
-			if overload_warning > 0.22 or high_danger > 0.55:
-				main.tension_fill.color = Color("#e65f45", 0.82)
-				main.fight_status_label.text = "ОБРЫВ %d%%" % roundi(max(high_danger, critical_break_risk) * 100.0)
-			else:
-				main.tension_fill.color = Color("#e0b84b", 0.78)
-				main.fight_status_label.text = "Перегруз %d%%" % roundi(max(line_load_ratio - 1.0, 0.0) * 100.0)
-		"low":
-			main.tension_fill.color = Color("#e0b84b", 0.78)
-			main.fight_status_label.text = "Сход %d%%" % roundi(low_danger * 100.0)
+	main.fight_status_label.add_theme_color_override("font_color", visual_color)
+	match visual_key:
+		"critical":
+			main.fight_status_label.text = "Критично %d%%" % roundi(max(max(high_danger, critical_break_risk), overload_warning) * 100.0)
+		"warning":
+			main.fight_status_label.text = "Опасно %d%%" % roundi(max(max(high_danger, critical_break_risk), max(line_load_ratio - 1.0, 0.0)) * 100.0)
+		"slack":
+			main.fight_status_label.text = "Слабина %d%%" % roundi(low_danger * 100.0)
 		_:
-			main.tension_fill.color = Color("#36c96e", 0.76)
 			if FishingManager.is_reeling:
-				main.fight_status_label.text = "Контроль"
+				main.fight_status_label.text = "Норма"

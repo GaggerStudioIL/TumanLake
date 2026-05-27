@@ -61,6 +61,7 @@ func refresh() -> void:
 	_add_summary_section()
 	_add_skill_tree_entry()
 	_add_stats_section()
+	_add_economy_section()
 	_add_rescue_section()
 	_add_trophies_section()
 	_add_records_section()
@@ -216,6 +217,151 @@ func _add_stats_section() -> void:
 	_add_stat_card(grid, "Самая крупная", _format_short_record(PlayerData.biggest_fish))
 	_add_stat_card(grid, "Самая дорогая", _format_short_record(_get_most_expensive_catch()))
 	_add_stat_card(grid, "Рекорды видов", "%d" % PlayerData.personal_records.size())
+
+func _add_economy_section() -> void:
+	_add_section_title("Экономика")
+
+	var market_grid := _make_grid(3)
+	content.add_child(market_grid)
+	var market_manager: Node = main.get_node_or_null("/root/DynamicMarketManager")
+	var market_items: Array = []
+	if market_manager != null and market_manager.has_method("get_market_snapshot"):
+		var market_value = market_manager.call("get_market_snapshot", 3)
+		if market_value is Array:
+			market_items = market_value
+
+	if market_items.is_empty():
+		_add_stat_card(market_grid, "Рынок", "Данных пока нет")
+	else:
+		for item in market_items:
+			if typeof(item) != TYPE_DICTIONARY:
+				continue
+			var market_item: Dictionary = item
+			var fish_id: String = str(market_item.get("fish_id", ""))
+			var previous_demand: float = _get_previous_market_demand(market_manager, fish_id)
+			_add_stat_card(
+				market_grid,
+				str(market_item.get("fish_name", "-")),
+				"x%.2f | вчера x%.2f" % [
+					float(market_item.get("demand", 1.0)),
+					previous_demand
+				]
+			)
+
+	var supplier_grid := _make_grid(3)
+	content.add_child(supplier_grid)
+	var reputation_system: Node = main.get_node_or_null("/root/ReputationSystem")
+	var reputation_items: Array = []
+	if reputation_system != null and reputation_system.has_method("get_summary"):
+		var reputation_value = reputation_system.call("get_summary", 3)
+		if reputation_value is Array:
+			reputation_items = reputation_value
+
+	if reputation_items.is_empty():
+		_add_stat_card(supplier_grid, "Поставщики", "Репутация 0")
+	else:
+		for item in reputation_items:
+			if typeof(item) != TYPE_DICTIONARY:
+				continue
+			var reputation_item: Dictionary = item
+			_add_stat_card(
+				supplier_grid,
+				str(reputation_item.get("name", "-")),
+				"%s | %d" % [
+					str(reputation_item.get("title", "Новичок")),
+					int(reputation_item.get("reputation", 0))
+				]
+			)
+
+	var contracts_list := VBoxContainer.new()
+	contracts_list.add_theme_constant_override("separation", 8)
+	content.add_child(contracts_list)
+	var contract_manager: Node = main.get_node_or_null("/root/ContractManager")
+	var contracts: Array = []
+	if contract_manager != null and contract_manager.has_method("get_active_contracts"):
+		var contracts_value = contract_manager.call("get_active_contracts")
+		if contracts_value is Array:
+			contracts = contracts_value
+
+	if contracts.is_empty():
+		_add_empty_label(contracts_list)
+		return
+
+	for contract_value in contracts:
+		if typeof(contract_value) != TYPE_DICTIONARY:
+			continue
+		_add_contract_card(contracts_list, contract_value)
+
+
+func _get_previous_market_demand(market_manager: Node, fish_id: String) -> float:
+	if market_manager == null or fish_id.is_empty() or not market_manager.has_method("get_price_history"):
+		return 1.0
+
+	var history_value = market_manager.call("get_price_history", fish_id, 2)
+	if not (history_value is Array):
+		return 1.0
+
+	var history: Array = history_value
+	if history.size() < 2 or typeof(history[0]) != TYPE_DICTIONARY:
+		return 1.0
+
+	var previous_entry: Dictionary = history[0]
+	return float(previous_entry.get("demand", 1.0))
+
+
+func _add_contract_card(parent: Control, contract: Dictionary) -> void:
+	var card := Panel.new()
+	card.custom_minimum_size = Vector2(0.0, 78.0)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	theme.apply_card_style(card)
+	parent.add_child(card)
+
+	var title := Label.new()
+	title.text = str(contract.get("title", "Контракт"))
+	title.position = Vector2(14.0, 8.0)
+	title.size = Vector2(430.0, 22.0)
+	title.clip_text = true
+	title.add_theme_font_size_override("font_size", 15)
+	title.add_theme_color_override("font_color", Color(0.94, 1.0, 0.90, 1.0))
+	card.add_child(title)
+
+	var supplier := Label.new()
+	supplier.text = str(contract.get("supplier_name", "Поставщик"))
+	supplier.position = Vector2(456.0, 8.0)
+	supplier.size = Vector2(190.0, 22.0)
+	supplier.clip_text = true
+	supplier.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	supplier.add_theme_font_size_override("font_size", 13)
+	supplier.add_theme_color_override("font_color", Color(0.74, 0.86, 0.78, 0.96))
+	card.add_child(supplier)
+
+	var progress_text := _format_contract_progress(contract)
+	var progress := Label.new()
+	progress.text = "%s | награда: %d мон., реп. +%d" % [
+		progress_text,
+		int(contract.get("reward_money", 0)),
+		int(contract.get("reward_reputation", 0))
+	]
+	progress.position = Vector2(14.0, 36.0)
+	progress.size = Vector2(760.0, 24.0)
+	progress.clip_text = true
+	progress.add_theme_font_size_override("font_size", 13)
+	progress.add_theme_color_override("font_color", Color(0.78, 0.90, 0.82, 0.95))
+	card.add_child(progress)
+
+
+func _format_contract_progress(contract: Dictionary) -> String:
+	var contract_type: String = str(contract.get("type", "weight"))
+	if contract_type == "weight":
+		return "%.1f / %.1f кг" % [
+			float(contract.get("progress_weight_kg", 0.0)),
+			float(contract.get("target_weight_kg", 0.0))
+		]
+	return "%d / %d шт." % [
+		int(contract.get("progress_count", 0)),
+		int(contract.get("target_count", 0))
+	]
+
 
 func _add_rescue_section() -> void:
 	_add_section_title("Помощь")
