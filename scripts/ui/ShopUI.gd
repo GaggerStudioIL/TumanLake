@@ -92,7 +92,13 @@ const BAIT_PACK_QUANTITIES := {
 	"medvedka": 6,
 	"lichinka_mayskogozhuka": 6,
 	"zhuk_plavunec": 6,
-	"vipolzok": 6
+	"vipolzok": 6,
+	"fish_piece": 6,
+	"small_live_bait": 5,
+	"frog_bait": 5,
+	"shrimp": 8,
+	"snail": 8,
+	"boilie_simple": 6
 }
 const CONSUMABLE_ITEMS := [
 	{
@@ -1142,7 +1148,8 @@ func _get_shop_compact_stat_text(item: Dictionary) -> String:
 				roundi(float(stats.get("hook_chance", stats.get("hook_success_bonus", 0.0))) * 100.0)
 			]
 		"bait":
-			return "Клёв +%d%%" % roundi(float(stats.get("fish_attraction", 0.0)) * 100.0)
+			var target_text := PlayerData.get_bait_target_fish_names(str(item.get("id", "")), 3)
+			return target_text if target_text != "" else "Общий клёв +%d%%" % roundi(float(stats.get("fish_attraction", 0.0)) * 100.0)
 		_:
 			if stats.has("bite_bonus"):
 				return "Бонус клёва +%d%%" % roundi(float(stats.get("bite_bonus", 0.0)) * 100.0)
@@ -1172,12 +1179,19 @@ func _get_shop_details_stats_text(item: Dictionary) -> String:
 		"rod":
 			return _get_rod_details_stats_text(item)
 		"bait":
-			return "Тип: %s\nБонус клёва: +%d%%\nПачка: x%d\nЦена: %s" % [
-				_format_bait_type_name(str(stats.get("bait_type", "worm"))),
-				roundi(float(stats.get("fish_attraction", 0.0)) * 100.0),
-				int(item.get("quantity", 1)),
-				PlayerData.format_money(float(item.get("price", 0.0)))
+			var lines: Array = [
+				"Тип: %s" % _format_bait_type_name(str(stats.get("bait_type", "worm"))),
+				"Общий бонус: +%d%%" % roundi(float(stats.get("fish_attraction", 0.0)) * 100.0),
+				"Пачка: x%d" % int(item.get("quantity", 1)),
+				"Цена: %s" % PlayerData.format_money(float(item.get("price", 0.0)))
 			]
+			var target_text := PlayerData.get_bait_target_fish_names(str(item.get("id", "")), 5)
+			var secondary_text := PlayerData.get_bait_secondary_fish_names(str(item.get("id", "")), 4)
+			if target_text != "":
+				lines.append(target_text)
+			if secondary_text != "":
+				lines.append(secondary_text)
+			return "\n".join(lines)
 		"line":
 			return _get_line_details_stats_text(item)
 		_:
@@ -1285,7 +1299,10 @@ func _get_shop_key_stat_text(item: Dictionary) -> String:
 				roundi(float(stats.get("hook_chance", stats.get("hook_success_bonus", 0.0))) * 100.0)
 			]
 		"bait":
-			return "Клёв +%d%%  |  пачка x%d" % [
+			var target_text := PlayerData.get_bait_target_fish_names(str(item.get("id", "")), 4)
+			if target_text != "":
+				return "%s  |  пачка x%d" % [target_text, int(item.get("quantity", 1))]
+			return "Общий клёв +%d%%  |  пачка x%d" % [
 				roundi(float(stats.get("fish_attraction", 0.0)) * 100.0),
 				int(item.get("quantity", 1))
 			]

@@ -725,19 +725,26 @@ func _get_bait_match_multiplier(fish: Dictionary, fish_id: String) -> float:
 	var attraction_by_id: Dictionary = _tackle_stats.get("fish_attraction_by_id", {})
 	var specific_attraction: float = float(attraction_by_id.get(fish_id, 0.0))
 	var general_attraction: float = float(_tackle_stats.get("fish_attraction", 0.0))
+	var target_fish_ids: Array = _tackle_stats.get("target_fish_ids", [])
+	var secondary_fish_ids: Array = _tackle_stats.get("secondary_fish_ids", [])
+
+	if specific_attraction > 0.0:
+		return clamp(1.0 + specific_attraction, 0.85, 1.75)
+
+	if target_fish_ids.has(fish_id):
+		return 1.18
+
+	if secondary_fish_ids.has(fish_id):
+		return 0.95
 
 	if preferred_baits.is_empty():
-		return clamp(0.82 + general_attraction + specific_attraction, 0.45, 1.45)
+		return clamp(0.55 + general_attraction, 0.35, 0.72)
 
-	var matched_baits := 0
 	for active_bait in bait_types:
 		if preferred_baits.has(str(active_bait)):
-			matched_baits += 1
+			return clamp(0.72 + general_attraction, 0.68, 0.82)
 
-	if matched_baits > 0:
-		return clamp(1.0 + general_attraction * 0.75 + specific_attraction + min(float(matched_baits - 1) * 0.12, 0.18), 0.75, 1.72)
-
-	return clamp(0.18 + general_attraction * 0.35 + specific_attraction * 0.25, 0.08, 0.50)
+	return 0.25
 
 func _get_fish_preferred_baits(fish: Dictionary) -> Array:
 	var preferred_baits = fish.get("preferred_baits", [])

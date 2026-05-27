@@ -2206,6 +2206,156 @@ const TACKLE_CATALOG := {
 		}
 	}
 }
+
+const ADDITIONAL_BAIT_CATALOG := {
+	"fish_piece": {
+		"id": "fish_piece",
+		"name": "Живец",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "rare",
+		"price": 78,
+		"image_path": "res://assets/ui/shop/baits/kusochki_ryby.png",
+		"description": "Живая или свежая рыбная насадка для хищника и сомовой рыбы.",
+		"stats": {
+			"bait_type": "worm",
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare", "legendary"]
+		}
+	},
+	"small_live_bait": {
+		"id": "small_live_bait",
+		"name": "Малёк",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "rare",
+		"price": 86,
+		"image_path": "",
+		"description": "Подвижная живая насадка для щуки, судака и крупного окуня.",
+		"stats": {
+			"bait_type": "worm",
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare", "legendary"]
+		}
+	},
+	"frog_bait": {
+		"id": "frog_bait",
+		"name": "Лягушонок",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "rare",
+		"price": 82,
+		"image_path": "",
+		"description": "Крупная животная насадка для хищной рыбы и сома.",
+		"stats": {
+			"bait_type": "worm",
+			"allowed_rarities": ["uncommon", "rare", "very_rare", "legendary"]
+		}
+	},
+	"shrimp": {
+		"id": "shrimp",
+		"name": "Креветка",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "uncommon",
+		"price": 46,
+		"image_path": "",
+		"description": "Пахучая белковая насадка для окуня, судака и донной рыбы.",
+		"stats": {
+			"bait_type": "maggot",
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"snail": {
+		"id": "snail",
+		"name": "Улитка",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "uncommon",
+		"price": 36,
+		"image_path": "",
+		"description": "Донная насадка для линя, леща, карася и осторожной рыбы у травы.",
+		"stats": {
+			"bait_type": "maggot",
+			"allowed_rarities": ["common", "uncommon", "rare", "very_rare"]
+		}
+	},
+	"boilie_simple": {
+		"id": "boilie_simple",
+		"name": "Простой бойл",
+		"type": "bait",
+		"category": "bait",
+		"rarity": "rare",
+		"price": 74,
+		"image_path": "",
+		"description": "Плотная ароматная насадка для будущей карповой ловли и крупной мирной рыбы.",
+		"stats": {
+			"bait_type": "dough",
+			"allowed_rarities": ["uncommon", "rare", "very_rare", "legendary"]
+		}
+	}
+}
+
+const BAIT_TARGET_PROFILES := {
+	"worm": {"bait_tags": ["animal", "bottom", "universal"], "target_fish_ids": ["roach", "perch", "ruffe", "gudgeon", "crucian", "silver_crucian"], "secondary_fish_ids": ["rotan", "bream", "tench", "ide", "goby", "loach"], "fish_attraction": 0.04, "target_bonus": 0.26, "secondary_bonus": 0.14},
+	"bread": {"bait_tags": ["plant", "surface", "soft"], "target_fish_ids": ["bleak", "topmouth_gudgeon", "roach", "rudd"], "secondary_fish_ids": ["silver_crucian", "golden_crucian", "crucian", "white_bream", "bream", "young_chub", "ide"], "fish_attraction": 0.03, "target_bonus": 0.24, "secondary_bonus": 0.12},
+	"dough": {"bait_tags": ["plant", "soft", "sweet"], "target_fish_ids": ["crucian", "silver_crucian", "golden_crucian", "white_bream", "roach"], "secondary_fish_ids": ["bream", "skimmer_bream", "tench", "ide", "young_mirror_carp", "mist_carp"], "fish_attraction": 0.04, "target_bonus": 0.25, "secondary_bonus": 0.13},
+	"maggot": {"bait_tags": ["animal", "larva", "active"], "target_fish_ids": ["bleak", "topmouth_gudgeon", "ruffe", "perch", "roach", "rudd"], "secondary_fish_ids": ["gudgeon", "rotan", "goby", "white_bream", "young_chub"], "fish_attraction": 0.04, "target_bonus": 0.25, "secondary_bonus": 0.13},
+	"cherv_moskovskiy": {"bait_tags": ["animal", "worm", "bottom"], "target_fish_ids": ["roach", "perch", "ruffe", "gudgeon", "crucian", "silver_crucian"], "secondary_fish_ids": ["bream", "tench", "ide", "young_chub"], "fish_attraction": 0.04, "target_bonus": 0.26, "secondary_bonus": 0.14},
+	"cherv_surskiy": {"bait_tags": ["animal", "worm", "river", "bottom"], "target_fish_ids": ["gudgeon", "ruffe", "perch", "bream", "skimmer_bream"], "secondary_fish_ids": ["roach", "crucian", "tench", "ide"], "fish_attraction": 0.04, "target_bonus": 0.27, "secondary_bonus": 0.14},
+	"cherv_navozni": {"bait_tags": ["animal", "worm", "scent", "bottom"], "target_fish_ids": ["crucian", "silver_crucian", "golden_crucian", "tench", "bream"], "secondary_fish_ids": ["roach", "perch", "ruffe", "gudgeon"], "fish_attraction": 0.04, "target_bonus": 0.26, "secondary_bonus": 0.14},
+	"cherv_astrahanskiy": {"bait_tags": ["animal", "worm", "large", "bottom"], "target_fish_ids": ["bream", "tench", "small_catfish", "catfish", "eel"], "secondary_fish_ids": ["perch", "pike", "zander", "young_pike"], "fish_attraction": 0.05, "target_bonus": 0.30, "secondary_bonus": 0.15},
+	"cherv_volhovskiy": {"bait_tags": ["animal", "worm", "deep", "bottom"], "target_fish_ids": ["bream", "skimmer_bream", "tench", "eel", "small_catfish"], "secondary_fish_ids": ["ide", "perch", "zander", "moon_catfish"], "fish_attraction": 0.05, "target_bonus": 0.30, "secondary_bonus": 0.15},
+	"cherv_leningradskiy": {"bait_tags": ["animal", "worm", "deep", "large"], "target_fish_ids": ["eel", "catfish", "small_catfish", "bream", "tench"], "secondary_fish_ids": ["zander", "pike", "young_pike", "moon_catfish"], "fish_attraction": 0.05, "target_bonus": 0.31, "secondary_bonus": 0.16},
+	"vipolzok": {"bait_tags": ["animal", "worm", "large", "deep"], "target_fish_ids": ["catfish", "small_catfish", "eel", "bream", "moon_catfish"], "secondary_fish_ids": ["pike", "zander", "young_pike", "tench"], "fish_attraction": 0.05, "target_bonus": 0.31, "secondary_bonus": 0.16},
+	"piyavka": {"bait_tags": ["animal", "leech", "predator", "deep"], "target_fish_ids": ["catfish", "eel", "pike", "zander", "small_catfish"], "secondary_fish_ids": ["perch", "moon_catfish", "water_turtle"], "fish_attraction": 0.05, "target_bonus": 0.31, "secondary_bonus": 0.16},
+	"kaster": {"bait_tags": ["animal", "larva", "small_fish"], "target_fish_ids": ["roach", "bleak", "topmouth_gudgeon", "rudd", "white_bream"], "secondary_fish_ids": ["perch", "ruffe", "gudgeon"], "fish_attraction": 0.03, "target_bonus": 0.24, "secondary_bonus": 0.12},
+	"motil": {"bait_tags": ["animal", "larva", "small_fish"], "target_fish_ids": ["bleak", "topmouth_gudgeon", "ruffe", "roach", "white_bream"], "secondary_fish_ids": ["perch", "gudgeon", "silver_crucian"], "fish_attraction": 0.03, "target_bonus": 0.24, "secondary_bonus": 0.12},
+	"lichinka_podenki": {"bait_tags": ["animal", "larva", "river", "surface"], "target_fish_ids": ["rudd", "roach", "bleak", "topmouth_gudgeon", "young_chub"], "secondary_fish_ids": ["perch", "white_bream", "ide"], "fish_attraction": 0.04, "target_bonus": 0.26, "secondary_bonus": 0.13},
+	"podenka": {"bait_tags": ["animal", "insect", "surface"], "target_fish_ids": ["rudd", "young_chub", "ide", "bleak"], "secondary_fish_ids": ["roach", "topmouth_gudgeon", "perch"], "fish_attraction": 0.04, "target_bonus": 0.27, "secondary_bonus": 0.14},
+	"lichinka_vesnyanki": {"bait_tags": ["animal", "larva", "river", "bottom"], "target_fish_ids": ["gudgeon", "ruffe", "perch", "young_chub", "ide"], "secondary_fish_ids": ["roach", "zander"], "fish_attraction": 0.04, "target_bonus": 0.26, "secondary_bonus": 0.13},
+	"rucheinik": {"bait_tags": ["animal", "larva", "river", "bottom"], "target_fish_ids": ["gudgeon", "ruffe", "perch", "young_chub", "ide"], "secondary_fish_ids": ["white_bream", "roach", "zander"], "fish_attraction": 0.04, "target_bonus": 0.26, "secondary_bonus": 0.13},
+	"lichinka_koroeda": {"bait_tags": ["animal", "larva", "wood", "surface"], "target_fish_ids": ["roach", "rudd", "young_chub", "ide"], "secondary_fish_ids": ["perch", "white_bream", "skimmer_bream"], "fish_attraction": 0.04, "target_bonus": 0.26, "secondary_bonus": 0.13},
+	"sverchok": {"bait_tags": ["animal", "insect", "surface"], "target_fish_ids": ["rudd", "young_chub", "ide", "perch"], "secondary_fish_ids": ["roach", "bleak", "topmouth_gudgeon"], "fish_attraction": 0.04, "target_bonus": 0.26, "secondary_bonus": 0.13},
+	"kuznechik": {"bait_tags": ["animal", "insect", "surface"], "target_fish_ids": ["rudd", "young_chub", "ide", "perch"], "secondary_fish_ids": ["roach", "bleak", "pike"], "fish_attraction": 0.04, "target_bonus": 0.27, "secondary_bonus": 0.14},
+	"muha": {"bait_tags": ["animal", "insect", "surface", "small_fish"], "target_fish_ids": ["bleak", "topmouth_gudgeon", "rudd", "young_chub"], "secondary_fish_ids": ["roach", "perch"], "fish_attraction": 0.03, "target_bonus": 0.24, "secondary_bonus": 0.12},
+	"maiskiy_zhuk": {"bait_tags": ["animal", "insect", "large", "surface"], "target_fish_ids": ["young_chub", "ide", "young_grass_carp", "rudd"], "secondary_fish_ids": ["perch", "pike", "young_pike"], "fish_attraction": 0.05, "target_bonus": 0.29, "secondary_bonus": 0.15},
+	"zhuk_navozni": {"bait_tags": ["animal", "insect", "bottom"], "target_fish_ids": ["young_chub", "ide", "perch", "tench"], "secondary_fish_ids": ["bream", "small_catfish", "catfish"], "fish_attraction": 0.04, "target_bonus": 0.27, "secondary_bonus": 0.14},
+	"medvedka": {"bait_tags": ["animal", "insect", "large", "bottom"], "target_fish_ids": ["catfish", "small_catfish", "bream", "tench", "young_mirror_carp"], "secondary_fish_ids": ["pike", "zander", "moon_catfish"], "fish_attraction": 0.05, "target_bonus": 0.30, "secondary_bonus": 0.15},
+	"lichinka_mayskogozhuka": {"bait_tags": ["animal", "larva", "large", "bottom"], "target_fish_ids": ["tench", "bream", "young_mirror_carp", "young_grass_carp", "catfish"], "secondary_fish_ids": ["ide", "young_chub", "moon_catfish"], "fish_attraction": 0.05, "target_bonus": 0.30, "secondary_bonus": 0.15},
+	"lichinka_zhukanosoroga": {"bait_tags": ["animal", "larva", "large", "bottom"], "target_fish_ids": ["tench", "bream", "young_mirror_carp", "catfish", "small_catfish"], "secondary_fish_ids": ["ide", "young_chub", "moon_catfish", "perch"], "fish_attraction": 0.05, "target_bonus": 0.30, "secondary_bonus": 0.15},
+	"zhuk_plavunec": {"bait_tags": ["animal", "insect", "water", "predator"], "target_fish_ids": ["perch", "pike", "young_pike", "zander"], "secondary_fish_ids": ["catfish", "small_catfish", "frog"], "fish_attraction": 0.05, "target_bonus": 0.29, "secondary_bonus": 0.15},
+	"ovod": {"bait_tags": ["animal", "insect", "surface"], "target_fish_ids": ["rudd", "young_chub", "ide", "perch"], "secondary_fish_ids": ["roach", "bleak", "topmouth_gudgeon"], "fish_attraction": 0.04, "target_bonus": 0.26, "secondary_bonus": 0.13},
+	"slepen": {"bait_tags": ["animal", "insect", "surface"], "target_fish_ids": ["rudd", "young_chub", "ide", "perch"], "secondary_fish_ids": ["roach", "bleak", "topmouth_gudgeon"], "fish_attraction": 0.04, "target_bonus": 0.26, "secondary_bonus": 0.13},
+	"bokoplav": {"bait_tags": ["animal", "crustacean", "bottom"], "target_fish_ids": ["perch", "ruffe", "goby", "gudgeon", "zander"], "secondary_fish_ids": ["roach", "young_chub", "ide"], "fish_attraction": 0.04, "target_bonus": 0.27, "secondary_bonus": 0.14},
+	"myaso_dreiseni": {"bait_tags": ["animal", "shellfish", "bottom"], "target_fish_ids": ["bream", "skimmer_bream", "white_bream", "tench", "crucian"], "secondary_fish_ids": ["roach", "ruffe", "goby", "crayfish"], "fish_attraction": 0.04, "target_bonus": 0.27, "secondary_bonus": 0.14},
+	"myaso_perlovici": {"bait_tags": ["animal", "shellfish", "bottom"], "target_fish_ids": ["bream", "tench", "skimmer_bream", "catfish", "small_catfish"], "secondary_fish_ids": ["crucian", "white_bream", "eel", "crayfish"], "fish_attraction": 0.04, "target_bonus": 0.28, "secondary_bonus": 0.14},
+	"krabovoe_myaso": {"bait_tags": ["animal", "crustacean", "predator", "scent"], "target_fish_ids": ["catfish", "small_catfish", "zander", "perch", "pike"], "secondary_fish_ids": ["bream", "tench", "crayfish", "moon_catfish"], "fish_attraction": 0.05, "target_bonus": 0.30, "secondary_bonus": 0.15},
+	"rakovaia_sheika": {"bait_tags": ["animal", "crustacean", "predator", "large"], "target_fish_ids": ["catfish", "small_catfish", "pike", "zander", "perch"], "secondary_fish_ids": ["eel", "moon_catfish", "water_turtle"], "fish_attraction": 0.05, "target_bonus": 0.31, "secondary_bonus": 0.16},
+	"kusochki_ryby": {"bait_tags": ["animal", "fish", "predator", "scent"], "target_fish_ids": ["pike", "young_pike", "zander", "catfish", "small_catfish", "perch"], "secondary_fish_ids": ["eel", "moon_catfish"], "fish_attraction": 0.05, "target_bonus": 0.31, "secondary_bonus": 0.16},
+	"ikra": {"bait_tags": ["animal", "egg", "scent", "small_fish"], "target_fish_ids": ["perch", "ruffe", "goby", "bleak", "roach"], "secondary_fish_ids": ["zander", "pike", "young_chub"], "fish_attraction": 0.05, "target_bonus": 0.28, "secondary_bonus": 0.14},
+	"goroshek": {"bait_tags": ["plant", "grain", "soft"], "target_fish_ids": ["roach", "crucian", "silver_crucian", "golden_crucian", "white_bream"], "secondary_fish_ids": ["bream", "young_grass_carp", "ide"], "fish_attraction": 0.03, "target_bonus": 0.24, "secondary_bonus": 0.12},
+	"zerna_phenici": {"bait_tags": ["plant", "grain"], "target_fish_ids": ["roach", "rudd", "white_bream", "crucian", "silver_crucian"], "secondary_fish_ids": ["bream", "young_grass_carp", "ide"], "fish_attraction": 0.03, "target_bonus": 0.24, "secondary_bonus": 0.12},
+	"zerna_kukuruzi": {"bait_tags": ["plant", "grain", "corn", "sweet"], "target_fish_ids": ["crucian", "silver_crucian", "golden_crucian", "young_mirror_carp", "young_grass_carp"], "secondary_fish_ids": ["bream", "tench", "ide", "mist_carp"], "fish_attraction": 0.04, "target_bonus": 0.27, "secondary_bonus": 0.14},
+	"kapustni_list": {"bait_tags": ["plant", "leaf", "grass"], "target_fish_ids": ["young_grass_carp", "rudd", "crucian"], "secondary_fish_ids": ["silver_crucian", "golden_crucian", "water_turtle"], "fish_attraction": 0.03, "target_bonus": 0.23, "secondary_bonus": 0.11},
+	"puchok_vodorosley": {"bait_tags": ["plant", "algae", "grass"], "target_fish_ids": ["young_grass_carp", "rudd", "water_turtle"], "secondary_fish_ids": ["crucian", "silver_crucian", "golden_crucian"], "fish_attraction": 0.03, "target_bonus": 0.24, "secondary_bonus": 0.12},
+	"kartofelniy_kubik": {"bait_tags": ["plant", "vegetable", "bottom"], "target_fish_ids": ["crucian", "silver_crucian", "golden_crucian", "young_mirror_carp"], "secondary_fish_ids": ["bream", "tench", "young_grass_carp"], "fish_attraction": 0.03, "target_bonus": 0.24, "secondary_bonus": 0.12},
+	"ovsyanaya_kasha": {"bait_tags": ["plant", "porridge", "soft"], "target_fish_ids": ["crucian", "silver_crucian", "roach", "white_bream"], "secondary_fish_ids": ["bream", "skimmer_bream", "golden_crucian"], "fish_attraction": 0.03, "target_bonus": 0.24, "secondary_bonus": 0.12},
+	"mannaya_kasha": {"bait_tags": ["plant", "porridge", "soft"], "target_fish_ids": ["crucian", "silver_crucian", "golden_crucian", "roach"], "secondary_fish_ids": ["white_bream", "skimmer_bream", "bream"], "fish_attraction": 0.03, "target_bonus": 0.24, "secondary_bonus": 0.12},
+	"gorohovaya_kasha": {"bait_tags": ["plant", "porridge", "pea", "bottom"], "target_fish_ids": ["bream", "skimmer_bream", "crucian", "silver_crucian", "young_grass_carp"], "secondary_fish_ids": ["tench", "ide", "young_mirror_carp"], "fish_attraction": 0.04, "target_bonus": 0.26, "secondary_bonus": 0.13},
+	"kukuruznaya_kasha": {"bait_tags": ["plant", "porridge", "corn", "sweet"], "target_fish_ids": ["crucian", "golden_crucian", "young_mirror_carp", "young_grass_carp"], "secondary_fish_ids": ["bream", "tench", "ide"], "fish_attraction": 0.04, "target_bonus": 0.26, "secondary_bonus": 0.13},
+	"perlovaya_kasha": {"bait_tags": ["plant", "porridge", "grain"], "target_fish_ids": ["roach", "crucian", "silver_crucian", "golden_crucian", "white_bream"], "secondary_fish_ids": ["bream", "skimmer_bream", "tench"], "fish_attraction": 0.03, "target_bonus": 0.24, "secondary_bonus": 0.12},
+	"sladkoe_testo": {"bait_tags": ["plant", "dough", "sweet"], "target_fish_ids": ["crucian", "silver_crucian", "golden_crucian", "roach", "rudd"], "secondary_fish_ids": ["white_bream", "bream", "young_mirror_carp"], "fish_attraction": 0.04, "target_bonus": 0.25, "secondary_bonus": 0.13},
+	"chesnochnoye_testo": {"bait_tags": ["plant", "dough", "garlic", "scent"], "target_fish_ids": ["bream", "skimmer_bream", "crucian", "silver_crucian"], "secondary_fish_ids": ["tench", "roach", "golden_crucian"], "fish_attraction": 0.04, "target_bonus": 0.26, "secondary_bonus": 0.13},
+	"yaichonoe_testo": {"bait_tags": ["plant", "dough", "protein"], "target_fish_ids": ["crucian", "silver_crucian", "golden_crucian", "bream"], "secondary_fish_ids": ["roach", "white_bream", "tench", "young_mirror_carp"], "fish_attraction": 0.04, "target_bonus": 0.26, "secondary_bonus": 0.13},
+	"tvorozhnoye_testo": {"bait_tags": ["plant", "dough", "dairy", "scent"], "target_fish_ids": ["bream", "skimmer_bream", "crucian", "silver_crucian", "golden_crucian"], "secondary_fish_ids": ["tench", "roach", "white_bream"], "fish_attraction": 0.04, "target_bonus": 0.26, "secondary_bonus": 0.13},
+	"medovoye_testo": {"bait_tags": ["plant", "dough", "honey", "sweet"], "target_fish_ids": ["crucian", "silver_crucian", "golden_crucian", "tench"], "secondary_fish_ids": ["bream", "skimmer_bream", "young_mirror_carp", "mist_carp"], "fish_attraction": 0.04, "target_bonus": 0.27, "secondary_bonus": 0.14},
+	"syrni_kubik": {"bait_tags": ["dairy", "scent", "bottom"], "target_fish_ids": ["young_chub", "ide", "bream", "tench"], "secondary_fish_ids": ["crucian", "roach", "young_mirror_carp"], "fish_attraction": 0.04, "target_bonus": 0.26, "secondary_bonus": 0.13},
+	"fish_piece": {"bait_tags": ["animal", "fish", "live_bait", "predator"], "target_fish_ids": ["pike", "young_pike", "zander", "catfish", "small_catfish", "perch", "eel"], "secondary_fish_ids": ["moon_catfish", "goby"], "fish_attraction": 0.05, "target_bonus": 0.32, "secondary_bonus": 0.16},
+	"small_live_bait": {"bait_tags": ["animal", "fish", "live_bait", "predator"], "target_fish_ids": ["pike", "young_pike", "zander", "perch", "catfish"], "secondary_fish_ids": ["small_catfish", "eel", "moon_catfish"], "fish_attraction": 0.05, "target_bonus": 0.33, "secondary_bonus": 0.16},
+	"frog_bait": {"bait_tags": ["animal", "frog", "predator", "surface"], "target_fish_ids": ["pike", "catfish", "small_catfish", "zander"], "secondary_fish_ids": ["young_pike", "moon_catfish", "water_turtle"], "fish_attraction": 0.05, "target_bonus": 0.31, "secondary_bonus": 0.16},
+	"shrimp": {"bait_tags": ["animal", "crustacean", "scent", "bottom"], "target_fish_ids": ["perch", "zander", "catfish", "goby", "crayfish"], "secondary_fish_ids": ["small_catfish", "bream", "ruffe"], "fish_attraction": 0.04, "target_bonus": 0.27, "secondary_bonus": 0.14},
+	"snail": {"bait_tags": ["animal", "shellfish", "bottom"], "target_fish_ids": ["tench", "bream", "skimmer_bream", "crucian", "water_turtle"], "secondary_fish_ids": ["silver_crucian", "golden_crucian", "crayfish"], "fish_attraction": 0.04, "target_bonus": 0.26, "secondary_bonus": 0.13},
+	"boilie_simple": {"bait_tags": ["plant", "boilie", "carp", "bottom"], "target_fish_ids": ["young_mirror_carp", "mist_carp", "bream", "tench"], "secondary_fish_ids": ["crucian", "silver_crucian", "young_grass_carp"], "fish_attraction": 0.05, "target_bonus": 0.29, "secondary_bonus": 0.15}
+}
 const TACKLE_SLOTS := ["rod", "line", "leader", "hook", "float", "bait", "bait_2"]
 const REQUIRED_TACKLE_SLOTS := ["rod", "line", "hook", "float", "bait"]
 const TACKLE_SLOT_ITEM_CATEGORIES := {
@@ -2703,23 +2853,44 @@ func get_current_spot_depth_range() -> Dictionary:
 		"preferred": float(spot.get("preferred_depth", spot.get("depth", 1.2)))
 	}
 
+func _get_raw_tackle_catalog_item(item_id: String) -> Dictionary:
+	if TACKLE_CATALOG.has(item_id):
+		return TACKLE_CATALOG[item_id]
+	if ADDITIONAL_BAIT_CATALOG.has(item_id):
+		return ADDITIONAL_BAIT_CATALOG[item_id]
+	return {}
+
+func _normalize_catalog_item(item: Dictionary) -> Dictionary:
+	if item.is_empty():
+		return {}
+
+	var normalized := item.duplicate(true)
+	var item_id := str(normalized.get("id", ""))
+	var category := str(normalized.get("category", normalized.get("type", "misc")))
+	if category == "bait":
+		var stats: Dictionary = normalized.get("stats", {}).duplicate(true) if typeof(normalized.get("stats", {})) == TYPE_DICTIONARY else {}
+		normalized["stats"] = _normalize_equipment_stats(stats, "bait", item_id)
+
+	return normalized
+
 func get_tackle_catalog_item(item_id: String) -> Dictionary:
-	var item: Dictionary = TACKLE_CATALOG.get(item_id, {})
+	var item: Dictionary = _get_raw_tackle_catalog_item(item_id)
 
 	if item.is_empty():
 		return {}
 
-	return item.duplicate(true)
+	return _normalize_catalog_item(item)
 
 func get_tackle_catalog_items(type_filter: String = "all") -> Array:
 	var items: Array = []
 
-	for item_id in TACKLE_CATALOG.keys():
-		var item: Dictionary = TACKLE_CATALOG[item_id].duplicate(true)
-		var item_type := str(item.get("type", item.get("category", "misc")))
+	for catalog in [TACKLE_CATALOG, ADDITIONAL_BAIT_CATALOG]:
+		for item_id in catalog.keys():
+			var item: Dictionary = _normalize_catalog_item(catalog[item_id])
+			var item_type := str(item.get("type", item.get("category", "misc")))
 
-		if type_filter == "all" or item_type == type_filter:
-			items.append(item)
+			if type_filter == "all" or item_type == type_filter:
+				items.append(item)
 
 	items.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		var category_order := {"rod": 0, "line": 1, "leader": 2, "hook": 3, "float": 4, "bait": 5}
@@ -2766,7 +2937,7 @@ func _make_tackle_component(item_id: String) -> Dictionary:
 	var component: Dictionary = item.get("stats", {}).duplicate(true)
 	var item_type := str(item.get("type", item.get("category", "misc")))
 	var category := str(item.get("category", item_type))
-	component = _normalize_equipment_stats(component, category)
+	component = _normalize_equipment_stats(component, category, item_id)
 	component["id"] = item["id"]
 	component["name"] = item["name"]
 	component["type"] = item_type
@@ -2803,7 +2974,7 @@ func _get_item_icon(item_type: String) -> String:
 		_:
 			return "?"
 
-func _normalize_equipment_stats(stats: Dictionary, category: String) -> Dictionary:
+func _normalize_equipment_stats(stats: Dictionary, category: String, item_id: String = "") -> Dictionary:
 	var normalized := stats.duplicate(true)
 
 	match category:
@@ -2892,8 +3063,87 @@ func _normalize_equipment_stats(stats: Dictionary, category: String) -> Dictiona
 			if not normalized.has("durability"):
 				normalized["durability"] = 1.0
 			normalized["durability"] = clamp(float(normalized["durability"]), 0.0, 1.0)
+		"bait":
+			var bait_id := item_id
+			if bait_id == "":
+				bait_id = str(normalized.get("id", normalized.get("bait_id", "")))
+			normalized = _apply_bait_target_profile(normalized, bait_id)
 
 	return normalized
+
+func _apply_bait_target_profile(stats: Dictionary, bait_id: String) -> Dictionary:
+	var normalized := stats.duplicate(true)
+	if bait_id != "":
+		normalized["bait_id"] = bait_id
+	if not normalized.has("bait_type"):
+		normalized["bait_type"] = "worm"
+
+	var profile: Dictionary = BAIT_TARGET_PROFILES.get(bait_id, {})
+	if profile.is_empty():
+		if not normalized.has("bait_tags"):
+			normalized["bait_tags"] = []
+		if not normalized.has("target_fish_ids"):
+			normalized["target_fish_ids"] = []
+		if not normalized.has("secondary_fish_ids"):
+			normalized["secondary_fish_ids"] = []
+		if not normalized.has("fish_attraction_by_id"):
+			normalized["fish_attraction_by_id"] = {}
+		normalized["fish_attraction"] = clamp(float(normalized.get("fish_attraction", 0.03)), 0.0, 0.08)
+		return normalized
+
+	var target_fish_ids: Array = _to_string_array(profile.get("target_fish_ids", []))
+	var secondary_fish_ids: Array = _to_string_array(profile.get("secondary_fish_ids", []))
+
+	for fish_id in target_fish_ids:
+		secondary_fish_ids.erase(str(fish_id))
+
+	normalized["bait_tags"] = _to_string_array(profile.get("bait_tags", []))
+	normalized["target_fish_ids"] = target_fish_ids
+	normalized["secondary_fish_ids"] = secondary_fish_ids
+	normalized["fish_attraction"] = clamp(float(profile.get("fish_attraction", normalized.get("fish_attraction", 0.03))), 0.0, 0.08)
+	normalized["fish_attraction_by_id"] = _build_bait_attraction_by_id(profile, target_fish_ids, secondary_fish_ids)
+	return normalized
+
+func _build_bait_attraction_by_id(profile: Dictionary, target_fish_ids: Array, secondary_fish_ids: Array) -> Dictionary:
+	var attraction: Dictionary = {}
+	var explicit = profile.get("fish_attraction_by_id", {})
+	if typeof(explicit) == TYPE_DICTIONARY:
+		for fish_id in explicit.keys():
+			attraction[str(fish_id)] = clamp(float(explicit[fish_id]), 0.0, 0.42)
+
+	var target_bonus: float = float(profile.get("target_bonus", 0.24))
+	for i in range(target_fish_ids.size()):
+		var fish_id := str(target_fish_ids[i])
+		var bonus: float = clamp(target_bonus - float(min(i, 4)) * 0.01, 0.20, 0.34)
+		attraction[fish_id] = max(float(attraction.get(fish_id, 0.0)), bonus)
+
+	var secondary_bonus: float = float(profile.get("secondary_bonus", 0.12))
+	for i in range(secondary_fish_ids.size()):
+		var fish_id := str(secondary_fish_ids[i])
+		var bonus: float = clamp(secondary_bonus - float(min(i, 4)) * 0.005, 0.08, 0.18)
+		attraction[fish_id] = max(float(attraction.get(fish_id, 0.0)), bonus)
+
+	return attraction
+
+func _to_string_array(value) -> Array:
+	var result: Array = []
+	if typeof(value) != TYPE_ARRAY:
+		return result
+
+	for entry in value:
+		var text := str(entry)
+		if text != "" and not result.has(text):
+			result.append(text)
+
+	return result
+
+func _merge_unique_string_arrays(base: Array, extra: Array) -> Array:
+	var merged: Array = _to_string_array(base)
+	for entry in extra:
+		var text := str(entry)
+		if text != "" and not merged.has(text):
+			merged.append(text)
+	return merged
 
 func _get_default_rod_class(length_m: float) -> String:
 	if length_m <= 3.8:
@@ -2939,7 +3189,7 @@ func _normalize_owned_item(item: Dictionary) -> Dictionary:
 	var stats: Dictionary = catalog_stats.duplicate(true)
 	if typeof(raw_stats) == TYPE_DICTIONARY:
 		stats.merge(raw_stats, true)
-	stats = _normalize_equipment_stats(stats, category)
+	stats = _normalize_equipment_stats(stats, category, item_id)
 
 	return {
 		"id": item_id,
@@ -3018,7 +3268,7 @@ func set_current_tackle(saved_tackle: Dictionary) -> void:
 			if not merged_component.has("target_fish_size"):
 				merged_component["target_fish_size"] = "small"
 
-		merged_component = _normalize_equipment_stats(merged_component, slot_category)
+		merged_component = _normalize_equipment_stats(merged_component, slot_category, str(merged_component.get("id", "")))
 		current_tackle[slot] = merged_component
 
 func set_owned_items(saved_items: Array) -> void:
@@ -3086,7 +3336,7 @@ func set_current_tackle_slot(slot_id: String, item: Dictionary) -> bool:
 	if item_category != slot_category:
 		return false
 
-	var component: Dictionary = _normalize_equipment_stats(item.get("stats", {}).duplicate(true), slot_category)
+	var component: Dictionary = _normalize_equipment_stats(item.get("stats", {}).duplicate(true), slot_category, str(item.get("id", "")))
 	component["id"] = str(item.get("id", ""))
 	component["name"] = str(item.get("name", "-"))
 	component["type"] = str(item.get("type", slot_category))
@@ -3341,7 +3591,7 @@ func _refresh_current_tackle_from_owned_item(owned_item: Dictionary) -> void:
 		if str(current_tackle[slot].get("id", "")) != owned_id:
 			continue
 
-		var stats: Dictionary = _normalize_equipment_stats(owned_item.get("stats", {}).duplicate(true), category)
+		var stats: Dictionary = _normalize_equipment_stats(owned_item.get("stats", {}).duplicate(true), category, owned_id)
 		for key in stats.keys():
 			current_tackle[slot][key] = stats[key]
 
@@ -3365,7 +3615,7 @@ func _set_owned_item_durability(item_id: String, durability: float) -> void:
 			continue
 
 		var category := str(item.get("category", ""))
-		var stats: Dictionary = _normalize_equipment_stats(item.get("stats", {}).duplicate(true), category)
+		var stats: Dictionary = _normalize_equipment_stats(item.get("stats", {}).duplicate(true), category, item_id)
 		stats["durability"] = clamp(durability, 0.0, 1.0)
 		item["stats"] = stats
 		_refresh_current_tackle_from_owned_item(item)
@@ -3598,8 +3848,8 @@ func get_tackle_stats() -> Dictionary:
 	var leader: Dictionary = _normalize_equipment_stats(current_tackle.get("leader", {}).duplicate(true), "leader")
 	var float_part: Dictionary = current_tackle.get("float", {})
 	var hook: Dictionary = _normalize_equipment_stats(current_tackle.get("hook", {}).duplicate(true), "hook")
-	var bait: Dictionary = current_tackle.get("bait", {})
-	var second_bait: Dictionary = current_tackle.get("bait_2", {}) if _has_active_second_bait() else {}
+	var bait: Dictionary = _normalize_equipment_stats(current_tackle.get("bait", {}).duplicate(true), "bait", str(current_tackle.get("bait", {}).get("id", "")))
+	var second_bait: Dictionary = _normalize_equipment_stats(current_tackle.get("bait_2", {}).duplicate(true), "bait", str(current_tackle.get("bait_2", {}).get("id", ""))) if _has_active_second_bait() else {}
 	var skill_effects := get_skill_effects()
 	var rod_durability: float = clamp(float(rod.get("durability", 1.0)), 0.0, 1.0)
 	var line_durability: float = clamp(float(line.get("durability", 1.0)), 0.0, 1.0)
@@ -3635,20 +3885,38 @@ func get_tackle_stats() -> Dictionary:
 	var line_wear_reduction: float = clamp(float(skill_effects.get("line_wear_reduction", 0.0)), 0.0, 0.85)
 	var line_wear_rate: float = max(float(line.get("wear_rate", 0.022)) * (1.0 - line_wear_reduction), 0.001)
 	var bite_detection_bonus: float = float_sensitivity + float_bite_visibility * 0.50 + float(skill_effects.get("bite_detection_bonus", 0.0))
+	var bait_id := str(bait.get("id", bait.get("bait_id", "")))
+	var secondary_bait_id := ""
 	var bait_types: Array = [str(bait.get("bait_type", "worm"))]
 	var secondary_bait_type := ""
-	var fish_attraction: float = float(bait.get("fish_attraction", 0.0))
+	var bait_tags: Array = _to_string_array(bait.get("bait_tags", []))
+	var target_fish_ids: Array = _to_string_array(bait.get("target_fish_ids", []))
+	var secondary_fish_ids: Array = _to_string_array(bait.get("secondary_fish_ids", []))
+	var fish_attraction: float = clamp(float(bait.get("fish_attraction", 0.0)), 0.0, 0.08)
 	var fish_attraction_by_id: Dictionary = bait.get("fish_attraction_by_id", {}).duplicate(true) if typeof(bait.get("fish_attraction_by_id", {})) == TYPE_DICTIONARY else {}
 	var allowed_rarities: Array = bait.get("allowed_rarities", []).duplicate(true) if typeof(bait.get("allowed_rarities", [])) == TYPE_ARRAY else []
 	if not second_bait.is_empty():
+		secondary_bait_id = str(second_bait.get("id", second_bait.get("bait_id", "")))
 		secondary_bait_type = str(second_bait.get("bait_type", ""))
 		if secondary_bait_type != "" and not bait_types.has(secondary_bait_type):
 			bait_types.append(secondary_bait_type)
-		fish_attraction = clamp(fish_attraction + float(second_bait.get("fish_attraction", 0.0)) * 0.45 + 0.03, 0.0, 0.42)
+		bait_tags = _merge_unique_string_arrays(bait_tags, _to_string_array(second_bait.get("bait_tags", [])))
+		target_fish_ids = _merge_unique_string_arrays(target_fish_ids, _to_string_array(second_bait.get("target_fish_ids", [])))
+		secondary_fish_ids = _merge_unique_string_arrays(secondary_fish_ids, _to_string_array(second_bait.get("secondary_fish_ids", [])))
+		for fish_id in target_fish_ids:
+			secondary_fish_ids.erase(str(fish_id))
+		var second_base_attraction: float = clamp(float(second_bait.get("fish_attraction", 0.0)), 0.0, 0.08)
+		fish_attraction = clamp(max(fish_attraction, second_base_attraction) + min(fish_attraction, second_base_attraction) * 0.35 + 0.01, 0.0, 0.12)
 		var second_attraction_by_id = second_bait.get("fish_attraction_by_id", {})
 		if typeof(second_attraction_by_id) == TYPE_DICTIONARY:
 			for fish_id in second_attraction_by_id.keys():
-				fish_attraction_by_id[str(fish_id)] = float(fish_attraction_by_id.get(str(fish_id), 0.0)) + float(second_attraction_by_id[fish_id]) * 0.45
+				var merged_fish_id := str(fish_id)
+				var current_attraction := float(fish_attraction_by_id.get(merged_fish_id, 0.0))
+				var second_attraction := float(second_attraction_by_id[fish_id])
+				if current_attraction > 0.0 and second_attraction > 0.0:
+					fish_attraction_by_id[merged_fish_id] = clamp(max(current_attraction, second_attraction) + min(current_attraction, second_attraction) * 0.35 + 0.03, 0.0, 0.42)
+				else:
+					fish_attraction_by_id[merged_fish_id] = max(current_attraction, second_attraction)
 		var second_allowed = second_bait.get("allowed_rarities", [])
 		if typeof(second_allowed) == TYPE_ARRAY:
 			for rarity in second_allowed:
@@ -3698,14 +3966,51 @@ func get_tackle_stats() -> Dictionary:
 		"hook_wear_rate": float(hook.get("wear_rate", 0.026)),
 		"target_fish_size": str(hook.get("target_fish_size", "small")),
 		"fish_escape_modifier": raw_escape_modifier * lerp(1.45, 1.0, hook_durability),
+		"bait_id": bait_id,
 		"bait_type": str(bait.get("bait_type", "worm")),
+		"secondary_bait_id": secondary_bait_id,
 		"secondary_bait_type": secondary_bait_type,
 		"bait_types": bait_types,
+		"bait_tags": bait_tags,
+		"target_fish_ids": target_fish_ids,
+		"secondary_fish_ids": secondary_fish_ids,
 		"fishing_depth": fishing_depth,
 		"fish_attraction": fish_attraction,
 		"fish_attraction_by_id": fish_attraction_by_id,
 		"allowed_rarities": allowed_rarities
 	}
+
+func get_bait_target_fish_names(bait_id: String, limit: int = 4) -> String:
+	var names := _get_bait_fish_names(bait_id, "target_fish_ids", limit)
+	if names.is_empty():
+		return ""
+	return "Лучше для: %s" % ", ".join(names)
+
+func get_bait_secondary_fish_names(bait_id: String, limit: int = 4) -> String:
+	var names := _get_bait_fish_names(bait_id, "secondary_fish_ids", limit)
+	if names.is_empty():
+		return ""
+	return "Также берёт: %s" % ", ".join(names)
+
+func _get_bait_fish_names(bait_id: String, field: String, limit: int) -> Array:
+	var item := get_tackle_catalog_item(bait_id)
+	var stats: Dictionary = item.get("stats", {})
+	var fish_ids: Array = stats.get(field, []) if typeof(stats.get(field, [])) == TYPE_ARRAY else []
+	var names: Array = []
+	var capped_limit: int = max(limit, 1)
+
+	for fish_id in fish_ids:
+		var fish := FishDatabase.get_fish(str(fish_id))
+		if fish.is_empty():
+			continue
+		names.append(str(fish.get("name", fish_id)))
+		if names.size() >= capped_limit:
+			break
+
+	if fish_ids.size() > names.size():
+		names.append("...")
+
+	return names
 
 func get_tackle_text() -> String:
 	return "Текущая снасть:\nУдочка: %s\nЛеска: %s\nПоплавок: %s\nКрючок: %s\nНаживка: %s x%d\nГлубина: %.1f м\nПрочность: уд. %d%% | леска %d%% | крючок %d%%" % [

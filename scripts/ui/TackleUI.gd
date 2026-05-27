@@ -839,6 +839,14 @@ func _get_tackle_stats_text(item: Dictionary) -> String:
 
 		lines.append("%s: %s" % [_get_tackle_stat_title(key), _format_tackle_stat_value(key, stats[key])])
 
+	if category == "bait":
+		var target_text := PlayerData.get_bait_target_fish_names(str(item.get("id", "")), 4)
+		var secondary_text := PlayerData.get_bait_secondary_fish_names(str(item.get("id", "")), 3)
+		if target_text != "":
+			lines.append(target_text)
+		if secondary_text != "":
+			lines.append(secondary_text)
+
 	return "\n".join(lines)
 
 
@@ -906,8 +914,6 @@ func _get_tackle_setup_hints() -> Array:
 	var tackle_stats = PlayerData.get_tackle_stats()
 	var hook_size: int = int(tackle_stats.get("hook_size", 12))
 	var line_strength: float = float(tackle_stats.get("line_strength", 1.0))
-	var bait_type = str(tackle_stats.get("bait_type", "worm"))
-	var bait_types: Array = tackle_stats.get("bait_types", [bait_type])
 	var depth_candidates: Array = []
 	var bait_match_names: Array = []
 	var too_big_hook_count = 0
@@ -950,8 +956,7 @@ func _get_tackle_setup_hints() -> Array:
 		if line_strength < average_weight * 0.85:
 			line_warning = true
 
-		var preferred_baits = fish.get("preferred_baits", [])
-		if typeof(preferred_baits) == TYPE_ARRAY and _any_bait_matches(preferred_baits, bait_types) and bait_match_names.size() < 4:
+		if _bait_targets_fish(tackle_stats, str(fish_id)) and bait_match_names.size() < 4:
 			bait_match_names.append(str(fish.get("name", "-")))
 
 	if depth_candidates.is_empty():
@@ -987,8 +992,6 @@ func _get_no_bite_candidate_reason(spot_id: String) -> String:
 	var bait_fish: Array = []
 	var tackle_stats = PlayerData.get_tackle_stats()
 	var hook_size: int = int(tackle_stats.get("hook_size", 12))
-	var bait_type = str(tackle_stats.get("bait_type", "worm"))
-	var bait_types: Array = tackle_stats.get("bait_types", [bait_type])
 
 	for fish_id in spot_fish:
 		var fish = FishDatabase.get_fish(str(fish_id))
@@ -1010,8 +1013,7 @@ func _get_no_bite_candidate_reason(spot_id: String) -> String:
 		if hook_size >= min_hook_size and hook_size <= max_hook_size:
 			hook_fish.append(fish)
 
-		var preferred_baits = fish.get("preferred_baits", [])
-		if typeof(preferred_baits) == TYPE_ARRAY and _any_bait_matches(preferred_baits, bait_types):
+		if _bait_targets_fish(tackle_stats, str(fish_id)):
 			bait_fish.append(fish)
 
 	if min_available_depth < 999.0:
@@ -1038,6 +1040,19 @@ func _get_no_bite_candidate_reason(spot_id: String) -> String:
 		return "Глубина и крючок подходят, но наживка слабая для этой рыбы."
 
 	return "На этой глубине и снасти нет подходящей рыбы. Измени глубину, крючок или наживку."
+
+
+func _bait_targets_fish(tackle_stats: Dictionary, fish_id: String) -> bool:
+	var attraction_by_id: Dictionary = tackle_stats.get("fish_attraction_by_id", {})
+	if float(attraction_by_id.get(fish_id, 0.0)) > 0.0:
+		return true
+
+	var target_fish_ids: Array = tackle_stats.get("target_fish_ids", [])
+	if target_fish_ids.has(fish_id):
+		return true
+
+	var secondary_fish_ids: Array = tackle_stats.get("secondary_fish_ids", [])
+	return secondary_fish_ids.has(fish_id)
 
 
 func _any_bait_matches(preferred_baits: Array, bait_types: Array) -> bool:
