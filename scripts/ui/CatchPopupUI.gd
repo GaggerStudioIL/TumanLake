@@ -130,6 +130,10 @@ func _bring_catch_reward_to_front() -> void:
 
 
 func _close_secondary_popups_for_reward() -> void:
+	if main.popup_manager != null and main.popup_manager.has_method("close_secondary_popups_for_priority_modal"):
+		main.popup_manager.close_secondary_popups_for_priority_modal()
+		return
+
 	if main.basket_panel != null:
 		main.basket_panel.visible = false
 	if main.basket_backdrop != null:
@@ -459,23 +463,22 @@ func _update_weight_progress_track(weight: float, personal_best_weight: float, t
 
 	var max_weight: float = maxf(maxf(weight, personal_best_weight), maxf(trophy_weight, record_weight))
 	max_weight = maxf(max_weight * 1.1, 0.1)
-	var inset := 10.0
-	var usable_width: float = maxf(progress_track.size.x - inset * 2.0, 1.0)
+	var usable_width: float = maxf(progress_track.size.x, 1.0)
 	var center_y: float = progress_track.size.y * 0.5
 	var track_height := 6.0
 	var caught_pos := clampf(weight / max_weight, 0.0, 1.0)
 
-	progress_fill.position = Vector2(inset, center_y - track_height * 0.5)
+	progress_fill.position = Vector2(0.0, center_y - track_height * 0.5)
 	progress_fill.size = Vector2(usable_width * caught_pos, track_height)
 	progress_fill.color = Color(accent.r, accent.g, accent.b, 0.50)
 
 	if record_weight > 0.0:
-		_add_weight_marker("RecordMarker", inset + usable_width * clampf(record_weight / max_weight, 0.0, 1.0), Color(0.86, 0.52, 1.0, 0.82), "✦", 16)
+		_add_weight_marker("RecordMarker", usable_width * clampf(record_weight / max_weight, 0.0, 1.0), Color(0.86, 0.52, 1.0, 0.82), "✦", 16)
 	if trophy_weight > 0.0:
-		_add_weight_marker("TrophyMarker", inset + usable_width * clampf(trophy_weight / max_weight, 0.0, 1.0), Color(1.0, 0.78, 0.34, 0.86), "★", 16)
+		_add_weight_marker("TrophyMarker", usable_width * clampf(trophy_weight / max_weight, 0.0, 1.0), Color(1.0, 0.78, 0.34, 0.86), "★", 16)
 	if personal_best_weight > 0.0:
-		_add_weight_marker("PersonalMarker", inset + usable_width * clampf(personal_best_weight / max_weight, 0.0, 1.0), Color(0.38, 0.86, 1.0, 0.80), "◆", 15)
-	_add_weight_marker("CaughtMarker", inset + usable_width * caught_pos, Color(0.92, 1.0, 0.86, 1.0), "●", 22)
+		_add_weight_marker("PersonalMarker", usable_width * clampf(personal_best_weight / max_weight, 0.0, 1.0), Color(0.38, 0.86, 1.0, 0.80), "◆", 15)
+	_add_caught_weight_marker(usable_width * caught_pos)
 
 
 func _add_weight_marker(marker_name: String, center_x: float, color: Color, marker_text: String, font_size: int) -> void:
@@ -488,6 +491,25 @@ func _add_weight_marker(marker_name: String, center_x: float, color: Color, mark
 	marker.add_theme_font_size_override("font_size", font_size)
 	marker.add_theme_color_override("font_color", color)
 	var marker_size := float(font_size + 8)
+	marker.size = Vector2(marker_size, marker_size)
+	marker.position = Vector2(
+		clampf(center_x - marker_size * 0.5, 0.0, maxf(progress_track.size.x - marker_size, 0.0)),
+		progress_track.size.y * 0.5 - marker_size * 0.5
+	)
+	progress_track.add_child(marker)
+
+
+func _add_caught_weight_marker(center_x: float) -> void:
+	var marker := Panel.new()
+	marker.name = "CaughtMarker"
+	marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var marker_size := 10.0
+	var marker_style := StyleBoxFlat.new()
+	marker_style.bg_color = Color(0.94, 1.0, 0.88, 1.0)
+	marker_style.border_color = Color(0.04, 0.10, 0.07, 0.70)
+	marker_style.set_border_width_all(1)
+	marker_style.set_corner_radius_all(roundi(marker_size * 0.5))
+	marker.add_theme_stylebox_override("panel", marker_style)
 	marker.size = Vector2(marker_size, marker_size)
 	marker.position = Vector2(
 		clampf(center_x - marker_size * 0.5, 0.0, maxf(progress_track.size.x - marker_size, 0.0)),

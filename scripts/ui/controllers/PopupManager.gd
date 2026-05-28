@@ -37,6 +37,66 @@ func clear() -> void:
 		main.toast_label.visible = false
 
 
+func close_secondary_popups_for_priority_modal() -> void:
+	if main == null:
+		return
+
+	_hide_control(main.basket_panel)
+	_hide_control(main.basket_backdrop)
+	_hide_control(main.inventory_panel)
+	_hide_control(main.inventory_backdrop)
+	_hide_control(main.shop_panel)
+	_hide_control(main.shop_backdrop)
+	_hide_control(main.tackle_panel)
+	_hide_control(main.tackle_backdrop)
+	_hide_control(main.waterbody_panel)
+	_hide_control(main.waterbody_backdrop)
+
+	if main.fish_harbor_ui != null:
+		main.fish_harbor_ui.visible = false
+	if main.system_menu_ui != null:
+		main.system_menu_ui.close_menu()
+		main.system_menu_ui.close_settings(false)
+
+	main._active_nav_tab = "fish"
+
+
+func prepare_for_menu_open(menu_name: String) -> void:
+	if main == null:
+		return
+
+	var menu_id := _normalize_menu_name(menu_name)
+	if menu_id == "":
+		return
+
+	if main.system_menu_ui != null:
+		main.system_menu_ui.close_menu()
+		main.system_menu_ui.close_settings(false)
+
+	if menu_id != "basket":
+		_hide_control(main.basket_panel)
+		_hide_control(main.basket_backdrop)
+	if menu_id != "inventory":
+		_hide_control(main.inventory_panel)
+		_hide_control(main.inventory_backdrop)
+	if menu_id != "shop":
+		_hide_control(main.shop_panel)
+		_hide_control(main.shop_backdrop)
+	if menu_id != "tackle":
+		_hide_control(main.tackle_panel)
+		_hide_control(main.tackle_backdrop)
+	if menu_id != "waterbody":
+		_hide_control(main.waterbody_panel)
+		_hide_control(main.waterbody_backdrop)
+
+	if menu_id != "harbor" and main.fish_harbor_ui != null:
+		main.fish_harbor_ui.visible = false
+	if menu_id != "profile" and main.profile_ui != null:
+		main.profile_ui.close(false)
+	if menu_id != "encyclopedia" and main.encyclopedia_ui != null:
+		main.encyclopedia_ui.close(false)
+
+
 func layout(screen_size: Vector2, margin: float) -> void:
 	if main == null or main.toast_label == null:
 		return
@@ -82,3 +142,19 @@ func _compose_message(title: String, text: String) -> String:
 	if text == "":
 		return title
 	return "%s\n%s" % [title, text]
+
+
+func _normalize_menu_name(menu_name: String) -> String:
+	var id := menu_name.strip_edges().to_lower()
+	if id == "keepnet" or id == "sell" or id == "sadok":
+		return "basket"
+	if id == "map" or id == "waterbodies":
+		return "waterbody"
+	if id == "fish_harbor" or id == "harbour":
+		return "harbor"
+	return id
+
+
+func _hide_control(control) -> void:
+	if control != null:
+		control.visible = false

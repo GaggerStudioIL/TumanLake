@@ -43,6 +43,9 @@ func get_buyer_lock_reason(buyer_id: String) -> String:
 		return "Неизвестный покупатель"
 	if is_buyer_unlocked(buyer_id):
 		return "Открыт"
+	var unlock_text := str(supplier.get("unlock_text", ""))
+	if not unlock_text.is_empty():
+		return unlock_text
 	return "Откроется при репутации %d" % int(supplier.get("min_reputation", 0))
 
 

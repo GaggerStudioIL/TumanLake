@@ -135,6 +135,113 @@ func sell_fish_to_buyer(fish_instance: Dictionary, buyer_id: String) -> int:
 	return sell_fish(fish_instance, buyer_id)
 
 
+func sell_fish_to_buyer_result(fish_instance: Dictionary, buyer_id: String) -> Dictionary:
+	var prepared := prepare_sale_catch_data(fish_instance)
+	if prepared.is_empty():
+		_set_error_summary(buyer_id, "Рыба не найдена.")
+		return _make_sale_result(false, "Рыба не найдена.", 0, buyer_id, {}, fish_instance)
+
+	var offer := get_offer_for_buyer(prepared, buyer_id)
+	if not bool(offer.get("accepted", false)):
+		var reason := str(offer.get("reason", "Покупатель не принимает эту рыбу."))
+		_set_error_summary(buyer_id, reason)
+		return _make_sale_result(false, reason, 0, buyer_id, offer, prepared)
+
+	var earned := sell_fish(prepared, buyer_id)
+	var summary := get_last_sale_summary()
+	var sale_total := int(summary.get("sale_total", int(offer.get("price", 0))))
+	var contract_reward := int(summary.get("contract_reward_total", maxi(earned - sale_total, 0)))
+	var success := earned > 0
+	var message := "Продано: +%d мон." % earned
+	if contract_reward > 0:
+		message = "Продано: +%d мон. (контракты +%d мон.)" % [earned, contract_reward]
+	if not success:
+		message = str(summary.get("error", "Рыба уже продана."))
+
+	return _make_sale_result(success, message, earned, str(summary.get("supplier_id", buyer_id)), offer, prepared, summary)
+
+
+func sell_fish_batch_to_buyer_result(fish_list: Array, buyer_id: String = "") -> Dictionary:
+	var sold_fish: Array = []
+	var failed_fish: Array = []
+	var errors: Array = []
+	var completed_contracts: Array = []
+	var supplier_totals: Dictionary = {}
+	var sale_total := 0
+	var contract_reward_total := 0
+
+	for value in fish_list:
+		var entry := _normalize_batch_sale_entry(value, buyer_id)
+		var fish: Dictionary = entry.get("fish", {})
+		var target_buyer_id := str(entry.get("buyer_id", ""))
+		var request_index := int(entry.get("request_index", -1))
+		if fish.is_empty():
+			var missing_result := _make_sale_result(false, "Рыба уже продана.", 0, target_buyer_id, {}, {})
+			missing_result["request_index"] = request_index
+			missing_result["requested_buyer_id"] = target_buyer_id
+			failed_fish.append(missing_result)
+			errors.append(str(missing_result.get("message", "Рыба уже продана.")))
+			continue
+
+		if target_buyer_id.is_empty():
+			target_buyer_id = get_best_buyer_for_fish(fish)
+
+		var result := sell_fish_to_buyer_result(fish, target_buyer_id)
+		result["request_index"] = request_index
+		result["requested_buyer_id"] = target_buyer_id
+		if bool(result.get("success", false)):
+			sold_fish.append(result)
+			var sale_price := int(result.get("price", 0))
+			var contract_reward := int(result.get("contract_reward", 0))
+			var supplier_id := str(result.get("supplier_id", result.get("buyer_id", target_buyer_id)))
+			sale_total += sale_price
+			contract_reward_total += contract_reward
+			supplier_totals[supplier_id] = int(supplier_totals.get(supplier_id, 0)) + sale_price
+			var summary_value = result.get("summary", {})
+			if summary_value is Dictionary:
+				var result_contracts = (summary_value as Dictionary).get("completed_contracts", [])
+				if result_contracts is Array:
+					completed_contracts.append_array(result_contracts)
+		else:
+			failed_fish.append(result)
+			var error := str(result.get("message", result.get("error", "Продажа не удалась.")))
+			if not error.is_empty():
+				errors.append(error)
+
+	var sold_count := sold_fish.size()
+	var failed_count := failed_fish.size()
+	var total_price := sale_total + contract_reward_total
+	var message := _format_batch_sale_message(sold_count, failed_count, total_price, contract_reward_total, errors)
+	last_sale_summary = {
+		"sale_total": sale_total,
+		"contract_reward_total": contract_reward_total,
+		"completed_contracts": completed_contracts,
+		"supplier_totals": supplier_totals,
+		"sold_count": sold_count,
+		"skipped_count": failed_count,
+		"errors": errors
+	}
+
+	return {
+		"success": sold_count > 0,
+		"sold_count": sold_count,
+		"failed_count": failed_count,
+		"total_price": total_price,
+		"total": total_price,
+		"sale_total": sale_total,
+		"contract_reward_total": contract_reward_total,
+		"buyer_id": buyer_id,
+		"buyer_name": _get_supplier_title(buyer_id) if not buyer_id.is_empty() else "Несколько покупателей",
+		"supplier_totals": supplier_totals,
+		"sold_fish": sold_fish,
+		"failed_fish": failed_fish,
+		"message": message,
+		"errors": errors,
+		"completed_contracts": completed_contracts,
+		"summary": last_sale_summary.duplicate(true)
+	}
+
+
 func sell_selected_fish(fish_ids: Array) -> int:
 	var requests := _normalize_sale_requests(fish_ids)
 	requests.sort_custom(func(a, b): return int(a.get("index", -1)) > int(b.get("index", -1)))
@@ -273,6 +380,39 @@ func _normalize_sale_requests(values: Array) -> Array:
 	return requests
 
 
+func _normalize_batch_sale_entry(value, fallback_buyer_id: String) -> Dictionary:
+	var index := -1
+	var buyer_id := fallback_buyer_id
+	var fish: Dictionary = {}
+	var inventory := _inventory()
+
+	if typeof(value) == TYPE_INT:
+		index = int(value)
+		if index >= 0 and index < inventory.size() and typeof(inventory[index]) == TYPE_DICTIONARY:
+			fish = (inventory[index] as Dictionary).duplicate(true)
+	elif typeof(value) == TYPE_DICTIONARY:
+		var entry: Dictionary = value
+		buyer_id = str(entry.get("buyer_id", entry.get("supplier_id", fallback_buyer_id)))
+		index = int(entry.get("inventory_index", entry.get("index", -1)))
+		var fish_value = entry.get("fish", {})
+		if fish_value is Dictionary and not (fish_value as Dictionary).is_empty():
+			fish = (fish_value as Dictionary).duplicate(true)
+		elif index >= 0 and index < inventory.size() and typeof(inventory[index]) == TYPE_DICTIONARY:
+			fish = (inventory[index] as Dictionary).duplicate(true)
+		else:
+			fish = entry.duplicate(true)
+	elif typeof(value) == TYPE_STRING or typeof(value) == TYPE_STRING_NAME:
+		index = _find_inventory_index(str(value))
+		if index >= 0 and index < inventory.size() and typeof(inventory[index]) == TYPE_DICTIONARY:
+			fish = (inventory[index] as Dictionary).duplicate(true)
+
+	return {
+		"fish": fish,
+		"buyer_id": buyer_id,
+		"request_index": index
+	}
+
+
 func _register_economy_sale(catch_data: Dictionary, sale_price: int, buyer_id: String) -> Dictionary:
 	var sale_catch_data := prepare_sale_catch_data(catch_data)
 	var supplier_id := buyer_id if not buyer_id.is_empty() else "local_market"
@@ -387,6 +527,46 @@ func _set_error_summary(buyer_id: String, message: String) -> void:
 		"supplier_name": _get_supplier_title(buyer_id),
 		"error": message
 	}
+
+
+func _make_sale_result(success: bool, message: String, total: int, buyer_id: String, offer: Dictionary, fish: Dictionary, summary: Dictionary = {}) -> Dictionary:
+	var result_summary := summary.duplicate(true)
+	var sale_total := int(result_summary.get("sale_total", int(offer.get("price", 0))))
+	var contract_reward := int(result_summary.get("contract_reward_total", maxi(total - sale_total, 0)))
+	var resolved_buyer_id := buyer_id
+	if resolved_buyer_id.is_empty():
+		resolved_buyer_id = str(offer.get("supplier_id", offer.get("buyer_id", "")))
+	return {
+		"success": success,
+		"message": message,
+		"price": sale_total,
+		"total": total,
+		"contract_reward": contract_reward,
+		"buyer_id": resolved_buyer_id,
+		"supplier_id": resolved_buyer_id,
+		"buyer_name": str(result_summary.get("supplier_name", offer.get("supplier_name", offer.get("buyer_name", resolved_buyer_id)))),
+		"supplier_name": str(result_summary.get("supplier_name", offer.get("supplier_name", offer.get("buyer_name", resolved_buyer_id)))),
+		"error": "" if success else message,
+		"fish": fish.duplicate(true),
+		"offer": offer.duplicate(true),
+		"summary": result_summary
+	}
+
+
+func _format_batch_sale_message(sold_count: int, failed_count: int, total_price: int, contract_reward: int, errors: Array) -> String:
+	if sold_count <= 0:
+		if not errors.is_empty():
+			return str(errors[0])
+		return "Выбранную рыбу не удалось продать."
+
+	var message := "Продано выбранное: %d шт. | +%d мон." % [sold_count, total_price]
+	if contract_reward > 0:
+		message += " (контракты +%d мон.)" % contract_reward
+	if failed_count > 0:
+		message += "\nНе продано: %d" % failed_count
+		if not errors.is_empty():
+			message += " | %s" % str(errors[0])
+	return message
 
 
 func _get_primary_buyer_ids() -> Array:

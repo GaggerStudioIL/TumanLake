@@ -117,6 +117,8 @@ const FAILURE_FISH_ESCAPED_HIGH_TENSION := "FISH_ESCAPED_HIGH_TENSION"
 const FAILURE_FISH_ESCAPED_HOOK := "FISH_ESCAPED_HOOK"
 const FAILURE_FISH_TOO_STRONG := "FISH_TOO_STRONG"
 const FAILURE_UNKNOWN := "UNKNOWN"
+const WeatherUIHelperScript := preload("res://scripts/ui/helpers/WeatherUIHelper.gd")
+const SHOW_WEATHER_BITE_DEBUG := false
 
 func get_bite_candidates(spot_id: String) -> Array:
 	var spot: Dictionary = SpotDatabase.get_spot(spot_id)
@@ -199,13 +201,16 @@ func start_fishing(spot_id: String) -> void:
 	var bait_bonus: float = _get_best_bait_bonus(available_fish)
 	var time_activity_modifier: float = _get_average_time_activity_modifier(available_fish)
 	var spot_bite_modifier: float = float(spot.get("bite_chance_modifier", 1.0)) * spot_depth_modifier
+	var weather_type := _get_current_weather_type()
+	var weather_modifiers := _get_weather_bite_modifiers(weather_type)
+	var weather_bite_multiplier: float = float(weather_modifiers.get("bite_chance", 1.0))
 
 	if use_new_bite_system:
 		_start_waiting_for_active_bite(spot, spot_id, available_fish, spot_depth_modifier)
 		return
 
 	var bite_speed: float = clamp(
-		(1.0 + float(_tackle_stats.get("bite_detection_bonus", 0.0)) + float(_tackle_stats.get("fish_attraction", 0.0)) + bait_bonus * 0.35 - float(_tackle_stats.get("visibility_penalty", 0.0))) * spot_bite_modifier * clamp(time_activity_modifier, 0.55, 1.35),
+		(1.0 + float(_tackle_stats.get("bite_detection_bonus", 0.0)) + float(_tackle_stats.get("fish_attraction", 0.0)) + bait_bonus * 0.35 - float(_tackle_stats.get("visibility_penalty", 0.0))) * spot_bite_modifier * clamp(time_activity_modifier, 0.55, 1.35) * weather_bite_multiplier,
 		0.65,
 		1.45
 	)
@@ -221,7 +226,7 @@ func start_fishing(spot_id: String) -> void:
 			return
 
 	var bite_chance: float = clamp(
-		(0.64 + float(_tackle_stats.get("bite_detection_bonus", 0.0)) + float(_tackle_stats.get("fish_attraction", 0.0)) + bait_bonus + float(_tackle_stats.get("hook_success_bonus", 0.0)) - float(_tackle_stats.get("visibility_penalty", 0.0))) * spot_bite_modifier * clamp(time_activity_modifier, 0.42, 1.38),
+		(0.64 + float(_tackle_stats.get("bite_detection_bonus", 0.0)) + float(_tackle_stats.get("fish_attraction", 0.0)) + bait_bonus + float(_tackle_stats.get("hook_success_bonus", 0.0)) - float(_tackle_stats.get("visibility_penalty", 0.0))) * spot_bite_modifier * clamp(time_activity_modifier, 0.42, 1.38) * weather_bite_multiplier,
 		0.30,
 		0.98
 	)
@@ -238,14 +243,17 @@ func start_fishing(spot_id: String) -> void:
 				"bite_chance": bite_chance,
 				"spot_depth_modifier": spot_depth_modifier,
 				"bait_bonus": bait_bonus,
-				"time_activity_modifier": time_activity_modifier
+				"time_activity_modifier": time_activity_modifier,
+				"weather_type": weather_type,
+				"weather_bite_multiplier": weather_bite_multiplier
 			}
 		)
 		return
 
 	var fish_id: String = _get_random_tackle_fish_id(
 		available_fish,
-		spot["rare_chance_modifier"]
+		spot["rare_chance_modifier"],
+		weather_modifiers
 	)
 
 	if not PlayerData.consume_current_tackle_baits(1):
@@ -260,7 +268,7 @@ func start_fishing(spot_id: String) -> void:
 		return
 
 	var catch_fish := FishDatabase.get_fish(fish_id)
-	var catch_data: Dictionary = FishDatabase.create_catch(fish_id, _get_time_peak_modifier(catch_fish))
+	var catch_data: Dictionary = FishDatabase.create_catch(fish_id, _get_weather_adjusted_weight_bias(catch_fish, weather_modifiers))
 	if catch_data.is_empty():
 		is_fishing = false
 		_emit_fishing_failure(
@@ -430,9 +438,11 @@ func _try_start_active_bite() -> void:
 	if randf() > bite_chance:
 		return
 
+	var weather_modifiers: Dictionary = bite_data.get("weather_modifiers", {})
 	var fish_id: String = _get_random_tackle_fish_id(
 		_active_available_fish,
-		float(_active_spot.get("rare_chance_modifier", 1.0))
+		float(_active_spot.get("rare_chance_modifier", 1.0)),
+		weather_modifiers
 	)
 
 	if not PlayerData.consume_current_tackle_baits(1):
@@ -447,7 +457,7 @@ func _try_start_active_bite() -> void:
 		)
 		return
 
-	var catch_data := _prepare_catch_data_for_bite(fish_id)
+	var catch_data := _prepare_catch_data_for_bite(fish_id, bite_data)
 	if catch_data.is_empty():
 		is_fishing = false
 		fishing_state = FishingState.FAILED
@@ -472,6 +482,9 @@ func _get_active_bite_balance_data() -> Dictionary:
 	var bait_bonus: float = _get_best_bait_bonus(_active_available_fish)
 	var time_activity_modifier: float = _get_average_time_activity_modifier(_active_available_fish)
 	var spot_bite_modifier: float = float(_active_spot.get("bite_chance_modifier", 1.0)) * _active_spot_depth_modifier
+	var weather_type := _get_current_weather_type()
+	var weather_modifiers := _get_weather_bite_modifiers(weather_type)
+	var weather_bite_multiplier: float = float(weather_modifiers.get("bite_chance", 1.0))
 	var bite_chance: float = clamp(
 		(
 			0.085
@@ -480,23 +493,35 @@ func _get_active_bite_balance_data() -> Dictionary:
 			+ bait_bonus * 0.09
 			+ float(_tackle_stats.get("hook_success_bonus", 0.0)) * 0.06
 			- float(_tackle_stats.get("visibility_penalty", 0.0)) * 0.08
-		) * spot_bite_modifier * clamp(time_activity_modifier, 0.42, 1.38),
+		) * spot_bite_modifier * clamp(time_activity_modifier, 0.42, 1.38) * weather_bite_multiplier,
 		0.04,
 		0.22
 	)
+
+	if SHOW_WEATHER_BITE_DEBUG:
+		print("[WeatherBite] weather=%s bite_x=%.2f final=%.3f modifiers=%s" % [
+			weather_type,
+			weather_bite_multiplier,
+			bite_chance,
+			str(weather_modifiers)
+		])
 
 	return {
 		"bite_chance": bite_chance,
 		"spot_depth_modifier": _active_spot_depth_modifier,
 		"bait_bonus": bait_bonus,
 		"time_activity_modifier": time_activity_modifier,
-		"spot_bite_modifier": spot_bite_modifier
+		"spot_bite_modifier": spot_bite_modifier,
+		"weather_type": weather_type,
+		"weather_bite_multiplier": weather_bite_multiplier,
+		"weather_modifiers": weather_modifiers
 	}
 
 
-func _prepare_catch_data_for_bite(fish_id: String) -> Dictionary:
+func _prepare_catch_data_for_bite(fish_id: String, bite_data: Dictionary = {}) -> Dictionary:
 	var catch_fish := FishDatabase.get_fish(fish_id)
-	var catch_data: Dictionary = FishDatabase.create_catch(fish_id, _get_time_peak_modifier(catch_fish))
+	var weather_modifiers: Dictionary = bite_data.get("weather_modifiers", _get_weather_bite_modifiers(_get_current_weather_type()))
+	var catch_data: Dictionary = FishDatabase.create_catch(fish_id, _get_weather_adjusted_weight_bias(catch_fish, weather_modifiers))
 	if catch_data.is_empty():
 		return {}
 
@@ -590,6 +615,31 @@ func reset_after_result() -> void:
 	_clear_active_bite_data()
 
 
+func can_cancel_current_fishing_wait() -> bool:
+	if not is_fishing or is_reeling:
+		return false
+	if fishing_state == FishingState.WAITING_FOR_BITE or fishing_state == FishingState.BITE_WINDOW:
+		return true
+	return not use_new_bite_system and fishing_state == FishingState.CASTING
+
+
+func cancel_current_fishing_wait() -> bool:
+	if not can_cancel_current_fishing_wait():
+		return false
+
+	_fishing_cycle_id += 1
+	is_fishing = false
+	is_reeling = false
+	fishing_state = FishingState.IDLE
+	_reel_input_active = false
+	_last_hook_attempt_msec = 0
+	_current_catch.clear()
+	_pending_catch.clear()
+	_pending_bite_data.clear()
+	_clear_active_bite_data()
+	return true
+
+
 func _is_fishing_cycle_current(cycle_id: int) -> bool:
 	return is_fishing and cycle_id == _fishing_cycle_id
 
@@ -637,8 +687,135 @@ func _get_best_bait_bonus(spot_fish: Array) -> float:
 
 	return best_bonus
 
-func _get_random_tackle_fish_id(available_fish: Array, rare_chance_modifier: float) -> String:
+
+func _get_current_weather_type() -> String:
+	var time_manager := get_node_or_null("/root/TimeManager")
+	var weather_state := WeatherUIHelperScript.get_current_weather_state(time_manager)
+	return str(weather_state.get("weather_type", "clear"))
+
+
+func _get_weather_effect_type_for_bite(weather_type: String) -> String:
+	var raw_type := str(weather_type).strip_edges().to_lower()
+	match raw_type:
+		"storm", "thunderstorm", "rain_with_thunderstorms", "гроза", "дождь с грозой":
+			return "thunderstorm"
+		"rain", "rainy", "дождь":
+			return "rain"
+		"cloudy", "overcast", "fog", "mist", "night_mist", "пасмурно", "облачно":
+			return "cloudy"
+
+	var normalized := WeatherUIHelperScript.normalize_weather_type(raw_type)
+	if normalized == "storm":
+		return "thunderstorm"
+	return normalized
+
+
+func _get_weather_bite_modifiers(weather_type: String) -> Dictionary:
+	match _get_weather_effect_type_for_bite(weather_type):
+		"cloudy":
+			return {
+				"bite_chance": 1.05,
+				"small_fish": 1.00,
+				"bottom_fish": 1.05,
+				"predator": 1.03,
+				"large_fish": 1.03,
+				"trophy_chance": 1.00,
+				"rare_chance": 1.00
+			}
+		"rain":
+			return {
+				"bite_chance": 1.10,
+				"small_fish": 0.90,
+				"bottom_fish": 1.12,
+				"predator": 1.08,
+				"large_fish": 1.08,
+				"trophy_chance": 1.03,
+				"rare_chance": 1.02
+			}
+		"thunderstorm":
+			return {
+				"bite_chance": 0.90,
+				"small_fish": 0.75,
+				"bottom_fish": 1.00,
+				"predator": 1.12,
+				"large_fish": 1.15,
+				"trophy_chance": 1.06,
+				"rare_chance": 1.05
+			}
+
+	return {
+		"bite_chance": 1.00,
+		"small_fish": 1.00,
+		"bottom_fish": 1.00,
+		"predator": 1.00,
+		"large_fish": 1.00,
+		"trophy_chance": 1.00,
+		"rare_chance": 1.00
+	}
+
+
+func _get_weather_fish_weight_multiplier(fish: Dictionary, weather_modifiers: Dictionary) -> float:
+	if fish.is_empty():
+		return 1.0
+
+	var multiplier := 1.0
+	var size_class := _get_fish_size_class(fish)
+	var habitat := str(fish.get("habitat", "lake")).to_lower()
+	var behavior := str(fish.get("behavior_type", fish.get("behavior", "calm"))).to_lower()
+	var rarity := str(fish.get("rarity", "common")).to_lower()
+	var rarity_type := str(fish.get("rarityType", "common")).to_lower()
+
+	if size_class == "small":
+		multiplier *= float(weather_modifiers.get("small_fish", 1.0))
+	elif size_class == "large":
+		multiplier *= float(weather_modifiers.get("large_fish", 1.0))
+
+	if habitat == "bottom" or habitat == "deep":
+		multiplier *= float(weather_modifiers.get("bottom_fish", 1.0))
+
+	if habitat == "predator" or behavior == "aggressive":
+		multiplier *= float(weather_modifiers.get("predator", 1.0))
+
+	if rarity == "rare" or rarity == "very_rare" or rarity == "legendary" or rarity_type.find("rare") >= 0 or rarity_type.find("legendary") >= 0:
+		multiplier *= float(weather_modifiers.get("rare_chance", 1.0))
+
+	return clamp(multiplier, 0.50, 1.35)
+
+
+func _get_weather_adjusted_weight_bias(fish: Dictionary, weather_modifiers: Dictionary) -> float:
+	var bias := _get_time_peak_modifier(fish)
+	var trophy_multiplier := float(weather_modifiers.get("trophy_chance", 1.0))
+	if trophy_multiplier > 1.0:
+		bias += (trophy_multiplier - 1.0) * 0.45
+	return clamp(bias, 0.0, 1.0)
+
+
+func _get_weather_debug_categories(fish: Dictionary) -> Array:
+	var categories: Array = []
+	if fish.is_empty():
+		return categories
+
+	var size_class := _get_fish_size_class(fish)
+	var habitat := str(fish.get("habitat", "lake")).to_lower()
+	var behavior := str(fish.get("behavior_type", fish.get("behavior", "calm"))).to_lower()
+	var rarity := str(fish.get("rarity", "common")).to_lower()
+	var rarity_type := str(fish.get("rarityType", "common")).to_lower()
+
+	categories.append(size_class)
+	if habitat == "bottom" or habitat == "deep":
+		categories.append("bottom")
+	if habitat == "predator" or behavior == "aggressive":
+		categories.append("predator")
+	if rarity == "rare" or rarity == "very_rare" or rarity == "legendary" or rarity_type.find("rare") >= 0 or rarity_type.find("legendary") >= 0:
+		categories.append("rare")
+
+	return categories
+
+
+func _get_random_tackle_fish_id(available_fish: Array, rare_chance_modifier: float, weather_modifiers: Dictionary = {}) -> String:
 	var weighted_list: Array = []
+	if weather_modifiers.is_empty():
+		weather_modifiers = _get_weather_bite_modifiers(_get_current_weather_type())
 
 	for fish_id in available_fish:
 		var fish: Dictionary = FishDatabase.get_fish(str(fish_id))
@@ -665,7 +842,8 @@ func _get_random_tackle_fish_id(available_fish: Array, rare_chance_modifier: flo
 		var line_multiplier: float = _get_line_visibility_multiplier(fish)
 		var time_multiplier: float = _get_time_activity_modifier(fish)
 		var peak_multiplier: float = 1.0 + _get_time_peak_modifier(fish) * 0.45
-		var final_weight: int = max(roundi(float(weight) * depth_multiplier * bait_multiplier * hook_multiplier * line_multiplier * time_multiplier * peak_multiplier), 1)
+		var weather_weight_multiplier: float = _get_weather_fish_weight_multiplier(fish, weather_modifiers)
+		var final_weight: int = max(roundi(float(weight) * depth_multiplier * bait_multiplier * hook_multiplier * line_multiplier * time_multiplier * peak_multiplier * weather_weight_multiplier), 1)
 
 		for i in final_weight:
 			weighted_list.append(fish_id)
@@ -673,7 +851,15 @@ func _get_random_tackle_fish_id(available_fish: Array, rare_chance_modifier: flo
 	if weighted_list.is_empty():
 		return FishDatabase.get_random_fish_id(available_fish, rare_chance_modifier)
 
-	return str(weighted_list.pick_random())
+	var selected_fish_id := str(weighted_list.pick_random())
+	if SHOW_WEATHER_BITE_DEBUG:
+		var selected_fish := FishDatabase.get_fish(selected_fish_id)
+		print("[WeatherBite] selected=%s categories=%s weight_x=%.2f" % [
+			selected_fish_id,
+			str(_get_weather_debug_categories(selected_fish)),
+			_get_weather_fish_weight_multiplier(selected_fish, weather_modifiers)
+		])
+	return selected_fish_id
 
 func _get_depth_match_multiplier(fish: Dictionary) -> float:
 	var depth: float = float(_tackle_stats.get("fishing_depth", 1.2))

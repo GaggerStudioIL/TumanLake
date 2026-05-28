@@ -9,80 +9,86 @@ const PRIMARY_SUPPLIER_IDS := [
 	"export_company"
 ]
 
+const DEFAULT_REPUTATION_BONUS_CAP := 0.18
+const SUPPLIER_REPUTATION_BONUS_CAPS := {
+	"local_market": 0.0,
+	"fish_shop": 0.02
+}
+
 const SUPPLIERS := {
 	"local_market": {
 		"name": "Местный рынок",
-		"description": "Покупает почти любой улов по стабильной цене.",
+		"description": "Безопасный покупатель для любого улова. Платит ровно, без особых бонусов.",
 		"price_multiplier": 1.00,
 		"min_status": "undersized",
 		"min_reputation": 0,
 		"accepted_fish_ids": [],
 		"accepted_rarity_types": [],
-		"accepts_text": "Все виды и любой размер.",
+		"accepts_text": "Почти все виды, включая незачётную рыбу.",
 		"contracts_text": "Простые поставки по весу и количеству.",
 		"unlock_text": "Открыт сразу."
 	},
 	"fish_shop": {
 		"name": "Рыбная лавка",
-		"description": "Покупает свежую рыбу, лучше платит за обычную рыбу.",
+		"description": "Берёт свежую ходовую рыбу для витрины. Чуть лучше рынка, но без трофейных переплат.",
 		"price_multiplier": 1.10,
 		"min_status": "undersized",
 		"min_reputation": 0,
 		"accepted_fish_ids": [],
 		"accepted_rarity_types": ["common", "rare"],
-		"accepts_text": "Обычные и редкие виды, включая мелкий улов.",
-		"contracts_text": "Заказы на ходовую рыбу.",
+		"accepts_text": "Обычные и редкие виды, свежий мелкий улов тоже берёт.",
+		"contracts_text": "Заказы на ходовую свежую рыбу.",
 		"unlock_text": "Открыта сразу."
 	},
 	"restaurant": {
 		"name": "Ресторан",
-		"description": "Покупает только качественную зачётную рыбу.",
-		"price_multiplier": 1.22,
+		"description": "Платит выше за свежую зачётную рыбу ресторанных видов. Мелочь не принимает.",
+		"price_multiplier": 1.26,
 		"min_status": "keeper",
-		"min_reputation": 50,
+		"min_reputation": 20,
 		"accepted_fish_ids": ["bream", "zander", "pike", "catfish", "tench", "perch", "crucian", "eel"],
 		"accepted_rarity_types": [],
-		"accepts_text": "Зачётную рыбу ресторанных видов.",
+		"accepts_text": "Свежую зачётную рыбу ресторанных видов.",
 		"contracts_text": "Поставки в трактир и праздничные заказы.",
-		"unlock_text": "Нужна репутация у ресторана: 50."
+		"unlock_text": "Нужна репутация у ресторана: 20."
 	},
 	"wholesale_buyer": {
-		"name": "Оптовик",
-		"description": "Покупает крупные партии по весу.",
-		"price_multiplier": 1.16,
+		"name": "Коптильня",
+		"description": "Берёт массовую обычную рыбу среднего размера. Хороша для партий без редких бонусов.",
+		"price_multiplier": 1.14,
 		"min_status": "keeper",
-		"min_reputation": 80,
-		"accepted_fish_ids": [],
-		"accepted_rarity_types": [],
-		"min_weight_kg": 1.2,
-		"accepts_text": "Зачётную рыбу от 1.2 кг или большие партии.",
-		"contracts_text": "Партии по общему весу.",
-		"unlock_text": "Нужна репутация у оптовика: 80."
+		"min_reputation": 30,
+		"accepted_fish_ids": ["roach", "rudd", "perch", "crucian", "silver_crucian", "golden_crucian", "bream", "white_bream", "skimmer_bream", "tench"],
+		"accepted_rarity_types": ["common"],
+		"min_weight_kg": 0.4,
+		"accepts_text": "Обычную зачётную рыбу от 0.4 кг для копчения.",
+		"contracts_text": "Партии средней рыбы по общему весу.",
+		"unlock_text": "Нужна репутация у коптильни: 30."
 	},
 	"collector": {
-		"name": "Коллекционер",
-		"description": "Покупает редкие виды и трофеи.",
-		"price_multiplier": 1.72,
+		"name": "Трофейный коллекционер",
+		"description": "Охотится за трофеями и редкими экземплярами. Обычную мелочь не берёт.",
+		"price_multiplier": 1.68,
 		"min_status": "undersized",
-		"min_reputation": 320,
+		"min_reputation": 120,
 		"accepted_fish_ids": [],
 		"accepted_rarity_types": ["rare", "legendary_species"],
 		"accepts_trophy_or_rare": true,
 		"accepts_text": "Редкие виды и любые трофейные экземпляры.",
 		"contracts_text": "Редкие заявки и трофейные поручения.",
-		"unlock_text": "Нужна репутация у коллекционера: 320."
+		"unlock_text": "Нужна репутация у коллекционера: 120."
 	},
 	"export_company": {
-		"name": "Экспортёр",
-		"description": "Дорогой покупатель для поздней стадии игры.",
-		"price_multiplier": 1.56,
+		"name": "Редкий торговец",
+		"description": "Покупает зачётные редкие виды для дальних заказов. Требует надёжную репутацию.",
+		"price_multiplier": 1.50,
 		"min_status": "keeper",
-		"min_reputation": 500,
+		"min_reputation": 180,
 		"accepted_fish_ids": [],
 		"accepted_rarity_types": ["rare", "legendary_species"],
 		"accepts_text": "Зачётные редкие и легендарные виды.",
-		"contracts_text": "Дорогие экспортные поставки.",
-		"unlock_text": "Нужна репутация у экспортёра: 500."
+		"contracts_text": "Редкие поставки с высоким чеком.",
+		"unlock_text": "Нужна репутация у редкого торговца: 180."
 	},
 	"factory": {
 		"name": "Переработка",
@@ -311,8 +317,16 @@ func get_supplier_bonus_multiplier(catch_data: Dictionary, supplier_id: String =
 
 	var supplier: Dictionary = get_supplier(target_supplier_id)
 	var base_multiplier: float = float(supplier.get("price_multiplier", 1.0))
-	var reputation_bonus: float = min(float(_get_reputation(target_supplier_id)) / 1000.0, 0.18)
+	var reputation_bonus: float = get_supplier_reputation_bonus(target_supplier_id)
 	return snappedf(clamp(base_multiplier + reputation_bonus, 0.5, 1.85), 0.01)
+
+
+func get_supplier_reputation_bonus(supplier_id: String, reputation_override: int = -1) -> float:
+	var cap := float(SUPPLIER_REPUTATION_BONUS_CAPS.get(supplier_id, DEFAULT_REPUTATION_BONUS_CAP))
+	if cap <= 0.0:
+		return 0.0
+	var reputation := reputation_override if reputation_override >= 0 else _get_reputation(supplier_id)
+	return minf(float(maxi(reputation, 0)) / 1000.0, cap)
 
 
 func get_supplier_summary(limit: int = 6) -> Array:

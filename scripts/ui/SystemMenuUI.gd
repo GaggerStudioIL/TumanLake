@@ -1,9 +1,11 @@
 # Top-right system menu for profile, fish atlas, and settings.
 extends RefCounted
 
+const WeatherUIHelperScript := preload("res://scripts/ui/helpers/WeatherUIHelper.gd")
+
 const BUTTON_BASE_SIZE := Vector2(60.0, 50.0)
-const PANEL_BASE_WIDTH := 210.0
-const ITEM_BASE_HEIGHT := 54.0
+const PANEL_BASE_WIDTH := 256.0
+const ITEM_BASE_HEIGHT := 56.0
 
 var main
 var root: Control
@@ -13,12 +15,19 @@ var dropdown_panel: Panel
 var menu_items_box: VBoxContainer
 var profile_item: Button
 var atlas_item: Button
+var forecast_item: Button
 var settings_item: Button
 var settings_backdrop: ColorRect
 var settings_panel: Panel
 var settings_title: Label
 var settings_message: Label
 var settings_close_button: Button
+var forecast_backdrop: ColorRect
+var forecast_panel: Panel
+var forecast_title: Label
+var forecast_scroll: ScrollContainer
+var forecast_list: VBoxContainer
+var forecast_close_button: Button
 var _is_disabled := false
 
 
@@ -26,6 +35,7 @@ func setup(main_ref) -> void:
 	main = main_ref
 	_ensure_menu_nodes()
 	_ensure_settings_nodes()
+	_ensure_forecast_nodes()
 	layout(main.get_viewport_rect().size)
 
 
@@ -42,9 +52,10 @@ func layout(screen_size: Vector2) -> void:
 		clampf(BUTTON_BASE_SIZE.x * ui_scale, 56.0, 68.0),
 		clampf(BUTTON_BASE_SIZE.y * ui_scale, 48.0, 58.0)
 	)
-	var panel_width: float = clampf(PANEL_BASE_WIDTH * ui_scale, 188.0, 224.0)
-	var item_height: float = clampf(ITEM_BASE_HEIGHT * ui_scale, 48.0, 56.0)
-	var panel_height: float = item_height * 3.0 + 18.0 * ui_scale
+	var panel_width: float = clampf(PANEL_BASE_WIDTH * ui_scale, 228.0, 286.0)
+	var item_height: float = clampf(ITEM_BASE_HEIGHT * ui_scale, 50.0, 60.0)
+	var panel_padding: float = 11.0 * ui_scale
+	var panel_height: float = item_height * 4.0 + panel_padding * 2.0 + 6.0 * ui_scale * 3.0
 	var button_x: float = screen_size.x - margin_x - button_size.x
 	var button_y: float = margin_y
 
@@ -75,15 +86,15 @@ func layout(screen_size: Vector2) -> void:
 	dropdown_panel.custom_minimum_size = dropdown_panel.size
 	_apply_panel_style(dropdown_panel)
 
-	menu_items_box.position = Vector2(9.0 * ui_scale, 9.0 * ui_scale)
-	menu_items_box.size = Vector2(panel_width - 18.0 * ui_scale, panel_height - 18.0 * ui_scale)
-	menu_items_box.add_theme_constant_override("separation", int(5.0 * ui_scale))
+	menu_items_box.position = Vector2(panel_padding, panel_padding)
+	menu_items_box.size = Vector2(panel_width - panel_padding * 2.0, panel_height - panel_padding * 2.0)
+	menu_items_box.add_theme_constant_override("separation", int(6.0 * ui_scale))
 
-	for item in [profile_item, atlas_item, settings_item]:
+	for item in [profile_item, atlas_item, forecast_item, settings_item]:
 		item.custom_minimum_size = Vector2(menu_items_box.size.x, item_height)
 		item.add_theme_font_size_override("font_size", int(16.0 * ui_scale))
-		item.add_theme_constant_override("icon_max_width", int(32.0 * ui_scale))
-		item.add_theme_constant_override("h_separation", int(12.0 * ui_scale))
+		item.add_theme_constant_override("icon_max_width", int(30.0 * ui_scale))
+		item.add_theme_constant_override("h_separation", int(11.0 * ui_scale))
 		_apply_menu_item_style(item)
 
 	if settings_panel != null:
@@ -107,6 +118,33 @@ func layout(screen_size: Vector2) -> void:
 		settings_close_button.add_theme_font_size_override("font_size", int(15.0 * ui_scale))
 		_apply_menu_item_style(settings_close_button)
 
+	if forecast_panel != null:
+		var forecast_size := Vector2(clampf(500.0 * ui_scale, 410.0, 540.0), clampf(486.0 * ui_scale, 438.0, 500.0))
+		var forecast_padding: float = 22.0 * ui_scale
+		var close_size := Vector2(124.0 * ui_scale, 40.0 * ui_scale)
+		var close_y: float = forecast_size.y - close_size.y - 16.0 * ui_scale
+		forecast_backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+		forecast_backdrop.position = Vector2.ZERO
+		forecast_backdrop.size = screen_size
+		forecast_panel.position = (screen_size - forecast_size) * 0.5
+		forecast_panel.size = forecast_size
+		forecast_panel.custom_minimum_size = forecast_size
+		_apply_panel_style(forecast_panel)
+		forecast_title.position = Vector2(forecast_padding, 18.0 * ui_scale)
+		forecast_title.size = Vector2(forecast_size.x - forecast_padding * 2.0, 34.0 * ui_scale)
+		forecast_title.add_theme_font_size_override("font_size", int(22.0 * ui_scale))
+		forecast_scroll.position = Vector2(forecast_padding, 62.0 * ui_scale)
+		forecast_scroll.size = Vector2(forecast_size.x - forecast_padding * 2.0, close_y - forecast_scroll.position.y - 18.0 * ui_scale)
+		forecast_list.position = Vector2.ZERO
+		forecast_list.size = forecast_scroll.size
+		forecast_list.custom_minimum_size = Vector2(forecast_scroll.size.x, 0.0)
+		forecast_list.add_theme_constant_override("separation", int(4.0 * ui_scale))
+		forecast_close_button.position = Vector2(forecast_size.x - close_size.x - forecast_padding, close_y)
+		forecast_close_button.size = close_size
+		forecast_close_button.custom_minimum_size = forecast_close_button.size
+		forecast_close_button.add_theme_font_size_override("font_size", int(15.0 * ui_scale))
+		_apply_menu_item_style(forecast_close_button)
+
 
 func is_menu_open() -> bool:
 	return dropdown_panel != null and dropdown_panel.visible
@@ -114,6 +152,10 @@ func is_menu_open() -> bool:
 
 func is_settings_open() -> bool:
 	return settings_panel != null and settings_panel.visible
+
+
+func is_forecast_open() -> bool:
+	return forecast_panel != null and forecast_panel.visible
 
 
 func close_menu() -> void:
@@ -131,6 +173,19 @@ func close_settings(reset_nav: bool = true) -> void:
 	settings_backdrop.visible = false
 	if main != null:
 		main.close_modal("settings")
+		if reset_nav:
+			main._active_nav_tab = "fish"
+			main._refresh_bottom_nav_styles()
+
+
+func close_forecast(reset_nav: bool = true) -> void:
+	if forecast_panel == null or forecast_backdrop == null:
+		return
+
+	forecast_panel.visible = false
+	forecast_backdrop.visible = false
+	if main != null:
+		main.close_modal("weather_forecast")
 		if reset_nav:
 			main._active_nav_tab = "fish"
 			main._refresh_bottom_nav_styles()
@@ -179,19 +234,22 @@ func _ensure_menu_nodes() -> void:
 
 	profile_item = _create_menu_item("Профиль", "profile")
 	atlas_item = _create_menu_item("Атлас рыб", "encyclopedia")
+	forecast_item = _create_menu_item("Прогноз погоды", "weather")
 	settings_item = _create_menu_item("Настройки", "settings")
 	menu_items_box.add_child(profile_item)
 	menu_items_box.add_child(atlas_item)
+	menu_items_box.add_child(forecast_item)
 	menu_items_box.add_child(settings_item)
 
 	profile_item.pressed.connect(_on_profile_pressed)
 	atlas_item.pressed.connect(_on_atlas_pressed)
+	forecast_item.pressed.connect(_on_forecast_pressed)
 	settings_item.pressed.connect(_on_settings_pressed)
 
 	menu_button = Button.new()
 	menu_button.name = "HamburgerMenuButton"
 	menu_button.text = "☰"
-	menu_button.tooltip_text = "Меню"
+	menu_button.tooltip_text = ""
 	menu_button.focus_mode = Control.FOCUS_NONE
 	menu_button.mouse_filter = Control.MOUSE_FILTER_STOP
 	menu_button.z_index = 3
@@ -244,12 +302,60 @@ func _ensure_settings_nodes() -> void:
 	settings_close_button.pressed.connect(_on_settings_close_pressed)
 
 
+func _ensure_forecast_nodes() -> void:
+	if forecast_panel != null:
+		return
+
+	var parent: Node = main.get_modal_content_root() if main.has_method("get_modal_content_root") else main
+
+	forecast_backdrop = ColorRect.new()
+	forecast_backdrop.name = "WeatherForecastBackdrop"
+	forecast_backdrop.color = Color(0.0, 0.0, 0.0, 0.56)
+	forecast_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	forecast_backdrop.visible = false
+	parent.add_child(forecast_backdrop)
+
+	forecast_panel = Panel.new()
+	forecast_panel.name = "WeatherForecastPanel"
+	forecast_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	forecast_panel.visible = false
+	parent.add_child(forecast_panel)
+
+	forecast_title = Label.new()
+	forecast_title.name = "WeatherForecastTitle"
+	forecast_title.text = "Прогноз погоды"
+	forecast_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	forecast_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	forecast_title.add_theme_color_override("font_color", Color(0.92, 1.0, 0.96, 1.0))
+	forecast_panel.add_child(forecast_title)
+
+	forecast_scroll = ScrollContainer.new()
+	forecast_scroll.name = "WeatherForecastScroll"
+	forecast_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	forecast_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	forecast_scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+	forecast_panel.add_child(forecast_scroll)
+
+	forecast_list = VBoxContainer.new()
+	forecast_list.name = "WeatherForecastList"
+	forecast_list.mouse_filter = Control.MOUSE_FILTER_PASS
+	forecast_scroll.add_child(forecast_list)
+
+	forecast_close_button = Button.new()
+	forecast_close_button.name = "WeatherForecastCloseButton"
+	forecast_close_button.text = "Закрыть"
+	forecast_close_button.focus_mode = Control.FOCUS_NONE
+	forecast_close_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	forecast_panel.add_child(forecast_close_button)
+	forecast_close_button.pressed.connect(_on_forecast_close_pressed)
+
+
 func _create_menu_item(text: String, icon_name: String) -> Button:
 	var item := Button.new()
 	item.text = text
 	item.focus_mode = Control.FOCUS_NONE
 	item.mouse_filter = Control.MOUSE_FILTER_STOP
-	item.clip_text = true
+	item.clip_text = false
 	if main.ui_theme != null:
 		item.icon = main.ui_theme.get_icon(icon_name)
 		item.expand_icon = true
@@ -282,6 +388,21 @@ func _on_atlas_pressed() -> void:
 		main._on_encyclopedia_button_pressed()
 
 
+func _on_forecast_pressed() -> void:
+	close_menu()
+	if main == null:
+		return
+
+	_ensure_forecast_nodes()
+	_build_forecast_content()
+	main.open_modal("weather_forecast")
+	forecast_backdrop.visible = true
+	forecast_panel.visible = true
+	main._active_nav_tab = "fish"
+	main._refresh_modal_input_blocker()
+	main._refresh_bottom_nav_styles()
+
+
 func _on_settings_pressed() -> void:
 	close_menu()
 	if main == null:
@@ -300,12 +421,97 @@ func _on_settings_close_pressed() -> void:
 	close_settings(true)
 
 
+func _on_forecast_close_pressed() -> void:
+	close_forecast(true)
+
+
 func _on_outside_close_gui_input(event: InputEvent) -> void:
 	var mouse_event := event as InputEventMouseButton
 	if mouse_event != null and mouse_event.pressed:
 		close_menu()
 		if main != null:
 			main.get_viewport().set_input_as_handled()
+
+
+func _build_forecast_content() -> void:
+	if forecast_list == null:
+		return
+
+	_clear_children(forecast_list)
+	var forecast := WeatherUIHelperScript.get_forecast(_get_time_manager(), 7)
+	for day_data in forecast:
+		forecast_list.add_child(_create_forecast_row(day_data))
+
+
+func _create_forecast_row(day_data: Dictionary) -> Panel:
+	var row := Panel.new()
+	row.custom_minimum_size = Vector2(0.0, 46.0)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_stylebox_override(
+		"panel",
+		_make_style(Color(0.040, 0.064, 0.066, 0.62), Color(0.72, 0.94, 0.88, 0.16), 10, 2, Color.TRANSPARENT)
+	)
+
+	var hbox := HBoxContainer.new()
+	hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+	hbox.offset_left = 14.0
+	hbox.offset_top = 4.0
+	hbox.offset_right = -14.0
+	hbox.offset_bottom = -4.0
+	hbox.add_theme_constant_override("separation", 12)
+	row.add_child(hbox)
+
+	var day_label := Label.new()
+	day_label.text = str(day_data.get("label", "День"))
+	day_label.custom_minimum_size = Vector2(126.0, 36.0)
+	day_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	day_label.clip_text = true
+	day_label.add_theme_font_size_override("font_size", 14)
+	day_label.add_theme_color_override("font_color", Color(0.92, 1.0, 0.96, 1.0))
+	hbox.add_child(day_label)
+
+	var icon := TextureRect.new()
+	var icon_path := str(day_data.get("icon_path", ""))
+	icon.texture = load(icon_path) if icon_path != "" else null
+	icon.custom_minimum_size = Vector2(42.0, 38.0)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	hbox.add_child(icon)
+
+	var temp_label := Label.new()
+	temp_label.text = str(day_data.get("temperature_text", "18°C"))
+	temp_label.custom_minimum_size = Vector2(70.0, 36.0)
+	temp_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	temp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	temp_label.add_theme_font_size_override("font_size", 16)
+	temp_label.add_theme_color_override("font_color", Color(0.84, 1.0, 0.92, 1.0))
+	hbox.add_child(temp_label)
+
+	var description_label := Label.new()
+	description_label.text = str(day_data.get("description", "Ясно"))
+	description_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	description_label.custom_minimum_size = Vector2(120.0, 36.0)
+	description_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	description_label.clip_text = true
+	description_label.add_theme_font_size_override("font_size", 14)
+	description_label.add_theme_color_override("font_color", Color(0.72, 0.84, 0.80, 0.94))
+	hbox.add_child(description_label)
+
+	return row
+
+
+func _get_time_manager() -> Node:
+	if main == null:
+		return null
+	return main.get_node_or_null("/root/TimeManager")
+
+
+func _clear_children(node: Node) -> void:
+	for child in node.get_children():
+		node.remove_child(child)
+		child.queue_free()
 
 
 func _apply_menu_button_style() -> void:

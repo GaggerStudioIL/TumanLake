@@ -1,8 +1,12 @@
 # Coordinates the compact top HUD values without owning gameplay logic.
 extends RefCounted
 
+const WeatherUIHelperScript := preload("res://scripts/ui/helpers/WeatherUIHelper.gd")
+
 var root: Control
 var main
+var _last_weather_icon_path := ""
+var _last_weather_icon_texture: Texture2D
 
 
 func setup(root_ref: Control, main_ref = null) -> void:
@@ -21,6 +25,7 @@ func refresh() -> void:
 func update_money() -> void:
 	if main == null or main.money_label == null:
 		return
+	main.money_label.visible = false
 	main.money_label.text = UIFormatters.format_money(PlayerData.money)
 
 
@@ -33,7 +38,18 @@ func update_time() -> void:
 func update_weather() -> void:
 	if main == null or main.weather_label == null:
 		return
-	main.weather_label.text = get_time_of_day_title()
+	var weather_state := WeatherUIHelperScript.get_current_weather_state(get_time_manager())
+	main.weather_label.text = str(weather_state.get("temperature_text", "18°C"))
+	if main.weather_hud_icon != null:
+		var icon_path := str(weather_state.get("icon_path", ""))
+		if icon_path != _last_weather_icon_path:
+			_last_weather_icon_path = icon_path
+			_last_weather_icon_texture = load(icon_path) if icon_path != "" else null
+		main.weather_hud_icon.texture = _last_weather_icon_texture
+		main.weather_hud_icon.visible = _last_weather_icon_texture != null
+	main.weather_label.tooltip_text = str(weather_state.get("description", ""))
+	if main.weather_effects_controller != null and main.weather_effects_controller.has_method("update_weather_state"):
+		main.weather_effects_controller.update_weather_state(weather_state)
 
 
 func update_location() -> void:

@@ -60,7 +60,7 @@ func calculate_buyer_multiplier(buyer_id: String, fish_instance: Dictionary = {}
 	if fish_instance.is_empty():
 		var supplier := _get_supplier(buyer_id)
 		var base_multiplier := float(supplier.get("price_multiplier", 1.0))
-		var reputation_bonus := minf(float(_get_reputation(buyer_id)) / 1000.0, 0.18)
+		var reputation_bonus := _get_supplier_reputation_bonus(buyer_id)
 		return snappedf(clamp(base_multiplier + reputation_bonus, 0.5, 1.85), 0.01)
 
 	var prepared := prepare_price_fish(fish_instance)
@@ -240,6 +240,12 @@ func _get_reputation(buyer_id: String) -> int:
 	if reputation_system != null and reputation_system.has_method("get_reputation"):
 		return int(reputation_system.call("get_reputation", buyer_id))
 	return 0
+
+
+func _get_supplier_reputation_bonus(buyer_id: String) -> float:
+	if SupplierManager != null and SupplierManager.has_method("get_supplier_reputation_bonus"):
+		return float(SupplierManager.call("get_supplier_reputation_bonus", buyer_id))
+	return minf(float(_get_reputation(buyer_id)) / 1000.0, 0.18)
 
 
 func _buyer_access_service() -> Node:

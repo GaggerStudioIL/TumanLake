@@ -10,6 +10,8 @@ const SECTION_CONTRACTS := "contracts"
 const SECTION_MARKET := "market"
 const SECTION_REPUTATION := "reputation"
 const REPUTATION_THRESHOLDS := [0, 50, 150, 350, 700, 1100]
+const SHOW_ECONOMY_DEBUG_REPORT := false
+const EconomyDebugReportScript := preload("res://scripts/dev/EconomyDebugReport.gd")
 const MarketHistoryChartScript := preload("res://scripts/ui/MarketHistoryChart.gd")
 const EmptyStateCardScript := preload("res://scripts/ui/components/EmptyStateCard.gd")
 const PriceLabelScript := preload("res://scripts/ui/components/PriceLabel.gd")
@@ -19,6 +21,7 @@ var main
 var current_section := SECTION_SALE
 var selected_fish: Dictionary = {}
 var selected_buyers: Dictionary = {}
+var selected_bulk_buyer_id := ""
 
 var background_texture: TextureRect
 var dim_layer: ColorRect
@@ -57,6 +60,7 @@ func open() -> void:
 		main._active_nav_tab = "harbor"
 	visible = true
 	refresh()
+	_maybe_print_economy_debug_report()
 	if main != null and main.has_method("refresh_mobile_scroll_helper"):
 		main.refresh_mobile_scroll_helper()
 	if main != null and main.has_method("_refresh_bottom_nav_styles"):
@@ -76,6 +80,14 @@ func close(reset_nav: bool = true) -> void:
 	closed.emit()
 
 
+func _maybe_print_economy_debug_report() -> void:
+	if not SHOW_ECONOMY_DEBUG_REPORT:
+		return
+	var report = EconomyDebugReportScript.new()
+	if report != null and report.has_method("print_report"):
+		report.print_report()
+
+
 func is_open() -> bool:
 	return visible
 
@@ -92,11 +104,12 @@ func refresh() -> void:
 	section_title_label.text = _get_section_title(current_section)
 	footer_panel.visible = current_section == SECTION_SALE
 	if sidebar_panel != null:
-		sidebar_panel.visible = current_section != SECTION_SALE
+		sidebar_panel.visible = true
 
 	match current_section:
 		SECTION_SALE:
 			_build_sale_section()
+			_build_buyers_sidebar()
 			_refresh_sale_footer()
 		SECTION_SUPPLIERS:
 			_build_suppliers_section()
@@ -336,7 +349,7 @@ func _create_sale_row(fish: Dictionary, fish_index: int) -> Panel:
 
 	var selected := bool(selected_fish.get(fish_index, false))
 	var card := Panel.new()
-	card.custom_minimum_size = Vector2(0.0, 104.0)
+	card.custom_minimum_size = Vector2(0.0, 122.0 if selected else 104.0)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_apply_card(card)
 
@@ -400,6 +413,11 @@ func _create_sale_row(fish: Dictionary, fish_index: int) -> Panel:
 	var rarity_label := _make_label(_get_rarity_title(str(prepared.get("rarityType", "common"))), 12, Color(0.68, 0.82, 0.78, 0.92))
 	rarity_label.clip_text = true
 	info.add_child(rarity_label)
+	if selected:
+		var price_hint := _make_label(_format_price_explanation(prepared, offer), 11, Color(0.72, 0.88, 0.82, 0.94))
+		price_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		price_hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		info.add_child(price_hint)
 
 	var buyer_button := Button.new()
 	buyer_button.name = "BuyerChoice_%d" % fish_index
@@ -446,6 +464,22 @@ func _get_buyer_button_text(fish: Dictionary, buyer_id: String, best_buyer_id: S
 	if bool(best_offer.get("accepted", false)):
 		return "%s\nЛучшее: %s — %s" % [selected_line, best_name, UIFormatters.format_money(float(best_offer.get("price", 0)))]
 	return selected_line
+
+
+func _format_price_explanation(fish: Dictionary, offer: Dictionary) -> String:
+	if not bool(offer.get("accepted", false)):
+		return "Цена: %s" % _short_rejection_reason(str(offer.get("reason", "покупатель не принимает")))
+	var status := str(fish.get("fish_status", "undersized"))
+	var quality_multiplier := float(offer.get("quality_multiplier", 1.0))
+	var freshness_multiplier := float(offer.get("freshness_multiplier", 1.0))
+	var buyer_multiplier := float(offer.get("buyer_multiplier", 1.0))
+	return "%s x%.2f | свеж. x%.2f\nпокупатель x%.2f | итог %s" % [
+		_get_status_title(status),
+		quality_multiplier,
+		freshness_multiplier,
+		buyer_multiplier,
+		UIFormatters.format_money(float(offer.get("price", 0)))
+	]
 
 
 func _show_buyer_popup(fish_index: int, fish: Dictionary, anchor: Control) -> void:
@@ -519,6 +553,7 @@ func _create_buyer_popup_option(fish_index: int, buyer_id: String, offer: Dictio
 
 func _on_custom_buyer_selected(fish_index: int, buyer_id: String) -> void:
 	selected_buyers[fish_index] = buyer_id
+	selected_bulk_buyer_id = buyer_id
 	_hide_buyer_popup()
 	refresh()
 
@@ -586,12 +621,12 @@ func _refresh_sale_footer() -> void:
 	sell_selected_button.pressed.connect(_on_sell_selected_pressed)
 	buttons_box.add_child(sell_selected_button)
 
-	var sell_all_summary := _get_sell_all_best_summary()
+	var sell_all_summary := _get_sell_all_selected_buyer_summary()
 	var sell_all_button := Button.new()
-	sell_all_button.text = "Продать всё"
+	sell_all_button.text = "Продать всё подходящее"
 	sell_all_button.custom_minimum_size = Vector2(198.0, 46.0)
 	sell_all_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	sell_all_button.disabled = int(sell_all_summary.get("count", 0)) <= 0 or int(sell_all_summary.get("price", 0)) <= 0
+	sell_all_button.disabled = int(sell_all_summary.get("inventory_count", 0)) <= 0
 	_apply_button(sell_all_button, false)
 	sell_all_button.pressed.connect(_on_sell_all_pressed)
 	buttons_box.add_child(sell_all_button)
@@ -625,19 +660,39 @@ func _get_selected_sale_summary() -> Dictionary:
 	return {"count": count, "selected_count": selected_count, "weight": weight, "price": price, "requests": requests}
 
 
-func _get_sell_all_best_summary() -> Dictionary:
+func _get_sell_all_selected_buyer_summary() -> Dictionary:
 	var count := 0
 	var price := 0
+	var rejected_count := 0
+	var inventory_count := 0
+	var buyer_id := selected_bulk_buyer_id
+	if buyer_id.is_empty():
+		return {
+			"count": 0,
+			"price": 0,
+			"rejected_count": 0,
+			"inventory_count": _inventory_items().size(),
+			"buyer_id": ""
+		}
+
 	for item in _inventory_items():
 		if typeof(item) != TYPE_DICTIONARY:
 			continue
+		inventory_count += 1
 		var fish := _prepare_fish(item)
-		var best_buyer_id := _get_best_buyer(fish)
-		var offer := _get_offer(fish, best_buyer_id)
+		var offer := _get_offer(fish, buyer_id)
 		if bool(offer.get("accepted", false)):
 			count += 1
 			price += int(offer.get("price", 0))
-	return {"count": count, "price": price}
+		else:
+			rejected_count += 1
+	return {
+		"count": count,
+		"price": price,
+		"rejected_count": rejected_count,
+		"inventory_count": inventory_count,
+		"buyer_id": buyer_id
+	}
 
 
 func _on_sell_selected_pressed() -> void:
@@ -649,22 +704,50 @@ func _on_sell_selected_pressed() -> void:
 	var inventory_manager := _inventory_manager()
 	var sales_service := _sales_service()
 	var earned := 0
+	if requests.size() == 1 and sales_service != null and sales_service.has_method("sell_fish_to_buyer_result"):
+		_after_single_sale_result(_sell_single_selected_fish(requests[0], sales_service))
+		return
+	if requests.size() > 1 and sales_service != null and sales_service.has_method("sell_fish_batch_to_buyer_result"):
+		_after_batch_sale_result(_sell_selected_fish_batch(requests, sales_service))
+		return
 	if sales_service != null and sales_service.has_method("sell_selected_fish"):
 		earned = int(sales_service.call("sell_selected_fish", requests))
 	elif inventory_manager != null and inventory_manager.has_method("sell_selected_fish"):
 		earned = int(inventory_manager.call("sell_selected_fish", requests, {}))
-	_after_sale("Продано выбранное: +%s" % UIFormatters.format_money(float(earned)), earned > 0)
+	_after_sale(_format_sale_result_message("Продано выбранное", earned, _get_last_sale_summary()), earned > 0)
 
 
 func _on_sell_all_pressed() -> void:
-	var inventory_manager := _inventory_manager()
 	var sales_service := _sales_service()
-	var earned := 0
-	if sales_service != null and sales_service.has_method("sell_all_fish_best_offer"):
-		earned = int(sales_service.call("sell_all_fish_best_offer"))
-	elif inventory_manager != null and inventory_manager.has_method("sell_all_fish_best_offer"):
-		earned = int(inventory_manager.call("sell_all_fish_best_offer"))
-	_after_sale("Продано всё: +%s" % UIFormatters.format_money(float(earned)), earned > 0)
+	if selected_bulk_buyer_id.is_empty():
+		_show_notice("Выберите покупателя.", false)
+		return
+	if not _is_buyer_unlocked(selected_bulk_buyer_id):
+		_show_notice("Покупатель пока недоступен: %s" % _short_rejection_reason(_get_buyer_lock_reason(selected_bulk_buyer_id, _get_supplier_data(selected_bulk_buyer_id))), false)
+		return
+	if sales_service == null or not sales_service.has_method("sell_fish_batch_to_buyer_result"):
+		_show_notice("Продажа через гавань сейчас недоступна.", false)
+		return
+
+	var batch_data := _get_sell_all_matching_batch(selected_bulk_buyer_id)
+	var batch: Array = batch_data.get("batch", [])
+	var rejected_count := int(batch_data.get("rejected_count", 0))
+	var first_rejection := str(batch_data.get("first_rejection", ""))
+	if batch.is_empty():
+		var message := "Нет подходящей рыбы для этого покупателя."
+		if not first_rejection.is_empty():
+			message += " %s" % _short_rejection_reason(first_rejection)
+		_show_notice(message, false)
+		return
+
+	var result_value = sales_service.call("sell_fish_batch_to_buyer_result", batch, selected_bulk_buyer_id)
+	if result_value is Dictionary:
+		var result: Dictionary = result_value
+		result["not_eligible_count"] = rejected_count
+		_after_sell_all_matching_result(result)
+		return
+
+	_show_notice("Продажа подходящей рыбы не удалась.", false)
 
 
 func _after_sale(message: String, success: bool) -> void:
@@ -681,51 +764,468 @@ func _after_sale(message: String, success: bool) -> void:
 	refresh()
 
 
+func _sell_selected_fish_batch(requests: Array, sales_service: Node) -> Dictionary:
+	var batch: Array = []
+	var inventory: Array = _inventory_items()
+	for value in requests:
+		if not (value is Dictionary):
+			continue
+		var entry: Dictionary = value
+		var index := int(entry.get("index", entry.get("inventory_index", -1)))
+		if index < 0 or index >= inventory.size() or typeof(inventory[index]) != TYPE_DICTIONARY:
+			batch.append({
+				"index": index,
+				"buyer_id": str(entry.get("buyer_id", "")),
+				"fish": {}
+			})
+			continue
+		batch.append({
+			"index": index,
+			"buyer_id": str(entry.get("buyer_id", "")),
+			"fish": (inventory[index] as Dictionary).duplicate(true)
+		})
+
+	var result_value = sales_service.call("sell_fish_batch_to_buyer_result", batch, "")
+	if result_value is Dictionary:
+		return result_value
+
+	return {
+		"success": false,
+		"sold_count": 0,
+		"failed_count": batch.size(),
+		"total_price": 0,
+		"message": "Продажа выбранной рыбы не удалась.",
+		"errors": ["Продажа выбранной рыбы не удалась."],
+		"sold_fish": [],
+		"failed_fish": []
+	}
+
+
+func _after_batch_sale_result(result: Dictionary) -> void:
+	var sold_count := int(result.get("sold_count", 0))
+	var message := str(result.get("message", ""))
+	if message.is_empty():
+		message = _format_batch_sale_result_message(result)
+
+	if sold_count > 0:
+		selected_fish.clear()
+		selected_buyers.clear()
+		_restore_failed_batch_selection(result.get("failed_fish", []))
+
+	if main != null:
+		main.result_label.text = message
+		if main.has_method("_update_ui"):
+			main._update_ui()
+	_show_notice(message, sold_count > 0)
+
+	if sold_count > 0:
+		var save_manager: Node = get_node_or_null("/root/SaveManager")
+		if save_manager != null and save_manager.has_method("save_game"):
+			save_manager.call("save_game")
+	refresh()
+
+
+func _get_sell_all_matching_batch(buyer_id: String) -> Dictionary:
+	var batch: Array = []
+	var rejected_count := 0
+	var first_rejection := ""
+	var inventory: Array = _inventory_items()
+
+	for i in inventory.size():
+		if typeof(inventory[i]) != TYPE_DICTIONARY:
+			continue
+		var fish: Dictionary = _prepare_fish(inventory[i])
+		var offer := _get_offer(fish, buyer_id)
+		if bool(offer.get("accepted", false)):
+			batch.append({
+				"index": i,
+				"buyer_id": buyer_id,
+				"fish": (inventory[i] as Dictionary).duplicate(true)
+			})
+		else:
+			rejected_count += 1
+			if first_rejection.is_empty():
+				first_rejection = str(offer.get("reason", _get_buyer_rejection_reason(buyer_id, fish)))
+
+	return {
+		"batch": batch,
+		"rejected_count": rejected_count,
+		"first_rejection": first_rejection
+	}
+
+
+func _after_sell_all_matching_result(result: Dictionary) -> void:
+	var sold_count := int(result.get("sold_count", 0))
+	var message := _format_sell_all_matching_result_message(result)
+
+	if sold_count > 0:
+		selected_fish.clear()
+		selected_buyers.clear()
+
+	if main != null:
+		main.result_label.text = message
+		if main.has_method("_update_ui"):
+			main._update_ui()
+	_show_notice(message, sold_count > 0)
+
+	if sold_count > 0:
+		var save_manager: Node = get_node_or_null("/root/SaveManager")
+		if save_manager != null and save_manager.has_method("save_game"):
+			save_manager.call("save_game")
+	refresh()
+
+
+func _sell_single_selected_fish(request, sales_service: Node) -> Dictionary:
+	var entry: Dictionary = request if request is Dictionary else {}
+	var index := int(entry.get("index", entry.get("inventory_index", -1)))
+	var inventory: Array = _inventory_items()
+	if index < 0 or index >= inventory.size() or typeof(inventory[index]) != TYPE_DICTIONARY:
+		return {
+			"success": false,
+			"message": "Рыба уже продана.",
+			"error": "Рыба уже продана.",
+			"price": 0,
+			"total": 0,
+			"buyer_id": str(entry.get("buyer_id", "")),
+			"buyer_name": "",
+			"fish": {}
+		}
+
+	var fish: Dictionary = (inventory[index] as Dictionary).duplicate(true)
+	var prepared := _prepare_fish(fish)
+	var buyer_id := str(entry.get("buyer_id", ""))
+	if buyer_id.is_empty():
+		buyer_id = _get_best_buyer(prepared)
+
+	var result_value = sales_service.call("sell_fish_to_buyer_result", fish, buyer_id)
+	if result_value is Dictionary:
+		return result_value
+
+	return {
+		"success": false,
+		"message": "Продажа не удалась.",
+		"error": "Продажа не удалась.",
+		"price": 0,
+		"total": 0,
+		"buyer_id": buyer_id,
+		"buyer_name": buyer_id,
+		"fish": fish
+	}
+
+
+func _after_single_sale_result(result: Dictionary) -> void:
+	var success := bool(result.get("success", false))
+	var message := _format_single_sale_result_message(result)
+	if success:
+		selected_fish.clear()
+		selected_buyers.clear()
+
+	if main != null:
+		main.result_label.text = message
+		if main.has_method("_update_ui"):
+			main._update_ui()
+	_show_notice(message, success)
+
+	if success:
+		var save_manager: Node = get_node_or_null("/root/SaveManager")
+		if save_manager != null and save_manager.has_method("save_game"):
+			save_manager.call("save_game")
+	refresh()
+
+
+func _get_last_sale_summary() -> Dictionary:
+	var sales_service := _sales_service()
+	if sales_service != null and sales_service.has_method("get_last_sale_summary"):
+		var service_value = sales_service.call("get_last_sale_summary")
+		if service_value is Dictionary:
+			return service_value
+	var inventory_manager := _inventory_manager()
+	if inventory_manager != null and inventory_manager.has_method("get_last_sale_summary"):
+		var inventory_value = inventory_manager.call("get_last_sale_summary")
+		if inventory_value is Dictionary:
+			return inventory_value
+	return {}
+
+
+func _format_sale_result_message(title: String, earned: int, summary: Dictionary) -> String:
+	if earned <= 0:
+		var error := str(summary.get("error", "Нет подходящей рыбы для продажи."))
+		return error if not error.is_empty() else "Нет подходящей рыбы для продажи."
+
+	var sold_count := int(summary.get("sold_count", 0))
+	var sale_total := int(summary.get("sale_total", earned))
+	var contract_reward := int(summary.get("contract_reward_total", maxi(earned - sale_total, 0)))
+	var prefix := title
+	if sold_count > 0:
+		prefix = "%s: %d шт." % [title, sold_count]
+
+	var message := "%s | +%s" % [prefix, UIFormatters.format_money(float(earned))]
+	if contract_reward > 0:
+		message += " (контракты +%s)" % UIFormatters.format_money(float(contract_reward))
+
+	var completed_contracts = summary.get("completed_contracts", [])
+	if completed_contracts is Array and not completed_contracts.is_empty():
+		message += "\nЗакрыто контрактов: %d" % completed_contracts.size()
+	return message
+
+
+func _format_single_sale_result_message(result: Dictionary) -> String:
+	var success := bool(result.get("success", false))
+	if not success:
+		var error := str(result.get("message", result.get("error", "Продажа не удалась.")))
+		return error if not error.is_empty() else "Продажа не удалась."
+
+	var fish_value = result.get("fish", {})
+	var fish_name := "Рыба"
+	if fish_value is Dictionary:
+		fish_name = str((fish_value as Dictionary).get("name", fish_name))
+	var buyer_name := str(result.get("buyer_name", result.get("supplier_name", result.get("buyer_id", "покупатель"))))
+	var total := int(result.get("total", result.get("price", 0)))
+	var contract_reward := int(result.get("contract_reward", 0))
+	var message := "%s → %s: +%s" % [fish_name, buyer_name, UIFormatters.format_money(float(total))]
+	if contract_reward > 0:
+		message += " (контракты +%s)" % UIFormatters.format_money(float(contract_reward))
+
+	var summary_value = result.get("summary", {})
+	if summary_value is Dictionary:
+		var completed_contracts = (summary_value as Dictionary).get("completed_contracts", [])
+		if completed_contracts is Array and not completed_contracts.is_empty():
+			message += "\nЗакрыто контрактов: %d" % completed_contracts.size()
+	return message
+
+
+func _format_batch_sale_result_message(result: Dictionary) -> String:
+	var sold_count := int(result.get("sold_count", 0))
+	var failed_count := int(result.get("failed_count", 0))
+	var total := int(result.get("total_price", result.get("total", 0)))
+	var contract_reward := int(result.get("contract_reward_total", 0))
+	if sold_count <= 0:
+		var errors = result.get("errors", [])
+		if errors is Array and not errors.is_empty():
+			return str(errors[0])
+		return "Выбранную рыбу не удалось продать."
+
+	var message := "Продано выбранное: %d шт. | +%s" % [
+		sold_count,
+		UIFormatters.format_money(float(total))
+	]
+	if contract_reward > 0:
+		message += " (контракты +%s)" % UIFormatters.format_money(float(contract_reward))
+	if failed_count > 0:
+		message += "\nНе продано: %d" % failed_count
+	return message
+
+
+func _format_sell_all_matching_result_message(result: Dictionary) -> String:
+	var sold_count := int(result.get("sold_count", 0))
+	var total := int(result.get("total_price", result.get("total", 0)))
+	var buyer_name := str(result.get("buyer_name", result.get("buyer_id", "покупатель")))
+	var not_eligible_count := int(result.get("not_eligible_count", 0))
+	var failed_count := int(result.get("failed_count", 0))
+	if sold_count <= 0:
+		var errors = result.get("errors", [])
+		if errors is Array and not errors.is_empty():
+			return str(errors[0])
+		return "Нет подходящей рыбы для этого покупателя."
+
+	var message := "Продано %d рыб покупателю %s. Получено: %s" % [
+		sold_count,
+		buyer_name,
+		UIFormatters.format_money(float(total))
+	]
+	var skipped := not_eligible_count + failed_count
+	if skipped > 0:
+		message += "\nНе подошло: %d" % skipped
+	return message
+
+
+func _restore_failed_batch_selection(failed_results) -> void:
+	if not (failed_results is Array):
+		return
+
+	for value in failed_results:
+		if not (value is Dictionary):
+			continue
+		var failed: Dictionary = value
+		var fish_value = failed.get("fish", {})
+		if not (fish_value is Dictionary):
+			continue
+		var index := _find_inventory_index_for_selection(fish_value)
+		if index < 0:
+			continue
+		selected_fish[index] = true
+		var buyer_id := str(failed.get("requested_buyer_id", failed.get("buyer_id", "")))
+		if not buyer_id.is_empty():
+			selected_buyers[index] = buyer_id
+
+
+func _find_inventory_index_for_selection(fish_value) -> int:
+	if not (fish_value is Dictionary):
+		return -1
+	var fish: Dictionary = fish_value
+	var inventory: Array = _inventory_items()
+	for i in inventory.size():
+		if typeof(inventory[i]) != TYPE_DICTIONARY:
+			continue
+		if _fish_matches_selection(inventory[i], fish):
+			return i
+	return -1
+
+
+func _fish_matches_selection(left_value, right: Dictionary) -> bool:
+	if typeof(left_value) != TYPE_DICTIONARY:
+		return false
+	var left: Dictionary = left_value
+	if str(left.get("id", left.get("fish_id", ""))) != str(right.get("id", right.get("fish_id", ""))):
+		return false
+	if abs(float(left.get("weight", 0.0)) - float(right.get("weight", 0.0))) > 0.001:
+		return false
+	if int(left.get("price", 0)) != int(right.get("price", 0)):
+		return false
+	return true
+
+
 func _build_buyers_sidebar() -> void:
 	_add_sidebar_title("Покупатели")
+	_add_selected_buyer_summary_card()
 	var summary := _get_selected_sale_summary()
 	var selected_count := int(summary.get("selected_count", summary.get("count", 0)))
-	var supplier_manager := _supplier_manager()
 	var inventory: Array = _inventory_items()
-	var available_suppliers: Array = []
-	if supplier_manager != null and supplier_manager.has_method("get_available_suppliers"):
-		var available_value = supplier_manager.call("get_available_suppliers")
-		if available_value is Array:
-			available_suppliers = available_value
 	for buyer_id in _get_primary_supplier_ids():
-		var supplier := {}
-		if supplier_manager != null and supplier_manager.has_method("get_supplier"):
-			var supplier_value = supplier_manager.call("get_supplier", str(buyer_id))
-			if supplier_value is Dictionary:
-				supplier = supplier_value
+		var buyer_key := str(buyer_id)
+		var supplier := _get_supplier_data(buyer_key)
 		var total := 0
 		var accepted := 0
-		var unlocked := available_suppliers.has(str(buyer_id)) or int(supplier.get("min_reputation", 0)) <= 0
+		var first_rejection := ""
+		var unlocked := _is_buyer_unlocked(buyer_key)
 		if selected_count > 0:
 			for key in selected_fish.keys():
 				var index := int(key)
 				if not bool(selected_fish.get(key, false)) or index < 0 or index >= inventory.size():
 					continue
-				var offer := _get_offer(_prepare_fish(inventory[index]), str(buyer_id))
+				var prepared_fish := _prepare_fish(inventory[index])
+				var offer := _get_offer(prepared_fish, buyer_key)
 				if bool(offer.get("accepted", false)):
 					accepted += 1
 					total += int(offer.get("price", 0))
+				elif first_rejection.is_empty():
+					first_rejection = str(offer.get("reason", _get_buyer_rejection_reason(buyer_key, prepared_fish)))
 		var lines: Array = ["x%.2f" % float(supplier.get("price_multiplier", 1.0))]
 		var locked := not unlocked
 		if locked:
-			lines.append("Закрыто: репутация %d" % int(supplier.get("min_reputation", 0)))
+			lines.append("Закрыто: %s" % _short_rejection_reason(_get_buyer_lock_reason(buyer_key, supplier)))
 		elif selected_count > 0:
 			lines.append("Принимает: %d/%d" % [accepted, selected_count])
-			lines.append("Итог: %s" % UIFormatters.format_money(float(total)))
+			if accepted > 0:
+				lines.append("Итог: %s" % UIFormatters.format_money(float(total)))
+			elif not first_rejection.is_empty():
+				lines.append(_short_rejection_reason(first_rejection))
+			else:
+				lines.append("Нет подходящей рыбы")
 		else:
 			lines.append(str(supplier.get("accepts_text", "")))
+		if selected_bulk_buyer_id == buyer_key:
+			lines.append("Выбран для продажи всего")
 		_add_buyer_sidebar_card(
-			str(supplier.get("name", buyer_id)),
+			str(supplier.get("name", buyer_key)),
 			lines,
-			str(buyer_id) == _get_best_sidebar_buyer(),
-			locked
+			selected_bulk_buyer_id == buyer_key or buyer_key == _get_best_sidebar_buyer(),
+			locked,
+			buyer_key
 		)
 	_add_sidebar_card("Цены обновятся через", _get_market_refresh_text(), false)
+
+
+func _add_selected_buyer_summary_card() -> void:
+	if selected_bulk_buyer_id.is_empty():
+		_add_sidebar_card("Продажа всего", "Выберите покупателя ниже.\nКнопка продаст только подходящую рыбу.", false)
+		return
+
+	var supplier := _get_supplier_data(selected_bulk_buyer_id)
+	if supplier.is_empty():
+		_add_sidebar_card("Покупатель", "Неизвестный покупатель.", false)
+		return
+
+	var unlocked := _is_buyer_unlocked(selected_bulk_buyer_id)
+	var summary := _get_buyer_inventory_summary(selected_bulk_buyer_id)
+	var accepted_count := int(summary.get("accepted_count", 0))
+	var inventory_count := int(summary.get("inventory_count", 0))
+	var total_price := int(summary.get("total_price", 0))
+	var rejected_count := int(summary.get("rejected_count", 0))
+	var lines: Array = []
+	lines.append(str(supplier.get("description", "")))
+	lines.append("Бонус: x%.2f | принимает: %s" % [
+		float(supplier.get("price_multiplier", 1.0)),
+		_short_supplier_accepts(selected_bulk_buyer_id, str(supplier.get("accepts_text", "")))
+	])
+	if unlocked:
+		lines.append("Подходит из садка: %d/%d | %s" % [
+			accepted_count,
+			inventory_count,
+			UIFormatters.format_money(float(total_price))
+		])
+		if rejected_count > 0:
+			lines.append("Не подходит: %d" % rejected_count)
+	else:
+		lines.append("Недоступен: %s" % _short_rejection_reason(_get_buyer_lock_reason(selected_bulk_buyer_id, supplier)))
+	_add_selected_buyer_card(str(supplier.get("name", selected_bulk_buyer_id)), lines, unlocked)
+
+
+func _add_selected_buyer_card(title: String, lines: Array, unlocked: bool) -> void:
+	var card := Panel.new()
+	card.custom_minimum_size = Vector2(0.0, 160.0)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_apply_card(card, Color(0.64, 0.96, 0.86, 1.0) if unlocked else Color(0.70, 0.58, 0.48, 0.88))
+	sidebar_content.add_child(card)
+
+	var box := VBoxContainer.new()
+	box.set_anchors_preset(Control.PRESET_FULL_RECT)
+	box.offset_left = 10.0
+	box.offset_top = 9.0
+	box.offset_right = -10.0
+	box.offset_bottom = -9.0
+	box.add_theme_constant_override("separation", 4)
+	card.add_child(box)
+
+	var title_label_node := _make_label("Выбран: %s" % title, 13, Color(0.95, 1.0, 0.92, 1.0) if unlocked else Color(0.78, 0.72, 0.66, 0.92))
+	title_label_node.clip_text = true
+	title_label_node.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	box.add_child(title_label_node)
+
+	for i in mini(lines.size(), 4):
+		var line := _make_label(str(lines[i]), 11, Color(0.76, 0.90, 0.84, 0.94) if unlocked else Color(0.62, 0.66, 0.62, 0.88))
+		line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		box.add_child(line)
+
+
+func _get_buyer_inventory_summary(buyer_id: String) -> Dictionary:
+	var inventory: Array = _inventory_items()
+	var accepted_count := 0
+	var rejected_count := 0
+	var total_price := 0
+	var first_rejection := ""
+
+	for item in inventory:
+		if typeof(item) != TYPE_DICTIONARY:
+			continue
+		var prepared := _prepare_fish(item)
+		var offer := _get_offer(prepared, buyer_id)
+		if bool(offer.get("accepted", false)):
+			accepted_count += 1
+			total_price += int(offer.get("price", 0))
+		else:
+			rejected_count += 1
+			if first_rejection.is_empty():
+				first_rejection = str(offer.get("reason", _get_buyer_rejection_reason(buyer_id, prepared)))
+
+	return {
+		"accepted_count": accepted_count,
+		"rejected_count": rejected_count,
+		"inventory_count": inventory.size(),
+		"total_price": total_price,
+		"first_rejection": first_rejection
+	}
 
 
 func _get_best_sidebar_buyer() -> String:
@@ -751,7 +1251,7 @@ func _build_suppliers_section() -> void:
 func _create_supplier_card(item: Dictionary) -> Panel:
 	var unlocked := bool(item.get("unlocked", true))
 	var card := Panel.new()
-	card.custom_minimum_size = Vector2(0.0, 142.0)
+	card.custom_minimum_size = Vector2(0.0, 166.0)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_apply_card(card, Color(0.58, 0.86, 0.80, 0.94) if unlocked else Color(0.48, 0.56, 0.54, 0.76))
 
@@ -788,9 +1288,14 @@ func _create_supplier_card(item: Dictionary) -> Panel:
 	], 12, Color(0.72, 0.90, 0.82, 0.96) if unlocked else Color(0.56, 0.66, 0.62, 0.84))
 	box.add_child(rep_label)
 
+	var description := _make_label(str(item.get("description", "")), 12, Color(0.78, 0.88, 0.82, 0.94) if unlocked else Color(0.58, 0.66, 0.62, 0.84))
+	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	description.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_child(description)
+
 	var accepts := _short_supplier_accepts(str(item.get("id", "")), str(item.get("accepts_text", "")))
 	var contracts := _short_supplier_contracts(str(item.get("id", "")), str(item.get("contracts_text", "")))
-	var unlock_text := "Открыт: сразу" if unlocked else "Откроется: репутация %d" % int(item.get("min_reputation", 0))
+	var unlock_text := "Открыт: сразу" if unlocked else str(item.get("unlock_text", "Откроется: репутация %d" % int(item.get("min_reputation", 0))))
 	var body := _make_label("Принимает: %s\nКонтракты: %s\n%s" % [accepts, contracts, unlock_text], 12, Color(0.78, 0.88, 0.82, 0.95) if unlocked else Color(0.58, 0.66, 0.62, 0.86))
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1114,6 +1619,48 @@ func _get_reputation_info(supplier_id: String) -> Dictionary:
 	}
 
 
+func _is_buyer_unlocked(buyer_id: String) -> bool:
+	var access_service := _buyer_access_service()
+	if access_service != null and access_service.has_method("is_buyer_unlocked"):
+		return bool(access_service.call("is_buyer_unlocked", buyer_id))
+
+	var supplier_manager := _supplier_manager()
+	if supplier_manager != null and supplier_manager.has_method("is_buyer_unlocked"):
+		return bool(supplier_manager.call("is_buyer_unlocked", buyer_id))
+	if supplier_manager != null and supplier_manager.has_method("get_supplier"):
+		var supplier_value = supplier_manager.call("get_supplier", buyer_id)
+		if supplier_value is Dictionary:
+			return int((supplier_value as Dictionary).get("min_reputation", 0)) <= 0
+	return buyer_id == "local_market"
+
+
+func _get_supplier_data(buyer_id: String) -> Dictionary:
+	var supplier_manager := _supplier_manager()
+	if supplier_manager != null and supplier_manager.has_method("get_supplier"):
+		var supplier_value = supplier_manager.call("get_supplier", buyer_id)
+		if supplier_value is Dictionary:
+			return supplier_value
+	return {}
+
+
+func _get_buyer_lock_reason(buyer_id: String, supplier: Dictionary) -> String:
+	var access_service := _buyer_access_service()
+	if access_service != null and access_service.has_method("get_buyer_lock_reason"):
+		return str(access_service.call("get_buyer_lock_reason", buyer_id))
+	return str(supplier.get("unlock_text", "Покупатель пока недоступен"))
+
+
+func _get_buyer_rejection_reason(buyer_id: String, fish: Dictionary) -> String:
+	var access_service := _buyer_access_service()
+	if access_service != null and access_service.has_method("get_buyer_rejection_reason"):
+		return str(access_service.call("get_buyer_rejection_reason", buyer_id, fish))
+
+	var supplier_manager := _supplier_manager()
+	if supplier_manager != null and supplier_manager.has_method("get_rejection_reason"):
+		return str(supplier_manager.call("get_rejection_reason", fish, buyer_id))
+	return "Этот покупатель не принимает такую рыбу"
+
+
 func _short_supplier_accepts(supplier_id: String, fallback: String) -> String:
 	match supplier_id:
 		"local_market":
@@ -1123,7 +1670,7 @@ func _short_supplier_accepts(supplier_id: String, fallback: String) -> String:
 		"restaurant":
 			return "зачётную рыбу"
 		"wholesale_buyer":
-			return "зачётную от 1.2 кг"
+			return "обычную от 0.4 кг"
 		"collector":
 			return "редкие виды и трофеи"
 		"export_company":
@@ -1141,11 +1688,11 @@ func _short_supplier_contracts(supplier_id: String, fallback: String) -> String:
 		"restaurant":
 			return "зачётные поставки"
 		"wholesale_buyer":
-			return "крупные партии"
+			return "копчёные партии"
 		"collector":
 			return "редкости / трофеи"
 		"export_company":
-			return "экспортные заявки"
+			return "редкие заявки"
 		_:
 			return fallback
 
@@ -1599,10 +2146,13 @@ func _add_sidebar_card(title: String, body: String, active: bool) -> void:
 	box.add_child(body_label)
 
 
-func _add_buyer_sidebar_card(title: String, lines: Array, active: bool, locked: bool) -> void:
+func _add_buyer_sidebar_card(title: String, lines: Array, active: bool, locked: bool, buyer_id: String = "") -> void:
 	var card := Panel.new()
 	card.custom_minimum_size = Vector2(0.0, 102.0 if lines.size() >= 3 else 90.0)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.mouse_filter = Control.MOUSE_FILTER_STOP if not buyer_id.is_empty() and not locked else Control.MOUSE_FILTER_PASS
+	if not buyer_id.is_empty() and not locked:
+		card.gui_input.connect(_on_buyer_sidebar_card_gui_input.bind(buyer_id))
 	var accent := Color(0.54, 0.94, 0.98, 1.0) if active else Color(0.62, 0.76, 0.72, 0.92)
 	if locked:
 		accent = Color(0.50, 0.58, 0.56, 0.70)
@@ -1629,6 +2179,26 @@ func _add_buyer_sidebar_card(title: String, lines: Array, active: bool, locked: 
 		line.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		box.add_child(line)
+
+
+func _on_buyer_sidebar_card_gui_input(event: InputEvent, buyer_id: String) -> void:
+	var mouse_event := event as InputEventMouseButton
+	if mouse_event != null and mouse_event.pressed and mouse_event.button_index == MOUSE_BUTTON_LEFT:
+		_select_bulk_buyer(buyer_id)
+		get_viewport().set_input_as_handled()
+		return
+
+	var touch_event := event as InputEventScreenTouch
+	if touch_event != null and touch_event.pressed:
+		_select_bulk_buyer(buyer_id)
+		get_viewport().set_input_as_handled()
+
+
+func _select_bulk_buyer(buyer_id: String) -> void:
+	if buyer_id.is_empty():
+		return
+	selected_bulk_buyer_id = buyer_id
+	refresh()
 
 
 func _add_empty_card(parent: Control, title: String, body: String) -> void:
@@ -1769,6 +2339,10 @@ func _sales_service() -> Node:
 
 func _supplier_manager() -> Node:
 	return get_node_or_null("/root/SupplierManager")
+
+
+func _buyer_access_service() -> Node:
+	return get_node_or_null("/root/BuyerAccessService")
 
 
 func _fish_status_system() -> Node:

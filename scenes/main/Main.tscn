@@ -20,7 +20,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.02745098, 0.0627451, 0.09411765, 1)
 
-[node name="SceneGradient" type="ColorRect" parent="."]
+[node name="SceneGradient" type="ColorRect" parent="." unique_id=263548888]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -29,7 +29,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="MistLayer" type="ColorRect" parent="."]
+[node name="MistLayer" type="ColorRect" parent="." unique_id=1487544495]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -38,7 +38,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="NoiseLayer" type="ColorRect" parent="."]
+[node name="NoiseLayer" type="ColorRect" parent="." unique_id=1451302044]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -47,7 +47,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="SunGlowLayer" type="ColorRect" parent="."]
+[node name="SunGlowLayer" type="ColorRect" parent="." unique_id=951514637]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -56,7 +56,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="FarForestLayer" type="ColorRect" parent="."]
+[node name="FarForestLayer" type="ColorRect" parent="." unique_id=1046458410]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -65,7 +65,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="MidForestLayer" type="ColorRect" parent="."]
+[node name="MidForestLayer" type="ColorRect" parent="." unique_id=45585536]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -74,7 +74,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="LakeLayer" type="ColorRect" parent="."]
+[node name="LakeLayer" type="ColorRect" parent="." unique_id=819451290]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -83,7 +83,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="ReflectionLayer" type="ColorRect" parent="."]
+[node name="ReflectionLayer" type="ColorRect" parent="." unique_id=1659310205]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -92,7 +92,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="ForegroundMistLayer" type="ColorRect" parent="."]
+[node name="ForegroundMistLayer" type="ColorRect" parent="." unique_id=179333895]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -101,7 +101,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="VignetteLayer" type="ColorRect" parent="."]
+[node name="VignetteLayer" type="ColorRect" parent="." unique_id=1746921332]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -110,161 +110,161 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="WaterPanel" type="Panel" parent="."]
+[node name="WaterPanel" type="Panel" parent="." unique_id=1493822804]
 layout_mode = 0
 offset_right = 720.0
 offset_bottom = 360.0
 
-[node name="FishingPresenceLayer" type="Node2D" parent="."]
+[node name="FishingPresenceLayer" type="Node2D" parent="." unique_id=2086809076]
 z_index = 4
 
-[node name="RodShadow" type="Line2D" parent="FishingPresenceLayer"]
+[node name="RodShadow" type="Line2D" parent="FishingPresenceLayer" unique_id=999977799]
 width = 11.0
 default_color = Color(0, 0, 0, 0.28)
 antialiased = true
 
-[node name="RodHandleShadow" type="Line2D" parent="FishingPresenceLayer"]
+[node name="RodHandleShadow" type="Line2D" parent="FishingPresenceLayer" unique_id=1374023309]
 width = 16.0
 default_color = Color(0, 0, 0, 0.22)
 antialiased = true
 
-[node name="RodHandle" type="Line2D" parent="FishingPresenceLayer"]
+[node name="RodHandle" type="Line2D" parent="FishingPresenceLayer" unique_id=295016807]
 width = 14.0
 default_color = Color(0.11, 0.075, 0.045, 0.95)
 antialiased = true
 
-[node name="RodHandleWrapA" type="Line2D" parent="FishingPresenceLayer"]
+[node name="RodHandleWrapA" type="Line2D" parent="FishingPresenceLayer" unique_id=1972056326]
 width = 2.0
 default_color = Color(0.86, 0.64, 0.34, 0.58)
 antialiased = true
 
-[node name="RodHandleWrapB" type="Line2D" parent="FishingPresenceLayer"]
+[node name="RodHandleWrapB" type="Line2D" parent="FishingPresenceLayer" unique_id=238624340]
 width = 2.0
 default_color = Color(0.86, 0.64, 0.34, 0.48)
 antialiased = true
 
-[node name="RodBlank" type="Line2D" parent="FishingPresenceLayer"]
+[node name="RodBlank" type="Line2D" parent="FishingPresenceLayer" unique_id=2139984230]
 width = 6.0
 default_color = Color(0.13, 0.105, 0.065, 0.98)
 antialiased = true
 
-[node name="RodNearSection" type="Line2D" parent="FishingPresenceLayer"]
+[node name="RodNearSection" type="Line2D" parent="FishingPresenceLayer" unique_id=2038248066]
 width = 8.0
-default_color = Color(0.29, 0.185, 0.090, 0.98)
+default_color = Color(0.29, 0.185, 0.09, 0.98)
 antialiased = true
 
-[node name="RodMidSection" type="Line2D" parent="FishingPresenceLayer"]
+[node name="RodMidSection" type="Line2D" parent="FishingPresenceLayer" unique_id=1760924695]
 width = 4.8
 default_color = Color(0.25, 0.165, 0.082, 0.96)
 antialiased = true
 
-[node name="RodTipSection" type="Line2D" parent="FishingPresenceLayer"]
+[node name="RodTipSection" type="Line2D" parent="FishingPresenceLayer" unique_id=215248269]
 width = 2.2
-default_color = Color(0.19, 0.130, 0.075, 0.92)
+default_color = Color(0.19, 0.13, 0.075, 0.92)
 antialiased = true
 
-[node name="RodHighlight" type="Line2D" parent="FishingPresenceLayer"]
+[node name="RodHighlight" type="Line2D" parent="FishingPresenceLayer" unique_id=1647484629]
 width = 1.5
 default_color = Color(0.92, 0.78, 0.48, 0.42)
 antialiased = true
 
-[node name="RodFerruleNear" type="Line2D" parent="FishingPresenceLayer"]
+[node name="RodFerruleNear" type="Line2D" parent="FishingPresenceLayer" unique_id=279801843]
 width = 2.2
-default_color = Color(0.92, 0.78, 0.50, 0.52)
+default_color = Color(0.92, 0.78, 0.5, 0.52)
 antialiased = true
 
-[node name="RodFerruleMid" type="Line2D" parent="FishingPresenceLayer"]
+[node name="RodFerruleMid" type="Line2D" parent="FishingPresenceLayer" unique_id=2115324153]
 width = 1.8
-default_color = Color(0.92, 0.78, 0.50, 0.46)
+default_color = Color(0.92, 0.78, 0.5, 0.46)
 antialiased = true
 
-[node name="RodFerruleTip" type="Line2D" parent="FishingPresenceLayer"]
+[node name="RodFerruleTip" type="Line2D" parent="FishingPresenceLayer" unique_id=1136854481]
 width = 1.3
-default_color = Color(0.92, 0.78, 0.50, 0.40)
+default_color = Color(0.92, 0.78, 0.5, 0.4)
 antialiased = true
 
-[node name="RodReelStem" type="Line2D" parent="FishingPresenceLayer"]
+[node name="RodReelStem" type="Line2D" parent="FishingPresenceLayer" unique_id=1419122589]
 width = 3.2
 default_color = Color(0.17, 0.18, 0.15, 0.82)
 antialiased = true
 
-[node name="RodReelSpool" type="Line2D" parent="FishingPresenceLayer"]
+[node name="RodReelSpool" type="Line2D" parent="FishingPresenceLayer" unique_id=127084404]
 width = 3.0
-default_color = Color(0.52, 0.58, 0.50, 0.72)
+default_color = Color(0.52, 0.58, 0.5, 0.72)
 antialiased = true
 
-[node name="RodReelHandle" type="Line2D" parent="FishingPresenceLayer"]
+[node name="RodReelHandle" type="Line2D" parent="FishingPresenceLayer" unique_id=2114603284]
 width = 2.2
-default_color = Color(0.52, 0.58, 0.50, 0.70)
+default_color = Color(0.52, 0.58, 0.5, 0.7)
 antialiased = true
 
-[node name="FishingLineGlow" type="Line2D" parent="FishingPresenceLayer"]
+[node name="FishingLineGlow" type="Line2D" parent="FishingPresenceLayer" unique_id=75585585]
 width = 1.8
 default_color = Color(0.72, 1, 0.88, 0.08)
 antialiased = true
 
-[node name="FishingLine" type="Line2D" parent="FishingPresenceLayer"]
+[node name="FishingLine" type="Line2D" parent="FishingPresenceLayer" unique_id=449417193]
 width = 0.8
 default_color = Color(0.86, 0.96, 0.92, 0.36)
 antialiased = true
 
-[node name="FloatMarker" type="ColorRect" parent="."]
+[node name="FloatMarker" type="ColorRect" parent="." unique_id=1239449313]
 layout_mode = 0
 offset_right = 8.0
 offset_bottom = 42.0
 color = Color(0.9, 0.95, 0.82, 0.9)
 
-[node name="FloatGlow" type="ColorRect" parent="."]
+[node name="FloatGlow" type="ColorRect" parent="." unique_id=434060790]
 layout_mode = 0
 offset_right = 58.0
 offset_bottom = 58.0
 color = Color(0.55, 1, 0.75, 0.2)
 
-[node name="FloatRipple" type="ColorRect" parent="."]
+[node name="FloatRipple" type="ColorRect" parent="." unique_id=1816141284]
 layout_mode = 0
 offset_right = 96.0
 offset_bottom = 38.0
 color = Color(0.65, 0.9, 0.86, 0.18)
 
-[node name="FloatReflection" type="ColorRect" parent="."]
+[node name="FloatReflection" type="ColorRect" parent="." unique_id=1302155722]
 layout_mode = 0
 offset_right = 74.0
 offset_bottom = 26.0
 color = Color(0.9, 1, 0.82, 0.16)
 
-[node name="TopHudPanel" type="Panel" parent="."]
+[node name="TopHudPanel" type="Panel" parent="." unique_id=1726785195]
 layout_mode = 0
 offset_right = 900.0
 offset_bottom = 54.0
 
-[node name="LeftHudPanel" type="Panel" parent="."]
+[node name="LeftHudPanel" type="Panel" parent="." unique_id=1525242063]
 layout_mode = 0
 offset_right = 190.0
 offset_bottom = 160.0
 
-[node name="RightHudPanel" type="Panel" parent="."]
+[node name="RightHudPanel" type="Panel" parent="." unique_id=1614334450]
 layout_mode = 0
 offset_right = 240.0
 offset_bottom = 220.0
 
-[node name="BottomNavPanel" type="Panel" parent="."]
+[node name="BottomNavPanel" type="Panel" parent="." unique_id=2097257620]
 layout_mode = 0
 offset_right = 900.0
 offset_bottom = 50.0
 
-[node name="ActionPanel" type="Panel" parent="."]
+[node name="ActionPanel" type="Panel" parent="." unique_id=976349698]
 layout_mode = 0
 offset_right = 520.0
 offset_bottom = 72.0
 
-[node name="ActionGlow" type="ColorRect" parent="."]
+[node name="ActionGlow" type="ColorRect" parent="." unique_id=955315175]
 layout_mode = 0
 offset_right = 280.0
 offset_bottom = 96.0
 mouse_filter = 2
 color = Color(0.2, 0.8, 0.35, 0.18)
 
-[node name="CatchPopupBackdrop" type="ColorRect" parent="."]
+[node name="CatchPopupBackdrop" type="ColorRect" parent="." unique_id=589997333]
 visible = false
 z_index = 40
 layout_mode = 1
@@ -273,39 +273,37 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 0
 color = Color(0, 0, 0, 0.62)
 
-[node name="CatchPopupPanel" type="Panel" parent="."]
+[node name="CatchPopupPanel" type="Panel" parent="." unique_id=166050258]
 visible = false
 z_index = 41
 layout_mode = 0
 offset_right = 680.0
 offset_bottom = 440.0
-mouse_filter = 0
 
-[node name="CatchPopupParticles" type="ColorRect" parent="CatchPopupPanel"]
+[node name="CatchPopupParticles" type="ColorRect" parent="CatchPopupPanel" unique_id=80827590]
 layout_mode = 0
 offset_right = 680.0
 offset_bottom = 440.0
 mouse_filter = 2
 color = Color(1, 1, 1, 0.12)
 
-[node name="CatchPopupGlow" type="ColorRect" parent="CatchPopupPanel"]
+[node name="CatchPopupGlow" type="ColorRect" parent="CatchPopupPanel" unique_id=1127393388]
 layout_mode = 0
 offset_right = 420.0
 offset_bottom = 220.0
 mouse_filter = 2
 color = Color(0.44, 0.88, 0.56, 0.2)
 
-[node name="CatchPopupTitleLabel" type="Label" parent="CatchPopupPanel"]
+[node name="CatchPopupTitleLabel" type="Label" parent="CatchPopupPanel" unique_id=1707431494]
 layout_mode = 0
 offset_right = 420.0
 offset_bottom = 26.0
 text = "Поймана рыба"
 horizontal_alignment = 1
 
-[node name="CatchPopupBadgeLabel" type="Label" parent="CatchPopupPanel"]
+[node name="CatchPopupBadgeLabel" type="Label" parent="CatchPopupPanel" unique_id=1695323302]
 layout_mode = 0
 offset_right = 160.0
 offset_bottom = 28.0
@@ -313,14 +311,14 @@ text = "Обычная"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="CatchPopupNameLabel" type="Label" parent="CatchPopupPanel"]
+[node name="CatchPopupNameLabel" type="Label" parent="CatchPopupPanel" unique_id=1053826987]
 layout_mode = 0
 offset_right = 420.0
 offset_bottom = 42.0
 text = "Плотва"
 horizontal_alignment = 1
 
-[node name="CatchTrophyBannerLabel" type="Label" parent="CatchPopupPanel"]
+[node name="CatchTrophyBannerLabel" type="Label" parent="CatchPopupPanel" unique_id=213207900]
 visible = false
 layout_mode = 0
 offset_right = 220.0
@@ -329,16 +327,8 @@ text = "РўР РћР¤Р•Р™"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="CatchFishShadow" type="TextureRect" parent="CatchPopupPanel"]
-layout_mode = 0
-offset_right = 380.0
-offset_bottom = 170.0
-mouse_filter = 2
+[node name="CatchFishShadow" type="TextureRect" parent="CatchPopupPanel" unique_id=1684389971]
 modulate = Color(0, 0, 0, 0.26)
-expand_mode = 1
-stretch_mode = 5
-
-[node name="CatchFishVisual" type="TextureRect" parent="CatchPopupPanel"]
 layout_mode = 0
 offset_right = 380.0
 offset_bottom = 170.0
@@ -346,33 +336,42 @@ mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
 
-[node name="CatchPopupStatsLabel" type="Label" parent="CatchPopupPanel"]
+[node name="CatchFishVisual" type="TextureRect" parent="CatchPopupPanel" unique_id=874551627]
+layout_mode = 0
+offset_right = 380.0
+offset_bottom = 170.0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="CatchPopupStatsLabel" type="Label" parent="CatchPopupPanel" unique_id=605323262]
 layout_mode = 0
 offset_right = 560.0
 offset_bottom = 72.0
-text = "Вес: 0.00 кг  Длина: 0 см\nXP: +0  Стоимость: 0 мон."
+text = "Вес: 0.00 кг  Длина: 0 см
+XP: +0  Стоимость: 0 мон."
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="CatchKeepButton" type="Button" parent="CatchPopupPanel"]
+[node name="CatchKeepButton" type="Button" parent="CatchPopupPanel" unique_id=1148872346]
 layout_mode = 0
 offset_right = 220.0
 offset_bottom = 52.0
 text = "В садок"
 
-[node name="CatchReleaseButton" type="Button" parent="CatchPopupPanel"]
+[node name="CatchReleaseButton" type="Button" parent="CatchPopupPanel" unique_id=2101502845]
 layout_mode = 0
 offset_right = 220.0
 offset_bottom = 52.0
 text = "Отпустить"
 
-[node name="CatchPopupOpenAudio" type="AudioStreamPlayer" parent="."]
+[node name="CatchPopupOpenAudio" type="AudioStreamPlayer" parent="." unique_id=989303564]
 
-[node name="CatchRewardAudio" type="AudioStreamPlayer" parent="."]
+[node name="CatchRewardAudio" type="AudioStreamPlayer" parent="." unique_id=1935491043]
 
-[node name="CatchRareAudio" type="AudioStreamPlayer" parent="."]
+[node name="CatchRareAudio" type="AudioStreamPlayer" parent="." unique_id=875394380]
 
-[node name="CatchTrophyAudio" type="AudioStreamPlayer" parent="."]
+[node name="CatchTrophyAudio" type="AudioStreamPlayer" parent="." unique_id=1248265603]
 
 [node name="TitleLabel" type="Label" parent="." unique_id=1764905154]
 layout_mode = 1
@@ -390,25 +389,26 @@ offset_right = 40.0
 offset_bottom = 23.0
 text = "Silver: 0"
 
-[node name="LevelLabel" type="Label" parent="."]
+[node name="LevelLabel" type="Label" parent="." unique_id=1501367185]
 layout_mode = 0
 offset_right = 120.0
 offset_bottom = 44.0
-text = "LVL 1\nXP: 0 / 175"
+text = "LVL 1
+XP: 0 / 175"
 
-[node name="XPProgressBar" type="ProgressBar" parent="."]
+[node name="XPProgressBar" type="ProgressBar" parent="." unique_id=299882003]
 layout_mode = 0
 offset_right = 120.0
 offset_bottom = 16.0
 show_percentage = false
 
-[node name="ClockLabel" type="Label" parent="."]
+[node name="ClockLabel" type="Label" parent="." unique_id=1372413435]
 layout_mode = 0
 offset_right = 72.0
 offset_bottom = 20.0
 text = "07:40"
 
-[node name="WeatherLabel" type="Label" parent="."]
+[node name="WeatherLabel" type="Label" parent="." unique_id=147769750]
 layout_mode = 0
 offset_right = 100.0
 offset_bottom = 20.0
@@ -419,7 +419,7 @@ layout_mode = 0
 offset_right = 32.0
 offset_bottom = 20.0
 
-[node name="NavFishButton" type="Button" parent="."]
+[node name="NavFishButton" type="Button" parent="." unique_id=248060175]
 layout_mode = 0
 offset_right = 82.0
 offset_bottom = 34.0
@@ -431,55 +431,55 @@ offset_right = 8.0
 offset_bottom = 8.0
 text = "Ловить"
 
-[node name="BasketButton" type="Button" parent="."]
+[node name="BasketButton" type="Button" parent="." unique_id=1900347520]
 layout_mode = 0
 offset_right = 8.0
 offset_bottom = 8.0
 text = "Садок"
 
-[node name="InventoryButton" type="Button" parent="."]
+[node name="InventoryButton" type="Button" parent="." unique_id=2068413834]
 layout_mode = 0
 offset_right = 8.0
 offset_bottom = 8.0
 text = "Инвентарь"
 
-[node name="TackleButton" type="Button" parent="."]
+[node name="TackleButton" type="Button" parent="." unique_id=4129582]
 layout_mode = 0
 offset_right = 82.0
 offset_bottom = 34.0
 text = "Снасти"
 
-[node name="ShopButton" type="Button" parent="."]
+[node name="ShopButton" type="Button" parent="." unique_id=426001430]
 layout_mode = 0
 offset_right = 82.0
 offset_bottom = 34.0
 text = "Магазин"
 
-[node name="MapButton" type="Button" parent="."]
+[node name="MapButton" type="Button" parent="." unique_id=1579471396]
 layout_mode = 0
 offset_right = 82.0
 offset_bottom = 34.0
 text = "Карта"
 
-[node name="ProfileButton" type="Button" parent="."]
+[node name="ProfileButton" type="Button" parent="." unique_id=610231511]
 layout_mode = 0
 offset_right = 82.0
 offset_bottom = 34.0
 text = "Профиль"
 
-[node name="FeedButton" type="Button" parent="."]
+[node name="FeedButton" type="Button" parent="." unique_id=112425919]
 layout_mode = 0
 offset_right = 72.0
 offset_bottom = 34.0
 text = "Прикорм"
 
-[node name="AutoButton" type="Button" parent="."]
+[node name="AutoButton" type="Button" parent="." unique_id=949926114]
 layout_mode = 0
 offset_right = 72.0
 offset_bottom = 34.0
 text = "Пауза"
 
-[node name="BaitButton" type="Button" parent="."]
+[node name="BaitButton" type="Button" parent="." unique_id=2146417672]
 layout_mode = 0
 offset_right = 72.0
 offset_bottom = 34.0
@@ -491,7 +491,7 @@ offset_right = 40.0
 offset_bottom = 23.0
 text = "Готов к ловле"
 
-[node name="TackleLabel" type="Label" parent="."]
+[node name="TackleLabel" type="Label" parent="." unique_id=1561695164]
 layout_mode = 0
 offset_right = 220.0
 offset_bottom = 86.0
@@ -505,13 +505,13 @@ offset_right = 40.0
 offset_bottom = 23.0
 text = "..."
 
-[node name="ReelingPanel" type="ColorRect" parent="."]
+[node name="ReelingPanel" type="ColorRect" parent="." unique_id=2055752125]
 layout_mode = 0
 offset_right = 320.0
 offset_bottom = 320.0
 color = Color(0.0588235, 0.0862745, 0.105882, 1)
 
-[node name="FightTitleLabel" type="Label" parent="ReelingPanel"]
+[node name="FightTitleLabel" type="Label" parent="ReelingPanel" unique_id=1974007317]
 layout_mode = 0
 offset_right = 280.0
 offset_bottom = 32.0
@@ -519,69 +519,55 @@ theme_override_font_sizes/font_size = 24
 text = "Reeling"
 horizontal_alignment = 1
 
-[node name="TensionLabel" type="Label" parent="ReelingPanel"]
+[node name="TensionLabel" type="Label" parent="ReelingPanel" unique_id=286658696]
 layout_mode = 0
 offset_right = 280.0
 offset_bottom = 24.0
 text = "Tension: 0%"
 
-[node name="TensionTrack" type="ColorRect" parent="ReelingPanel"]
+[node name="TensionTrack" type="ColorRect" parent="ReelingPanel" unique_id=1429905632]
 layout_mode = 0
 offset_right = 280.0
 offset_bottom = 44.0
 color = Color(0.14, 0.16, 0.17, 1)
 
-[node name="SafeZone" type="ColorRect" parent="ReelingPanel/TensionTrack"]
+[node name="SafeZone" type="ColorRect" parent="ReelingPanel/TensionTrack" unique_id=1579364995]
 layout_mode = 0
 offset_right = 80.0
 offset_bottom = 44.0
 color = Color(0.16, 0.75, 0.36, 0.9)
 
-[node name="TensionFill" type="ColorRect" parent="ReelingPanel/TensionTrack"]
+[node name="TensionFill" type="ColorRect" parent="ReelingPanel/TensionTrack" unique_id=121569386]
 layout_mode = 0
 offset_right = 120.0
 offset_bottom = 44.0
 color = Color(0.86, 0.7, 0.22, 0.68)
 
-[node name="TensionMarker" type="ColorRect" parent="ReelingPanel/TensionTrack"]
+[node name="TensionMarker" type="ColorRect" parent="ReelingPanel/TensionTrack" unique_id=1828752646]
 layout_mode = 0
 offset_right = 6.0
 offset_bottom = 52.0
 color = Color(0.95, 0.95, 0.9, 1)
 
-[node name="ProgressLabel" type="Label" parent="ReelingPanel"]
+[node name="ProgressLabel" type="Label" parent="ReelingPanel" unique_id=860824640]
 layout_mode = 0
 offset_right = 280.0
 offset_bottom = 24.0
 text = "Control: 0%"
 
-[node name="ProgressTrack" type="ColorRect" parent="ReelingPanel"]
+[node name="ProgressTrack" type="ColorRect" parent="ReelingPanel" unique_id=1946114756]
 layout_mode = 0
 offset_right = 280.0
 offset_bottom = 24.0
 color = Color(0.14, 0.16, 0.17, 1)
 
-[node name="ProgressFill" type="ColorRect" parent="ReelingPanel/ProgressTrack"]
+[node name="ProgressFill" type="ColorRect" parent="ReelingPanel/ProgressTrack" unique_id=42051317]
 layout_mode = 0
 offset_right = 20.0
 offset_bottom = 24.0
 color = Color(0.31, 0.62, 0.95, 0.85)
 
-[node name="DebugPanel" type="Panel" parent="."]
-visible = false
-layout_mode = 0
-offset_right = 320.0
-offset_bottom = 150.0
-
-[node name="DebugLabel" type="Label" parent="DebugPanel"]
-layout_mode = 0
-offset_right = 280.0
-offset_bottom = 96.0
-theme_override_font_sizes/font_size = 15
-text = "Debug"
-autowrap_mode = 3
-
-[node name="FightStatusLabel" type="Label" parent="ReelingPanel"]
+[node name="FightStatusLabel" type="Label" parent="ReelingPanel" unique_id=983662599]
 layout_mode = 0
 offset_right = 280.0
 offset_bottom = 70.0
@@ -591,7 +577,7 @@ horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 3
 
-[node name="FightHintLabel" type="Label" parent="ReelingPanel"]
+[node name="FightHintLabel" type="Label" parent="ReelingPanel" unique_id=1864360651]
 layout_mode = 0
 offset_right = 280.0
 offset_bottom = 84.0
@@ -600,7 +586,21 @@ text = "Hold the button to raise tension. Release to drop it."
 horizontal_alignment = 1
 autowrap_mode = 3
 
-[node name="BasketPanel" type="ColorRect" parent="."]
+[node name="DebugPanel" type="Panel" parent="." unique_id=553688050]
+visible = false
+layout_mode = 0
+offset_right = 320.0
+offset_bottom = 150.0
+
+[node name="DebugLabel" type="Label" parent="DebugPanel" unique_id=1580327858]
+layout_mode = 0
+offset_right = 280.0
+offset_bottom = 96.0
+theme_override_font_sizes/font_size = 15
+text = "Debug"
+autowrap_mode = 3
+
+[node name="BasketPanel" type="ColorRect" parent="." unique_id=637079519]
 visible = false
 z_index = 20
 layout_mode = 0
@@ -608,7 +608,7 @@ offset_right = 520.0
 offset_bottom = 360.0
 color = Color(0.0352941, 0.0509804, 0.0627451, 0.98)
 
-[node name="BasketTitleLabel" type="Label" parent="BasketPanel"]
+[node name="BasketTitleLabel" type="Label" parent="BasketPanel" unique_id=1694961023]
 layout_mode = 0
 offset_right = 480.0
 offset_bottom = 34.0
@@ -616,7 +616,7 @@ theme_override_font_sizes/font_size = 26
 text = "Садок"
 horizontal_alignment = 1
 
-[node name="BasketContentsLabel" type="Label" parent="BasketPanel"]
+[node name="BasketContentsLabel" type="Label" parent="BasketPanel" unique_id=481074600]
 layout_mode = 0
 offset_right = 480.0
 offset_bottom = 220.0
@@ -624,19 +624,19 @@ theme_override_font_sizes/font_size = 17
 text = "Садок пуст."
 autowrap_mode = 3
 
-[node name="BasketSellAllButton" type="Button" parent="BasketPanel"]
+[node name="BasketSellAllButton" type="Button" parent="BasketPanel" unique_id=1303652418]
 layout_mode = 0
 offset_right = 220.0
 offset_bottom = 52.0
 text = "Продать всё"
 
-[node name="BasketCloseButton" type="Button" parent="BasketPanel"]
+[node name="BasketCloseButton" type="Button" parent="BasketPanel" unique_id=697800626]
 layout_mode = 0
 offset_right = 220.0
 offset_bottom = 52.0
 text = "Закрыть"
 
-[node name="InventoryBackdrop" type="ColorRect" parent="."]
+[node name="InventoryBackdrop" type="ColorRect" parent="." unique_id=1737574304]
 visible = false
 z_index = 24
 layout_mode = 1
@@ -647,7 +647,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0, 0, 0, 0.56)
 
-[node name="InventoryPanel" type="ColorRect" parent="."]
+[node name="InventoryPanel" type="ColorRect" parent="." unique_id=173551286]
 visible = false
 z_index = 25
 layout_mode = 0
@@ -655,7 +655,7 @@ offset_right = 760.0
 offset_bottom = 460.0
 color = Color(0.0352941, 0.0509804, 0.0627451, 0.98)
 
-[node name="InventoryTitleLabel" type="Label" parent="InventoryPanel"]
+[node name="InventoryTitleLabel" type="Label" parent="InventoryPanel" unique_id=704093051]
 layout_mode = 0
 offset_right = 720.0
 offset_bottom = 34.0
@@ -663,72 +663,72 @@ theme_override_font_sizes/font_size = 26
 text = "Инвентарь"
 horizontal_alignment = 1
 
-[node name="CategoryAllButton" type="Button" parent="InventoryPanel"]
+[node name="CategoryAllButton" type="Button" parent="InventoryPanel" unique_id=94539232]
 layout_mode = 0
 offset_right = 80.0
 offset_bottom = 34.0
 text = "Всё"
 
-[node name="CategoryRodsButton" type="Button" parent="InventoryPanel"]
+[node name="CategoryRodsButton" type="Button" parent="InventoryPanel" unique_id=612781013]
 layout_mode = 0
 offset_right = 80.0
 offset_bottom = 34.0
 text = "Удилища"
 
-[node name="CategoryLinesButton" type="Button" parent="InventoryPanel"]
+[node name="CategoryLinesButton" type="Button" parent="InventoryPanel" unique_id=1775066222]
 layout_mode = 0
 offset_right = 80.0
 offset_bottom = 34.0
 text = "Лески"
 
-[node name="CategoryFloatsButton" type="Button" parent="InventoryPanel"]
+[node name="CategoryFloatsButton" type="Button" parent="InventoryPanel" unique_id=725592383]
 layout_mode = 0
 offset_right = 80.0
 offset_bottom = 34.0
 text = "Поплавки"
 
-[node name="CategoryHooksButton" type="Button" parent="InventoryPanel"]
+[node name="CategoryHooksButton" type="Button" parent="InventoryPanel" unique_id=1955197276]
 layout_mode = 0
 offset_right = 80.0
 offset_bottom = 34.0
 text = "Крючки"
 
-[node name="CategoryBaitsButton" type="Button" parent="InventoryPanel"]
+[node name="CategoryBaitsButton" type="Button" parent="InventoryPanel" unique_id=1913080711]
 layout_mode = 0
 offset_right = 80.0
 offset_bottom = 34.0
 text = "Наживки"
 
-[node name="CategoryFishButton" type="Button" parent="InventoryPanel"]
+[node name="CategoryFishButton" type="Button" parent="InventoryPanel" unique_id=380054773]
 layout_mode = 0
 offset_right = 80.0
 offset_bottom = 34.0
 text = "Рыба / Садок"
 
-[node name="CategoryMiscButton" type="Button" parent="InventoryPanel"]
+[node name="CategoryMiscButton" type="Button" parent="InventoryPanel" unique_id=1902077255]
 layout_mode = 0
 offset_right = 80.0
 offset_bottom = 34.0
 text = "Разное"
 
-[node name="InventoryDetailsCard" type="ColorRect" parent="InventoryPanel"]
+[node name="InventoryDetailsCard" type="ColorRect" parent="InventoryPanel" unique_id=78320659]
 layout_mode = 0
 offset_right = 360.0
 offset_bottom = 180.0
 color = Color(0.0705882, 0.101961, 0.121569, 1)
 
-[node name="InventoryTackleCard" type="ColorRect" parent="InventoryPanel"]
+[node name="InventoryTackleCard" type="ColorRect" parent="InventoryPanel" unique_id=2077718922]
 layout_mode = 0
 offset_right = 720.0
 offset_bottom = 92.0
 color = Color(0.0705882, 0.101961, 0.121569, 1)
 
-[node name="InventoryItemList" type="ItemList" parent="InventoryPanel"]
+[node name="InventoryItemList" type="ItemList" parent="InventoryPanel" unique_id=1063802847]
 layout_mode = 0
 offset_right = 300.0
 offset_bottom = 260.0
 
-[node name="InventoryDetailsLabel" type="Label" parent="InventoryPanel"]
+[node name="InventoryDetailsLabel" type="Label" parent="InventoryPanel" unique_id=567196188]
 layout_mode = 0
 offset_right = 360.0
 offset_bottom = 170.0
@@ -736,7 +736,7 @@ theme_override_font_sizes/font_size = 16
 text = "Выбери предмет."
 autowrap_mode = 3
 
-[node name="InventoryTackleLabel" type="Label" parent="InventoryPanel"]
+[node name="InventoryTackleLabel" type="Label" parent="InventoryPanel" unique_id=1427476617]
 layout_mode = 0
 offset_right = 360.0
 offset_bottom = 170.0
@@ -744,13 +744,13 @@ theme_override_font_sizes/font_size = 15
 text = "Текущая снасть:"
 autowrap_mode = 3
 
-[node name="InventoryEquipButton" type="Button" parent="InventoryPanel"]
+[node name="InventoryEquipButton" type="Button" parent="InventoryPanel" unique_id=864782330]
 layout_mode = 0
 offset_right = 170.0
 offset_bottom = 48.0
 text = "Экипировать"
 
-[node name="InventoryCloseButton" type="Button" parent="InventoryPanel"]
+[node name="InventoryCloseButton" type="Button" parent="InventoryPanel" unique_id=1429798379]
 layout_mode = 0
 offset_right = 170.0
 offset_bottom = 48.0
