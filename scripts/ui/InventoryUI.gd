@@ -17,6 +17,7 @@ enum FishingUiState {
 func setup(main_ref) -> void:
 	main = main_ref
 	theme = main.ui_theme
+	_ensure_inventory_action_nodes()
 	_ensure_inventory_pager_nodes()
 
 func open() -> void:
@@ -45,6 +46,28 @@ func refresh() -> void:
 
 func is_open() -> bool:
 	return main != null and main.inventory_panel != null and main.inventory_panel.visible
+
+func _ensure_inventory_action_nodes() -> void:
+	if main == null or main.inventory_panel == null:
+		return
+
+	if main.inventory_repair_button == null:
+		main.inventory_repair_button = Button.new()
+		main.inventory_repair_button.name = "InventoryRepairButton"
+		main.inventory_repair_button.text = "Починить"
+		main.inventory_repair_button.focus_mode = Control.FOCUS_NONE
+		main.inventory_repair_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		main.inventory_repair_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		main.inventory_panel.add_child(main.inventory_repair_button)
+
+	if main.inventory_discard_button == null:
+		main.inventory_discard_button = Button.new()
+		main.inventory_discard_button.name = "InventoryDiscardButton"
+		main.inventory_discard_button.text = "Выбросить"
+		main.inventory_discard_button.focus_mode = Control.FOCUS_NONE
+		main.inventory_discard_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		main.inventory_discard_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		main.inventory_panel.add_child(main.inventory_discard_button)
 
 func _update_inventory_ui() -> void:
 	main._visible_inventory_items = _get_visible_inventory_items()
@@ -78,6 +101,10 @@ func _update_inventory_ui() -> void:
 		var item: Dictionary = main._visible_inventory_items[i]
 		main.inventory_item_list.add_item(_get_inventory_item_display_text(item), _get_item_texture(item))
 		var list_index = main.inventory_item_list.item_count - 1
+		var item_block_reason := PlayerData.get_equip_block_reason(item)
+		if _is_equippable_inventory_item(item) and item_block_reason != "":
+			main.inventory_item_list.set_item_custom_bg_color(list_index, Color(0.10, 0.10, 0.10, 0.36))
+			main.inventory_item_list.set_item_custom_fg_color(list_index, Color(0.62, 0.68, 0.66, 0.86))
 		if _is_inventory_item_equipped(item):
 			main.inventory_item_list.set_item_custom_bg_color(list_index, Color(0.12, 0.34, 0.22, 0.66))
 			main.inventory_item_list.set_item_custom_fg_color(list_index, Color(0.80, 1.0, 0.82, 1.0))
@@ -98,11 +125,15 @@ func _update_inventory_ui() -> void:
 	else:
 		main.inventory_details_label.text = _get_inventory_item_details_text(selected_item)
 
-	var can_equip = not selected_item.is_empty() and PlayerData.can_equip_item(selected_item)
-	var is_equipped := can_equip and _is_inventory_item_equipped(selected_item)
+	var is_equippable := not selected_item.is_empty() and _is_equippable_inventory_item(selected_item)
+	var block_reason := PlayerData.get_equip_block_reason(selected_item) if is_equippable else ""
+	var can_equip = is_equippable and block_reason == ""
+	var is_equipped := is_equippable and _is_inventory_item_equipped(selected_item)
+	var can_repair := not selected_item.is_empty() and PlayerData.is_item_repairable(selected_item)
+	var can_discard := not selected_item.is_empty() and PlayerData.can_discard_item(selected_item)
 	var details_bottom_padding = 24.0
 
-	if can_equip:
+	if is_equippable or can_repair or can_discard:
 		details_bottom_padding = 76.0
 
 	main.inventory_details_label.size = Vector2(
@@ -110,11 +141,21 @@ func _update_inventory_ui() -> void:
 		max(main.inventory_details_card.size.y - details_bottom_padding, 48.0)
 	)
 	main.inventory_equip_button.disabled = not can_equip or is_equipped or main._fishing_ui_state != FishingUiState.IDLE
-	main.inventory_equip_button.visible = can_equip
+	main.inventory_equip_button.visible = is_equippable
+	if main.inventory_repair_button != null:
+		main.inventory_repair_button.visible = can_repair
+		main.inventory_repair_button.disabled = not can_repair
+		main.inventory_repair_button.text = "Починить"
+	if main.inventory_discard_button != null:
+		main.inventory_discard_button.visible = can_discard
+		main.inventory_discard_button.disabled = not can_discard
+		main.inventory_discard_button.text = "Выбросить"
 	if is_equipped:
 		main.inventory_equip_button.text = "Надето"
 	elif main._fishing_ui_state != FishingUiState.IDLE and can_equip:
 		main.inventory_equip_button.text = "Только вне ловли"
+	elif block_reason != "":
+		main.inventory_equip_button.text = "Недоступно"
 	else:
 		main.inventory_equip_button.text = "Экипировать"
 	_refresh_inventory_category_buttons()
@@ -196,6 +237,12 @@ func _get_visible_inventory_items() -> Array:
 	elif main._inventory_category != "fish":
 		items.append_array(PlayerData.get_owned_items_for_category(main._inventory_category))
 
+	var filtered_items: Array = []
+	for item in items:
+		if typeof(item) == TYPE_DICTIONARY and _should_show_inventory_item(item):
+			filtered_items.append(item)
+	items = filtered_items
+
 	if main._inventory_category == "all" or main._inventory_category == "fish":
 		for i in InventoryManager.inventory.size():
 			var fish: Dictionary = InventoryManager.inventory[i]
@@ -218,6 +265,16 @@ func _get_visible_inventory_items() -> Array:
 			})
 
 	return items
+
+func _should_show_inventory_item(item: Dictionary) -> bool:
+	var category := str(item.get("category", "misc"))
+	if ["bait", "consumable", "groundbait"].has(category) and int(item.get("quantity", 0)) <= 0:
+		return false
+	return true
+
+func _is_equippable_inventory_item(item: Dictionary) -> bool:
+	var category := str(item.get("category", ""))
+	return PlayerData.TACKLE_SLOT_ITEM_CATEGORIES.values().has(category)
 
 
 func _get_selected_inventory_item() -> Dictionary:
@@ -242,6 +299,11 @@ func _get_inventory_item_display_text(item: Dictionary) -> String:
 			int(stats.get("sell_price", stats.get("price", 0))),
 			str(stats.get("freshness_title", "-"))
 		]
+
+	if ["rod", "line", "leader", "hook"].has(category):
+		var status := PlayerData.get_item_condition_title(item)
+		if status != "Исправна":
+			return "%s [%s]%s" % [name, status, equipped_marker]
 
 	if quantity > 1:
 		return "%s x%d%s" % [name, quantity, equipped_marker]
@@ -273,6 +335,10 @@ func _get_inventory_item_details_text(item: Dictionary) -> String:
 		_get_inventory_category_title(category),
 		quantity
 	]
+
+	var condition_text := _get_item_condition_details_text(item, "")
+	if condition_text != "":
+		details += "\n\n%s" % condition_text
 
 	if description != "":
 		details += "\n%s" % description
@@ -326,23 +392,42 @@ func _get_inventory_stats_text(stats: Dictionary) -> String:
 
 	return stats_text
 
+func _get_item_condition_details_text(item: Dictionary, slot_type: String = "") -> String:
+	var category := str(item.get("category", ""))
+	if not ["rod", "line", "leader", "hook", "bait"].has(category):
+		return ""
+
+	if category == "bait":
+		if int(item.get("quantity", 0)) <= 0:
+			return "Состояние: закончилась\nПричина: Наживка закончилась."
+		return ""
+
+	var wear_percent := PlayerData.get_item_wear_percent(item)
+	var repair_cost := PlayerData.get_item_repair_cost(item)
+	var block_reason := PlayerData.get_equip_block_reason(item, slot_type)
+	var lines: Array = [
+		"Состояние: %s" % PlayerData.get_item_condition_title(item),
+		"Износ: %d%%" % wear_percent
+	]
+	if repair_cost > 0:
+		lines.append("Ремонт: %s" % PlayerData.format_money(float(repair_cost)))
+	if block_reason != "":
+		lines.append("Причина: %s" % block_reason)
+	return "\n".join(lines)
+
 
 func _get_current_tackle_inventory_text() -> String:
 	var bait_2_text := "закрыта"
 	if PlayerData.can_use_second_bait():
-		bait_2_text = "%s x%d" % [
-			PlayerData.current_tackle.get("bait_2", {}).get("name", "-"),
-			PlayerData.get_current_bait_quantity("bait_2")
-		]
+		bait_2_text = _format_current_bait_slot("bait_2")
 
-	return "ТЕКУЩАЯ СНАСТЬ\nУдочка: %s\nЛеска: %s | Поводок: %s | Поплавок: %s\nКрючок: %s | Наживка 1: %s x%d | Наживка 2: %s\nГлубина %.1f м | Состояние: уд.%d%% / леска %d%% / крючок %d%%\n%s" % [
+	return "ТЕКУЩАЯ СНАСТЬ\nУдочка: %s\nЛеска: %s | Поводок: %s | Поплавок: %s\nКрючок: %s | Наживка 1: %s | Наживка 2: %s\nГлубина %.1f м | Состояние: уд.%d%% / леска %d%% / крючок %d%%\n%s" % [
 		PlayerData.current_tackle.get("rod", {}).get("name", "-"),
 		PlayerData.current_tackle.get("line", {}).get("name", "-"),
 		PlayerData.current_tackle.get("leader", {}).get("name", "-"),
 		PlayerData.current_tackle.get("float", {}).get("name", "-"),
 		PlayerData.current_tackle.get("hook", {}).get("name", "-"),
-		PlayerData.current_tackle.get("bait", {}).get("name", "-"),
-		PlayerData.get_current_bait_quantity("bait"),
+		_format_current_bait_slot("bait"),
 		bait_2_text,
 		PlayerData.fishing_depth,
 		roundi(PlayerData.get_tackle_condition("rod") * 100.0),
@@ -350,6 +435,16 @@ func _get_current_tackle_inventory_text() -> String:
 		roundi(PlayerData.get_tackle_condition("hook") * 100.0),
 		_get_tackle_setup_status_inline()
 	]
+
+func _format_current_bait_slot(slot_id: String) -> String:
+	var current: Dictionary = PlayerData.current_tackle.get(slot_id, {})
+	if str(current.get("id", "")) == "":
+		return "не установлена"
+	var name := str(current.get("name", "-"))
+	var quantity := PlayerData.get_current_bait_quantity(slot_id)
+	if quantity <= 0:
+		return "%s x0 — закончилась" % name
+	return "%s x%d" % [name, quantity]
 
 func _get_current_tackle_inventory_text_legacy() -> String:
 	return "СЕЙЧАС НАДЕТО В СБОРКЕ\nУдочка: %s\nЛеска: %s  |  Поплавок: %s\nКрючок: %s  |  Наживка: %s x%d\nГлубина %.1f м  |  Состояние: уд.%d%% / леска %d%% / крючок %d%%\n%s" % [

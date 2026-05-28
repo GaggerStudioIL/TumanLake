@@ -31,6 +31,13 @@ func get_active_contracts() -> Array:
 	return active_contracts.duplicate(true)
 
 
+func get_completed_contracts(limit: int = 12) -> Array:
+	var result: Array = completed_contracts.duplicate(true)
+	if limit > 0 and result.size() > limit:
+		return result.slice(result.size() - limit)
+	return result
+
+
 func register_sold_fish(catch_data: Dictionary, supplier_id: String, sale_price: int) -> Dictionary:
 	refresh_contracts(false)
 	var completed_now: Array = []
@@ -145,10 +152,23 @@ func _generate_contract(day_index: int, rng: RandomNumberGenerator) -> Dictionar
 
 func _build_contract_title(contract_type: String, fish_name: String, target_weight: float, target_count: int, required_status: String) -> String:
 	if contract_type == "trophy_count":
-		return "Доставить %d троф.: %s" % [target_count, fish_name]
+		return "Доставить %d %s: %s" % [target_count, _plural_ru(target_count, "трофей", "трофея", "трофеев"), fish_name]
 	if contract_type == "count":
-		return "Поймать %d зачет.: %s" % [target_count, fish_name]
+		return "Поймать %d зачётных: %s" % [target_count, fish_name]
 	return "Поставить %.1f кг: %s" % [target_weight, fish_name]
+
+
+func _plural_ru(count: int, one: String, few: String, many: String) -> String:
+	var value: int = absi(count)
+	var last_two: int = value % 100
+	if last_two >= 11 and last_two <= 14:
+		return many
+	var last: int = value % 10
+	if last == 1:
+		return one
+	if last >= 2 and last <= 4:
+		return few
+	return many
 
 
 func _catch_matches_contract(catch_data: Dictionary, supplier_id: String, contract: Dictionary) -> bool:
@@ -189,5 +209,5 @@ func _remove_expired_contracts(day_index: int) -> void:
 func _get_day_index() -> int:
 	var time_manager: Node = get_node_or_null("/root/TimeManager")
 	if time_manager != null:
-		return max(int(time_manager.get("day_index")), 1)
+		return maxi(int(time_manager.get("day_index")), 1)
 	return 1

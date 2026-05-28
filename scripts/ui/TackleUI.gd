@@ -259,6 +259,16 @@ func _ensure_tackle_ui_nodes() -> void:
 	main.tackle_equip_button.text = "Экипировать"
 	main.tackle_panel.add_child(main.tackle_equip_button)
 
+	main.tackle_repair_button = Button.new()
+	main.tackle_repair_button.name = "TackleRepairButton"
+	main.tackle_repair_button.text = "Починить"
+	main.tackle_panel.add_child(main.tackle_repair_button)
+
+	main.tackle_discard_button = Button.new()
+	main.tackle_discard_button.name = "TackleDiscardButton"
+	main.tackle_discard_button.text = "Выбросить"
+	main.tackle_panel.add_child(main.tackle_discard_button)
+
 	main.tackle_close_button = Button.new()
 	main.tackle_close_button.name = "TackleCloseButton"
 	main.tackle_close_button.text = "Закрыть"
@@ -343,7 +353,7 @@ func _update_tackle_ui() -> void:
 	if main._tackle_category == "bait_2" and not PlayerData.can_use_second_bait():
 		main._visible_tackle_items = []
 	else:
-		main._visible_tackle_items = PlayerData.get_owned_items_for_category(item_category)
+		main._visible_tackle_items = _get_visible_tackle_items_for_category(item_category)
 	main.tackle_title_label.text = "Сборка снасти"
 	main.tackle_current_label.text = _get_rod_assembly_summary_text()
 	main.tackle_depth_label.text = "Глубина: %.1f м" % PlayerData.fishing_depth
@@ -376,6 +386,10 @@ func _update_tackle_ui() -> void:
 		var item: Dictionary = main._visible_tackle_items[i]
 		main.tackle_item_list.add_item(_get_tackle_item_display_text(item), _get_item_texture(item))
 		var list_index = main.tackle_item_list.item_count - 1
+		var item_block_reason := PlayerData.get_equip_block_reason(item, main._tackle_category)
+		if item_block_reason != "":
+			main.tackle_item_list.set_item_custom_bg_color(list_index, Color(0.10, 0.10, 0.10, 0.36))
+			main.tackle_item_list.set_item_custom_fg_color(list_index, Color(0.62, 0.68, 0.66, 0.86))
 
 		if _is_tackle_item_equipped(item):
 			main.tackle_item_list.set_item_custom_bg_color(list_index, Color(0.12, 0.34, 0.22, 0.66))
@@ -405,11 +419,22 @@ func _update_tackle_ui() -> void:
 		main.tackle_details_label.text = _get_tackle_item_details_text(selected_item)
 		main.tackle_compare_label.text = "%s\n\nПодсказки:\n%s" % [_get_tackle_compare_text(selected_item), hints_text]
 
-	var can_equip = not selected_item.is_empty() and PlayerData.can_equip_item(selected_item)
+	var block_reason := PlayerData.get_equip_block_reason(selected_item, main._tackle_category) if not selected_item.is_empty() else ""
+	var can_equip = not selected_item.is_empty() and block_reason == ""
 	if main._tackle_category == "bait_2" and not PlayerData.can_use_second_bait():
 		can_equip = false
+	var can_repair := not selected_item.is_empty() and PlayerData.is_item_repairable(selected_item)
+	var can_discard := not selected_item.is_empty() and PlayerData.can_discard_item(selected_item)
 	main.tackle_equip_button.visible = true
 	main.tackle_equip_button.disabled = not can_equip or _is_tackle_item_equipped(selected_item) or main._fishing_ui_state != FishingUiState.IDLE
+	if main.tackle_repair_button != null:
+		main.tackle_repair_button.visible = _picker_open and can_repair
+		main.tackle_repair_button.disabled = not can_repair
+		main.tackle_repair_button.text = "Починить"
+	if main.tackle_discard_button != null:
+		main.tackle_discard_button.visible = _picker_open and can_discard
+		main.tackle_discard_button.disabled = not can_discard
+		main.tackle_discard_button.text = "Выбросить"
 
 	if not _picker_open:
 		main.tackle_equip_button.text = "Сейчас используется"
@@ -421,6 +446,8 @@ func _update_tackle_ui() -> void:
 		main.tackle_equip_button.text = "Закрыто"
 	elif selected_item.is_empty():
 		main.tackle_equip_button.text = "Нет предметов"
+	elif block_reason != "":
+		main.tackle_equip_button.text = "Недоступно"
 	else:
 		main.tackle_equip_button.text = "Экипировать"
 
@@ -611,14 +638,23 @@ func _get_tackle_slot_equipped_name(category: String) -> String:
 		return "Закрыта"
 	if category == "leader" and str(current.get("id", "")) == "":
 		return "Не установлен"
+	if ["bait", "bait_2"].has(category) and str(current.get("id", "")) == "":
+		return "Не установлена"
 	var equipped_name := str(current.get("name", "-"))
 
 	if category == "bait":
-		return "%s x%d" % [_short_tackle_slot_text(equipped_name, 17), PlayerData.get_current_bait_quantity("bait")]
+		return _format_tackle_bait_slot_text(category, equipped_name)
 	if category == "bait_2":
-		return "%s x%d" % [_short_tackle_slot_text(equipped_name, 17), PlayerData.get_current_bait_quantity("bait_2")]
+		return _format_tackle_bait_slot_text(category, equipped_name)
 
 	return _short_tackle_slot_text(equipped_name, 20)
+
+func _format_tackle_bait_slot_text(slot_id: String, equipped_name: String) -> String:
+	var quantity := PlayerData.get_current_bait_quantity(slot_id)
+	var short_name := _short_tackle_slot_text(equipped_name, 15)
+	if quantity <= 0:
+		return "%s x0 — закончилась" % short_name
+	return "%s x%d" % [short_name, quantity]
 
 
 func _short_tackle_slot_text(value: String, max_chars: int) -> String:
@@ -760,10 +796,14 @@ func _on_tackle_item_activated(index: int) -> void:
 
 	main._selected_tackle_item_id = str(main._visible_tackle_items[item_index].get("id", ""))
 
-	if main._fishing_ui_state == FishingUiState.IDLE and not _is_tackle_item_equipped(main._visible_tackle_items[item_index]):
+	var selected_item: Dictionary = main._visible_tackle_items[item_index]
+	var block_reason := PlayerData.get_equip_block_reason(selected_item, main._tackle_category)
+	if main._fishing_ui_state == FishingUiState.IDLE and not _is_tackle_item_equipped(selected_item) and block_reason == "":
 		main._on_tackle_equip_button_pressed()
 		_picker_open = false
 		_update_tackle_ui()
+	elif block_reason != "":
+		main._show_toast(block_reason, false)
 
 
 func _on_tackle_prev_page_pressed() -> void:
@@ -776,7 +816,7 @@ func _on_tackle_prev_page_pressed() -> void:
 
 
 func _on_tackle_next_page_pressed() -> void:
-	var total_count: int = PlayerData.get_owned_items_for_category(_get_item_category_for_slot(main._tackle_category)).size()
+	var total_count: int = _get_visible_tackle_items_for_category(_get_item_category_for_slot(main._tackle_category)).size()
 	var page_count: int = max(ceili(float(total_count) / float(TACKLE_ITEMS_PER_PAGE)), 1)
 	if main._tackle_page >= page_count - 1:
 		return
@@ -784,6 +824,22 @@ func _on_tackle_next_page_pressed() -> void:
 	main._tackle_page += 1
 	main._selected_tackle_item_id = ""
 	_update_tackle_ui()
+
+func _get_visible_tackle_items_for_category(category: String) -> Array:
+	var items: Array = []
+	for item in PlayerData.get_owned_items_for_category(category):
+		if typeof(item) != TYPE_DICTIONARY:
+			continue
+		var typed_item: Dictionary = item
+		if _should_show_tackle_item(typed_item):
+			items.append(typed_item)
+	return items
+
+func _should_show_tackle_item(item: Dictionary) -> bool:
+	var category := str(item.get("category", ""))
+	if ["bait", "consumable", "groundbait"].has(category) and int(item.get("quantity", 0)) <= 0:
+		return false
+	return true
 
 
 func _get_selected_tackle_item() -> Dictionary:
@@ -802,6 +858,11 @@ func _get_tackle_item_display_text(item: Dictionary) -> String:
 	if str(item.get("category", "")) == "bait":
 		return "%s x%d%s" % [name, quantity, equipped_marker]
 
+	if ["rod", "line", "leader", "hook"].has(str(item.get("category", ""))):
+		var status := PlayerData.get_item_condition_title(item)
+		if status != "Исправна":
+			return "%s [%s]%s" % [name, status, equipped_marker]
+
 	return "%s%s" % [name, equipped_marker]
 
 
@@ -818,6 +879,10 @@ func _get_tackle_item_details_text(item: Dictionary) -> String:
 	]
 	var description = str(item.get("description", ""))
 
+	var condition_text := _get_tackle_item_condition_details_text(item)
+	if condition_text != "":
+		details += "\n\n%s" % condition_text
+
 	if description != "":
 		details += "\n%s" % description
 
@@ -826,6 +891,28 @@ func _get_tackle_item_details_text(item: Dictionary) -> String:
 		details += "\n\n%s" % stats_text
 
 	return details
+
+func _get_tackle_item_condition_details_text(item: Dictionary) -> String:
+	var category := str(item.get("category", ""))
+	if category == "bait":
+		if int(item.get("quantity", 0)) <= 0:
+			return "Состояние: закончилась\nПричина: Наживка закончилась."
+		return ""
+	if not ["rod", "line", "leader", "hook"].has(category):
+		return ""
+
+	var wear_percent := PlayerData.get_item_wear_percent(item)
+	var repair_cost := PlayerData.get_item_repair_cost(item)
+	var block_reason := PlayerData.get_equip_block_reason(item, main._tackle_category)
+	var lines: Array = [
+		"Состояние: %s" % PlayerData.get_item_condition_title(item),
+		"Износ: %d%%" % wear_percent
+	]
+	if repair_cost > 0:
+		lines.append("Ремонт: %s" % PlayerData.format_money(float(repair_cost)))
+	if block_reason != "":
+		lines.append("Причина: %s" % block_reason)
+	return "\n".join(lines)
 
 
 func _get_tackle_stats_text(item: Dictionary) -> String:

@@ -6,6 +6,7 @@ var theme
 var progress_label: Label
 var progress_track: Panel
 var progress_fill: ColorRect
+var reward_badge_row: HBoxContainer
 var _species_texture_cache: Dictionary = {}
 signal catch_keep_requested
 signal catch_release_requested
@@ -58,6 +59,14 @@ func _ensure_progress_nodes() -> void:
 	if progress_label != null:
 		return
 
+	reward_badge_row = HBoxContainer.new()
+	reward_badge_row.name = "CatchRewardBadgeRow"
+	reward_badge_row.z_index = 6
+	reward_badge_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	reward_badge_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	reward_badge_row.add_theme_constant_override("separation", 8)
+	main.catch_popup_panel.add_child(reward_badge_row)
+
 	progress_label = Label.new()
 	progress_label.name = "CatchRankProgressLabel"
 	progress_label.z_index = 5
@@ -71,7 +80,7 @@ func _ensure_progress_nodes() -> void:
 	progress_track.name = "CatchRankProgressTrack"
 	progress_track.z_index = 5
 	progress_track.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	progress_track.clip_contents = true
+	progress_track.clip_contents = false
 	progress_track.add_theme_stylebox_override(
 		"panel",
 		main._make_panel_style(Color(0.028, 0.044, 0.042, 0.76), Color(0.74, 0.90, 0.78, 0.18), 5, 2, Color(0.0, 0.0, 0.0, 0.12))
@@ -81,7 +90,7 @@ func _ensure_progress_nodes() -> void:
 	progress_fill = ColorRect.new()
 	progress_fill.name = "CatchRankProgressFill"
 	progress_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	progress_fill.color = Color(0.42, 0.72, 0.22, 0.96)
+	progress_fill.color = Color(0.42, 0.72, 0.22, 0.72)
 	progress_track.add_child(progress_fill)
 
 func open(catch_data: Dictionary = {}) -> void:
@@ -139,6 +148,11 @@ func _close_secondary_popups_for_reward() -> void:
 		main.waterbody_panel.visible = false
 	if main.waterbody_backdrop != null:
 		main.waterbody_backdrop.visible = false
+	if main.fish_harbor_ui != null:
+		main.fish_harbor_ui.visible = false
+	if main.system_menu_ui != null:
+		main.system_menu_ui.close_menu()
+		main.system_menu_ui.close_settings(false)
 	main._active_nav_tab = "fish"
 
 
@@ -184,6 +198,8 @@ func _show_catch_reward_popup(catch_data: Dictionary) -> void:
 	main.catch_popup_glow.modulate = Color(1.0, 1.0, 1.0, 0.0)
 	main.catch_popup_title_label.modulate = Color(1.0, 1.0, 1.0, 0.0)
 	main.catch_popup_badge_label.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	if reward_badge_row != null:
+		reward_badge_row.modulate = Color(1.0, 1.0, 1.0, 0.0)
 	main.catch_popup_name_label.modulate = Color(1.0, 1.0, 1.0, 0.0)
 	main.catch_trophy_banner_label.modulate = Color(1.0, 1.0, 1.0, 0.0)
 	main.catch_popup_stats_label.modulate = Color(1.0, 1.0, 1.0, 0.0)
@@ -203,6 +219,8 @@ func _show_catch_reward_popup(catch_data: Dictionary) -> void:
 	main._catch_popup_tween.parallel().tween_property(main.catch_popup_title_label, "modulate:a", 1.0, 0.16).set_delay(0.08)
 	main._catch_popup_tween.parallel().tween_property(main.catch_popup_badge_label, "modulate:a", 1.0, 0.18).set_delay(0.13)
 	main._catch_popup_tween.parallel().tween_property(main.catch_popup_name_label, "modulate:a", 1.0, 0.22).set_delay(0.17)
+	if reward_badge_row != null and reward_badge_row.visible:
+		main._catch_popup_tween.parallel().tween_property(reward_badge_row, "modulate:a", 1.0, 0.20).set_delay(0.20)
 	if main.catch_trophy_banner_label.visible:
 		main._catch_popup_tween.parallel().tween_property(main.catch_trophy_banner_label, "modulate:a", 1.0, 0.24).set_delay(0.22)
 	main._catch_popup_tween.parallel().tween_property(main.catch_fish_visual, "modulate:a", 1.0, 0.18).set_delay(fish_delay)
@@ -276,7 +294,6 @@ func _update_catch_reward_popup(catch_data: Dictionary) -> void:
 	var gained_xp = int(xp_result.get("gained_xp", 0))
 	var weight = float(catch_data.get("weight", 0.0))
 	var length_cm = _get_catch_length_cm(catch_data)
-	var price = int(catch_data.get("price", 0))
 	var catch_rank := str(catch_data.get("catch_rank", "normal"))
 	var trophy_weight := float(catch_data.get("trophy_weight", 0.0))
 	var rarity_weight := float(catch_data.get("rarity_weight", 0.0))
@@ -288,29 +305,14 @@ func _update_catch_reward_popup(catch_data: Dictionary) -> void:
 	_set_reward_fish_texture(str(catch_data.get("id", "")))
 
 	main.catch_popup_title_label.text = "Поймана рыба"
-	main.catch_popup_badge_label.visible = catch_rank != "normal"
-	main.catch_popup_badge_label.text = _get_catch_rank_badge(catch_rank)
+	main.catch_popup_badge_label.visible = false
+	main.catch_popup_badge_label.text = ""
 	main.catch_popup_name_label.text = str(catch_data.get("name", "-"))
-	main.catch_trophy_banner_label.visible = catch_rank != "normal" or not record_messages.is_empty()
-	main.catch_trophy_banner_label.text = "ТРОФЕЙНЫЙ УЛОВ"
-	main.catch_popup_stats_label.text = "Вес: %.2f кг   Длина: %.1f см\nXP: +%d   Стоимость: %d мон." % [
-		weight,
-		length_cm,
-		gained_xp,
-		price
-	]
-
-	main.catch_popup_stats_label.text = _build_catch_info_text(catch_data, weight, length_cm, price, gained_xp, trophy_weight, rarity_weight, catch_rank)
+	main.catch_trophy_banner_label.visible = false
+	main.catch_trophy_banner_label.text = ""
+	_update_reward_badges(catch_rank, record_messages, colors)
+	main.catch_popup_stats_label.text = _build_catch_info_text(weight, length_cm, gained_xp)
 	_update_rank_progress(catch_data, weight, trophy_weight, rarity_weight, catch_rank, colors)
-
-	var banner_lines: Array = []
-	if catch_rank == "trophy":
-		banner_lines.append("Трофейная рыба")
-	elif catch_rank == "rarity":
-		banner_lines.append("Раритетный экземпляр")
-	banner_lines.append_array(record_messages)
-	main.catch_trophy_banner_label.visible = not banner_lines.is_empty()
-	main.catch_trophy_banner_label.text = "\n".join(banner_lines)
 
 	main.catch_popup_badge_label.add_theme_color_override("font_color", colors["text"])
 	main.catch_popup_badge_label.add_theme_stylebox_override(
@@ -349,119 +351,134 @@ func _update_catch_reward_popup(catch_data: Dictionary) -> void:
 		fish_material.set_shader_parameter("shimmer_speed", float(feedback["shimmer_speed"]))
 
 
-func _build_catch_info_text(
-	catch_data: Dictionary,
-	weight: float,
-	length_cm: float,
-	price: int,
-	gained_xp: int,
-	trophy_weight: float,
-	rarity_weight: float,
-	catch_rank: String
-) -> String:
-	var lines: Array = []
-	lines.append("Вес: %s | Длина: %.1f см | XP: +%d | Цена: %d мон." % [
+func _build_catch_info_text(weight: float, length_cm: float, gained_xp: int) -> String:
+	return "%s | %.1f см | XP +%d" % [
 		_format_weight(weight),
 		length_cm,
-		gained_xp,
-		price
-	])
-	lines.append(_get_catch_economy_line(catch_data))
+		gained_xp
+	]
 
-	if catch_rank == "normal":
-		if trophy_weight > 0.0:
-			lines.append("Трофей от: %s | До трофея: %s" % [
-				_format_weight(trophy_weight),
-				_format_weight(max(trophy_weight - weight, 0.0))
-			])
-	elif catch_rank == "trophy":
-		lines.append("Трофейная рыба!")
-		if rarity_weight > 0.0:
-			lines.append("Раритет от: %s | До раритета: %s" % [
-				_format_weight(rarity_weight),
-				_format_weight(max(rarity_weight - weight, 0.0))
-			])
+
+func _update_reward_badges(catch_rank: String, record_messages: Array, _colors: Dictionary) -> void:
+	if reward_badge_row == null:
+		return
+	for child in reward_badge_row.get_children():
+		reward_badge_row.remove_child(child)
+		child.queue_free()
+
+	var panel_width: float = main.catch_popup_panel.size.x
+	var row_width: float = min(panel_width - 72.0, 430.0)
+	reward_badge_row.position = Vector2((panel_width - row_width) * 0.5, 90.0)
+	reward_badge_row.size = Vector2(row_width, 24.0)
+
+	if catch_rank == "trophy":
+		_add_reward_badge("Трофей", Color(0.32, 0.22, 0.075, 0.86), Color(1.0, 0.78, 0.34, 0.60), Color(1.0, 0.88, 0.50, 1.0))
 	elif catch_rank == "rarity":
-		lines.append("Раритетный экземпляр!")
+		_add_reward_badge("Раритет", Color(0.18, 0.075, 0.28, 0.86), Color(0.86, 0.58, 1.0, 0.58), Color(0.90, 0.76, 1.0, 1.0))
 
-	lines.append_array(_get_species_record_info_lines(catch_data, weight))
-	return "\n".join(lines)
+	if record_messages.has("Новый личный рекорд!"):
+		_add_reward_badge("Личный рекорд", Color(0.055, 0.20, 0.255, 0.84), Color(0.46, 0.88, 1.0, 0.48), Color(0.74, 0.94, 1.0, 1.0))
+	if record_messages.has("Новый рекорд вида!"):
+		_add_reward_badge("Рекорд вида", Color(0.22, 0.145, 0.04, 0.84), Color(1.0, 0.70, 0.26, 0.52), Color(1.0, 0.86, 0.48, 1.0))
 
-
-func _get_catch_economy_line(catch_data: Dictionary) -> String:
-	var status_title := str(catch_data.get("fish_status_title", "Незачет"))
-	var demand := 1.0
-	var supplier_name := "Местный рынок"
-	var market_manager: Node = main.get_node_or_null("/root/DynamicMarketManager")
-	if market_manager != null and market_manager.has_method("get_demand_multiplier"):
-		demand = float(market_manager.call("get_demand_multiplier", str(catch_data.get("id", "")), str(catch_data.get("waterbody_id", ""))))
-
-	var supplier_manager: Node = main.get_node_or_null("/root/SupplierManager")
-	if supplier_manager != null and supplier_manager.has_method("get_best_supplier_for_catch"):
-		var supplier_id := str(supplier_manager.call("get_best_supplier_for_catch", catch_data))
-		if supplier_manager.has_method("get_supplier_title"):
-			supplier_name = str(supplier_manager.call("get_supplier_title", supplier_id))
-
-	return "Статус: %s | Спрос x%.2f | %s" % [status_title, demand, supplier_name]
+	reward_badge_row.visible = reward_badge_row.get_child_count() > 0
+	main.catch_trophy_banner_label.visible = false
 
 
-func _get_species_record_info_lines(catch_data: Dictionary, current_weight: float) -> Array:
+func _add_reward_badge(text: String, bg: Color, border: Color, font_color: Color) -> void:
+	var badge := Label.new()
+	badge.text = text
+	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.custom_minimum_size = Vector2(0.0, 24.0)
+	badge.add_theme_font_size_override("font_size", 11)
+	badge.add_theme_color_override("font_color", font_color)
+	badge.add_theme_stylebox_override("normal", main._make_panel_style(bg, border, 12, 6, Color(0.0, 0.0, 0.0, 0.18)))
+	reward_badge_row.add_child(badge)
+
+
+func _get_personal_best_weight(catch_data: Dictionary, current_weight: float) -> float:
 	var previous_weight := float(catch_data.get("previous_species_record_weight", 0.0))
-	if previous_weight <= 0.0:
-		return ["Первый улов этого вида!"]
-
-	if bool(catch_data.get("is_new_species_record", false)):
-		var improvement: float = max(current_weight - previous_weight, 0.0)
-		return [
-			"Старый рекорд: %s | Новый: %s" % [
-				_format_weight(previous_weight),
-				_format_weight(current_weight)
-			],
-			"Улучшение: +%s" % _format_weight(improvement)
-		]
-
-	return ["Рекорд вида: %s | До рекорда: %s" % [
-		_format_weight(previous_weight),
-		_format_weight(max(previous_weight - current_weight, 0.0))
-	]]
+	if previous_weight <= 0.0 or bool(catch_data.get("is_new_species_record", false)):
+		return maxf(previous_weight, current_weight)
+	return previous_weight
 
 
-func _update_rank_progress(catch_data: Dictionary, weight: float, trophy_weight: float, rarity_weight: float, catch_rank: String, colors: Dictionary) -> void:
-	if progress_label == null or progress_track == null or progress_fill == null:
+func _get_record_scale_weight(catch_data: Dictionary, rarity_weight: float) -> float:
+	var fish := FishDatabase.get_fish(str(catch_data.get("id", catch_data.get("fish_id", ""))))
+	if not fish.is_empty():
+		var status_system: Node = main.get_node_or_null("/root/FishStatusSystem")
+		if status_system != null and status_system.has_method("get_record_weight"):
+			return float(status_system.call("get_record_weight", fish))
+	return maxf(float(catch_data.get("recordWeight", catch_data.get("record_weight", 0.0))), rarity_weight)
+
+
+func _update_weight_progress_track(weight: float, personal_best_weight: float, trophy_weight: float, record_weight: float, accent: Color) -> void:
+	if progress_track == null or progress_fill == null:
+		return
+	for child in progress_track.get_children():
+		if child != progress_fill:
+			progress_track.remove_child(child)
+			child.queue_free()
+
+	var max_weight: float = maxf(maxf(weight, personal_best_weight), maxf(trophy_weight, record_weight))
+	max_weight = maxf(max_weight * 1.1, 0.1)
+	var inset := 10.0
+	var usable_width: float = maxf(progress_track.size.x - inset * 2.0, 1.0)
+	var center_y: float = progress_track.size.y * 0.5
+	var track_height := 6.0
+	var caught_pos := clampf(weight / max_weight, 0.0, 1.0)
+
+	progress_fill.position = Vector2(inset, center_y - track_height * 0.5)
+	progress_fill.size = Vector2(usable_width * caught_pos, track_height)
+	progress_fill.color = Color(accent.r, accent.g, accent.b, 0.50)
+
+	if record_weight > 0.0:
+		_add_weight_marker("RecordMarker", inset + usable_width * clampf(record_weight / max_weight, 0.0, 1.0), Color(0.86, 0.52, 1.0, 0.82), "✦", 16)
+	if trophy_weight > 0.0:
+		_add_weight_marker("TrophyMarker", inset + usable_width * clampf(trophy_weight / max_weight, 0.0, 1.0), Color(1.0, 0.78, 0.34, 0.86), "★", 16)
+	if personal_best_weight > 0.0:
+		_add_weight_marker("PersonalMarker", inset + usable_width * clampf(personal_best_weight / max_weight, 0.0, 1.0), Color(0.38, 0.86, 1.0, 0.80), "◆", 15)
+	_add_weight_marker("CaughtMarker", inset + usable_width * caught_pos, Color(0.92, 1.0, 0.86, 1.0), "●", 22)
+
+
+func _add_weight_marker(marker_name: String, center_x: float, color: Color, marker_text: String, font_size: int) -> void:
+	var marker := Label.new()
+	marker.name = marker_name
+	marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	marker.text = marker_text
+	marker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	marker.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	marker.add_theme_font_size_override("font_size", font_size)
+	marker.add_theme_color_override("font_color", color)
+	var marker_size := float(font_size + 8)
+	marker.size = Vector2(marker_size, marker_size)
+	marker.position = Vector2(
+		clampf(center_x - marker_size * 0.5, 0.0, maxf(progress_track.size.x - marker_size, 0.0)),
+		progress_track.size.y * 0.5 - marker_size * 0.5
+	)
+	progress_track.add_child(marker)
+
+
+func _update_rank_progress(catch_data: Dictionary, weight: float, trophy_weight: float, rarity_weight: float, _catch_rank: String, colors: Dictionary) -> void:
+	if progress_label == null or progress_track == null:
 		return
 
-	var label_text := ""
-	var progress := 0.0
-	if catch_rank == "normal" and trophy_weight > 0.0:
-		label_text = "Прогресс до трофея"
-		progress = clamp(weight / trophy_weight, 0.0, 1.0)
-	elif catch_rank == "trophy" and rarity_weight > 0.0:
-		label_text = "Прогресс до раритета"
-		progress = clamp(weight / rarity_weight, 0.0, 1.0)
-	elif catch_rank == "rarity":
-		label_text = "Раритет достигнут"
-		progress = 1.0
-
-	var should_show := label_text != ""
-	progress_label.visible = should_show
-	progress_track.visible = should_show
-	if not should_show:
-		return
-
+	var personal_best_weight := _get_personal_best_weight(catch_data, weight)
+	var record_weight := _get_record_scale_weight(catch_data, rarity_weight)
 	var panel_size: Vector2 = main.catch_popup_panel.size
-	var track_width: float = min(panel_size.x - 96.0, 380.0)
-	var track_height := 7.0
+	var track_width: float = min(panel_size.x - 120.0, 430.0)
+	var track_height := 8.0
 	var track_x: float = (panel_size.x - track_width) * 0.5
-	var track_y: float = panel_size.y - 176.0
+	var track_y: float = panel_size.y - 116.0
 
-	progress_label.text = label_text
-	progress_label.position = Vector2(track_x, track_y - 20.0)
-	progress_label.size = Vector2(track_width, 18.0)
+	progress_label.visible = false
+	progress_track.visible = true
+	progress_label.text = ""
 	progress_track.position = Vector2(track_x, track_y)
 	progress_track.size = Vector2(track_width, track_height)
-	progress_fill.position = Vector2.ZERO
-	progress_fill.size = Vector2(track_width * progress, track_height)
-	progress_fill.color = colors.get("glow", Color(0.42, 0.72, 0.22, 0.96))
+	_update_weight_progress_track(weight, personal_best_weight, trophy_weight, record_weight, colors.get("glow", Color(0.55, 0.95, 0.78, 1.0)))
 
 
 func _format_weight(value: float) -> String:
@@ -585,6 +602,9 @@ func _set_catch_popup_hidden() -> void:
 	main.catch_popup_glow.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	main.catch_popup_title_label.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	main.catch_popup_badge_label.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	if reward_badge_row != null:
+		reward_badge_row.modulate = Color(1.0, 1.0, 1.0, 1.0)
+		reward_badge_row.visible = false
 	main.catch_popup_name_label.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	main.catch_trophy_banner_label.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	main.catch_popup_stats_label.modulate = Color(1.0, 1.0, 1.0, 1.0)
@@ -604,16 +624,6 @@ func _get_reward_tier(catch_data: Dictionary) -> String:
 	if catch_rank == "trophy":
 		return "trophy"
 	return "common"
-
-func _get_catch_rank_badge(catch_rank: String) -> String:
-	match catch_rank:
-		"rarity":
-			return "Раритет"
-		"trophy":
-			return "Трофей"
-		_:
-			return ""
-
 
 func _get_reward_colors(tier: String) -> Dictionary:
 	match tier:

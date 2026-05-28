@@ -5,9 +5,9 @@ const STATUS_KEEPER := "keeper"
 const STATUS_TROPHY := "trophy"
 
 const QUALITY_MULTIPLIERS := {
-	STATUS_UNDERSIZED: 1.0,
-	STATUS_KEEPER: 10.0,
-	STATUS_TROPHY: 100.0
+	STATUS_UNDERSIZED: 0.8,
+	STATUS_KEEPER: 3.0,
+	STATUS_TROPHY: 8.0
 }
 
 func get_status(fish: Dictionary, weight_kg: float) -> String:

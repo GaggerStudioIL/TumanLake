@@ -56,13 +56,16 @@ func _update_ui() -> void:
 	var active_hook_input: bool = main._fishing_ui_state == FishingUiState.WAITING and bool(FishingManager.get("use_new_bite_system"))
 	var locked_for_result_or_fishing: bool = main._fishing_ui_state != FishingUiState.IDLE or main.is_cast_animating
 	main.fish_button.disabled = (main._fishing_ui_state == FishingUiState.WAITING and not active_hook_input) or main.is_cast_animating
-	main.spot_option_button.disabled = locked_for_result_or_fishing
+	main.spot_option_button.visible = false
+	main.spot_option_button.disabled = true
 	main.basket_button.disabled = main._fishing_ui_state == FishingUiState.WAITING or main._fishing_ui_state == FishingUiState.FIGHTING or main.is_cast_animating
 	main.inventory_button.disabled = main._fishing_ui_state == FishingUiState.WAITING or main._fishing_ui_state == FishingUiState.FIGHTING or main.is_cast_animating
 	main.tackle_button.disabled = main.inventory_button.disabled
 	main.shop_button.disabled = main.inventory_button.disabled
-	main.encyclopedia_button.disabled = main.inventory_button.disabled
+	main.harbor_button.disabled = main.inventory_button.disabled
 	main.map_button.disabled = main.inventory_button.disabled
+	if main.system_menu_ui != null:
+		main.system_menu_ui.set_disabled(main.inventory_button.disabled)
 	main.bait_button.disabled = main.inventory_button.disabled
 	main.reeling_panel.visible = main._fishing_ui_state == FishingUiState.FIGHTING
 	main.debug_panel.visible = main.SHOW_DEBUG_PANEL
@@ -82,6 +85,8 @@ func _update_ui() -> void:
 		main.waterbody_backdrop.visible = false
 		main.shop_panel.visible = false
 		main.shop_backdrop.visible = false
+		if main.fish_harbor_ui != null:
+			main.fish_harbor_ui.visible = false
 		if main.encyclopedia_ui != null:
 			main.encyclopedia_ui.close(false)
 		main._active_nav_tab = "fish"
@@ -111,6 +116,8 @@ func _update_ui() -> void:
 		main._update_tackle_ui()
 	if main.waterbody_panel.visible:
 		main._update_waterbody_ui()
+	if main.fish_harbor_ui != null and main.fish_harbor_ui.visible and main.fish_harbor_ui.has_method("refresh"):
+		main.fish_harbor_ui.call("refresh")
 
 
 func _refresh_bottom_nav_styles() -> void:
@@ -124,20 +131,16 @@ func _refresh_bottom_nav_styles() -> void:
 		active_tab = main._active_nav_tab
 	elif main.shop_panel != null and main.shop_panel.visible:
 		active_tab = "shop"
+	elif main.fish_harbor_ui != null and main.fish_harbor_ui.visible:
+		active_tab = "harbor"
 	elif main.waterbody_panel != null and main.waterbody_panel.visible:
 		active_tab = "map"
-	elif main.encyclopedia_ui != null and main.encyclopedia_ui.is_open():
-		active_tab = "encyclopedia"
-	elif main.profile_ui != null and main.profile_ui.is_open():
-		active_tab = "profile"
-
 	var nav_data: Array = [
 		[main.basket_button, "sell"],
 		[main.inventory_button, "inventory"],
 		[main.shop_button, "shop"],
-		[main.encyclopedia_button, "encyclopedia"],
-		[main.map_button, "map"],
-		[main.profile_button, "profile"]
+		[main.harbor_button, "harbor"],
+		[main.map_button, "map"]
 	]
 
 	for item in nav_data:

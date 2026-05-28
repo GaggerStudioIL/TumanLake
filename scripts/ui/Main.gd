@@ -10,8 +10,11 @@ const FishingHUDUIScript := preload("res://scripts/ui/FishingHUDUI.gd")
 const FishingPresenceUIScript := preload("res://scripts/ui/FishingPresenceUI.gd")
 const ProfileUIScript := preload("res://scripts/ui/ProfileUI.gd")
 const EncyclopediaUIScript := preload("res://scripts/ui/EncyclopediaUI.gd")
+const SystemMenuUIScript := preload("res://scripts/ui/SystemMenuUI.gd")
 const FailurePopupUIScript := preload("res://scripts/ui/FailurePopupUI.gd")
 const UIThemeScript := preload("res://scripts/ui/UITheme.gd")
+const MobileScrollHelperScript := preload("res://scripts/ui/MobileScrollHelper.gd")
+const FishHarborScene := preload("res://scenes/economy/FishHarbor.tscn")
 const TUMAN_LAKE_THEME := preload("res://themes/TumanLakeUI.tres")
 
 const SHOW_DEBUG_PANEL := false
@@ -24,7 +27,7 @@ const STYLE_BOTTOM_NAV_ACTIVE := "BottomNavActive"
 const BASE_SCREEN_SIZE := Vector2(960.0, 540.0)
 const HUD_HEIGHT := 44.0
 const LEFT_NAV_WIDTH := 140.0
-const LEFT_NAV_HEIGHT := 340.0
+const LEFT_NAV_HEIGHT := 286.0
 const ACTION_BAR_HEIGHT := 46.0
 const MENU_BACKDROP_Z := 300
 const MENU_PANEL_Z := 301
@@ -133,6 +136,8 @@ const ROD_TARGET_POS := Vector2(590.0, 382.0)
 @onready var inventory_tackle_label: Label = $InventoryPanel/InventoryTackleLabel
 @onready var inventory_equip_button: Button = $InventoryPanel/InventoryEquipButton
 @onready var inventory_close_button: Button = $InventoryPanel/InventoryCloseButton
+var inventory_repair_button: Button
+var inventory_discard_button: Button
 var inventory_prev_page_button: Button
 var inventory_next_page_button: Button
 var inventory_page_label: Label
@@ -223,10 +228,15 @@ var tackle_hook_button: Button
 var tackle_bait_button: Button
 var tackle_bait_2_button: Button
 var tackle_equip_button: Button
+var tackle_repair_button: Button
+var tackle_discard_button: Button
 var tackle_close_button: Button
 var tackle_prev_page_button: Button
 var tackle_next_page_button: Button
 var tackle_page_label: Label
+var discard_confirm_dialog: ConfirmationDialog
+var _pending_discard_item_id := ""
+var _pending_discard_source := ""
 var waterbody_backdrop: ColorRect
 var waterbody_panel: Panel
 var waterbody_title_label: Label
@@ -254,7 +264,10 @@ var fishing_hud_ui
 var fishing_presence_ui
 var profile_ui
 var encyclopedia_ui
+var system_menu_ui
 var failure_popup_ui
+var mobile_scroll_helper
+var fish_harbor_ui: Control
 var ui_theme
 var ui_canvas_layer: CanvasLayer
 var modal_canvas_layer: CanvasLayer
@@ -270,6 +283,7 @@ var top_hud_spacer: Control
 var quick_actions_container: VBoxContainer
 var bottom_nav_container: VBoxContainer
 var encyclopedia_button: Button
+var harbor_button: Button
 var environment_layer: Node2D
 var environment_sprites: Dictionary = {}
 var day_night_controller: Node2D
@@ -388,6 +402,8 @@ func _ready() -> void:
 	SaveManager.load_game()
 	_setup_ui_controllers()
 	_ensure_ui_canvas_layer()
+	_ensure_system_menu_ui()
+	_ensure_fish_harbor_ui()
 	failure_popup_ui.setup(self)
 	profile_ui.setup(self)
 	encyclopedia_ui.setup(self)
@@ -403,6 +419,7 @@ func _ready() -> void:
 	_connect_signals()
 	_reset_reeling_ui()
 	_update_ui()
+	_ensure_mobile_scroll_helper()
 
 func _process(delta: float) -> void:
 	_update_fishing_presence(delta)
@@ -434,6 +451,11 @@ func _input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if system_menu_ui != null and system_menu_ui.is_menu_open() and event.is_action_pressed("ui_cancel"):
+		system_menu_ui.close_menu()
+		get_viewport().set_input_as_handled()
+		return
+
 	if not is_modal_open:
 		return
 	if event.is_action_pressed("ui_cancel"):
@@ -452,6 +474,7 @@ func _setup_ui_controllers() -> void:
 	fishing_presence_ui = FishingPresenceUIScript.new()
 	profile_ui = ProfileUIScript.new()
 	encyclopedia_ui = EncyclopediaUIScript.new()
+	system_menu_ui = SystemMenuUIScript.new()
 	failure_popup_ui = FailurePopupUIScript.new()
 
 	encyclopedia_button = Button.new()
@@ -459,6 +482,12 @@ func _setup_ui_controllers() -> void:
 	encyclopedia_button.text = "Атлас рыб"
 	encyclopedia_button.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(encyclopedia_button)
+
+	harbor_button = Button.new()
+	harbor_button.name = "HarborButton"
+	harbor_button.text = "Гавань"
+	harbor_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(harbor_button)
 
 	shop_ui.setup(self)
 	keepnet_ui.setup(self)
@@ -502,6 +531,7 @@ func _ensure_ui_canvas_layer() -> void:
 		inventory_button,
 		tackle_button,
 		shop_button,
+		harbor_button,
 		map_button,
 		profile_button,
 		encyclopedia_button,
@@ -539,6 +569,32 @@ func _ensure_ui_canvas_layer() -> void:
 	_ensure_modal_layer()
 	_move_modal_roots_to_layer()
 	_refresh_modal_input_blocker()
+
+func _ensure_fish_harbor_ui() -> void:
+	_ensure_modal_layer()
+	if fish_harbor_ui == null:
+		fish_harbor_ui = FishHarborScene.instantiate() as Control
+		fish_harbor_ui.name = "FishHarbor"
+		fish_harbor_ui.visible = false
+		modal_content_root.add_child(fish_harbor_ui)
+		if fish_harbor_ui.has_method("setup"):
+			fish_harbor_ui.call("setup", self)
+	elif fish_harbor_ui.get_parent() != modal_content_root:
+		_reparent_node(fish_harbor_ui, modal_content_root)
+
+func _ensure_system_menu_ui() -> void:
+	if system_menu_ui == null:
+		system_menu_ui = SystemMenuUIScript.new()
+	if system_menu_ui.has_method("setup"):
+		system_menu_ui.setup(self)
+
+func _ensure_mobile_scroll_helper() -> void:
+	if mobile_scroll_helper == null:
+		mobile_scroll_helper = MobileScrollHelperScript.new()
+		mobile_scroll_helper.name = "MobileScrollHelper"
+		add_child(mobile_scroll_helper)
+	if mobile_scroll_helper.has_method("setup"):
+		mobile_scroll_helper.setup(self)
 
 func _ensure_modal_input_shield() -> void:
 	_ensure_modal_layer()
@@ -622,7 +678,8 @@ func _move_modal_roots_to_layer() -> void:
 		tackle_backdrop,
 		tackle_panel,
 		waterbody_backdrop,
-		waterbody_panel
+		waterbody_panel,
+		fish_harbor_ui
 	]:
 		_reparent_node(node, root)
 		if node is Control:
@@ -631,6 +688,8 @@ func _move_modal_roots_to_layer() -> void:
 func open_modal(modal_name: String) -> void:
 	_ensure_modal_layer()
 	_move_modal_roots_to_layer()
+	if system_menu_ui != null:
+		system_menu_ui.close_menu()
 	_hide_modal_roots_except(modal_name)
 	_current_modal_name = modal_name
 	is_modal_open = true
@@ -658,6 +717,12 @@ func close_current_modal() -> void:
 		"profile":
 			if profile_ui != null:
 				profile_ui.close()
+		"fish_harbor":
+			if fish_harbor_ui != null and fish_harbor_ui.has_method("close"):
+				fish_harbor_ui.call("close")
+		"settings":
+			if system_menu_ui != null:
+				system_menu_ui.close_settings()
 		"encyclopedia":
 			if encyclopedia_ui != null:
 				encyclopedia_ui.close()
@@ -669,6 +734,10 @@ func close_current_modal() -> void:
 				profile_ui.close()
 			if encyclopedia_ui != null:
 				encyclopedia_ui.close()
+			if fish_harbor_ui != null:
+				fish_harbor_ui.visible = false
+			if system_menu_ui != null:
+				system_menu_ui.close_settings()
 			_refresh_modal_input_blocker()
 
 func _hide_modal_roots_except(modal_name: String) -> void:
@@ -699,6 +768,8 @@ func _hide_modal_roots_except(modal_name: String) -> void:
 			waterbody_panel.visible = false
 		if waterbody_backdrop != null:
 			waterbody_backdrop.visible = false
+	if modal_name != "fish_harbor" and fish_harbor_ui != null:
+		fish_harbor_ui.visible = false
 	if modal_name != "catch_reward":
 		if catch_popup_panel != null:
 			catch_popup_panel.visible = false
@@ -708,6 +779,8 @@ func _hide_modal_roots_except(modal_name: String) -> void:
 		profile_ui.close(false)
 	if modal_name != "encyclopedia" and encyclopedia_ui != null:
 		encyclopedia_ui.close(false)
+	if modal_name != "settings" and system_menu_ui != null:
+		system_menu_ui.close_settings(false)
 
 func _refresh_modal_input_blocker() -> void:
 	_ensure_modal_layer()
@@ -731,6 +804,10 @@ func _is_any_modal_visible() -> bool:
 	if profile_ui != null and profile_ui.is_any_modal_open():
 		return true
 	if encyclopedia_ui != null and encyclopedia_ui.is_any_modal_open():
+		return true
+	if fish_harbor_ui != null and fish_harbor_ui.visible:
+		return true
+	if system_menu_ui != null and system_menu_ui.is_settings_open():
 		return true
 	return false
 
@@ -793,14 +870,19 @@ func _ensure_mobile_ui_containers() -> void:
 		_reparent_node(nav_fish_button, ui_canvas_layer)
 	nav_fish_button.visible = false
 
-	for node in [basket_button, inventory_button, shop_button, encyclopedia_button, map_button, profile_button]:
+	for node in [basket_button, inventory_button, shop_button, harbor_button, map_button]:
 		_reparent_node(node, bottom_nav_container)
 	bottom_nav_container.move_child(basket_button, 0)
 	bottom_nav_container.move_child(inventory_button, 1)
 	bottom_nav_container.move_child(shop_button, 2)
-	bottom_nav_container.move_child(encyclopedia_button, 3)
+	bottom_nav_container.move_child(harbor_button, 3)
 	bottom_nav_container.move_child(map_button, 4)
-	bottom_nav_container.move_child(profile_button, 5)
+
+	for node in [encyclopedia_button, profile_button]:
+		if node != null:
+			_reparent_node(node, ui_canvas_layer)
+			node.visible = false
+			node.disabled = true
 
 func _ensure_cast_button_visual() -> void:
 	if cast_button_visual != null:
@@ -1730,10 +1812,11 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	debug_panel.visible = SHOW_DEBUG_PANEL
 
 	var hud_rect := _scale_rect(Rect2(20.0, 16.0, 910.0, HUD_HEIGHT), screen_size)
+	hud_rect.size.x = max(620.0 * sx, screen_size.x - hud_rect.position.x - 128.0 * sx)
 	_anchor_control(top_hud_container, 0.0, 0.0, 0.0, 0.0, hud_rect.position.x, hud_rect.position.y, hud_rect.end.x, hud_rect.end.y)
 	top_hud_container.z_index = 100
 	top_hud_container.add_theme_constant_override("separation", int(9.0 * ui_scale))
-	top_hud_spacer.custom_minimum_size = _scale_size(Vector2(250.0, 1.0), screen_size)
+	top_hud_spacer.custom_minimum_size = _scale_size(Vector2(150.0, 1.0), screen_size)
 
 	top_hud_panel.visible = true
 	top_hud_panel.custom_minimum_size = _scale_size(Vector2(120.0, HUD_HEIGHT), screen_size)
@@ -1788,15 +1871,11 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	_layout_hud_icon(time_hud_icon, Vector2(11.0, 12.0), Vector2(19.0, 19.0), screen_size)
 	_layout_hud_icon(weather_hud_icon, Vector2(11.0, 12.0), Vector2(19.0, 19.0), screen_size)
 
-	spot_option_button.visible = true
-	spot_option_button.custom_minimum_size = _scale_size(Vector2(280.0, HUD_HEIGHT), screen_size)
+	spot_option_button.visible = false
+	spot_option_button.disabled = true
+	spot_option_button.custom_minimum_size = Vector2.ZERO
 	spot_option_button.size_flags_horizontal = Control.SIZE_SHRINK_END
-	spot_option_button.size_flags_vertical = Control.SIZE_FILL
-	spot_option_button.z_index = 101
-	spot_option_button.add_theme_font_size_override("font_size", 13)
-	_set_button_icon(spot_option_button, "location", 20.0)
-	_apply_button_style(spot_option_button, STYLE_SECONDARY_BUTTON)
-	spot_option_button.add_theme_font_size_override("font_size", 13)
+	spot_option_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
 	action_panel.visible = true
 	var action_panel_rect := _scale_rect(Rect2(174.0, 476.0, 520.0, 48.0), screen_size)
@@ -1867,28 +1946,31 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	bottom_nav_container.mouse_filter = Control.MOUSE_FILTER_PASS
 	bottom_nav_container.add_theme_constant_override("separation", int(9.0 * ui_scale))
 
-	var nav_buttons: Array = [nav_fish_button, basket_button, inventory_button, shop_button, encyclopedia_button, map_button, profile_button]
-	var nav_labels: Array = ["Ловля", "Садок", "Инвентарь", "Магазин", "Атлас", "Карта", "Профиль"]
+	var nav_buttons: Array = [nav_fish_button, basket_button, inventory_button, shop_button, harbor_button, map_button]
+	var nav_labels: Array = ["Ловля", "Садок", "Инвентарь", "Магазин", "Гавань", "Карта"]
 	var nav_button_size := _scale_size(Vector2(LEFT_NAV_WIDTH - 18.0, 42.0), screen_size)
 	for i in nav_buttons.size():
 		_layout_nav_button(nav_buttons[i], nav_labels[i], Vector2.ZERO, nav_button_size, i == 0)
-	var nav_icons: Array = ["fish", "keepnet", "inventory", "shop", "encyclopedia", "map", "profile"]
+	var nav_icons: Array = ["fish", "keepnet", "inventory", "shop", "harbor", "map"]
 	for i in nav_buttons.size():
 		_set_button_icon(nav_buttons[i], nav_icons[i], 12.0)
 
 	nav_fish_button.visible = false
-	var side_menu_buttons: Array = [basket_button, inventory_button, shop_button, encyclopedia_button, map_button, profile_button]
-	var side_menu_labels: Array = ["Садок", "Инвентарь", "Магазин", "Атлас рыб", "Карта", "Профиль"]
-	var side_menu_icons: Array = ["keepnet", "inventory", "shop", "encyclopedia", "map", "profile"]
+	var side_menu_buttons: Array = [basket_button, inventory_button, shop_button, harbor_button, map_button]
+	var side_menu_labels: Array = ["Садок", "Инвентарь", "Магазин", "Гавань", "Карта"]
+	var side_menu_icons: Array = ["keepnet", "inventory", "shop", "harbor", "map"]
 	var side_menu_button_size := _scale_size(Vector2(LEFT_NAV_WIDTH, 48.0), screen_size)
 	for i in side_menu_buttons.size():
 		_layout_side_menu_button(side_menu_buttons[i], side_menu_labels[i], side_menu_icons[i], side_menu_button_size, false)
 
 	basket_button.visible = true
 
-	encyclopedia_button.disabled = false
 	map_button.disabled = false
-	profile_button.disabled = false
+	harbor_button.disabled = false
+	encyclopedia_button.visible = false
+	profile_button.visible = false
+	encyclopedia_button.disabled = true
+	profile_button.disabled = true
 
 	var water_anchor := _scale_point(FLOAT_DEFAULT_POS, screen_size)
 	_float_base_center = water_anchor
@@ -2085,10 +2167,10 @@ func _layout_side_menu_button(button: Button, label: String, icon_name: String, 
 	var text_label := _ensure_side_menu_label(button)
 	var arrow_label := _ensure_side_menu_arrow(button)
 	var scale_factor: float = clamp(button_size.y / 48.0, 0.78, 1.22)
-	var icon_size := Vector2(31.0, 31.0) * scale_factor
-	var left_pad := 9.0 * scale_factor
+	var icon_size := Vector2(37.0, 37.0) * scale_factor
+	var left_pad := 6.5 * scale_factor
 	var arrow_width := 12.0 * scale_factor
-	var text_x := 45.0 * scale_factor
+	var text_x := 50.0 * scale_factor
 	var font_size := int(round(13.0 * scale_factor))
 
 	icon_rect.texture = ui_theme.get_side_menu_icon(icon_name)
@@ -2314,12 +2396,16 @@ func _is_menu_overlay_open() -> bool:
 		return true
 	if _is_visible_ui_control(waterbody_panel):
 		return true
+	if _is_visible_ui_control(fish_harbor_ui):
+		return true
 	if profile_ui != null and profile_ui.is_any_modal_open():
+		return true
+	if system_menu_ui != null and (system_menu_ui.is_menu_open() or system_menu_ui.is_settings_open()):
 		return true
 	return encyclopedia_ui != null and encyclopedia_ui.is_any_modal_open()
 
 func _should_ignore_base_ui_press() -> bool:
-	return is_modal_open or _is_modal_tap_guard_active() or _is_catch_reward_open()
+	return is_modal_open or _is_modal_tap_guard_active() or _is_catch_reward_open() or (system_menu_ui != null and system_menu_ui.is_menu_open())
 
 func _trigger_fish_button_action(from_pointer_event: bool = false) -> void:
 	if _should_ignore_base_ui_press():
@@ -2521,6 +2607,8 @@ func _setup_layout() -> void:
 		inventory_details_label,
 		inventory_tackle_label,
 		inventory_equip_button,
+		inventory_repair_button,
+		inventory_discard_button,
 		inventory_close_button,
 		shop_title_label,
 		shop_money_label,
@@ -2552,6 +2640,8 @@ func _setup_layout() -> void:
 		tackle_depth_plus_button,
 		tackle_hint_label,
 		tackle_equip_button,
+		tackle_repair_button,
+		tackle_discard_button,
 		tackle_close_button,
 		waterbody_title_label,
 		waterbody_item_list,
@@ -2914,6 +3004,9 @@ func _setup_layout() -> void:
 
 	spot_option_button.position = Vector2(screen_size.x - margin - location_card_width + 12.0, margin + 7.0)
 	spot_option_button.size = Vector2(location_card_width - 24.0, 44.0)
+	spot_option_button.visible = false
+	spot_option_button.disabled = true
+	spot_option_button.custom_minimum_size = Vector2.ZERO
 	spot_option_button.add_theme_font_size_override("font_size", 13)
 	_apply_button_style(spot_option_button, STYLE_SECONDARY_BUTTON)
 
@@ -2966,10 +3059,9 @@ func _setup_layout() -> void:
 		nav_fish_button,
 		inventory_button,
 		shop_button,
-		encyclopedia_button,
+		harbor_button,
 		basket_button,
-		map_button,
-		profile_button
+		map_button
 	]
 	var nav_texts: Array = [
 		"○ Ловить",
@@ -2981,6 +3073,7 @@ func _setup_layout() -> void:
 		"◎ Профиль"
 	]
 	nav_texts = ["Ловля", "Инвентарь", "Магазин", "Атлас", "Садок", "Карта", "Профиль"]
+	nav_texts = ["Ловля", "Инвентарь", "Магазин", "Гавань", "Садок", "Карта"]
 	var nav_gap := 6.0
 	var nav_x := bottom_nav_panel.position.x + 10.0
 	var nav_y := bottom_nav_y + 3.0
@@ -2994,8 +3087,11 @@ func _setup_layout() -> void:
 		nav_button.add_theme_font_size_override("font_size", 11)
 		_apply_button_style(nav_button, STYLE_BOTTOM_NAV_ACTIVE if i == 0 else STYLE_BOTTOM_NAV_BUTTON)
 
-	encyclopedia_button.disabled = false
+	harbor_button.disabled = false
 	map_button.disabled = false
+	encyclopedia_button.visible = false
+	profile_button.visible = false
+	encyclopedia_button.disabled = true
 	profile_button.disabled = true
 
 	timer_label.position = left_hud_panel.position + Vector2(12.0, 10.0)
@@ -3094,6 +3190,8 @@ func _setup_layout() -> void:
 	fight_hint_label.visible = false
 
 	_apply_gameplay_screen_composition(screen_size)
+	if system_menu_ui != null and system_menu_ui.has_method("layout"):
+		system_menu_ui.layout(screen_size)
 
 	for primary_label in [title_label, money_label, level_label, fight_title_label, tension_label, progress_label, basket_title_label, shop_title_label, tackle_title_label]:
 		_apply_label_style(primary_label, true)
@@ -3133,8 +3231,8 @@ func _setup_layout() -> void:
 	basket_stats_label.position = Vector2(basket_padding, 62.0)
 	basket_stats_label.size = Vector2(basket_inner_width, 34.0)
 	basket_stats_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	basket_stats_label.add_theme_font_size_override("font_size", 12)
-	basket_stats_label.add_theme_color_override("font_color", Color(0.82, 0.94, 0.84, 0.92))
+	basket_stats_label.add_theme_font_size_override("font_size", 14)
+	basket_stats_label.add_theme_color_override("font_color", Color(0.88, 1.0, 0.88, 0.98))
 
 	basket_scroll.position = Vector2(basket_padding, basket_scroll_y)
 	basket_scroll.size = Vector2(basket_inner_width, basket_scroll_height)
@@ -3294,9 +3392,21 @@ func _setup_layout() -> void:
 	inventory_tackle_label.add_theme_font_size_override("font_size", 12)
 	inventory_tackle_label.clip_text = true
 
-	inventory_equip_button.position = Vector2(right_panel_x + right_panel_width - 154.0, inventory_body_y + inventory_body_height - 54.0)
-	inventory_equip_button.size = Vector2(142.0, 50.0)
+	var inventory_action_button_width: float = min(142.0, max((right_panel_width - 36.0) * 0.48, 104.0))
+	var inventory_action_y_pos: float = inventory_body_y + inventory_body_height - 54.0
+	var inventory_secondary_x: float = right_panel_x + 12.0
+	var inventory_primary_x: float = right_panel_x + right_panel_width - inventory_action_button_width - 12.0
+	inventory_equip_button.position = Vector2(inventory_primary_x, inventory_action_y_pos)
+	inventory_equip_button.size = Vector2(inventory_action_button_width, 50.0)
 	_apply_button_style(inventory_equip_button, STYLE_PRIMARY_BUTTON)
+	if inventory_repair_button != null:
+		inventory_repair_button.position = Vector2(inventory_secondary_x, inventory_action_y_pos)
+		inventory_repair_button.size = Vector2(inventory_action_button_width, 50.0)
+		_apply_button_style(inventory_repair_button, STYLE_SECONDARY_BUTTON)
+	if inventory_discard_button != null:
+		inventory_discard_button.position = Vector2(inventory_secondary_x, inventory_action_y_pos)
+		inventory_discard_button.size = Vector2(inventory_action_button_width, 50.0)
+		_apply_button_style(inventory_discard_button, STYLE_SECONDARY_BUTTON)
 
 	inventory_close_button.position = Vector2(inventory_width - inventory_padding - close_button_size.x, inventory_action_y)
 	inventory_close_button.size = close_button_size
@@ -3501,7 +3611,7 @@ func _setup_layout() -> void:
 
 	var details_panel_y: float = tackle_rod_stats_panel.position.y + tackle_rod_stats_panel.size.y + 8.0
 	tackle_rod_description_panel.position = Vector2(tackle_right_x + 9.0, details_panel_y)
-	tackle_rod_description_panel.size = Vector2(tackle_right_width - 18.0, 78.0)
+	tackle_rod_description_panel.size = Vector2(tackle_right_width - 18.0, 112.0)
 	ui_theme.apply_tackle_panel_style(tackle_rod_description_panel)
 
 	tackle_details_label.position = Vector2(tackle_right_x + 19.0, details_panel_y + 8.0)
@@ -3543,10 +3653,20 @@ func _setup_layout() -> void:
 	tackle_depth_plus_button.add_theme_font_size_override("font_size", 20)
 	_apply_button_style(tackle_depth_plus_button, STYLE_SECONDARY_BUTTON)
 
-	var equip_width: float = min(304.0, tackle_inner_width * 0.34)
-	tackle_equip_button.position = Vector2(tackle_padding + tackle_inner_width * 0.5 - equip_width * 0.5, tackle_action_y + 9.0)
+	var equip_width: float = min(190.0, tackle_inner_width * 0.22)
+	var tackle_secondary_width: float = min(124.0, tackle_inner_width * 0.15)
+	var tackle_action_button_y: float = tackle_action_y + 9.0
+	tackle_equip_button.position = Vector2(tackle_padding + tackle_inner_width * 0.5 - equip_width * 0.5, tackle_action_button_y)
 	tackle_equip_button.size = Vector2(equip_width, 50.0)
 	ui_theme.apply_tackle_primary_action_style(tackle_equip_button)
+	if tackle_repair_button != null:
+		tackle_repair_button.position = Vector2(tackle_equip_button.position.x + equip_width + 10.0, tackle_action_button_y)
+		tackle_repair_button.size = Vector2(tackle_secondary_width, 50.0)
+		_apply_button_style(tackle_repair_button, STYLE_SECONDARY_BUTTON)
+	if tackle_discard_button != null:
+		tackle_discard_button.position = Vector2(tackle_equip_button.position.x + equip_width + 10.0, tackle_action_button_y)
+		tackle_discard_button.size = Vector2(tackle_secondary_width, 50.0)
+		_apply_button_style(tackle_discard_button, STYLE_SECONDARY_BUTTON)
 
 	var close_width: float = min(194.0, tackle_inner_width * 0.22)
 	tackle_close_button.position = Vector2(tackle_padding + tackle_inner_width - close_width - 16.0, tackle_action_y + 10.0)
@@ -3727,7 +3847,7 @@ func _setup_layout() -> void:
 
 	shop_items_scroll.position = Vector2(shop_padding, shop_items_y)
 	shop_items_scroll.size = Vector2(shop_inner_width, shop_height - shop_items_y - shop_footer_height)
-	shop_items_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	shop_items_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	shop_items_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	shop_items_container.position = Vector2.ZERO
 	shop_items_container.size = shop_items_scroll.size
@@ -3768,14 +3888,17 @@ func _setup_layout() -> void:
 	_update_shop_ui()
 
 	if toast_label != null:
-		toast_label.position = Vector2((screen_size.x - 360.0) * 0.5, screen_size.y - 116.0)
-		toast_label.size = Vector2(360.0, 40.0)
+		var toast_width: float = min(screen_size.x - margin * 4.0, 520.0)
+		toast_label.position = Vector2((screen_size.x - toast_width) * 0.5, screen_size.y - 132.0)
+		toast_label.size = Vector2(toast_width, 64.0)
 		toast_label.z_index = 220
-		toast_label.add_theme_font_size_override("font_size", 15)
+		toast_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		toast_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		toast_label.add_theme_font_size_override("font_size", 14)
 		toast_label.add_theme_color_override("font_color", Color(0.90, 1.0, 0.90, 1.0))
 		toast_label.add_theme_stylebox_override(
 			"normal",
-			_make_panel_style(Color(0.055, 0.135, 0.105, 0.92), Color(0.68, 1.0, 0.76, 0.36), 18, 10, Color(0.0, 0.0, 0.0, 0.24))
+			_make_panel_style(Color(0.045, 0.105, 0.086, 0.92), Color(0.68, 1.0, 0.76, 0.36), 18, 10, Color(0.0, 0.0, 0.0, 0.24))
 		)
 
 	var reward_width: float = min(screen_size.x - margin * 4.0, 700.0)
@@ -3800,8 +3923,8 @@ func _setup_layout() -> void:
 	catch_popup_particles.z_index = 0
 	catch_popup_particles.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	catch_popup_glow.position = Vector2((reward_width - 470.0) * 0.5, 112.0)
-	catch_popup_glow.size = Vector2(470.0, 176.0)
+	catch_popup_glow.position = Vector2((reward_width - 540.0) * 0.5, 100.0)
+	catch_popup_glow.size = Vector2(540.0, 218.0)
 	catch_popup_glow.z_index = 0
 	catch_popup_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
@@ -3811,13 +3934,13 @@ func _setup_layout() -> void:
 	catch_popup_title_label.add_theme_font_size_override("font_size", 13)
 	catch_popup_title_label.add_theme_color_override("font_color", Color(0.78, 0.94, 0.86, 0.92))
 
-	catch_popup_badge_label.position = Vector2((reward_width - 142.0) * 0.5, 42.0)
+	catch_popup_badge_label.position = Vector2((reward_width - 142.0) * 0.5, 86.0)
 	catch_popup_badge_label.size = Vector2(142.0, 22.0)
 	catch_popup_badge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	catch_popup_badge_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	catch_popup_badge_label.add_theme_font_size_override("font_size", 11)
 
-	catch_popup_name_label.position = Vector2(reward_padding, 64.0)
+	catch_popup_name_label.position = Vector2(reward_padding, 50.0)
 	catch_popup_name_label.size = Vector2(reward_inner_width, 34.0)
 	catch_popup_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	catch_popup_name_label.add_theme_font_size_override("font_size", 24)
@@ -3826,40 +3949,40 @@ func _setup_layout() -> void:
 	catch_popup_name_label.add_theme_constant_override("shadow_offset_x", 0)
 	catch_popup_name_label.add_theme_constant_override("shadow_offset_y", 2)
 
-	catch_trophy_banner_label.position = Vector2((reward_width - 430.0) * 0.5, 98.0)
-	catch_trophy_banner_label.size = Vector2(430.0, 40.0)
+	catch_trophy_banner_label.position = Vector2((reward_width - 430.0) * 0.5, 88.0)
+	catch_trophy_banner_label.size = Vector2(430.0, 24.0)
 	catch_trophy_banner_label.z_index = 5
 	catch_trophy_banner_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	catch_trophy_banner_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	catch_trophy_banner_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	catch_trophy_banner_label.add_theme_font_size_override("font_size", 12)
+	catch_trophy_banner_label.add_theme_font_size_override("font_size", 11)
 	catch_trophy_banner_label.add_theme_color_override("font_color", Color(1.0, 0.90, 0.56, 1.0))
 	catch_trophy_banner_label.add_theme_stylebox_override(
 		"normal",
-		_make_panel_style(Color(0.34, 0.235, 0.08, 0.84), Color(1.0, 0.78, 0.38, 0.50), 15, 8, Color(0.86, 0.54, 0.16, 0.20))
+		_make_panel_style(Color(0.12, 0.095, 0.045, 0.62), Color(1.0, 0.78, 0.38, 0.28), 12, 6, Color(0.86, 0.54, 0.16, 0.10))
 	)
 
-	var fish_visual_width: float = min(reward_inner_width, 450.0)
-	var fish_visual_height: float = min(148.0, reward_height * 0.34)
-	catch_fish_shadow.position = Vector2((reward_width - fish_visual_width) * 0.5 + 8.0, 144.0)
+	var fish_visual_width: float = min(reward_inner_width, 560.0)
+	var fish_visual_height: float = min(190.0, reward_height * 0.40)
+	catch_fish_shadow.position = Vector2((reward_width - fish_visual_width) * 0.5 + 8.0, 134.0)
 	catch_fish_shadow.size = Vector2(fish_visual_width, fish_visual_height)
 	catch_fish_shadow.z_index = 1
 	catch_fish_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_catch_shadow_base_position = catch_fish_shadow.position
 
-	catch_fish_visual.position = Vector2((reward_width - fish_visual_width) * 0.5, 136.0)
+	catch_fish_visual.position = Vector2((reward_width - fish_visual_width) * 0.5, 126.0)
 	catch_fish_visual.size = Vector2(fish_visual_width, fish_visual_height)
 	catch_fish_visual.z_index = 2
 	catch_fish_visual.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_catch_fish_base_position = catch_fish_visual.position
 
-	catch_popup_stats_label.position = Vector2(reward_padding, reward_height - 158.0)
-	catch_popup_stats_label.size = Vector2(reward_inner_width, 82.0)
+	catch_popup_stats_label.position = Vector2(reward_padding, reward_height - 160.0)
+	catch_popup_stats_label.size = Vector2(reward_inner_width, 24.0)
 	catch_popup_stats_label.z_index = 5
 	catch_popup_stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	catch_popup_stats_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	catch_popup_stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	catch_popup_stats_label.add_theme_font_size_override("font_size", 11)
+	catch_popup_stats_label.add_theme_font_size_override("font_size", 14)
 	catch_popup_stats_label.add_theme_color_override("font_color", Color(0.88, 0.98, 0.91, 0.96))
 
 	catch_keep_button.position = Vector2(reward_button_x, reward_button_y)
@@ -3919,12 +4042,17 @@ func _connect_signals() -> void:
 	inventory_button.pressed.connect(_on_inventory_button_pressed)
 	tackle_button.pressed.connect(_on_tackle_button_pressed)
 	shop_button.pressed.connect(_on_shop_button_pressed)
+	harbor_button.pressed.connect(_on_harbor_button_pressed)
 	encyclopedia_button.pressed.connect(_on_encyclopedia_button_pressed)
 	map_button.pressed.connect(_on_map_button_pressed)
 	profile_button.pressed.connect(_on_profile_button_pressed)
 	bait_button.pressed.connect(_on_bait_button_pressed)
 	inventory_close_button.pressed.connect(_on_inventory_close_button_pressed)
 	inventory_equip_button.pressed.connect(_on_inventory_equip_button_pressed)
+	if inventory_repair_button != null:
+		inventory_repair_button.pressed.connect(_on_inventory_repair_button_pressed)
+	if inventory_discard_button != null:
+		inventory_discard_button.pressed.connect(_on_inventory_discard_button_pressed)
 	inventory_item_list.item_selected.connect(_on_inventory_item_selected)
 	shop_close_button.pressed.connect(_on_shop_close_button_pressed)
 	shop_bait_category_button.pressed.connect(_set_shop_category.bind("bait"))
@@ -3946,6 +4074,10 @@ func _connect_signals() -> void:
 	tackle_depth_minus_button.pressed.connect(_on_tackle_depth_button_pressed.bind(-0.1))
 	tackle_depth_plus_button.pressed.connect(_on_tackle_depth_button_pressed.bind(0.1))
 	tackle_equip_button.pressed.connect(_on_tackle_equip_button_pressed)
+	if tackle_repair_button != null:
+		tackle_repair_button.pressed.connect(_on_tackle_repair_button_pressed)
+	if tackle_discard_button != null:
+		tackle_discard_button.pressed.connect(_on_tackle_discard_button_pressed)
 	tackle_close_button.pressed.connect(_on_tackle_close_button_pressed)
 	waterbody_item_list.item_selected.connect(_on_waterbody_item_selected)
 	waterbody_spot_list.item_selected.connect(_on_waterbody_spot_item_selected)
@@ -4474,12 +4606,14 @@ func _show_toast(message: String, success: bool = true) -> void:
 		_toast_tween.kill()
 
 	toast_label.text = message
+	toast_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	toast_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	toast_label.visible = true
 	toast_label.modulate = Color(0.78, 1.0, 0.78, 0.0) if success else Color(1.0, 0.68, 0.58, 0.0)
 
 	_toast_tween = create_tween()
 	_toast_tween.tween_property(toast_label, "modulate:a", 1.0, 0.12)
-	_toast_tween.tween_interval(1.2)
+	_toast_tween.tween_interval(2.1)
 	_toast_tween.tween_property(toast_label, "modulate:a", 0.0, 0.28)
 	_toast_tween.tween_callback(func() -> void:
 		if toast_label != null:
@@ -4533,9 +4667,11 @@ func _on_tackle_item_activated(index: int) -> void:
 
 func _on_tackle_equip_button_pressed() -> void:
 	var selected_item := _get_selected_tackle_item()
+	var block_reason := PlayerData.get_equip_block_reason(selected_item, _tackle_category)
 
-	if selected_item.is_empty() or not PlayerData.can_equip_item(selected_item):
-		result_label.text = "Эту снасть нельзя экипировать."
+	if selected_item.is_empty() or block_reason != "":
+		result_label.text = block_reason if block_reason != "" else "Эту снасть нельзя экипировать."
+		_show_toast(result_label.text, false)
 		_update_tackle_ui()
 		return
 
@@ -4560,6 +4696,18 @@ func _on_tackle_equip_button_pressed() -> void:
 		result_label.text = "Не удалось экипировать снасть."
 
 	_update_ui()
+
+func _on_tackle_repair_button_pressed() -> void:
+	var selected_item := _get_selected_tackle_item()
+	if selected_item.is_empty():
+		return
+	_apply_repair_result(PlayerData.repair_owned_item(str(selected_item.get("id", ""))))
+
+func _on_tackle_discard_button_pressed() -> void:
+	var selected_item := _get_selected_tackle_item()
+	if selected_item.is_empty():
+		return
+	_request_discard_owned_item(str(selected_item.get("id", "")), "tackle")
 
 func _on_tackle_depth_button_pressed(delta: float) -> void:
 	if _fishing_ui_state != FishingUiState.IDLE:
@@ -4861,10 +5009,14 @@ func _on_nav_fish_button_pressed() -> void:
 	_refresh_bottom_nav_styles()
 
 func _close_profile_and_encyclopedia(reset_nav: bool = false) -> void:
+	if system_menu_ui != null:
+		system_menu_ui.close_menu()
 	if profile_ui != null:
 		profile_ui.close(reset_nav)
 	if encyclopedia_ui != null:
 		encyclopedia_ui.close(reset_nav)
+	if fish_harbor_ui != null:
+		fish_harbor_ui.visible = false
 
 func _on_basket_button_pressed() -> void:
 	if _should_ignore_base_ui_press():
@@ -4903,12 +5055,23 @@ func _on_shop_button_pressed() -> void:
 	_close_profile_and_encyclopedia(false)
 	shop_ui.open()
 
+func _on_harbor_button_pressed() -> void:
+	if _should_ignore_base_ui_press():
+		return
+
+	_close_profile_and_encyclopedia(false)
+	_ensure_fish_harbor_ui()
+	if fish_harbor_ui != null and fish_harbor_ui.has_method("open"):
+		fish_harbor_ui.call("open")
+
 func _on_encyclopedia_button_pressed() -> void:
 	if _should_ignore_base_ui_press():
 		return
 
 	if profile_ui != null:
 		profile_ui.close(false)
+	if fish_harbor_ui != null:
+		fish_harbor_ui.visible = false
 	encyclopedia_ui.open()
 
 func _on_map_button_pressed() -> void:
@@ -4924,6 +5087,8 @@ func _on_profile_button_pressed() -> void:
 
 	if encyclopedia_ui != null:
 		encyclopedia_ui.close(false)
+	if fish_harbor_ui != null:
+		fish_harbor_ui.visible = false
 	profile_ui.open()
 	return
 	if _is_catch_reward_open():
@@ -5043,9 +5208,11 @@ func _on_inventory_item_selected(index: int) -> void:
 
 func _on_inventory_equip_button_pressed() -> void:
 	var selected_item := _get_selected_inventory_item()
+	var block_reason := PlayerData.get_equip_block_reason(selected_item)
 
-	if selected_item.is_empty() or not PlayerData.can_equip_item(selected_item):
-		result_label.text = "Этот предмет нельзя экипировать."
+	if selected_item.is_empty() or block_reason != "":
+		result_label.text = block_reason if block_reason != "" else "Этот предмет нельзя экипировать."
+		_show_toast(result_label.text, false)
 		_update_inventory_ui()
 		return
 
@@ -5055,6 +5222,70 @@ func _on_inventory_equip_button_pressed() -> void:
 	else:
 		result_label.text = "Не удалось экипировать предмет."
 
+	_update_ui()
+
+func _on_inventory_repair_button_pressed() -> void:
+	var selected_item := _get_selected_inventory_item()
+	if selected_item.is_empty():
+		return
+	_apply_repair_result(PlayerData.repair_owned_item(str(selected_item.get("id", ""))))
+
+func _on_inventory_discard_button_pressed() -> void:
+	var selected_item := _get_selected_inventory_item()
+	if selected_item.is_empty():
+		return
+	_request_discard_owned_item(str(selected_item.get("id", "")), "inventory")
+
+func _apply_repair_result(result: Dictionary) -> void:
+	var success := bool(result.get("success", false))
+	var message := str(result.get("message", "Ремонт недоступен."))
+	result_label.text = message
+	_show_toast(message, success)
+	if success:
+		SaveManager.save_game()
+	_update_ui()
+
+func _request_discard_owned_item(item_id: String, source: String) -> void:
+	var item := PlayerData.get_owned_item(item_id)
+	if item.is_empty():
+		_show_toast("Предмет не найден.", false)
+		return
+	if not PlayerData.can_discard_item(item):
+		_show_toast("Выбросить можно только полностью сломанную снасть.", false)
+		return
+
+	_pending_discard_item_id = item_id
+	_pending_discard_source = source
+	_ensure_discard_confirm_dialog()
+	discard_confirm_dialog.title = "Выбросить снасть"
+	discard_confirm_dialog.dialog_text = "Выбросить сломанную снасть?\nЭто действие нельзя отменить."
+	if discard_confirm_dialog.get_ok_button() != null:
+		discard_confirm_dialog.get_ok_button().text = "Выбросить"
+	if discard_confirm_dialog.get_cancel_button() != null:
+		discard_confirm_dialog.get_cancel_button().text = "Отмена"
+	discard_confirm_dialog.popup_centered(Vector2i(360, 160))
+
+func _ensure_discard_confirm_dialog() -> void:
+	if discard_confirm_dialog != null and is_instance_valid(discard_confirm_dialog):
+		return
+	discard_confirm_dialog = ConfirmationDialog.new()
+	discard_confirm_dialog.name = "DiscardBrokenTackleDialog"
+	discard_confirm_dialog.exclusive = true
+	discard_confirm_dialog.confirmed.connect(_on_discard_confirmed)
+	add_child(discard_confirm_dialog)
+
+func _on_discard_confirmed() -> void:
+	if _pending_discard_item_id == "":
+		return
+	var result := PlayerData.discard_owned_item(_pending_discard_item_id)
+	var success := bool(result.get("success", false))
+	var message := str(result.get("message", "Не удалось выбросить предмет."))
+	_pending_discard_item_id = ""
+	_pending_discard_source = ""
+	result_label.text = message
+	_show_toast(message, success)
+	if success:
+		SaveManager.save_game()
 	_update_ui()
 
 func _return_to_idle_after_result() -> void:

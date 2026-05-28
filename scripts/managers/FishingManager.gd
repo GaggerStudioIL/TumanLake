@@ -1527,22 +1527,22 @@ func _get_failure_template(reason: String) -> Dictionary:
 		FAILURE_FISH_ESCAPED_LOW_TENSION:
 			return {
 				"title": "Рыба сошла",
-				"message": "Натяжение было слишком слабым, и рыба освободилась.",
-				"hint": "Не отпускайте леску слишком сильно. Держите натяжение в зелёной зоне.",
+				"message": "Натяжение было слишком слабым, и рыба сорвалась.",
+				"hint": "Старайся удерживать натяжение в зелёной зоне.",
 				"severity": "medium"
 			}
 		FAILURE_FISH_ESCAPED_HIGH_TENSION:
 			return {
 				"title": "Рыба сорвалась",
-				"message": "Натяжение было слишком высоким, рыба резко дёрнула и сошла.",
-				"hint": "Снижайте натяжение при рывках рыбы.",
+				"message": "Натяжение стало слишком высоким.",
+				"hint": "Отпускай леску при резких рывках.",
 				"severity": "medium"
 			}
 		FAILURE_FISH_ESCAPED_HOOK:
 			return {
 				"title": "Рыба сорвалась с крючка",
 				"message": "Крючок плохо удержал рыбу.",
-				"hint": "Попробуйте другой размер крючка или более подходящую наживку.",
+				"hint": "Попробуй другой крючок или наживку.",
 				"severity": "medium"
 			}
 		FAILURE_FISH_TOO_STRONG:

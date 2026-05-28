@@ -2371,6 +2371,9 @@ const RESCUE_KIT_MONEY_LIMIT := 10.0
 const RESCUE_KIT_LINE_ID := "lakeline_nylon_basic_1_5kg"
 const RESCUE_KIT_PRIMARY_HOOK_ID := "riverstart_basic_hook_16"
 const RESCUE_KIT_FALLBACK_HOOK_ID := "small_hook_12"
+const REPAIR_COST_MULTIPLIER := 0.35
+const REPAIR_BLOCK_WEAR_PERCENT := 90
+const BROKEN_WEAR_PERCENT := 100
 
 var money: float = 0.0
 var level: int = 1
@@ -2388,6 +2391,7 @@ var fishing_depth: float = 1.2
 var owned_items: Array = get_default_owned_items()
 var current_tackle: Dictionary = get_default_tackle()
 var total_fish_caught := 0
+var total_fish_weight: float = 0.0
 var total_trophies_caught := 0
 var total_rarity_caught := 0
 var biggest_fish := {}
@@ -2465,6 +2469,7 @@ func register_catch_stats(catch_data: Dictionary) -> void:
 	_fill_catch_record_context(catch_data)
 
 	total_fish_caught += 1
+	total_fish_weight = snappedf(total_fish_weight + weight, 0.01)
 
 	var record_entry := _build_catch_record_entry(catch_data)
 	if catch_rank == "trophy":
@@ -2509,6 +2514,7 @@ func get_catch_stats_save_data() -> Dictionary:
 	return {
 		"player_name": player_name,
 		"total_fish_caught": total_fish_caught,
+		"total_fish_weight": total_fish_weight,
 		"total_trophies_caught": total_trophies_caught,
 		"total_rarity_caught": total_rarity_caught,
 		"biggest_fish": biggest_fish.duplicate(true),
@@ -2520,12 +2526,16 @@ func get_catch_stats_save_data() -> Dictionary:
 func set_catch_stats_from_save(save_data: Dictionary) -> void:
 	player_name = str(save_data.get("player_name", player_name))
 	total_fish_caught = max(int(save_data.get("total_fish_caught", 0)), 0)
+	total_fish_weight = max(float(save_data.get("total_fish_weight", 0.0)), 0.0)
 	total_trophies_caught = max(int(save_data.get("total_trophies_caught", 0)), 0)
 	total_rarity_caught = max(int(save_data.get("total_rarity_caught", 0)), 0)
 	biggest_fish = _safe_saved_dictionary(save_data.get("biggest_fish", {}))
 	biggest_fish_by_species = _safe_saved_dictionary(save_data.get("biggest_fish_by_species", {}))
 	trophy_catches = _safe_saved_array(save_data.get("trophy_catches", []))
 	personal_records = _safe_saved_dictionary(save_data.get("personal_records", {}))
+
+func has_caught_species(fish_id: String) -> bool:
+	return personal_records.has(fish_id) or biggest_fish_by_species.has(fish_id)
 
 func _fill_catch_record_context(catch_data: Dictionary) -> void:
 	var spot := SpotDatabase.get_spot(str(catch_data.get("spot_id", current_spot)))
@@ -3359,16 +3369,129 @@ func clear_current_tackle_slot(slot_id: String) -> void:
 	current_tackle[slot_id] = {}
 
 func can_equip_item(item: Dictionary) -> bool:
+	return get_equip_block_reason(item) == ""
+
+func get_equip_block_reason(item: Dictionary, slot_type: String = "") -> String:
+	if item.is_empty():
+		return "Предмет не выбран."
+
 	var category := str(item.get("category", ""))
+	if slot_type != "":
+		if slot_type == "bait_2" and not can_use_second_bait():
+			return "Нужен навык «Бутерброд»."
+		var expected_category := _get_tackle_slot_item_category(slot_type)
+		if category != expected_category:
+			return "Не подходит к этой снасти."
 
-	if not TACKLE_SLOT_ITEM_CATEGORIES.values().has(category) or int(item.get("quantity", 0)) <= 0:
+	if not TACKLE_SLOT_ITEM_CATEGORIES.values().has(category):
+		return "Не подходит к этой снасти."
+
+	if _is_durable_tackle_category(category):
+		var wear_percent := get_item_wear_percent(item)
+		if wear_percent >= BROKEN_WEAR_PERCENT:
+			return "Предмет сломан."
+		if wear_percent >= REPAIR_BLOCK_WEAR_PERCENT:
+			return "%s требует ремонта." % _get_tackle_slot_title(category)
+
+	if int(item.get("quantity", 0)) <= 0:
+		if category == "bait":
+			return "Наживка закончилась."
+		return "Предмет отсутствует."
+
+	return ""
+
+func is_item_repairable(item: Dictionary) -> bool:
+	if item.is_empty():
 		return false
+	var category := str(item.get("category", ""))
+	if not _is_durable_tackle_category(category):
+		return false
+	var wear_percent := get_item_wear_percent(item)
+	return wear_percent > 0 and wear_percent < BROKEN_WEAR_PERCENT
 
-	if ["rod", "line", "leader", "hook"].has(category):
-		var stats: Dictionary = item.get("stats", {})
-		return float(stats.get("durability", 1.0)) > 0.05
+func can_discard_item(item: Dictionary) -> bool:
+	return not item.is_empty() and _is_durable_tackle_category(str(item.get("category", ""))) and get_item_wear_percent(item) >= BROKEN_WEAR_PERCENT
 
-	return true
+func get_item_wear_percent(item: Dictionary) -> int:
+	if item.is_empty():
+		return 0
+	var category := str(item.get("category", ""))
+	if not _is_durable_tackle_category(category):
+		return 0
+	var stats: Dictionary = item.get("stats", {}) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
+	var durability: float = clamp(float(stats.get("durability", item.get("durability", 1.0))), 0.0, 1.0)
+	return clampi(roundi((1.0 - durability) * 100.0), 0, 100)
+
+func get_item_condition_title(item: Dictionary) -> String:
+	var wear_percent := get_item_wear_percent(item)
+	if wear_percent >= BROKEN_WEAR_PERCENT:
+		return "Сломана"
+	if wear_percent >= REPAIR_BLOCK_WEAR_PERCENT:
+		return "Требует ремонта"
+	if wear_percent >= 65:
+		return "Сильно изношена"
+	if wear_percent >= 30:
+		return "Изношена"
+	return "Исправна"
+
+func get_item_repair_cost(item: Dictionary) -> int:
+	if not is_item_repairable(item):
+		return 0
+	var wear_ratio: float = float(get_item_wear_percent(item)) / 100.0
+	var base_price: float = max(float(item.get("price", 0.0)), 25.0)
+	return maxi(roundi(base_price * wear_ratio * REPAIR_COST_MULTIPLIER), 1)
+
+func repair_owned_item(item_id: String) -> Dictionary:
+	var item := get_owned_item(item_id)
+	if item.is_empty():
+		return {"success": false, "message": "Предмет не найден."}
+	if get_item_wear_percent(item) >= BROKEN_WEAR_PERCENT:
+		return {"success": false, "message": "Предмет полностью сломан. Его можно только выбросить."}
+	if not is_item_repairable(item):
+		return {"success": false, "message": "Ремонт не требуется."}
+
+	var cost := get_item_repair_cost(item)
+	if money < float(cost):
+		return {"success": false, "message": "Недостаточно монет для ремонта."}
+
+	money -= float(cost)
+	_set_owned_item_durability(item_id, 1.0)
+	return {
+		"success": true,
+		"cost": cost,
+		"message": "Починено: %s" % str(item.get("name", "-"))
+	}
+
+func discard_owned_item(item_id: String) -> Dictionary:
+	var item_index := -1
+	var item: Dictionary = {}
+	for i in owned_items.size():
+		var owned_item: Dictionary = owned_items[i]
+		if str(owned_item.get("id", "")) == item_id:
+			item_index = i
+			item = owned_item
+			break
+
+	if item_index < 0:
+		return {"success": false, "message": "Предмет не найден."}
+	if not can_discard_item(item):
+		return {"success": false, "message": "Выбросить можно только полностью сломанную снасть."}
+
+	for slot in TACKLE_SLOTS:
+		if not current_tackle.has(slot):
+			continue
+		var component = current_tackle.get(slot, {})
+		if typeof(component) == TYPE_DICTIONARY and str(component.get("id", "")) == item_id:
+			clear_current_tackle_slot(slot)
+
+	owned_items.remove_at(item_index)
+	return {
+		"success": true,
+		"message": "Выброшено: %s" % str(item.get("name", "-"))
+	}
+
+func _is_durable_tackle_category(category: String) -> bool:
+	return ["rod", "line", "leader", "hook"].has(category)
 
 func has_usable_basic_tackle() -> bool:
 	for slot in REQUIRED_TACKLE_SLOTS:
@@ -3464,7 +3587,7 @@ func _is_current_tackle_slot_usable(slot: String) -> bool:
 		return false
 
 	if ["rod", "line", "leader", "hook"].has(slot):
-		return get_tackle_condition(slot) > 0.05
+		return get_item_wear_percent(component) < REPAIR_BLOCK_WEAR_PERCENT
 
 	return true
 
@@ -3689,22 +3812,18 @@ func _get_tackle_slot_issue(slot: String) -> String:
 		return ""
 	if slot == "bait_2":
 		if get_current_bait_quantity("bait_2") <= 0:
-			return "Second bait is depleted: %s." % item_name
+			return "Наживка 2 закончилась: %s." % item_name
 		return ""
 
 	if _get_owned_item_quantity(item_id) <= 0:
 		return "%s отсутствует в инвентаре: %s." % [title, item_name]
 
 	if ["rod", "line", "leader", "hook"].has(slot):
-		var condition := get_tackle_condition(slot)
-		if condition <= 0.08:
-			match slot:
-				"rod":
-					return "Удочка повреждена: %s." % item_name
-				"line":
-					return "Леска порвана: %s." % item_name
-				"hook":
-					return "Крючок потерян или поврежден: %s." % item_name
+		var wear_percent := get_item_wear_percent(component)
+		if wear_percent >= BROKEN_WEAR_PERCENT:
+			return "%s сломана: %s." % [title, item_name]
+		if wear_percent >= REPAIR_BLOCK_WEAR_PERCENT:
+			return "%s требует ремонта: %s." % [title, item_name]
 
 	return ""
 

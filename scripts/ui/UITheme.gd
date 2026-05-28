@@ -28,9 +28,11 @@ const RARITY_EPIC_STYLE := preload("res://assets/ui/inventory/rarity_epic.tres")
 const RARITY_LEGENDARY_STYLE := preload("res://assets/ui/inventory/rarity_legendary.tres")
 
 const ICON_FISH := preload("res://assets/ui/icons/icon_fish.png")
+const ICON_FISH_ATLAS := preload("res://assets/ui/icons/icon_fish_atlas.png")
 const ICON_BAIT := preload("res://assets/ui/icons/icon_bait.png")
 const ICON_ROD := preload("res://assets/ui/icons/icon_rod.png")
 const ICON_SHOP := preload("res://assets/ui/icons/icon_shop.png")
+const ICON_HARBOR := preload("res://assets/ui/icons/icon_harbor.png")
 const ICON_INVENTORY := preload("res://assets/ui/icons/icon_inventory.png")
 const ICON_KEEPNET := preload("res://assets/ui/icons/icon_keepnet.png")
 const ICON_MAP := preload("res://assets/ui/icons/icon_map.png")
@@ -58,8 +60,11 @@ const HUD_ICON_AUTO := preload("res://assets/ui/icons/hud/auto.svg")
 const SIDE_MENU_ICON_KEEPNET := preload("res://assets/ui/icons/side_menu/optimized/sadok.png")
 const SIDE_MENU_ICON_INVENTORY := preload("res://assets/ui/icons/side_menu/optimized/inventory.png")
 const SIDE_MENU_ICON_SHOP := preload("res://assets/ui/icons/side_menu/optimized/shop.png")
+const SIDE_MENU_ICON_HARBOR := preload("res://assets/ui/icons/side_menu/optimized/harbor.png")
 const SIDE_MENU_ICON_MAP := preload("res://assets/ui/icons/side_menu/optimized/map.png")
 const SIDE_MENU_ICON_PROFILE := preload("res://assets/ui/icons/side_menu/optimized/profile.png")
+const SIDE_MENU_ICON_FISH_ATLAS := preload("res://assets/ui/icons/side_menu/optimized/fish_atlas.png")
+const SIDE_MENU_ICON_SETTINGS := preload("res://assets/ui/icons/side_menu/optimized/settings.png")
 
 const GLASS_BG := Color(0.030, 0.043, 0.046, 0.72)
 const GLASS_BG_STRONG := Color(0.028, 0.038, 0.040, 0.86)
@@ -319,8 +324,10 @@ func get_icon(icon_name: String) -> Texture2D:
 			return HUD_ICON_AUTO
 		"hook", "cast":
 			return ICON_HOOK
-		"fish", "fishing", "encyclopedia", "atlas":
+		"fish", "fishing":
 			return ICON_FISH
+		"encyclopedia", "atlas", "fish_atlas":
+			return ICON_FISH_ATLAS
 		"basket", "keepnet":
 			return ICON_KEEPNET
 		"bait":
@@ -331,6 +338,8 @@ func get_icon(icon_name: String) -> Texture2D:
 			return ICON_SETTINGS
 		"cart", "shop":
 			return ICON_SHOP
+		"harbor", "fish_harbor":
+			return ICON_HARBOR
 		"money":
 			return ICON_MONEY
 		"location":
@@ -432,12 +441,16 @@ func get_side_menu_icon(icon_name: String) -> Texture2D:
 			return SIDE_MENU_ICON_INVENTORY
 		"shop":
 			return SIDE_MENU_ICON_SHOP
+		"harbor", "fish_harbor":
+			return SIDE_MENU_ICON_HARBOR
 		"map":
 			return SIDE_MENU_ICON_MAP
 		"profile":
 			return SIDE_MENU_ICON_PROFILE
 		"encyclopedia", "atlas":
-			return ICON_FISH
+			return SIDE_MENU_ICON_FISH_ATLAS
+		"settings":
+			return SIDE_MENU_ICON_SETTINGS
 		_:
 			return null
 
