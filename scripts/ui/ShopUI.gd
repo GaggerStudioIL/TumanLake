@@ -1,6 +1,8 @@
 # Handles the shop window: categories, item cards, and buy requests.
 extends RefCounted
 
+const PriceLabelScript := preload("res://scripts/ui/components/PriceLabel.gd")
+
 var main
 var theme
 var _texture_cache: Dictionary = {}
@@ -177,6 +179,8 @@ func open() -> void:
 	main.shop_backdrop.visible = true
 	main.shop_panel.visible = true
 	refresh()
+	if main.has_method("refresh_mobile_scroll_helper"):
+		main.refresh_mobile_scroll_helper()
 	main._refresh_bottom_nav_styles()
 
 func close() -> void:
@@ -615,7 +619,7 @@ func _update_shop_ui() -> void:
 	if main.shop_panel == null:
 		return
 
-	main.shop_money_label.text = PlayerData.format_money(PlayerData.money)
+	main.shop_money_label.text = UIFormatters.format_money(PlayerData.money)
 	theme.apply_tab_button_style(main.shop_bait_category_button, main._shop_category == SHOP_CATEGORY_BAIT)
 	theme.apply_tab_button_style(main.shop_consumable_category_button, main._shop_category == SHOP_CATEGORY_CONSUMABLE)
 	theme.apply_tab_button_style(main.shop_tackle_category_button, main._shop_category == SHOP_CATEGORY_ROD)
@@ -751,13 +755,13 @@ func _create_shop_card(item: Dictionary, card_size: Vector2) -> Panel:
 		var compact_meta_label = Label.new()
 		compact_meta_label.text = "%s  |  %s" % [
 			_get_shop_compact_stat_text(item),
-			PlayerData.format_money(float(item.get("price", 0.0)))
+			UIFormatters.format_money(float(item.get("price", 0.0)))
 		]
 		if compact_quantity > 1:
 			compact_meta_label.text = "%s  |  x%d  |  %s" % [
 				_get_shop_compact_stat_text(item),
 				compact_quantity,
-				PlayerData.format_money(float(item.get("price", 0.0)))
+				UIFormatters.format_money(float(item.get("price", 0.0)))
 			]
 		compact_meta_label.position = Vector2(compact_content_x, compact_text_y + 22.0)
 		compact_meta_label.size = Vector2(compact_text_width, 17.0)
@@ -860,7 +864,7 @@ func _populate_line_shop_card(card: Panel, item: Dictionary, card_size: Vector2,
 	card.add_child(stat_line_b)
 
 	var price_label := Label.new()
-	price_label.text = PlayerData.format_money(float(item.get("price", 0.0)))
+	PriceLabelScript.set_price(price_label, float(item.get("price", 0.0)))
 	price_label.position = Vector2(content_x, title_y + 63.0)
 	price_label.size = Vector2(text_width, 17.0)
 	price_label.clip_text = true
@@ -981,7 +985,7 @@ func _populate_rod_image_card(card: Panel, item: Dictionary, card_size: Vector2,
 
 	var price_label := Label.new()
 	price_label.name = "RodCardPriceLabel"
-	price_label.text = PlayerData.format_money(float(item.get("price", 0.0)))
+	PriceLabelScript.set_price(price_label, float(item.get("price", 0.0)))
 	price_label.position = Vector2(details_x, 3.0)
 	price_label.size = Vector2(actions_width, 16.0)
 	price_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -1136,7 +1140,7 @@ func _get_line_details_stats_text(item: Dictionary) -> String:
 		str(line_values.get("diameter", "-")),
 		str(line_values.get("strength", "-")),
 		str(line_values.get("material", "нейлон")),
-		PlayerData.format_money(float(item.get("price", 0.0)))
+		UIFormatters.format_money(float(item.get("price", 0.0)))
 	]
 
 func _get_shop_compact_stat_text(item: Dictionary) -> String:
@@ -1183,7 +1187,7 @@ func _get_rod_details_stats_text(item: Dictionary) -> String:
 		main._format_tackle_stat_value("length_m", stats.get("length_m", 0.0)),
 		main._format_tackle_stat_value("rod_class", stats.get("rod_class", "medium")),
 		main._format_tackle_stat_value("max_fish_weight", stats.get("max_fish_weight", 0.0)),
-		PlayerData.format_money(float(item.get("price", 0.0))),
+		UIFormatters.format_money(float(item.get("price", 0.0))),
 		_format_signed_percent(float(stats.get("control_bonus", stats.get("tension_bonus", 0.0)))),
 		_format_signed_percent(float(stats.get("handling_bonus", 0.0))),
 		_format_signed_percent(float(stats.get("reach_bonus", 0.0))),
@@ -1208,7 +1212,7 @@ func _get_shop_details_stats_text(item: Dictionary) -> String:
 					roundi(float(stats.get("fish_attraction", 0.0)) * 100.0),
 					int(item.get("quantity", 1))
 				],
-				"Цена: %s" % PlayerData.format_money(float(item.get("price", 0.0)))
+				"Цена: %s" % UIFormatters.format_money(float(item.get("price", 0.0)))
 			]
 			if target_text != "":
 				lines.append(target_text)
@@ -1220,7 +1224,7 @@ func _get_shop_details_stats_text(item: Dictionary) -> String:
 		_:
 			return "%s\nЦена: %s" % [
 				_get_shop_key_stat_text(item),
-				PlayerData.format_money(float(item.get("price", 0.0)))
+				UIFormatters.format_money(float(item.get("price", 0.0)))
 			]
 
 func _format_bait_type_name(bait_type: String) -> String:

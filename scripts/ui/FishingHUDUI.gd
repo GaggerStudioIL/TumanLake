@@ -36,22 +36,19 @@ func is_open() -> bool:
 	return main != null
 
 func _update_ui() -> void:
-	main._update_time_hud()
-	main.money_label.text = PlayerData.format_money(PlayerData.money)
-	main.tackle_label.text = _get_main_hud_text()
-	main.level_label.text = "LVL %d  XP %d/%d" % [
-		PlayerData.level,
-		PlayerData.current_xp,
-		PlayerData.xp_to_next_level
-	]
-	main.xp_progress_bar.max_value = max(PlayerData.xp_to_next_level, 1)
-	main.xp_progress_bar.value = clamp(PlayerData.current_xp, 0, PlayerData.xp_to_next_level)
-	main.money_label.text = "%s ₽" % PlayerData.format_money_amount(PlayerData.money)
-	main.level_label.text = "LVL %d  %d/%d XP" % [
-		PlayerData.level,
-		PlayerData.current_xp,
-		PlayerData.xp_to_next_level
-	]
+	if main.main_hud_controller != null:
+		main.main_hud_controller.refresh()
+	else:
+		main._update_time_hud()
+		main.money_label.text = UIFormatters.format_money(PlayerData.money)
+		main.tackle_label.text = _get_main_hud_text()
+		main.level_label.text = "LVL %d  %d/%d XP" % [
+			PlayerData.level,
+			PlayerData.current_xp,
+			PlayerData.xp_to_next_level
+		]
+		main.xp_progress_bar.max_value = max(PlayerData.xp_to_next_level, 1)
+		main.xp_progress_bar.value = clamp(PlayerData.current_xp, 0, PlayerData.xp_to_next_level)
 
 	var active_hook_input: bool = main._fishing_ui_state == FishingUiState.WAITING and bool(FishingManager.get("use_new_bite_system"))
 	var locked_for_result_or_fishing: bool = main._fishing_ui_state != FishingUiState.IDLE or main.is_cast_animating

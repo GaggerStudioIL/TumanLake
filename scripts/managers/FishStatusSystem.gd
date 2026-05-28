@@ -49,13 +49,16 @@ func get_quality_multiplier(status: String) -> float:
 
 
 func get_status_title(status: String) -> String:
+	var formatters := get_node_or_null("/root/UIFormatters")
+	if formatters != null and formatters.has_method("format_fish_status"):
+		return str(formatters.call("format_fish_status", status))
 	match status:
 		STATUS_KEEPER:
-			return "Зачет"
+			return "зачёт"
 		STATUS_TROPHY:
-			return "Трофей"
+			return "трофей"
 		_:
-			return "Незачет"
+			return "незачёт"
 
 
 func meets_min_status(catch_status: String, min_status: String) -> bool:

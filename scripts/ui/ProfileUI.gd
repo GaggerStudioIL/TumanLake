@@ -38,6 +38,8 @@ func open() -> void:
 	backdrop.visible = true
 	panel.visible = true
 	refresh()
+	if main.has_method("refresh_mobile_scroll_helper"):
+		main.refresh_mobile_scroll_helper()
 	main._refresh_bottom_nav_styles()
 
 
@@ -214,10 +216,10 @@ func _add_info_section() -> void:
 	_add_stat_card(grid, "Имя", PlayerData.player_name)
 	_add_stat_card(grid, "Уровень", "LVL %d" % PlayerData.level)
 	_add_stat_card(grid, "Опыт", "%d / %d" % [PlayerData.current_xp, PlayerData.xp_to_next_level])
-	_add_stat_card(grid, "Деньги", PlayerData.format_money(PlayerData.money))
+	_add_stat_card(grid, "Деньги", UIFormatters.format_money(PlayerData.money))
 	_add_stat_card(grid, "Водоём", _get_current_waterbody_name())
 	_add_stat_card(grid, "Поймано рыб", "%d" % PlayerData.total_fish_caught)
-	_add_stat_card(grid, "Общий вес", "%.2f кг" % float(PlayerData.get("total_fish_weight")))
+	_add_stat_card(grid, "Общий вес", UIFormatters.format_weight_kg(float(PlayerData.get("total_fish_weight"))))
 	_add_stat_card(grid, "Самый дорогой улов", _format_short_record(_get_most_expensive_catch(), true))
 	_add_stat_card(grid, "Самая крупная рыба", _format_short_record(PlayerData.biggest_fish))
 	_add_stat_card(grid, "Трофеи", "%d" % PlayerData.total_trophies_caught)
@@ -452,9 +454,9 @@ func _add_record_card(parent: Control, record: Dictionary) -> void:
 	rank_label.add_theme_stylebox_override("normal", main._make_panel_style(Color(0.035, 0.075, 0.062, 0.74), Color(_get_rank_color(rank).r, _get_rank_color(rank).g, _get_rank_color(rank).b, 0.34), 10, 3))
 	card.add_child(rank_label)
 
-	var main_line := _make_label("%.2f кг | %.1f см | %s" % [
-		float(record.get("weight", 0.0)),
-		float(record.get("length_cm", 0.0)),
+	var main_line := _make_label("%s | %s | %s" % [
+		UIFormatters.format_weight_kg(float(record.get("weight", 0.0))),
+		UIFormatters.format_length_cm(float(record.get("length_cm", 0.0))),
 		str(record.get("spot_name", "-"))
 	], 13, Color(0.78, 0.90, 0.82, 0.95))
 	main_line.position = Vector2(14.0, 36.0)
@@ -547,12 +549,12 @@ func _get_player_initials() -> String:
 func _format_short_record(record: Dictionary, include_price: bool = false) -> String:
 	if record.is_empty():
 		return "пока нет данных"
-	var text := "%s %.2f кг" % [
+	var text := "%s %s" % [
 		str(record.get("fish_name", record.get("name", "-"))),
-		float(record.get("weight", 0.0))
+		UIFormatters.format_weight_kg(float(record.get("weight", 0.0)))
 	]
 	if include_price:
-		text += " | %d мон." % int(record.get("price", 0))
+		text += " | %s" % UIFormatters.format_money(float(record.get("price", 0)))
 	return text
 
 

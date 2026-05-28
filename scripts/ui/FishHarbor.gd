@@ -11,6 +11,9 @@ const SECTION_MARKET := "market"
 const SECTION_REPUTATION := "reputation"
 const REPUTATION_THRESHOLDS := [0, 50, 150, 350, 700, 1100]
 const MarketHistoryChartScript := preload("res://scripts/ui/MarketHistoryChart.gd")
+const EmptyStateCardScript := preload("res://scripts/ui/components/EmptyStateCard.gd")
+const PriceLabelScript := preload("res://scripts/ui/components/PriceLabel.gd")
+const StatusBadgeScript := preload("res://scripts/ui/components/StatusBadge.gd")
 
 var main
 var current_section := SECTION_SALE
@@ -54,6 +57,8 @@ func open() -> void:
 		main._active_nav_tab = "harbor"
 	visible = true
 	refresh()
+	if main != null and main.has_method("refresh_mobile_scroll_helper"):
+		main.refresh_mobile_scroll_helper()
 	if main != null and main.has_method("_refresh_bottom_nav_styles"):
 		main._refresh_bottom_nav_styles()
 
@@ -104,7 +109,9 @@ func refresh() -> void:
 			_build_harbor_sidebar("Рынок", "Высокий спрос усиливает цену до расчёта бонусов покупателя и свежести.")
 		SECTION_REPUTATION:
 			_build_reputation_section()
-			_build_harbor_sidebar("Репутация", "Каждая продажа приносит репутацию покупателю. Зачётная и трофейная рыба ценится выше.")
+			_build_harbor_sidebar("Репутация", "Каждая продажа приносит репутацию покупателю. Зачёт и трофей ценятся выше.")
+	if main != null and main.has_method("refresh_mobile_scroll_helper"):
+		main.refresh_mobile_scroll_helper()
 
 
 func _ensure_nodes() -> void:
@@ -383,8 +390,8 @@ func _create_sale_row(fish: Dictionary, fish_index: int) -> Panel:
 	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	info.add_child(name_label)
 
-	var details_label := _make_label("%.2f кг  |  %s" % [
-		float(prepared.get("weight", 0.0)),
+	var details_label := _make_label("%s  |  %s" % [
+		UIFormatters.format_weight_kg(float(prepared.get("weight", 0.0))),
 		_get_status_title(str(prepared.get("fish_status", "undersized")))
 	], 12, _get_status_color(str(prepared.get("fish_status", "undersized"))))
 	details_label.clip_text = true
@@ -411,14 +418,15 @@ func _create_sale_row(fish: Dictionary, fish_index: int) -> Panel:
 	price_box.add_theme_constant_override("separation", 2)
 	row.add_child(price_box)
 
-	var price_label := _make_label("%d мон." % int(offer.get("price", 0)), 15, Color(1.0, 0.84, 0.46, 1.0))
+	var price_label := _make_label("", 15, Color(1.0, 0.84, 0.46, 1.0))
+	PriceLabelScript.set_price(price_label, float(offer.get("price", 0)))
 	price_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	price_box.add_child(price_label)
-	var multiplier_label := _make_label("x%.2f" % float(offer.get("multiplier", 0.0)), 11, Color(0.76, 0.88, 0.84, 0.92))
+	var multiplier_label := _make_label(UIFormatters.format_market_multiplier(float(offer.get("multiplier", 0.0))), 11, Color(0.76, 0.88, 0.84, 0.92))
 	multiplier_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	price_box.add_child(multiplier_label)
 	if buyer_id == best_buyer_id and bool(offer.get("accepted", false)):
-		var best_badge := _make_label("Лучшее", 11, Color(0.42, 0.96, 0.86, 1.0))
+		var best_badge := StatusBadgeScript.create_badge("Лучшее", "best")
 		best_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		price_box.add_child(best_badge)
 
@@ -427,7 +435,7 @@ func _create_sale_row(fish: Dictionary, fish_index: int) -> Panel:
 
 func _get_buyer_button_text(fish: Dictionary, buyer_id: String, best_buyer_id: String, offer: Dictionary) -> String:
 	var buyer_name := str(offer.get("supplier_name", offer.get("buyer_name", buyer_id)))
-	var selected_line := "%s — %d мон." % [buyer_name, int(offer.get("price", 0))]
+	var selected_line := "%s — %s" % [buyer_name, UIFormatters.format_money(float(offer.get("price", 0)))]
 	if not bool(offer.get("accepted", false)):
 		selected_line = "%s — %s" % [buyer_name, _short_rejection_reason(str(offer.get("reason", "не принимает")))]
 	if buyer_id == best_buyer_id and bool(offer.get("accepted", false)):
@@ -436,7 +444,7 @@ func _get_buyer_button_text(fish: Dictionary, buyer_id: String, best_buyer_id: S
 	var best_offer := _get_offer(fish, best_buyer_id)
 	var best_name := str(best_offer.get("supplier_name", best_offer.get("buyer_name", best_buyer_id)))
 	if bool(best_offer.get("accepted", false)):
-		return "%s\nЛучшее: %s — %d мон." % [selected_line, best_name, int(best_offer.get("price", 0))]
+		return "%s\nЛучшее: %s — %s" % [selected_line, best_name, UIFormatters.format_money(float(best_offer.get("price", 0)))]
 	return selected_line
 
 
@@ -499,9 +507,9 @@ func _create_buyer_popup_option(fish_index: int, buyer_id: String, offer: Dictio
 	button.disabled = not accepted
 	if accepted:
 		if best:
-			button.text = "%s — %d мон.\nЛучшее" % [buyer_name, int(offer.get("price", 0))]
+			button.text = "%s — %s\nЛучшее" % [buyer_name, UIFormatters.format_money(float(offer.get("price", 0)))]
 		else:
-			button.text = "%s — %d мон." % [buyer_name, int(offer.get("price", 0))]
+			button.text = "%s — %s" % [buyer_name, UIFormatters.format_money(float(offer.get("price", 0)))]
 		button.pressed.connect(_on_custom_buyer_selected.bind(fish_index, buyer_id))
 	else:
 		button.text = "Закрыто: %s\n%s" % [buyer_name, _short_rejection_reason(str(offer.get("reason", "не принимает")))]
@@ -550,13 +558,14 @@ func _refresh_sale_footer() -> void:
 	summary_box.add_theme_constant_override("separation", 4)
 	row.add_child(summary_box)
 
-	var total_label := _make_label("Итого: %d мон." % int(summary.get("price", 0)), 18, Color(1.0, 0.88, 0.58, 1.0))
+	var total_label := _make_label("", 18, Color(1.0, 0.88, 0.58, 1.0))
+	PriceLabelScript.set_total_price(total_label, float(summary.get("price", 0)))
 	total_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	summary_box.add_child(total_label)
 
-	var selected_label := _make_label("Выбрано: %d | %.2f кг" % [
+	var selected_label := _make_label("Выбрано: %d | %s" % [
 		int(summary.get("selected_count", summary.get("count", 0))),
-		float(summary.get("weight", 0.0))
+		UIFormatters.format_weight_kg(float(summary.get("weight", 0.0)))
 	], 12, Color(0.76, 0.88, 0.82, 0.94))
 	selected_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	summary_box.add_child(selected_label)
@@ -638,18 +647,24 @@ func _on_sell_selected_pressed() -> void:
 		_show_notice("Выберите рыбу для продажи.", false)
 		return
 	var inventory_manager := _inventory_manager()
+	var sales_service := _sales_service()
 	var earned := 0
-	if inventory_manager != null and inventory_manager.has_method("sell_selected_fish"):
+	if sales_service != null and sales_service.has_method("sell_selected_fish"):
+		earned = int(sales_service.call("sell_selected_fish", requests))
+	elif inventory_manager != null and inventory_manager.has_method("sell_selected_fish"):
 		earned = int(inventory_manager.call("sell_selected_fish", requests, {}))
-	_after_sale("Продано выбранное: +%d мон." % earned, earned > 0)
+	_after_sale("Продано выбранное: +%s" % UIFormatters.format_money(float(earned)), earned > 0)
 
 
 func _on_sell_all_pressed() -> void:
 	var inventory_manager := _inventory_manager()
+	var sales_service := _sales_service()
 	var earned := 0
-	if inventory_manager != null and inventory_manager.has_method("sell_all_fish_best_offer"):
+	if sales_service != null and sales_service.has_method("sell_all_fish_best_offer"):
+		earned = int(sales_service.call("sell_all_fish_best_offer"))
+	elif inventory_manager != null and inventory_manager.has_method("sell_all_fish_best_offer"):
 		earned = int(inventory_manager.call("sell_all_fish_best_offer"))
-	_after_sale("Продано всё: +%d мон." % earned, earned > 0)
+	_after_sale("Продано всё: +%s" % UIFormatters.format_money(float(earned)), earned > 0)
 
 
 func _after_sale(message: String, success: bool) -> void:
@@ -701,7 +716,7 @@ func _build_buyers_sidebar() -> void:
 			lines.append("Закрыто: репутация %d" % int(supplier.get("min_reputation", 0)))
 		elif selected_count > 0:
 			lines.append("Принимает: %d/%d" % [accepted, selected_count])
-			lines.append("Итог: %d мон." % total)
+			lines.append("Итог: %s" % UIFormatters.format_money(float(total)))
 		else:
 			lines.append(str(supplier.get("accepts_text", "")))
 		_add_buyer_sidebar_card(
@@ -824,11 +839,11 @@ func _create_contract_card(contract: Dictionary, completed: bool) -> Panel:
 	box.add_child(title)
 
 	var progress_text := _format_contract_progress(contract)
-	var details := _make_label("Рыба: %s | Поставщик: %s\nПрогресс: %s\nНаграда: %d мон. | Репутация +%d%s" % [
+	var details := _make_label("Рыба: %s | Поставщик: %s\nПрогресс: %s\nНаграда: %s | Репутация +%d%s" % [
 		str(contract.get("fish_name", "-")),
 		str(contract.get("supplier_name", "Покупатель")),
 		progress_text,
-		int(contract.get("reward_money", 0)),
+		UIFormatters.format_money(float(contract.get("reward_money", 0))),
 		int(contract.get("reward_reputation", 0)),
 		_get_contract_deadline_text(contract, completed)
 	], 12, Color(0.78, 0.88, 0.82, 0.95))
@@ -1054,6 +1069,12 @@ func _prepare_fish(fish: Dictionary) -> Dictionary:
 
 
 func _get_offer(fish: Dictionary, buyer_id: String) -> Dictionary:
+	var sales_service := _sales_service()
+	if sales_service != null and sales_service.has_method("get_offer_for_buyer"):
+		var service_value = sales_service.call("get_offer_for_buyer", fish, buyer_id)
+		if service_value is Dictionary:
+			return service_value
+
 	var inventory_manager := _inventory_manager()
 	if inventory_manager != null and inventory_manager.has_method("get_buyer_offer"):
 		var value = inventory_manager.call("get_buyer_offer", fish, buyer_id)
@@ -1063,6 +1084,10 @@ func _get_offer(fish: Dictionary, buyer_id: String) -> Dictionary:
 
 
 func _get_best_buyer(fish: Dictionary) -> String:
+	var sales_service := _sales_service()
+	if sales_service != null and sales_service.has_method("get_best_buyer_for_fish"):
+		return str(sales_service.call("get_best_buyer_for_fish", fish))
+
 	var inventory_manager := _inventory_manager()
 	if inventory_manager != null and inventory_manager.has_method("get_best_buyer_for_fish"):
 		return str(inventory_manager.call("get_best_buyer_for_fish", fish))
@@ -1475,13 +1500,7 @@ func _get_sale_status_color(selected: bool, buyer_id: String, best_buyer_id: Str
 
 
 func _get_status_title(status: String) -> String:
-	match status:
-		"keeper":
-			return "зачётная"
-		"trophy":
-			return "трофейная"
-		_:
-			return "незачётная"
+	return UIFormatters.format_fish_status(status)
 
 
 func _get_status_color(status: String) -> Color:
@@ -1613,17 +1632,11 @@ func _add_buyer_sidebar_card(title: String, lines: Array, active: bool, locked: 
 
 
 func _add_empty_card(parent: Control, title: String, body: String) -> void:
-	var card := _make_content_card(82.0)
+	var card := EmptyStateCardScript.new()
+	card.custom_minimum_size = Vector2(0.0, 92.0)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.setup(title, body)
 	parent.add_child(card)
-	var title_label_node := _make_label(title, 15, Color(0.94, 1.0, 0.92, 1.0))
-	title_label_node.position = Vector2(14.0, 10.0)
-	title_label_node.size = Vector2(420.0, 22.0)
-	card.add_child(title_label_node)
-	var body_label := _make_label(body, 12, Color(0.74, 0.84, 0.80, 0.94))
-	body_label.position = Vector2(14.0, 38.0)
-	body_label.size = Vector2(560.0, 34.0)
-	body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	card.add_child(body_label)
 
 
 func _make_content_card(height: float) -> Panel:
@@ -1750,6 +1763,10 @@ func _inventory_manager() -> Node:
 	return get_node_or_null("/root/InventoryManager")
 
 
+func _sales_service() -> Node:
+	return get_node_or_null("/root/SalesService")
+
+
 func _supplier_manager() -> Node:
 	return get_node_or_null("/root/SupplierManager")
 
@@ -1779,6 +1796,6 @@ func _get_fish_data(fish_id: String) -> Dictionary:
 
 func _format_player_money() -> String:
 	var player_data: Node = get_node_or_null("/root/PlayerData")
-	if player_data != null and player_data.has_method("format_money"):
-		return str(player_data.call("format_money", float(player_data.get("money"))))
-	return "0 мон."
+	if player_data != null:
+		return UIFormatters.format_money(float(player_data.get("money")))
+	return UIFormatters.format_money(0.0)

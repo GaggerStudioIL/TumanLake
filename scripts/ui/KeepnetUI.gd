@@ -1,9 +1,13 @@
 # Handles the keepnet window: fish cards, stats, and sell requests.
 extends RefCounted
 
+const EmptyStateCardScript := preload("res://scripts/ui/components/EmptyStateCard.gd")
+const FishCardScript := preload("res://scripts/ui/components/FishCard.gd")
+
 var main
 var theme
 var fish_details_overlay: Control
+var empty_state_card: Control
 signal sell_fish_requested(fish_index: int)
 
 enum FishingUiState {
@@ -29,6 +33,8 @@ func open() -> void:
 	main.basket_panel.visible = true
 	_show_basket_notice("")
 	refresh()
+	if main.has_method("refresh_mobile_scroll_helper"):
+		main.refresh_mobile_scroll_helper()
 	main._refresh_bottom_nav_styles()
 
 func close() -> void:
@@ -51,6 +57,7 @@ func is_open() -> bool:
 func _on_keepnet_sell_fish_pressed(fish_index: int) -> void:
 	_hide_fish_details()
 	sell_fish_requested.emit(fish_index)
+	call_deferred("_hide_fish_details")
 
 func _ensure_keepnet_ui_nodes() -> void:
 	if main.basket_backdrop != null:
@@ -105,23 +112,44 @@ func _ensure_keepnet_ui_nodes() -> void:
 	main.basket_notice_label.z_index = 2
 	main.basket_panel.add_child(main.basket_notice_label)
 
+	empty_state_card = EmptyStateCardScript.new()
+	empty_state_card.name = "BasketEmptyStateCard"
+	empty_state_card.visible = false
+	empty_state_card.z_index = 2
+	empty_state_card.setup("Садок пуст", "Поймайте рыбу, и она появится здесь.")
+	main.basket_panel.add_child(empty_state_card)
+
 
 func _update_basket_ui() -> void:
 	var fish_count: int = InventoryManager.inventory.size()
+	if fish_count == 0:
+		_hide_fish_details()
 	main.basket_button.text = "Садок"
 	var summary = _get_keepnet_summary()
-	main.basket_stats_label.text = "Рыб: %d    Вес: %.2f кг    Стоимость: %d мон." % [
+	main.basket_stats_label.text = "Рыб: %d    Вес: %s    Стоимость: %s" % [
 		fish_count,
-		float(summary.get("weight", 0.0)),
-		int(summary.get("price", 0))
+		UIFormatters.format_weight_kg(float(summary.get("weight", 0.0))),
+		UIFormatters.format_money(float(summary.get("price", 0)))
 	]
-	main.basket_contents_label.text = "Садок пуст.\nПоймай первую рыбу."
-	main.basket_contents_label.visible = fish_count == 0
+	main.basket_contents_label.visible = false
+	_update_empty_state_card(fish_count)
 	main.basket_scroll.visible = fish_count > 0
 	main.basket_sell_all_button.disabled = fish_count == 0 or main._fishing_ui_state == FishingUiState.WAITING or main._fishing_ui_state == FishingUiState.FIGHTING
 
 	if main.basket_panel.visible:
 		_rebuild_keepnet_cards()
+
+
+func _update_empty_state_card(fish_count: int) -> void:
+	if empty_state_card == null:
+		return
+	empty_state_card.visible = fish_count == 0
+	empty_state_card.position = main.basket_contents_label.position + Vector2(18.0, 18.0)
+	empty_state_card.size = Vector2(
+		maxf(main.basket_contents_label.size.x - 36.0, 220.0),
+		maxf(main.basket_contents_label.size.y - 36.0, 92.0)
+	)
+	empty_state_card.custom_minimum_size = empty_state_card.size
 
 
 func _get_keepnet_summary() -> Dictionary:
@@ -184,138 +212,24 @@ func _create_keepnet_card(fish: Dictionary, fish_index: int, card_size: Vector2)
 		tier = "trophy"
 	if tier != "trophy" and tier != "rarity":
 		tier = "normal"
-	var accent = _get_keepnet_tier_color(tier)
-	var card = Panel.new()
-	card.custom_minimum_size = card_size
-	card.size = card_size
-	card.mouse_filter = Control.MOUSE_FILTER_PASS
-	card.clip_contents = true
-	theme.apply_card_style(card)
-
-	var details_button := Button.new()
-	details_button.text = ""
-	details_button.set_anchors_preset(Control.PRESET_FULL_RECT)
-	details_button.mouse_filter = Control.MOUSE_FILTER_PASS
-	details_button.focus_mode = Control.FOCUS_NONE
-	details_button.z_index = 1
-	_apply_transparent_card_button_style(details_button, accent)
-	details_button.pressed.connect(_show_fish_details.bind(fish_index))
-	card.add_child(details_button)
-
-	var fish_slot = Panel.new()
-	fish_slot.position = Vector2(12.0, 14.0)
-	fish_slot.size = Vector2(108.0, 58.0)
-	fish_slot.clip_contents = true
-	fish_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	fish_slot.z_index = 2
-	var slot_rarity: String = "epic" if tier == "rarity" else ("legendary" if tier == "trophy" else "common")
-	theme.apply_rarity_slot_style(fish_slot, slot_rarity)
-	card.add_child(fish_slot)
-
-	var fish_texture = main._get_reward_fish_texture(str(fish.get("id", "")))
-	if fish_texture != null:
-		var fish_sprite = Sprite2D.new()
-		fish_sprite.texture = fish_texture
-		fish_sprite.centered = true
-		fish_sprite.position = fish_slot.size * 0.5
-		var texture_size = fish_texture.get_size()
-		var fit_scale: float = min(
-			(fish_slot.size.x - 12.0) / max(texture_size.x, 1.0),
-			(fish_slot.size.y - 10.0) / max(texture_size.y, 1.0)
-		)
-		fish_sprite.scale = Vector2.ONE * fit_scale
-		fish_slot.add_child(fish_sprite)
-	else:
-		var fallback_label = Label.new()
-		fallback_label.text = "><>"
-		fallback_label.position = Vector2.ZERO
-		fallback_label.size = fish_slot.size
-		fallback_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		fallback_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		fallback_label.add_theme_font_size_override("font_size", 24)
-		fallback_label.add_theme_color_override("font_color", Color(accent.r, accent.g, accent.b, 0.84))
-		fish_slot.add_child(fallback_label)
-
-	var text_x := 132.0
-	var badge_width := 96.0
-	var badge_right_margin := 14.0
-	var badge_visible := tier == "trophy" or tier == "rarity"
-	var title_right_gap := badge_width + badge_right_margin + 8.0 if badge_visible else 12.0
-	var text_width: float = maxf(card_size.x - text_x - title_right_gap, 120.0)
-	var fish_name := str(fish.get("name", "-"))
-	var name_label = Label.new()
-	name_label.text = fish_name
-	name_label.position = Vector2(text_x, 12.0)
-	name_label.size = Vector2(text_width, 24.0)
-	name_label.clip_text = true
-	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	name_label.z_index = 2
-	name_label.add_theme_font_size_override("font_size", 13 if fish_name.length() > 18 else 15)
-	name_label.add_theme_color_override("font_color", Color(0.94, 1.0, 0.91, 1.0))
-	card.add_child(name_label)
-
-	var badge_label = Label.new()
-	badge_label.text = _get_keepnet_tier_label(tier)
-	badge_label.visible = badge_visible
-	badge_label.position = Vector2(card_size.x - badge_width - badge_right_margin, 14.0)
-	badge_label.size = Vector2(badge_width, 20.0)
-	badge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	badge_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	badge_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	badge_label.z_index = 2
-	badge_label.add_theme_font_size_override("font_size", 12)
-	badge_label.add_theme_color_override("font_color", Color(accent.r, accent.g, accent.b, 1.0))
-	badge_label.add_theme_stylebox_override(
-		"normal",
-		main._make_panel_style(Color(accent.r * 0.16, accent.g * 0.20, accent.b * 0.18, 0.62), Color(accent.r, accent.g, accent.b, 0.36), 11, 4, Color(0.0, 0.0, 0.0, 0.10))
-	)
-	card.add_child(badge_label)
-
-	var weight = float(fish.get("weight", 0.0))
-	var price = InventoryManager.get_fish_sell_price(fish)
-	var status_title := _get_short_fish_status_title(fish)
-	var supplier_name := _get_best_supplier_name(fish)
-	var stats_label = Label.new()
-	stats_label.text = "%.2f кг | %s\n%d мон." % [
-		weight,
-		status_title,
-		price
-	]
-	stats_label.position = Vector2(text_x, 42.0)
-	stats_label.size = Vector2(card_size.x - text_x - 12.0, 40.0)
-	stats_label.clip_text = false
-	stats_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	stats_label.z_index = 2
-	stats_label.add_theme_font_size_override("font_size", 12)
-	stats_label.add_theme_color_override("font_color", Color(0.76, 0.88, 0.80, 0.92))
-	card.add_child(stats_label)
-
-	var supplier_label := Label.new()
-	supplier_label.text = supplier_name
-	supplier_label.position = Vector2(12.0, 102.0)
-	supplier_label.size = Vector2(card_size.x - 122.0, 34.0)
-	supplier_label.clip_text = true
-	supplier_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	supplier_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	supplier_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	supplier_label.z_index = 2
-	supplier_label.add_theme_font_size_override("font_size", 12)
-	supplier_label.add_theme_color_override("font_color", Color(0.84, 0.96, 0.88, 0.96))
-	card.add_child(supplier_label)
-
-	var sell_button = Button.new()
-	sell_button.text = "Продать"
-	sell_button.position = Vector2(card_size.x - 104.0, card_size.y - 46.0)
-	sell_button.size = Vector2(92.0, 36.0)
-	sell_button.z_index = 10
-	sell_button.mouse_filter = Control.MOUSE_FILTER_STOP
-	main._apply_button_style(sell_button, main.STYLE_SECONDARY_BUTTON)
-	sell_button.size = Vector2(92.0, 36.0)
-	sell_button.add_theme_font_size_override("font_size", 12)
-	sell_button.pressed.connect(_on_keepnet_sell_fish_pressed.bind(fish_index))
-	card.add_child(sell_button)
-
+	var price := InventoryManager.get_fish_sell_price(fish)
+	var card := FishCardScript.new()
+	card.setup({
+		"fish_id": str(fish.get("id", fish.get("fish_id", ""))),
+		"name": str(fish.get("name", "-")),
+		"icon": main._get_reward_fish_texture(str(fish.get("id", fish.get("fish_id", "")))),
+		"weight": float(fish.get("weight", 0.0)),
+		"status": fish_status_id,
+		"rarity": str(fish.get("rarityType", "common")),
+		"price": price,
+		"buyer_name": _get_best_supplier_name(fish),
+		"is_trophy": fish_status_id == "trophy",
+		"badge_text": _get_keepnet_tier_label(tier) if tier == "trophy" or tier == "rarity" else "",
+		"badge_type": "trophy" if tier == "trophy" else ("rare" if tier == "rarity" else ""),
+		"card_size": card_size
+	}, "keepnet")
+	card.set_pressed_callback(_show_fish_details.bind(fish_index))
+	card.set_action_button("Продать", _on_keepnet_sell_fish_pressed.bind(fish_index))
 	return card
 
 
@@ -417,15 +331,15 @@ func _show_fish_details(fish_index: int) -> void:
 	info.add_child(name_label)
 
 	var stats := Label.new()
-	stats.text = "Вес: %.2f кг\nДлина: %.1f см\nСтатус: %s\nРедкость: %s\nСвежесть: %s\nСпрос: x%.2f\nЛучший покупатель: %s\nЦена: %d мон." % [
-		weight,
-		length_cm,
+	stats.text = "Вес: %s\nДлина: %s\nСтатус: %s\nРедкость: %s\nСвежесть: %s\nСпрос: %s\nЛучший покупатель: %s\nЦена: %s" % [
+		UIFormatters.format_weight_kg(weight),
+		UIFormatters.format_length_cm(length_cm),
 		status_title,
 		rarity_title,
 		freshness_title,
-		market_demand,
+		UIFormatters.format_market_multiplier(market_demand),
 		supplier_name,
-		price
+		UIFormatters.format_money(float(price))
 	]
 	stats.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	stats.add_theme_font_size_override("font_size", 13)
@@ -460,13 +374,21 @@ func _show_fish_details(fish_index: int) -> void:
 
 
 func _hide_fish_details() -> void:
-	if fish_details_overlay == null:
-		return
 	if is_instance_valid(fish_details_overlay):
 		if fish_details_overlay.get_parent() != null:
 			fish_details_overlay.get_parent().remove_child(fish_details_overlay)
 		fish_details_overlay.queue_free()
 	fish_details_overlay = null
+	_remove_orphan_fish_details_overlays()
+
+
+func _remove_orphan_fish_details_overlays() -> void:
+	if main == null or main.basket_panel == null:
+		return
+	for child in main.basket_panel.get_children():
+		if child != null and child.name == "BasketFishDetailsOverlay":
+			main.basket_panel.remove_child(child)
+			child.queue_free()
 
 
 func _add_fish_preview(parent: Control, fish: Dictionary, preview_size: Vector2) -> void:
@@ -499,7 +421,7 @@ func _add_fish_preview(parent: Control, fish: Dictionary, preview_size: Vector2)
 func _get_buyer_offer_text(fish: Dictionary) -> String:
 	var supplier_manager: Node = main.get_node_or_null("/root/SupplierManager")
 	if supplier_manager == null or not supplier_manager.has_method("get_buyer_offer"):
-		return "%s — %d мон." % [_get_best_supplier_name(fish), InventoryManager.get_fish_sell_price(fish)]
+		return "%s — %s" % [_get_best_supplier_name(fish), UIFormatters.format_money(float(InventoryManager.get_fish_sell_price(fish)))]
 
 	var supplier_ids: Array = []
 	if supplier_manager.has_method("get_primary_supplier_ids"):
@@ -526,9 +448,9 @@ func _get_buyer_offer_text(fish: Dictionary) -> String:
 	var lines: Array = []
 	for i in range(mini(offers.size(), 4)):
 		var offer: Dictionary = offers[i]
-		lines.append("%s — %d мон." % [str(offer.get("name", "-")), int(offer.get("price", 0))])
+		lines.append("%s — %s" % [str(offer.get("name", "-")), UIFormatters.format_money(float(offer.get("price", 0)))])
 	if lines.is_empty():
-		lines.append("%s — %d мон." % [_get_best_supplier_name(fish), InventoryManager.get_fish_sell_price(fish)])
+		lines.append("%s — %s" % [_get_best_supplier_name(fish), UIFormatters.format_money(float(InventoryManager.get_fish_sell_price(fish)))])
 	return "\n".join(lines)
 
 
@@ -580,17 +502,6 @@ func _get_keepnet_tier_label(tier: String) -> String:
 			return "Обычная"
 
 
-func _get_fish_status_title(fish: Dictionary) -> String:
-	if fish.has("fish_status_title"):
-		return str(fish.get("fish_status_title", "Незачет"))
-
-	var status_system: Node = main.get_node_or_null("/root/FishStatusSystem")
-	if status_system != null and status_system.has_method("get_status_title"):
-		return str(status_system.call("get_status_title", str(fish.get("fish_status", "undersized"))))
-
-	return "Незачет"
-
-
 func _get_fish_status_id(fish: Dictionary) -> String:
 	var status := str(fish.get("fish_status", ""))
 	if status.is_empty():
@@ -610,13 +521,7 @@ func _get_short_fish_status_title(fish: Dictionary) -> String:
 		var fish_data: Dictionary = FishDatabase.get_fish(str(fish.get("id", fish.get("fish_id", ""))))
 		if status_system != null and status_system.has_method("get_status") and not fish_data.is_empty():
 			status = str(status_system.call("get_status", fish_data, float(fish.get("weight", 0.0))))
-	match status:
-		"keeper":
-			return "зачёт"
-		"trophy":
-			return "трофей"
-		_:
-			return "незачёт"
+	return UIFormatters.format_fish_status(status)
 
 
 func _get_rarity_title(fish: Dictionary) -> String:

@@ -2411,6 +2411,9 @@ func format_money_amount(value: float) -> String:
 	return "%.2f" % rounded_value
 
 func format_money(value: float, suffix: String = "мон.") -> String:
+	var formatters := get_node_or_null("/root/UIFormatters")
+	if formatters != null and formatters.has_method("format_money") and suffix == "мон.":
+		return str(formatters.call("format_money", value))
 	return "%s %s" % [format_money_amount(value), suffix]
 
 func format_hook_size(size: int) -> String:

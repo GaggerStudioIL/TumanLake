@@ -1,10 +1,12 @@
 extends Node
 
 const SAVE_PATH := "user://save_game.json"
+const SAVE_VERSION := 1
 
 func save_game() -> void:
 	var time_save_data := _get_time_save_data()
 	var save_data := {
+		"save_version": SAVE_VERSION,
 		"money": PlayerData.money,
 		"level": PlayerData.level,
 		"current_xp": PlayerData.current_xp,
@@ -79,6 +81,9 @@ func load_game() -> void:
 		print("Save data is not valid")
 		return
 
+	var migrated_save := not (save_data as Dictionary).has("save_version")
+	save_data = _migrate_save_data(save_data as Dictionary)
+
 	PlayerData.money = float(save_data.get("money", 0.0))
 	PlayerData.set_progression(
 		int(save_data.get("level", 1)),
@@ -125,7 +130,7 @@ func load_game() -> void:
 		migrated_freshness = InventoryManager.ensure_inventory_freshness_metadata()
 
 	print("Game loaded")
-	if should_save_after_time_load or migrated_freshness:
+	if should_save_after_time_load or migrated_freshness or migrated_save:
 		save_game()
 
 func delete_save() -> void:
@@ -203,3 +208,17 @@ func _get_time_value(property_name: String, fallback: float) -> float:
 		return fallback
 
 	return float(time_manager.get(property_name))
+
+
+func _migrate_save_data(save_data: Dictionary) -> Dictionary:
+	var result := save_data.duplicate(true)
+	var version := int(result.get("save_version", 0))
+	if version <= 0:
+		result["save_version"] = SAVE_VERSION
+		if not result.has("economy") or typeof(result.get("economy")) != TYPE_DICTIONARY:
+			result["economy"] = {}
+		if not result.has("inventory") or typeof(result.get("inventory")) != TYPE_ARRAY:
+			result["inventory"] = []
+		if not result.has("max_items"):
+			result["max_items"] = 20
+	return result

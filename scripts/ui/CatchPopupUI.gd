@@ -1,6 +1,8 @@
 # Handles the catch popup: fish visual, button lock, and animations.
 extends RefCounted
 
+const StatusBadgeScript := preload("res://scripts/ui/components/StatusBadge.gd")
+
 var main
 var theme
 var progress_label: Label
@@ -295,6 +297,9 @@ func _update_catch_reward_popup(catch_data: Dictionary) -> void:
 	var weight = float(catch_data.get("weight", 0.0))
 	var length_cm = _get_catch_length_cm(catch_data)
 	var catch_rank := str(catch_data.get("catch_rank", "normal"))
+	var fish_status := _get_catch_status(catch_data, catch_rank)
+	var rarity := str(catch_data.get("species_rarity", catch_data.get("rarityType", catch_data.get("rarity", "common"))))
+	var price := int(catch_data.get("price", 0))
 	var trophy_weight := float(catch_data.get("trophy_weight", 0.0))
 	var rarity_weight := float(catch_data.get("rarity_weight", 0.0))
 	var record_messages: Array = []
@@ -310,8 +315,8 @@ func _update_catch_reward_popup(catch_data: Dictionary) -> void:
 	main.catch_popup_name_label.text = str(catch_data.get("name", "-"))
 	main.catch_trophy_banner_label.visible = false
 	main.catch_trophy_banner_label.text = ""
-	_update_reward_badges(catch_rank, record_messages, colors)
-	main.catch_popup_stats_label.text = _build_catch_info_text(weight, length_cm, gained_xp)
+	_update_reward_badges(catch_rank, record_messages, colors, fish_status, rarity)
+	main.catch_popup_stats_label.text = _build_catch_info_text(weight, length_cm, gained_xp, price)
 	_update_rank_progress(catch_data, weight, trophy_weight, rarity_weight, catch_rank, colors)
 
 	main.catch_popup_badge_label.add_theme_color_override("font_color", colors["text"])
@@ -351,15 +356,16 @@ func _update_catch_reward_popup(catch_data: Dictionary) -> void:
 		fish_material.set_shader_parameter("shimmer_speed", float(feedback["shimmer_speed"]))
 
 
-func _build_catch_info_text(weight: float, length_cm: float, gained_xp: int) -> String:
-	return "%s | %.1f см | XP +%d" % [
-		_format_weight(weight),
-		length_cm,
+func _build_catch_info_text(weight: float, length_cm: float, gained_xp: int, price: int) -> String:
+	return "Вес: %s (%s)\nЦена: %s\nXP: +%d" % [
+		UIFormatters.format_weight_kg(weight),
+		UIFormatters.format_length_cm(length_cm),
+		UIFormatters.format_money(float(price)),
 		gained_xp
 	]
 
 
-func _update_reward_badges(catch_rank: String, record_messages: Array, _colors: Dictionary) -> void:
+func _update_reward_badges(catch_rank: String, record_messages: Array, _colors: Dictionary, fish_status: String, rarity: String) -> void:
 	if reward_badge_row == null:
 		return
 	for child in reward_badge_row.get_children():
@@ -371,10 +377,15 @@ func _update_reward_badges(catch_rank: String, record_messages: Array, _colors: 
 	reward_badge_row.position = Vector2((panel_width - row_width) * 0.5, 90.0)
 	reward_badge_row.size = Vector2(row_width, 24.0)
 
+	_add_reward_badge(_get_status_badge_label(fish_status), Color(0.0, 0.0, 0.0, 0.0), Color(0.0, 0.0, 0.0, 0.0), Color(1.0, 1.0, 1.0, 1.0), _get_status_badge_type(fish_status))
+
 	if catch_rank == "trophy":
-		_add_reward_badge("Трофей", Color(0.32, 0.22, 0.075, 0.86), Color(1.0, 0.78, 0.34, 0.60), Color(1.0, 0.88, 0.50, 1.0))
+		if fish_status != "trophy":
+			_add_reward_badge("Трофей", Color(0.32, 0.22, 0.075, 0.86), Color(1.0, 0.78, 0.34, 0.60), Color(1.0, 0.88, 0.50, 1.0))
 	elif catch_rank == "rarity":
 		_add_reward_badge("Раритет", Color(0.18, 0.075, 0.28, 0.86), Color(0.86, 0.58, 1.0, 0.58), Color(0.90, 0.76, 1.0, 1.0))
+	elif rarity == "rare" or rarity == "legendary_species":
+		_add_reward_badge(UIFormatters.format_rarity(rarity), Color(0.18, 0.075, 0.28, 0.86), Color(0.86, 0.58, 1.0, 0.58), Color(0.90, 0.76, 1.0, 1.0), "rare")
 
 	if record_messages.has("Новый личный рекорд!"):
 		_add_reward_badge("Личный рекорд", Color(0.055, 0.20, 0.255, 0.84), Color(0.46, 0.88, 1.0, 0.48), Color(0.74, 0.94, 1.0, 1.0))
@@ -385,17 +396,41 @@ func _update_reward_badges(catch_rank: String, record_messages: Array, _colors: 
 	main.catch_trophy_banner_label.visible = false
 
 
-func _add_reward_badge(text: String, bg: Color, border: Color, font_color: Color) -> void:
-	var badge := Label.new()
-	badge.text = text
-	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	badge.custom_minimum_size = Vector2(0.0, 24.0)
-	badge.add_theme_font_size_override("font_size", 11)
-	badge.add_theme_color_override("font_color", font_color)
-	badge.add_theme_stylebox_override("normal", main._make_panel_style(bg, border, 12, 6, Color(0.0, 0.0, 0.0, 0.18)))
+func _add_reward_badge(text: String, bg: Color, border: Color, font_color: Color, badge_type: String = "") -> void:
+	var type := badge_type if badge_type != "" else _get_reward_badge_type(text)
+	var badge := StatusBadgeScript.create_badge(text, type)
 	reward_badge_row.add_child(badge)
+
+
+func _get_reward_badge_type(text: String) -> String:
+	match text:
+		"Трофей":
+			return "trophy"
+		"Раритет":
+			return "rare"
+		"Личный рекорд", "Рекорд вида":
+			return "best"
+		_:
+			return "normal"
+
+
+func _get_catch_status(catch_data: Dictionary, catch_rank: String) -> String:
+	var status := str(catch_data.get("fish_status", catch_data.get("status", "")))
+	if status != "":
+		return status
+	if catch_rank == "trophy" or bool(catch_data.get("is_trophy_status", catch_data.get("is_trophy", false))):
+		return "trophy"
+	if bool(catch_data.get("is_keeper", false)):
+		return "keeper"
+	return "undersized"
+
+
+func _get_status_badge_label(status: String) -> String:
+	return UIFormatters.format_fish_status(status)
+
+
+func _get_status_badge_type(status: String) -> String:
+	return StatusBadgeScript.type_for_fish_status(status)
 
 
 func _get_personal_best_weight(catch_data: Dictionary, current_weight: float) -> float:
@@ -621,7 +656,7 @@ func _get_reward_tier(catch_data: Dictionary) -> String:
 	var catch_rank := str(catch_data.get("catch_rank", "normal"))
 	if catch_rank == "rarity":
 		return "rarity"
-	if catch_rank == "trophy":
+	if catch_rank == "trophy" or str(catch_data.get("fish_status", "")) == "trophy" or bool(catch_data.get("is_trophy_status", catch_data.get("is_trophy", false))):
 		return "trophy"
 	return "common"
 

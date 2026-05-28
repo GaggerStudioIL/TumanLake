@@ -86,6 +86,8 @@ func open() -> void:
 	panel.visible = true
 	_hide_details()
 	refresh()
+	if main.has_method("refresh_mobile_scroll_helper"):
+		main.refresh_mobile_scroll_helper()
 	main._refresh_bottom_nav_styles()
 
 

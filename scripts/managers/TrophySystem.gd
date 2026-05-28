@@ -18,7 +18,7 @@ func get_trophy_notification(catch_data: Dictionary) -> String:
 	if bool(catch_data.get("is_record_weight", false)):
 		return "Рекордный экземпляр"
 	if bool(catch_data.get("is_trophy_status", false)):
-		return "Трофейная рыба"
+		return "трофей"
 	if bool(catch_data.get("is_keeper", false)):
-		return "Зачетная рыба"
-	return "Незачет"
+		return "зачёт"
+	return "незачёт"

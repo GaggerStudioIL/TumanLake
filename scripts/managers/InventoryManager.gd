@@ -32,6 +32,10 @@ func remove_fish(catch_data: Dictionary) -> bool:
 
 
 func sell_all() -> int:
+	var sales_service := _sales_service()
+	if sales_service != null and sales_service.has_method("sell_all_fish_best_offer"):
+		return int(sales_service.call("sell_all_fish_best_offer"))
+
 	var total_sale_money := 0
 	var total_contract_reward := 0
 	var completed_contracts: Array = []
@@ -74,10 +78,17 @@ func sell_all() -> int:
 
 
 func sell_all_fish_best_offer() -> int:
+	var sales_service := _sales_service()
+	if sales_service != null and sales_service.has_method("sell_all_fish_best_offer"):
+		return int(sales_service.call("sell_all_fish_best_offer"))
 	return sell_all()
 
 
 func sell_fish_at(index: int) -> int:
+	var sales_service := _sales_service()
+	if sales_service != null and sales_service.has_method("sell_fish_at"):
+		return int(sales_service.call("sell_fish_at", index))
+
 	if index < 0 or index >= inventory.size():
 		return 0
 
@@ -116,6 +127,10 @@ func sell_fish_at(index: int) -> int:
 
 
 func sell_fish_at_to_buyer(index: int, buyer_id: String) -> int:
+	var sales_service := _sales_service()
+	if sales_service != null and sales_service.has_method("sell_fish_at"):
+		return int(sales_service.call("sell_fish_at", index, buyer_id))
+
 	if index < 0 or index >= inventory.size():
 		return 0
 
@@ -153,10 +168,23 @@ func sell_fish_at_to_buyer(index: int, buyer_id: String) -> int:
 
 
 func sell_fish_to_buyer(fish_instance: Dictionary, buyer_id: String) -> int:
+	var sales_service := _sales_service()
+	if sales_service != null and sales_service.has_method("sell_fish_to_buyer"):
+		return int(sales_service.call("sell_fish_to_buyer", fish_instance, buyer_id))
 	return sell_fish_at_to_buyer(_find_fish_index(fish_instance), buyer_id)
 
 
 func sell_selected_fish(selected_fish: Array, buyer_rules: Dictionary = {}) -> int:
+	var sales_service := _sales_service()
+	if sales_service != null and sales_service.has_method("sell_selected_fish"):
+		var requests := selected_fish.duplicate(true)
+		if not buyer_rules.is_empty():
+			for i in requests.size():
+				if typeof(requests[i]) == TYPE_INT:
+					var index := int(requests[i])
+					requests[i] = {"index": index, "buyer_id": str(buyer_rules.get(index, ""))}
+		return int(sales_service.call("sell_selected_fish", requests))
+
 	var requests: Array = []
 	for value in selected_fish:
 		var index := -1
@@ -219,6 +247,9 @@ func sell_selected_fish(selected_fish: Array, buyer_rules: Dictionary = {}) -> i
 
 
 func get_fish_freshness_price(catch_data: Dictionary) -> int:
+	var price_service := get_node_or_null("/root/FishPriceService")
+	if price_service != null and price_service.has_method("calculate_sell_price"):
+		return int(price_service.call("calculate_sell_price", catch_data, "local_market"))
 	var price_calculator: Node = get_node_or_null("/root/FishPriceCalculator")
 	if price_calculator != null and price_calculator.has_method("calculate_sell_price"):
 		return int(price_calculator.call("calculate_sell_price", catch_data))
@@ -226,10 +257,16 @@ func get_fish_freshness_price(catch_data: Dictionary) -> int:
 
 
 func get_fish_sell_price(catch_data: Dictionary) -> int:
+	var sales_service := _sales_service()
+	if sales_service != null and sales_service.has_method("get_fish_sell_price"):
+		return int(sales_service.call("get_fish_sell_price", catch_data))
 	return max(PlayerData.get_skill_adjusted_sell_price(get_fish_freshness_price(catch_data)), 1)
 
 
 func get_fish_sell_price_for_buyer(catch_data: Dictionary, buyer_id: String) -> int:
+	var sales_service := _sales_service()
+	if sales_service != null and sales_service.has_method("get_fish_sell_price_for_buyer"):
+		return int(sales_service.call("get_fish_sell_price_for_buyer", catch_data, buyer_id))
 	var offer: Dictionary = get_buyer_offer(catch_data, buyer_id)
 	if bool(offer.get("accepted", false)):
 		return int(offer.get("price", 0))
@@ -237,6 +274,12 @@ func get_fish_sell_price_for_buyer(catch_data: Dictionary, buyer_id: String) -> 
 
 
 func get_available_buyers_for_fish(fish_instance: Dictionary) -> Array:
+	var sales_service := _sales_service()
+	if sales_service != null and sales_service.has_method("get_available_buyers_for_fish"):
+		var service_value = sales_service.call("get_available_buyers_for_fish", fish_instance)
+		if service_value is Array:
+			return service_value
+
 	var supplier_manager: Node = get_node_or_null("/root/SupplierManager")
 	if supplier_manager != null and supplier_manager.has_method("get_available_buyers_for_fish"):
 		var value = supplier_manager.call("get_available_buyers_for_fish", _prepare_sale_catch_data(fish_instance))
@@ -246,6 +289,12 @@ func get_available_buyers_for_fish(fish_instance: Dictionary) -> Array:
 
 
 func get_buyer_offer(fish_instance: Dictionary, buyer_id: String) -> Dictionary:
+	var sales_service := _sales_service()
+	if sales_service != null and sales_service.has_method("get_offer_for_buyer"):
+		var service_value = sales_service.call("get_offer_for_buyer", fish_instance, buyer_id)
+		if service_value is Dictionary:
+			return service_value
+
 	var supplier_manager: Node = get_node_or_null("/root/SupplierManager")
 	if supplier_manager != null and supplier_manager.has_method("get_buyer_offer"):
 		var value = supplier_manager.call("get_buyer_offer", _prepare_sale_catch_data(fish_instance), buyer_id)
@@ -263,6 +312,10 @@ func get_buyer_offer(fish_instance: Dictionary, buyer_id: String) -> Dictionary:
 
 
 func get_best_buyer_for_fish(fish_instance: Dictionary) -> String:
+	var sales_service := _sales_service()
+	if sales_service != null and sales_service.has_method("get_best_buyer_for_fish"):
+		return str(sales_service.call("get_best_buyer_for_fish", fish_instance))
+
 	var supplier_manager: Node = get_node_or_null("/root/SupplierManager")
 	if supplier_manager != null and supplier_manager.has_method("get_best_buyer_for_fish"):
 		return str(supplier_manager.call("get_best_buyer_for_fish", _prepare_sale_catch_data(fish_instance)))
@@ -270,6 +323,12 @@ func get_best_buyer_for_fish(fish_instance: Dictionary) -> String:
 
 
 func _get_best_sale_offer(catch_data: Dictionary) -> Dictionary:
+	var sales_service := _sales_service()
+	if sales_service != null and sales_service.has_method("get_best_offer_for_fish"):
+		var service_value = sales_service.call("get_best_offer_for_fish", catch_data)
+		if service_value is Dictionary:
+			return service_value
+
 	var prepared: Dictionary = _prepare_sale_catch_data(catch_data)
 	var buyer_id := get_best_buyer_for_fish(prepared)
 	if not buyer_id.is_empty():
@@ -292,6 +351,11 @@ func _get_best_sale_offer(catch_data: Dictionary) -> Dictionary:
 
 
 func get_last_sale_summary() -> Dictionary:
+	var sales_service := _sales_service()
+	if sales_service != null and sales_service.has_method("get_last_sale_summary"):
+		var service_value = sales_service.call("get_last_sale_summary")
+		if service_value is Dictionary:
+			return service_value
 	return last_sale_summary.duplicate(true)
 
 
@@ -337,6 +401,12 @@ func _register_economy_sale(catch_data: Dictionary, sale_price: int, supplier_id
 
 
 func _prepare_sale_catch_data(catch_data: Dictionary) -> Dictionary:
+	var sales_service := _sales_service()
+	if sales_service != null and sales_service.has_method("prepare_sale_catch_data"):
+		var service_value = sales_service.call("prepare_sale_catch_data", catch_data)
+		if service_value is Dictionary:
+			return service_value
+
 	var result := catch_data.duplicate(true)
 	var fish_id := str(result.get("id", result.get("fish_id", "")))
 	var fish: Dictionary = FishDatabase.get_fish(fish_id)
@@ -403,11 +473,29 @@ func get_inventory_text() -> String:
 		if typeof(item) != TYPE_DICTIONARY:
 			continue
 
-		text += "%s | %.2f кг | %d мон. | %s\n" % [
+		text += "%s | %s | %s | %s\n" % [
 			item["name"],
-			item["weight"],
-			get_fish_sell_price(item),
+			_format_weight_kg(float(item["weight"])),
+			_format_money(float(get_fish_sell_price(item))),
 			FishFreshnessManager.get_freshness_title(item)
 		]
 
 	return text
+
+
+func _format_money(value: float) -> String:
+	var formatters := get_node_or_null("/root/UIFormatters")
+	if formatters != null and formatters.has_method("format_money"):
+		return str(formatters.call("format_money", value))
+	return "%s мон." % str(int(round(value)))
+
+
+func _format_weight_kg(value: float) -> String:
+	var formatters := get_node_or_null("/root/UIFormatters")
+	if formatters != null and formatters.has_method("format_weight_kg"):
+		return str(formatters.call("format_weight_kg", value))
+	return "%.2f кг" % maxf(value, 0.0)
+
+
+func _sales_service() -> Node:
+	return get_node_or_null("/root/SalesService")

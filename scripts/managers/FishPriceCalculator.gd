@@ -24,19 +24,34 @@ const MASS_COMMON_PRICE_PER_KG_CAPS := {
 }
 
 func calculate_catch_base_price(catch_data: Dictionary, supplier_id: String = "") -> int:
+	var service := _fish_price_service()
+	if service != null and service.has_method("calculate_catch_base_price"):
+		return int(service.call("calculate_catch_base_price", catch_data, supplier_id))
 	return calculate_price(catch_data, supplier_id, false)
 
 
 func calculate_sell_price(catch_data: Dictionary, supplier_id: String = "") -> int:
+	var service := _fish_price_service()
+	if service != null and service.has_method("calculate_sell_price"):
+		return int(service.call("calculate_sell_price", catch_data, supplier_id))
 	return calculate_price(catch_data, supplier_id, true)
 
 
 func calculate_price(catch_data: Dictionary, supplier_id: String = "", include_freshness: bool = true) -> int:
+	var service := _fish_price_service()
+	if service != null and service.has_method("calculate_price"):
+		return int(service.call("calculate_price", catch_data, supplier_id, include_freshness))
 	var breakdown: Dictionary = calculate_breakdown(catch_data, supplier_id, include_freshness)
 	return max(roundi(float(breakdown.get("final_price", 0.0))), 1)
 
 
 func calculate_breakdown(catch_data: Dictionary, supplier_id: String = "", include_freshness: bool = true) -> Dictionary:
+	var service := _fish_price_service()
+	if service != null and service.has_method("calculate_breakdown"):
+		var service_value = service.call("calculate_breakdown", catch_data, supplier_id, include_freshness)
+		if service_value is Dictionary:
+			return service_value
+
 	var fish_id: String = str(catch_data.get("id", catch_data.get("fish_id", "")))
 	var fish: Dictionary = FishDatabase.get_fish(fish_id)
 	var weight_kg: float = max(float(catch_data.get("weight", 0.0)), 0.0)
@@ -91,10 +106,16 @@ func calculate_breakdown(catch_data: Dictionary, supplier_id: String = "", inclu
 
 
 func get_rarity_multiplier(rarity_type: String) -> float:
+	var service := _fish_price_service()
+	if service != null and service.has_method("get_rarity_multiplier"):
+		return float(service.call("get_rarity_multiplier", rarity_type))
 	return float(RARITY_MULTIPLIERS.get(rarity_type, 1.0))
 
 
 func get_rarity_title(rarity_type: String) -> String:
+	var service := _fish_price_service()
+	if service != null and service.has_method("get_rarity_title"):
+		return str(service.call("get_rarity_title", rarity_type))
 	match rarity_type:
 		"rare":
 			return "Редкий вид"
@@ -153,3 +174,7 @@ func _with_status(catch_data: Dictionary, status: String, rarity_type: String) -
 	result["fish_status"] = status
 	result["rarityType"] = rarity_type
 	return result
+
+
+func _fish_price_service() -> Node:
+	return get_node_or_null("/root/FishPriceService")

@@ -130,10 +130,16 @@ func get_supplier_title(supplier_id: String) -> String:
 
 
 func is_buyer_unlocked(buyer_id: String) -> bool:
+	var access_service := _buyer_access_service()
+	if access_service != null and access_service.has_method("is_buyer_unlocked"):
+		return bool(access_service.call("is_buyer_unlocked", buyer_id))
 	return _is_supplier_unlocked(buyer_id)
 
 
 func can_sell_to_buyer(buyer_id: String, fish_data: Dictionary) -> bool:
+	var access_service := _buyer_access_service()
+	if access_service != null and access_service.has_method("can_buyer_accept_fish"):
+		return bool(access_service.call("can_buyer_accept_fish", buyer_id, fish_data))
 	return can_buy(fish_data, buyer_id)
 
 
@@ -146,6 +152,10 @@ func get_available_suppliers() -> Array:
 
 
 func can_buy(catch_data: Dictionary, supplier_id: String) -> bool:
+	var access_service := _buyer_access_service()
+	if access_service != null and access_service.has_method("can_buyer_accept_fish"):
+		return bool(access_service.call("can_buyer_accept_fish", supplier_id, catch_data))
+
 	var supplier: Dictionary = get_supplier(supplier_id)
 	if supplier.is_empty() or not _is_supplier_unlocked(supplier_id):
 		return false
@@ -178,6 +188,12 @@ func can_buy(catch_data: Dictionary, supplier_id: String) -> bool:
 
 
 func get_available_buyers_for_fish(fish_instance: Dictionary) -> Array:
+	var sales_service := _sales_service()
+	if sales_service != null and sales_service.has_method("get_available_buyers_for_fish"):
+		var service_value = sales_service.call("get_available_buyers_for_fish", fish_instance)
+		if service_value is Array:
+			return service_value
+
 	var result: Array = []
 	for supplier_id in get_available_suppliers():
 		if can_buy(fish_instance, str(supplier_id)):
@@ -186,6 +202,12 @@ func get_available_buyers_for_fish(fish_instance: Dictionary) -> Array:
 
 
 func get_buyer_offer(fish_instance: Dictionary, buyer_id: String) -> Dictionary:
+	var sales_service := _sales_service()
+	if sales_service != null and sales_service.has_method("get_offer_for_buyer"):
+		var service_value = sales_service.call("get_offer_for_buyer", fish_instance, buyer_id)
+		if service_value is Dictionary:
+			return service_value
+
 	var supplier: Dictionary = get_supplier(buyer_id)
 	var fish: Dictionary = FishDatabase.get_fish(str(fish_instance.get("id", fish_instance.get("fish_id", ""))))
 	var rarity_type: String = str(fish_instance.get("rarityType", fish.get("rarityType", "common")))
@@ -251,6 +273,10 @@ func get_buyer_offer(fish_instance: Dictionary, buyer_id: String) -> Dictionary:
 
 
 func get_best_buyer_for_fish(fish_instance: Dictionary) -> String:
+	var sales_service := _sales_service()
+	if sales_service != null and sales_service.has_method("get_best_buyer_for_fish"):
+		return str(sales_service.call("get_best_buyer_for_fish", fish_instance))
+
 	var best_buyer_id := ""
 	var best_price := -1
 
@@ -269,6 +295,9 @@ func get_best_buyer_for_fish(fish_instance: Dictionary) -> String:
 
 
 func get_best_supplier_for_catch(catch_data: Dictionary) -> String:
+	var sales_service := _sales_service()
+	if sales_service != null and sales_service.has_method("get_best_buyer_for_fish"):
+		return str(sales_service.call("get_best_buyer_for_fish", catch_data))
 	return get_best_buyer_for_fish(catch_data)
 
 
@@ -310,6 +339,10 @@ func get_supplier_summary(limit: int = 6) -> Array:
 
 
 func get_rejection_reason(catch_data: Dictionary, supplier_id: String) -> String:
+	var access_service := _buyer_access_service()
+	if access_service != null and access_service.has_method("get_buyer_rejection_reason"):
+		return str(access_service.call("get_buyer_rejection_reason", supplier_id, catch_data))
+
 	var supplier: Dictionary = get_supplier(supplier_id)
 	if supplier.is_empty():
 		return "Не принимает этот вид"
@@ -372,3 +405,11 @@ func _get_status_for_catch(fish: Dictionary, catch_data: Dictionary) -> String:
 	if fish.is_empty():
 		return "undersized"
 	return FishStatusSystem.get_status(fish, float(catch_data.get("weight", 0.0)))
+
+
+func _buyer_access_service() -> Node:
+	return get_node_or_null("/root/BuyerAccessService")
+
+
+func _sales_service() -> Node:
+	return get_node_or_null("/root/SalesService")

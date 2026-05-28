@@ -32,6 +32,8 @@ func open() -> void:
 	_picker_open = false
 	main._selected_tackle_item_id = ""
 	refresh()
+	if main.has_method("refresh_mobile_scroll_helper"):
+		main.refresh_mobile_scroll_helper()
 	main._refresh_bottom_nav_styles()
 
 func close() -> void:
@@ -386,7 +388,7 @@ func _update_tackle_ui() -> void:
 		var item: Dictionary = main._visible_tackle_items[i]
 		main.tackle_item_list.add_item(_get_tackle_item_display_text(item), _get_item_texture(item))
 		var list_index = main.tackle_item_list.item_count - 1
-		var item_block_reason := PlayerData.get_equip_block_reason(item, main._tackle_category)
+		var item_block_reason := _get_equip_block_reason(item, main._tackle_category)
 		if item_block_reason != "":
 			main.tackle_item_list.set_item_custom_bg_color(list_index, Color(0.10, 0.10, 0.10, 0.36))
 			main.tackle_item_list.set_item_custom_fg_color(list_index, Color(0.62, 0.68, 0.66, 0.86))
@@ -419,12 +421,12 @@ func _update_tackle_ui() -> void:
 		main.tackle_details_label.text = _get_tackle_item_details_text(selected_item)
 		main.tackle_compare_label.text = "%s\n\nПодсказки:\n%s" % [_get_tackle_compare_text(selected_item), hints_text]
 
-	var block_reason := PlayerData.get_equip_block_reason(selected_item, main._tackle_category) if not selected_item.is_empty() else ""
+	var block_reason := _get_equip_block_reason(selected_item, main._tackle_category) if not selected_item.is_empty() else ""
 	var can_equip = not selected_item.is_empty() and block_reason == ""
 	if main._tackle_category == "bait_2" and not PlayerData.can_use_second_bait():
 		can_equip = false
-	var can_repair := not selected_item.is_empty() and PlayerData.is_item_repairable(selected_item)
-	var can_discard := not selected_item.is_empty() and PlayerData.can_discard_item(selected_item)
+	var can_repair := not selected_item.is_empty() and _can_repair_item(selected_item)
+	var can_discard := not selected_item.is_empty() and _can_discard_item(selected_item)
 	main.tackle_equip_button.visible = true
 	main.tackle_equip_button.disabled = not can_equip or _is_tackle_item_equipped(selected_item) or main._fishing_ui_state != FishingUiState.IDLE
 	if main.tackle_repair_button != null:
@@ -797,7 +799,7 @@ func _on_tackle_item_activated(index: int) -> void:
 	main._selected_tackle_item_id = str(main._visible_tackle_items[item_index].get("id", ""))
 
 	var selected_item: Dictionary = main._visible_tackle_items[item_index]
-	var block_reason := PlayerData.get_equip_block_reason(selected_item, main._tackle_category)
+	var block_reason := _get_equip_block_reason(selected_item, main._tackle_category)
 	if main._fishing_ui_state == FishingUiState.IDLE and not _is_tackle_item_equipped(selected_item) and block_reason == "":
 		main._on_tackle_equip_button_pressed()
 		_picker_open = false
@@ -874,7 +876,7 @@ func _get_tackle_item_details_text(item: Dictionary) -> String:
 		equipped_line,
 		main._get_inventory_category_title(category),
 		_get_rarity_title(str(item.get("rarity", "common"))),
-		PlayerData.format_money(float(item.get("price", 0.0))),
+		UIFormatters.format_money(float(item.get("price", 0.0))),
 		int(item.get("quantity", 1))
 	]
 	var description = str(item.get("description", ""))
@@ -892,6 +894,61 @@ func _get_tackle_item_details_text(item: Dictionary) -> String:
 
 	return details
 
+
+func _repair_service() -> Node:
+	if main != null:
+		return main.get_node_or_null("/root/RepairService")
+	return null
+
+
+func _validation_service() -> Node:
+	if main != null:
+		return main.get_node_or_null("/root/TackleValidationService")
+	return null
+
+
+func _get_equip_block_reason(item: Dictionary, slot_type: String = "") -> String:
+	var validation_service := _validation_service()
+	if validation_service != null and validation_service.has_method("get_equip_block_reason"):
+		return str(validation_service.call("get_equip_block_reason", slot_type, item))
+	return PlayerData.get_equip_block_reason(item, slot_type)
+
+
+func _can_repair_item(item: Dictionary) -> bool:
+	var repair_service := _repair_service()
+	if repair_service != null and repair_service.has_method("can_repair_item"):
+		return bool(repair_service.call("can_repair_item", item))
+	return PlayerData.is_item_repairable(item)
+
+
+func _can_discard_item(item: Dictionary) -> bool:
+	var repair_service := _repair_service()
+	if repair_service != null and repair_service.has_method("can_discard_item"):
+		return bool(repair_service.call("can_discard_item", item))
+	return PlayerData.can_discard_item(item)
+
+
+func _get_item_wear_percent(item: Dictionary) -> int:
+	var repair_service := _repair_service()
+	if repair_service != null and repair_service.has_method("get_wear_percent"):
+		return int(repair_service.call("get_wear_percent", item))
+	return PlayerData.get_item_wear_percent(item)
+
+
+func _get_item_repair_cost(item: Dictionary) -> int:
+	var repair_service := _repair_service()
+	if repair_service != null and repair_service.has_method("get_repair_cost"):
+		return int(repair_service.call("get_repair_cost", item))
+	return PlayerData.get_item_repair_cost(item)
+
+
+func _get_item_condition_title(item: Dictionary) -> String:
+	var repair_service := _repair_service()
+	if repair_service != null and repair_service.has_method("get_item_condition_title"):
+		return str(repair_service.call("get_item_condition_title", item))
+	return PlayerData.get_item_condition_title(item)
+
+
 func _get_tackle_item_condition_details_text(item: Dictionary) -> String:
 	var category := str(item.get("category", ""))
 	if category == "bait":
@@ -901,15 +958,15 @@ func _get_tackle_item_condition_details_text(item: Dictionary) -> String:
 	if not ["rod", "line", "leader", "hook"].has(category):
 		return ""
 
-	var wear_percent := PlayerData.get_item_wear_percent(item)
-	var repair_cost := PlayerData.get_item_repair_cost(item)
-	var block_reason := PlayerData.get_equip_block_reason(item, main._tackle_category)
+	var wear_percent := _get_item_wear_percent(item)
+	var repair_cost := _get_item_repair_cost(item)
+	var block_reason := _get_equip_block_reason(item, main._tackle_category)
 	var lines: Array = [
-		"Состояние: %s" % PlayerData.get_item_condition_title(item),
+		"Состояние: %s" % _get_item_condition_title(item),
 		"Износ: %d%%" % wear_percent
 	]
 	if repair_cost > 0:
-		lines.append("Ремонт: %s" % PlayerData.format_money(float(repair_cost)))
+		lines.append("Ремонт: %s" % UIFormatters.format_money(float(repair_cost)))
 	if block_reason != "":
 		lines.append("Причина: %s" % block_reason)
 	return "\n".join(lines)

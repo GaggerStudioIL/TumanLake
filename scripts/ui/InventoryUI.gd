@@ -29,6 +29,8 @@ func open() -> void:
 	main.inventory_backdrop.visible = true
 	main.inventory_panel.visible = true
 	refresh()
+	if main.has_method("refresh_mobile_scroll_helper"):
+		main.refresh_mobile_scroll_helper()
 	main._refresh_bottom_nav_styles()
 
 func close() -> void:
@@ -101,7 +103,7 @@ func _update_inventory_ui() -> void:
 		var item: Dictionary = main._visible_inventory_items[i]
 		main.inventory_item_list.add_item(_get_inventory_item_display_text(item), _get_item_texture(item))
 		var list_index = main.inventory_item_list.item_count - 1
-		var item_block_reason := PlayerData.get_equip_block_reason(item)
+		var item_block_reason := _get_equip_block_reason(item)
 		if _is_equippable_inventory_item(item) and item_block_reason != "":
 			main.inventory_item_list.set_item_custom_bg_color(list_index, Color(0.10, 0.10, 0.10, 0.36))
 			main.inventory_item_list.set_item_custom_fg_color(list_index, Color(0.62, 0.68, 0.66, 0.86))
@@ -126,11 +128,11 @@ func _update_inventory_ui() -> void:
 		main.inventory_details_label.text = _get_inventory_item_details_text(selected_item)
 
 	var is_equippable := not selected_item.is_empty() and _is_equippable_inventory_item(selected_item)
-	var block_reason := PlayerData.get_equip_block_reason(selected_item) if is_equippable else ""
+	var block_reason := _get_equip_block_reason(selected_item) if is_equippable else ""
 	var can_equip = is_equippable and block_reason == ""
 	var is_equipped := is_equippable and _is_inventory_item_equipped(selected_item)
-	var can_repair := not selected_item.is_empty() and PlayerData.is_item_repairable(selected_item)
-	var can_discard := not selected_item.is_empty() and PlayerData.can_discard_item(selected_item)
+	var can_repair := not selected_item.is_empty() and _can_repair_item(selected_item)
+	var can_discard := not selected_item.is_empty() and _can_discard_item(selected_item)
 	var details_bottom_padding = 24.0
 
 	if is_equippable or can_repair or can_discard:
@@ -293,10 +295,10 @@ func _get_inventory_item_display_text(item: Dictionary) -> String:
 
 	if category == "fish":
 		var stats: Dictionary = item.get("stats", {})
-		return "%s | %.2f кг | %d мон. | %s" % [
+		return "%s | %s | %s | %s" % [
 			name,
-			float(stats.get("weight", 0.0)),
-			int(stats.get("sell_price", stats.get("price", 0))),
+			UIFormatters.format_weight_kg(float(stats.get("weight", 0.0))),
+			UIFormatters.format_money(float(stats.get("sell_price", stats.get("price", 0)))),
 			str(stats.get("freshness_title", "-"))
 		]
 
@@ -319,12 +321,12 @@ func _get_inventory_item_details_text(item: Dictionary) -> String:
 	var stats: Dictionary = item.get("stats", {})
 
 	if category == "fish":
-		return "%s\nКатегория: Рыба / Садок\nВес: %.2f кг\nСвежесть: %s\nЦена продажи: %d мон.\nБазовая цена: %d мон.\nРедкость: %s" % [
+		return "%s\nКатегория: Рыба / Садок\nВес: %s\nСвежесть: %s\nЦена продажи: %s\nБазовая цена: %s\nРедкость: %s" % [
 			name,
-			float(stats.get("weight", 0.0)),
+			UIFormatters.format_weight_kg(float(stats.get("weight", 0.0))),
 			str(stats.get("freshness_title", "-")),
-			int(stats.get("sell_price", stats.get("price", 0))),
-			int(stats.get("price", 0)),
+			UIFormatters.format_money(float(stats.get("sell_price", stats.get("price", 0)))),
+			UIFormatters.format_money(float(stats.get("price", 0))),
 			str(stats.get("rarity", "-"))
 		]
 
@@ -392,6 +394,61 @@ func _get_inventory_stats_text(stats: Dictionary) -> String:
 
 	return stats_text
 
+
+func _repair_service() -> Node:
+	if main != null:
+		return main.get_node_or_null("/root/RepairService")
+	return null
+
+
+func _validation_service() -> Node:
+	if main != null:
+		return main.get_node_or_null("/root/TackleValidationService")
+	return null
+
+
+func _get_equip_block_reason(item: Dictionary, slot_type: String = "") -> String:
+	var validation_service := _validation_service()
+	if validation_service != null and validation_service.has_method("get_equip_block_reason"):
+		return str(validation_service.call("get_equip_block_reason", slot_type, item))
+	return PlayerData.get_equip_block_reason(item, slot_type)
+
+
+func _can_repair_item(item: Dictionary) -> bool:
+	var repair_service := _repair_service()
+	if repair_service != null and repair_service.has_method("can_repair_item"):
+		return bool(repair_service.call("can_repair_item", item))
+	return PlayerData.is_item_repairable(item)
+
+
+func _can_discard_item(item: Dictionary) -> bool:
+	var repair_service := _repair_service()
+	if repair_service != null and repair_service.has_method("can_discard_item"):
+		return bool(repair_service.call("can_discard_item", item))
+	return PlayerData.can_discard_item(item)
+
+
+func _get_item_wear_percent(item: Dictionary) -> int:
+	var repair_service := _repair_service()
+	if repair_service != null and repair_service.has_method("get_wear_percent"):
+		return int(repair_service.call("get_wear_percent", item))
+	return PlayerData.get_item_wear_percent(item)
+
+
+func _get_item_repair_cost(item: Dictionary) -> int:
+	var repair_service := _repair_service()
+	if repair_service != null and repair_service.has_method("get_repair_cost"):
+		return int(repair_service.call("get_repair_cost", item))
+	return PlayerData.get_item_repair_cost(item)
+
+
+func _get_item_condition_title(item: Dictionary) -> String:
+	var repair_service := _repair_service()
+	if repair_service != null and repair_service.has_method("get_item_condition_title"):
+		return str(repair_service.call("get_item_condition_title", item))
+	return PlayerData.get_item_condition_title(item)
+
+
 func _get_item_condition_details_text(item: Dictionary, slot_type: String = "") -> String:
 	var category := str(item.get("category", ""))
 	if not ["rod", "line", "leader", "hook", "bait"].has(category):
@@ -402,15 +459,15 @@ func _get_item_condition_details_text(item: Dictionary, slot_type: String = "") 
 			return "Состояние: закончилась\nПричина: Наживка закончилась."
 		return ""
 
-	var wear_percent := PlayerData.get_item_wear_percent(item)
-	var repair_cost := PlayerData.get_item_repair_cost(item)
-	var block_reason := PlayerData.get_equip_block_reason(item, slot_type)
+	var wear_percent := _get_item_wear_percent(item)
+	var repair_cost := _get_item_repair_cost(item)
+	var block_reason := _get_equip_block_reason(item, slot_type)
 	var lines: Array = [
-		"Состояние: %s" % PlayerData.get_item_condition_title(item),
+		"Состояние: %s" % _get_item_condition_title(item),
 		"Износ: %d%%" % wear_percent
 	]
 	if repair_cost > 0:
-		lines.append("Ремонт: %s" % PlayerData.format_money(float(repair_cost)))
+		lines.append("Ремонт: %s" % UIFormatters.format_money(float(repair_cost)))
 	if block_reason != "":
 		lines.append("Причина: %s" % block_reason)
 	return "\n".join(lines)

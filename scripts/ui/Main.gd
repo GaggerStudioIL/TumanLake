@@ -14,6 +14,11 @@ const SystemMenuUIScript := preload("res://scripts/ui/SystemMenuUI.gd")
 const FailurePopupUIScript := preload("res://scripts/ui/FailurePopupUI.gd")
 const UIThemeScript := preload("res://scripts/ui/UITheme.gd")
 const MobileScrollHelperScript := preload("res://scripts/ui/MobileScrollHelper.gd")
+const MainHUDControllerScript := preload("res://scripts/ui/controllers/MainHUDController.gd")
+const PopupManagerScript := preload("res://scripts/ui/controllers/PopupManager.gd")
+const CatchPopupControllerScript := preload("res://scripts/ui/controllers/CatchPopupController.gd")
+const NAVIGATION_CONTROLLER_PATH := "res://scripts/ui/controllers/NavigationController.gd"
+const SIDE_MENU_CONTROLLER_PATH := "res://scripts/ui/controllers/SideMenuController.gd"
 const FishHarborScene := preload("res://scenes/economy/FishHarbor.tscn")
 const TUMAN_LAKE_THEME := preload("res://themes/TumanLakeUI.tres")
 
@@ -253,7 +258,11 @@ var waterbody_spot_next_page_button: Button
 var waterbody_spot_page_label: Label
 var waterbody_spot_buttons: Array = []
 var toast_label: Label
-var _toast_tween: Tween
+var main_hud_controller
+var popup_manager
+var navigation_controller
+var side_menu_controller
+var catch_popup_controller
 var shop_ui
 var keepnet_ui
 var inventory_ui
@@ -464,6 +473,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _setup_ui_controllers() -> void:
 	ui_theme = UIThemeScript.new()
+	main_hud_controller = MainHUDControllerScript.new()
+	popup_manager = PopupManagerScript.new()
+	catch_popup_controller = CatchPopupControllerScript.new()
+	navigation_controller = load(NAVIGATION_CONTROLLER_PATH).new()
+	side_menu_controller = load(SIDE_MENU_CONTROLLER_PATH).new()
 	shop_ui = ShopUIScript.new()
 	keepnet_ui = KeepnetUIScript.new()
 	inventory_ui = InventoryUIScript.new()
@@ -489,20 +503,24 @@ func _setup_ui_controllers() -> void:
 	harbor_button.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(harbor_button)
 
+	main_hud_controller.setup(self, self)
+	popup_manager.setup(self)
+	navigation_controller.setup(self)
+	side_menu_controller.setup(self, navigation_controller, false)
 	shop_ui.setup(self)
 	keepnet_ui.setup(self)
 	inventory_ui.setup(self)
 	tackle_ui.setup(self)
 	waterbody_ui.setup(self)
-	catch_popup_ui.setup(self)
+	catch_popup_controller.setup(self, catch_popup_ui)
 	fishing_hud_ui.setup(self)
 	fishing_presence_ui.setup(self)
 	fishing_presence_ui.cast_visual_finished.connect(_on_cast_visual_finished)
 
 	shop_ui.buy_requested.connect(_on_shop_buy_pressed)
 	keepnet_ui.sell_fish_requested.connect(_on_keepnet_sell_fish_pressed)
-	catch_popup_ui.catch_keep_requested.connect(_on_catch_keep_button_pressed)
-	catch_popup_ui.catch_release_requested.connect(_on_catch_release_button_pressed)
+	catch_popup_controller.keep_requested.connect(_on_catch_keep_button_pressed)
+	catch_popup_controller.release_requested.connect(_on_catch_release_button_pressed)
 
 func _ensure_ui_canvas_layer() -> void:
 	if ui_canvas_layer == null:
@@ -595,6 +613,13 @@ func _ensure_mobile_scroll_helper() -> void:
 		add_child(mobile_scroll_helper)
 	if mobile_scroll_helper.has_method("setup"):
 		mobile_scroll_helper.setup(self)
+
+
+func refresh_mobile_scroll_helper() -> void:
+	if mobile_scroll_helper == null:
+		_ensure_mobile_scroll_helper()
+	if mobile_scroll_helper != null and mobile_scroll_helper.has_method("refresh"):
+		mobile_scroll_helper.call_deferred("refresh")
 
 func _ensure_modal_input_shield() -> void:
 	_ensure_modal_layer()
@@ -3888,18 +3913,7 @@ func _setup_layout() -> void:
 	_update_shop_ui()
 
 	if toast_label != null:
-		var toast_width: float = min(screen_size.x - margin * 4.0, 520.0)
-		toast_label.position = Vector2((screen_size.x - toast_width) * 0.5, screen_size.y - 132.0)
-		toast_label.size = Vector2(toast_width, 64.0)
-		toast_label.z_index = 220
-		toast_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		toast_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		toast_label.add_theme_font_size_override("font_size", 14)
-		toast_label.add_theme_color_override("font_color", Color(0.90, 1.0, 0.90, 1.0))
-		toast_label.add_theme_stylebox_override(
-			"normal",
-			_make_panel_style(Color(0.045, 0.105, 0.086, 0.92), Color(0.68, 1.0, 0.76, 0.36), 18, 10, Color(0.0, 0.0, 0.0, 0.24))
-		)
+		popup_manager.layout(screen_size, margin)
 
 	var reward_width: float = min(screen_size.x - margin * 4.0, 700.0)
 	var reward_height: float = min(screen_size.y - margin * 3.0, 486.0)
@@ -3963,7 +3977,7 @@ func _setup_layout() -> void:
 	)
 
 	var fish_visual_width: float = min(reward_inner_width, 560.0)
-	var fish_visual_height: float = min(190.0, reward_height * 0.40)
+	var fish_visual_height: float = min(170.0, reward_height * 0.36)
 	catch_fish_shadow.position = Vector2((reward_width - fish_visual_width) * 0.5 + 8.0, 134.0)
 	catch_fish_shadow.size = Vector2(fish_visual_width, fish_visual_height)
 	catch_fish_shadow.z_index = 1
@@ -3976,13 +3990,13 @@ func _setup_layout() -> void:
 	catch_fish_visual.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_catch_fish_base_position = catch_fish_visual.position
 
-	catch_popup_stats_label.position = Vector2(reward_padding, reward_height - 160.0)
-	catch_popup_stats_label.size = Vector2(reward_inner_width, 24.0)
+	catch_popup_stats_label.position = Vector2(reward_padding, reward_height - 184.0)
+	catch_popup_stats_label.size = Vector2(reward_inner_width, 56.0)
 	catch_popup_stats_label.z_index = 5
 	catch_popup_stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	catch_popup_stats_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	catch_popup_stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	catch_popup_stats_label.add_theme_font_size_override("font_size", 14)
+	catch_popup_stats_label.add_theme_font_size_override("font_size", 12)
 	catch_popup_stats_label.add_theme_color_override("font_color", Color(0.88, 0.98, 0.91, 0.96))
 
 	catch_keep_button.position = Vector2(reward_button_x, reward_button_y)
@@ -4083,8 +4097,6 @@ func _connect_signals() -> void:
 	waterbody_spot_list.item_selected.connect(_on_waterbody_spot_item_selected)
 	waterbody_select_button.pressed.connect(_on_waterbody_select_button_pressed)
 	waterbody_close_button.pressed.connect(_on_waterbody_close_button_pressed)
-	catch_keep_button.pressed.connect(catch_popup_ui.request_keep)
-	catch_release_button.pressed.connect(catch_popup_ui.request_release)
 	category_all_button.pressed.connect(_set_inventory_category.bind("all"))
 	category_rods_button.pressed.connect(_set_inventory_category.bind("rod"))
 	category_lines_button.pressed.connect(_set_inventory_category.bind("line"))
@@ -4119,6 +4131,11 @@ func _on_global_period_changed(_time_of_day: String) -> void:
 	_apply_time_atmosphere()
 
 func _update_time_hud() -> void:
+	if main_hud_controller != null:
+		main_hud_controller.update_time()
+		main_hud_controller.update_weather()
+		return
+
 	if clock_label == null or weather_label == null:
 		return
 
@@ -4468,40 +4485,52 @@ func _show_basket_notice(message: String, success: bool = true) -> void:
 	keepnet_ui._show_basket_notice(message, success)
 
 func _is_catch_reward_open() -> bool:
-	return catch_popup_ui._is_catch_reward_open()
+	return catch_popup_controller != null and catch_popup_controller.is_open()
 
 func _bring_catch_reward_to_front() -> void:
-	catch_popup_ui._bring_catch_reward_to_front()
+	if catch_popup_controller != null:
+		catch_popup_controller.bring_to_front()
 
 func _close_secondary_popups_for_reward() -> void:
-	catch_popup_ui._close_secondary_popups_for_reward()
+	if catch_popup_controller != null:
+		catch_popup_controller.close_secondary_popups()
 
 func _show_catch_reward_popup(catch_data: Dictionary) -> void:
-	catch_popup_ui._show_catch_reward_popup(catch_data)
+	if catch_popup_controller != null:
+		catch_popup_controller.show_catch_result(catch_data)
 
 func _lock_catch_reward_buttons() -> void:
-	catch_popup_ui._lock_catch_reward_buttons()
+	if catch_popup_controller != null:
+		catch_popup_controller.lock_buttons()
 
 func _update_catch_reward_input_lock() -> void:
-	catch_popup_ui._update_catch_reward_input_lock()
+	if catch_popup_controller != null:
+		catch_popup_controller.update_input_lock()
 
 func _unlock_catch_reward_buttons() -> void:
-	catch_popup_ui._unlock_catch_reward_buttons()
+	if catch_popup_controller != null:
+		catch_popup_controller.unlock_buttons()
 
 func _start_catch_fish_idle_motion(feedback: Dictionary) -> void:
-	catch_popup_ui._start_catch_fish_idle_motion(feedback)
+	if catch_popup_controller != null:
+		catch_popup_controller.start_fish_idle_motion(feedback)
 
 func _update_catch_reward_popup(catch_data: Dictionary) -> void:
-	catch_popup_ui._update_catch_reward_popup(catch_data)
+	if catch_popup_controller != null:
+		catch_popup_controller.update_popup(catch_data)
 
 func _set_reward_fish_texture(fish_id: String) -> void:
-	catch_popup_ui._set_reward_fish_texture(fish_id)
+	if catch_popup_controller != null:
+		catch_popup_controller.set_fish_texture(fish_id)
 
 func _get_reward_fish_texture(fish_id: String) -> Texture2D:
-	return catch_popup_ui._get_reward_fish_texture(fish_id)
+	if catch_popup_controller != null:
+		return catch_popup_controller.get_fish_texture(fish_id)
+	return null
 
 func _play_catch_reward_sound(tier: String) -> void:
-	catch_popup_ui._play_catch_reward_sound(tier)
+	if catch_popup_controller != null:
+		catch_popup_controller.play_reward_sound(tier)
 
 func _play_main_ambient() -> void:
 	_call_audio_manager("play_water_ambient_loop")
@@ -4545,22 +4574,32 @@ func _play_audio_hook(player: AudioStreamPlayer) -> void:
 	player.play()
 
 func _hide_catch_reward_popup(animated: bool = true) -> void:
-	catch_popup_ui._hide_catch_reward_popup(animated)
+	if catch_popup_controller != null:
+		catch_popup_controller.hide(animated)
 
 func _set_catch_popup_hidden() -> void:
-	catch_popup_ui._set_catch_popup_hidden()
+	if catch_popup_controller != null:
+		catch_popup_controller.set_hidden()
 
 func _get_reward_tier(catch_data: Dictionary) -> String:
-	return catch_popup_ui._get_reward_tier(catch_data)
+	if catch_popup_controller != null:
+		return catch_popup_controller.get_reward_tier(catch_data)
+	return "common"
 
 func _get_reward_colors(tier: String) -> Dictionary:
-	return catch_popup_ui._get_reward_colors(tier)
+	if catch_popup_controller != null:
+		return catch_popup_controller.get_reward_colors(tier)
+	return {}
 
 func _get_reward_feedback_tuning(tier: String) -> Dictionary:
-	return catch_popup_ui._get_reward_feedback_tuning(tier)
+	if catch_popup_controller != null:
+		return catch_popup_controller.get_reward_feedback_tuning(tier)
+	return {}
 
 func _get_catch_length_cm(catch_data: Dictionary) -> float:
-	return catch_popup_ui._get_catch_length_cm(catch_data)
+	if catch_popup_controller != null:
+		return catch_popup_controller.get_catch_length_cm(catch_data)
+	return 0.0
 
 func _refresh_bottom_nav_styles() -> void:
 	fishing_hud_ui._refresh_bottom_nav_styles()
@@ -4599,26 +4638,8 @@ func _show_shop_notice(message: String, success: bool) -> void:
 	shop_ui._show_shop_notice(message, success)
 
 func _show_toast(message: String, success: bool = true) -> void:
-	if toast_label == null or message == "":
-		return
-
-	if is_instance_valid(_toast_tween):
-		_toast_tween.kill()
-
-	toast_label.text = message
-	toast_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	toast_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	toast_label.visible = true
-	toast_label.modulate = Color(0.78, 1.0, 0.78, 0.0) if success else Color(1.0, 0.68, 0.58, 0.0)
-
-	_toast_tween = create_tween()
-	_toast_tween.tween_property(toast_label, "modulate:a", 1.0, 0.12)
-	_toast_tween.tween_interval(2.1)
-	_toast_tween.tween_property(toast_label, "modulate:a", 0.0, 0.28)
-	_toast_tween.tween_callback(func() -> void:
-		if toast_label != null:
-			toast_label.visible = false
-	)
+	if popup_manager != null:
+		popup_manager.show_toast(message, success)
 
 func _play_shop_card_feedback(item_id: String, success: bool) -> void:
 	shop_ui._play_shop_card_feedback(item_id, success)
@@ -4667,7 +4688,8 @@ func _on_tackle_item_activated(index: int) -> void:
 
 func _on_tackle_equip_button_pressed() -> void:
 	var selected_item := _get_selected_tackle_item()
-	var block_reason := PlayerData.get_equip_block_reason(selected_item, _tackle_category)
+	var validation_service := get_node_or_null("/root/TackleValidationService")
+	var block_reason := str(validation_service.call("get_equip_block_reason", _tackle_category, selected_item)) if validation_service != null and validation_service.has_method("get_equip_block_reason") else PlayerData.get_equip_block_reason(selected_item, _tackle_category)
 
 	if selected_item.is_empty() or block_reason != "":
 		result_label.text = block_reason if block_reason != "" else "Эту снасть нельзя экипировать."
@@ -4701,7 +4723,11 @@ func _on_tackle_repair_button_pressed() -> void:
 	var selected_item := _get_selected_tackle_item()
 	if selected_item.is_empty():
 		return
-	_apply_repair_result(PlayerData.repair_owned_item(str(selected_item.get("id", ""))))
+	var repair_service := get_node_or_null("/root/RepairService")
+	if repair_service != null and repair_service.has_method("repair_item"):
+		_apply_repair_result(repair_service.call("repair_item", str(selected_item.get("id", ""))))
+	else:
+		_apply_repair_result(PlayerData.repair_owned_item(str(selected_item.get("id", ""))))
 
 func _on_tackle_discard_button_pressed() -> void:
 	var selected_item := _get_selected_tackle_item()
@@ -4949,15 +4975,16 @@ func _on_sell_all_button_pressed() -> void:
 	if _is_catch_reward_open():
 		return
 
-	var earned := InventoryManager.sell_all()
-	var sale_summary: Dictionary = InventoryManager.get_last_sale_summary()
+	var sales_service := get_node_or_null("/root/SalesService")
+	var earned := int(sales_service.call("sell_all_fish_best_offer")) if sales_service != null and sales_service.has_method("sell_all_fish_best_offer") else InventoryManager.sell_all()
+	var sale_summary: Dictionary = sales_service.call("get_last_sale_summary") if sales_service != null and sales_service.has_method("get_last_sale_summary") else InventoryManager.get_last_sale_summary()
 	var contract_reward: int = int(sale_summary.get("contract_reward_total", 0))
 	var sale_total: int = int(sale_summary.get("sale_total", max(earned - contract_reward, 0)))
 
 	if earned > 0:
-		result_label.text = "Рыба продана. Получено: %d мон." % earned
+		result_label.text = "Рыба продана. Получено: %s" % UIFormatters.format_money(float(earned))
 		if contract_reward > 0:
-			result_label.text += " Контракты: +%d мон." % contract_reward
+			result_label.text += " Контракты: +%s" % UIFormatters.format_money(float(contract_reward))
 	else:
 		result_label.text = "Садок пуст. Продавать пока нечего."
 
@@ -4965,9 +4992,9 @@ func _on_sell_all_button_pressed() -> void:
 	_update_ui()
 
 	if earned > 0:
-		var notice := "Рыба продана: +%d мон." % sale_total
+		var notice := "Рыба продана: +%s" % UIFormatters.format_money(float(sale_total))
 		if contract_reward > 0:
-			notice += " Контракты: +%d мон." % contract_reward
+			notice += " Контракты: +%s" % UIFormatters.format_money(float(contract_reward))
 		_show_basket_notice(notice, true)
 	else:
 		_show_basket_notice("Садок пуст.", false)
@@ -4982,22 +5009,36 @@ func _on_keepnet_sell_fish_pressed(fish_index: int) -> void:
 		return
 
 	var fish: Dictionary = InventoryManager.inventory[fish_index]
-	var price := InventoryManager.sell_fish_at(fish_index)
-	var sale_summary: Dictionary = InventoryManager.get_last_sale_summary()
+	var sales_service := get_node_or_null("/root/SalesService")
+	var price := int(sales_service.call("sell_fish_at", fish_index)) if sales_service != null and sales_service.has_method("sell_fish_at") else InventoryManager.sell_fish_at(fish_index)
+	var sale_summary: Dictionary = sales_service.call("get_last_sale_summary") if sales_service != null and sales_service.has_method("get_last_sale_summary") else InventoryManager.get_last_sale_summary()
 	var supplier_name := str(sale_summary.get("supplier_name", "Местный рынок"))
 	var contract_reward := int(sale_summary.get("contract_reward_total", 0))
 	var sale_total := int(sale_summary.get("sale_total", max(price - contract_reward, 0)))
-	result_label.text = "Рыба продана: %s +%d мон." % [
+	result_label.text = "Рыба продана: %s +%s" % [
 		str(fish.get("name", "-")),
-		sale_total
+		UIFormatters.format_money(float(sale_total))
 	]
 	if contract_reward > 0:
-		result_label.text += " Контракт: +%d мон." % contract_reward
-	_show_basket_notice("Продано: +%d мон. | %s" % [sale_total, supplier_name], true)
+		result_label.text += " Контракт: +%s" % UIFormatters.format_money(float(contract_reward))
+	_show_basket_notice("Продано: +%s | %s" % [UIFormatters.format_money(float(sale_total)), supplier_name], true)
 	SaveManager.save_game()
 	_update_ui()
 
 func _on_nav_fish_button_pressed() -> void:
+	if _open_screen_via_navigation("fish"):
+		return
+	_open_fishing_screen()
+
+
+func _open_screen_via_navigation(screen_id: String) -> bool:
+	if navigation_controller == null or not navigation_controller.has_method("open_screen"):
+		return false
+	navigation_controller.open_screen(screen_id)
+	return true
+
+
+func _open_fishing_screen() -> void:
 	if _should_ignore_base_ui_press():
 		return
 	if _is_catch_reward_open():
@@ -5007,6 +5048,12 @@ func _on_nav_fish_button_pressed() -> void:
 	_hide_modal_roots_except("")
 	_refresh_modal_input_blocker()
 	_refresh_bottom_nav_styles()
+
+
+func close_game_panels_before_opening_new_one(_screen_id: String = "") -> void:
+	if system_menu_ui != null:
+		system_menu_ui.close_menu()
+
 
 func _close_profile_and_encyclopedia(reset_nav: bool = false) -> void:
 	if system_menu_ui != null:
@@ -5019,6 +5066,12 @@ func _close_profile_and_encyclopedia(reset_nav: bool = false) -> void:
 		fish_harbor_ui.visible = false
 
 func _on_basket_button_pressed() -> void:
+	if _open_screen_via_navigation("keepnet"):
+		return
+	_open_keepnet()
+
+
+func _open_keepnet() -> void:
 	if _should_ignore_base_ui_press():
 		return
 
@@ -5033,6 +5086,12 @@ func _close_keepnet_ui_after_guard() -> void:
 	keepnet_ui.close()
 
 func _on_inventory_button_pressed() -> void:
+	if _open_screen_via_navigation("inventory"):
+		return
+	_open_inventory()
+
+
+func _open_inventory() -> void:
 	if _should_ignore_base_ui_press():
 		return
 
@@ -5049,6 +5108,12 @@ func _on_tackle_button_pressed() -> void:
 	tackle_ui.open()
 
 func _on_shop_button_pressed() -> void:
+	if _open_screen_via_navigation("shop"):
+		return
+	_open_shop()
+
+
+func _open_shop() -> void:
 	if _should_ignore_base_ui_press():
 		return
 
@@ -5056,6 +5121,12 @@ func _on_shop_button_pressed() -> void:
 	shop_ui.open()
 
 func _on_harbor_button_pressed() -> void:
+	if _open_screen_via_navigation("harbor"):
+		return
+	_open_harbor()
+
+
+func _open_harbor() -> void:
 	if _should_ignore_base_ui_press():
 		return
 
@@ -5065,6 +5136,12 @@ func _on_harbor_button_pressed() -> void:
 		fish_harbor_ui.call("open")
 
 func _on_encyclopedia_button_pressed() -> void:
+	if _open_screen_via_navigation("encyclopedia"):
+		return
+	_open_encyclopedia()
+
+
+func _open_encyclopedia() -> void:
 	if _should_ignore_base_ui_press():
 		return
 
@@ -5075,6 +5152,12 @@ func _on_encyclopedia_button_pressed() -> void:
 	encyclopedia_ui.open()
 
 func _on_map_button_pressed() -> void:
+	if _open_screen_via_navigation("map"):
+		return
+	_open_map()
+
+
+func _open_map() -> void:
 	if _should_ignore_base_ui_press():
 		return
 
@@ -5082,6 +5165,12 @@ func _on_map_button_pressed() -> void:
 	waterbody_ui.open()
 
 func _on_profile_button_pressed() -> void:
+	if _open_screen_via_navigation("profile"):
+		return
+	_open_profile()
+
+
+func _open_profile() -> void:
 	if _should_ignore_base_ui_press():
 		return
 
@@ -5107,6 +5196,15 @@ func _on_profile_button_pressed() -> void:
 	_active_nav_tab = "profile"
 	_refresh_bottom_nav_styles()
 	_show_toast("Профиль пока недоступен.", false)
+
+
+func _open_settings() -> void:
+	if _should_ignore_base_ui_press():
+		return
+	if system_menu_ui != null and system_menu_ui.has_method("open_settings"):
+		system_menu_ui.open_settings()
+	elif system_menu_ui != null and system_menu_ui.has_method("_on_settings_pressed"):
+		system_menu_ui._on_settings_pressed()
 
 func _on_bait_button_pressed() -> void:
 	if _should_ignore_base_ui_press():
@@ -5169,6 +5267,7 @@ func _on_inventory_close_button_pressed() -> void:
 func _close_inventory_ui_after_guard() -> void:
 	inventory_ui.close()
 
+# Gameplay/reward logic intentionally stays in Main for now.
 func _on_catch_keep_button_pressed() -> void:
 	if not _catch_reward_buttons_ready:
 		return
@@ -5184,6 +5283,7 @@ func _on_catch_keep_button_pressed() -> void:
 	SaveManager.save_game()
 	_return_to_idle_after_result()
 
+# Gameplay/reward logic intentionally stays in Main for now.
 func _on_catch_release_button_pressed() -> void:
 	if not _catch_reward_buttons_ready:
 		return
@@ -5208,7 +5308,8 @@ func _on_inventory_item_selected(index: int) -> void:
 
 func _on_inventory_equip_button_pressed() -> void:
 	var selected_item := _get_selected_inventory_item()
-	var block_reason := PlayerData.get_equip_block_reason(selected_item)
+	var validation_service := get_node_or_null("/root/TackleValidationService")
+	var block_reason := str(validation_service.call("get_equip_block_reason", "", selected_item)) if validation_service != null and validation_service.has_method("get_equip_block_reason") else PlayerData.get_equip_block_reason(selected_item)
 
 	if selected_item.is_empty() or block_reason != "":
 		result_label.text = block_reason if block_reason != "" else "Этот предмет нельзя экипировать."
@@ -5228,7 +5329,11 @@ func _on_inventory_repair_button_pressed() -> void:
 	var selected_item := _get_selected_inventory_item()
 	if selected_item.is_empty():
 		return
-	_apply_repair_result(PlayerData.repair_owned_item(str(selected_item.get("id", ""))))
+	var repair_service := get_node_or_null("/root/RepairService")
+	if repair_service != null and repair_service.has_method("repair_item"):
+		_apply_repair_result(repair_service.call("repair_item", str(selected_item.get("id", ""))))
+	else:
+		_apply_repair_result(PlayerData.repair_owned_item(str(selected_item.get("id", ""))))
 
 func _on_inventory_discard_button_pressed() -> void:
 	var selected_item := _get_selected_inventory_item()
@@ -5250,7 +5355,9 @@ func _request_discard_owned_item(item_id: String, source: String) -> void:
 	if item.is_empty():
 		_show_toast("Предмет не найден.", false)
 		return
-	if not PlayerData.can_discard_item(item):
+	var repair_service := get_node_or_null("/root/RepairService")
+	var can_discard := bool(repair_service.call("can_discard_item", item)) if repair_service != null and repair_service.has_method("can_discard_item") else PlayerData.can_discard_item(item)
+	if not can_discard:
 		_show_toast("Выбросить можно только полностью сломанную снасть.", false)
 		return
 
@@ -5277,7 +5384,14 @@ func _ensure_discard_confirm_dialog() -> void:
 func _on_discard_confirmed() -> void:
 	if _pending_discard_item_id == "":
 		return
-	var result := PlayerData.discard_owned_item(_pending_discard_item_id)
+	var repair_service := get_node_or_null("/root/RepairService")
+	var result: Dictionary = {}
+	if repair_service != null and repair_service.has_method("discard_item"):
+		var result_value = repair_service.call("discard_item", _pending_discard_item_id)
+		if result_value is Dictionary:
+			result = result_value
+	else:
+		result = PlayerData.discard_owned_item(_pending_discard_item_id)
 	var success := bool(result.get("success", false))
 	var message := str(result.get("message", "Не удалось выбросить предмет."))
 	_pending_discard_item_id = ""
@@ -5419,9 +5533,9 @@ func _on_reeling_started(catch_data: Dictionary, state: Dictionary) -> void:
 	if fishing_presence_ui != null and fishing_presence_ui.has_method("set_rod_visual_state"):
 		fishing_presence_ui.set_rod_visual_state("reeling")
 	timer_label.text = "Поклевка!"
-	result_label.text = "На крючке: %s\nВес: %.2f кг\nРедкость: %s\nПоведение: %s" % [
+	result_label.text = "На крючке: %s\nВес: %s\nРедкость: %s\nПоведение: %s" % [
 		catch_data["name"],
-		catch_data["weight"],
+		UIFormatters.format_weight_kg(float(catch_data["weight"])),
 		catch_data["rarity"],
 		catch_data.get("behavior", "-")
 	]
@@ -5451,16 +5565,17 @@ func _on_fish_caught(catch_data: Dictionary) -> void:
 	if wear_text != "":
 		xp_text += "\n%s" % wear_text
 
-	result_label.text = "Поймано: %s\nВес: %.2f кг\nЦена: %d мон.%s\nНажми “Вытянуть удочку”." % [
+	result_label.text = "Поймано: %s\nВес: %s\nЦена: %s%s\nНажми “Вытянуть удочку”." % [
 		catch_data["name"],
-		catch_data["weight"],
-		catch_data["price"],
+		UIFormatters.format_weight_kg(float(catch_data["weight"])),
+		UIFormatters.format_money(float(catch_data["price"])),
 		xp_text
 	]
 	_reset_reeling_ui()
 	SaveManager.save_game()
 	_update_ui()
-	_show_catch_reward_popup(catch_data)
+	if catch_popup_controller != null:
+		catch_popup_controller.show_catch_result(catch_data)
 
 func _on_fishing_failed_detailed(failure_data: Dictionary) -> void:
 	_play_line_break_sfx_if_needed(failure_data)
