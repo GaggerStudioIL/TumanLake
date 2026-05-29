@@ -1,7 +1,7 @@
 extends Node
 
 var inventory: Array = []
-var max_items: int = 20
+var max_items: int = 30
 var last_sale_summary: Dictionary = {}
 
 func add_fish(catch_data: Dictionary) -> bool:

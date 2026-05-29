@@ -473,12 +473,6 @@ offset_right = 72.0
 offset_bottom = 34.0
 text = "Прикорм"
 
-[node name="AutoButton" type="Button" parent="." unique_id=949926114]
-layout_mode = 0
-offset_right = 72.0
-offset_bottom = 34.0
-text = "Пауза"
-
 [node name="BaitButton" type="Button" parent="." unique_id=2146417672]
 layout_mode = 0
 offset_right = 72.0

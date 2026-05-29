@@ -14,6 +14,8 @@ const SystemMenuUIScript := preload("res://scripts/ui/SystemMenuUI.gd")
 const FailurePopupUIScript := preload("res://scripts/ui/FailurePopupUI.gd")
 const UIThemeScript := preload("res://scripts/ui/UITheme.gd")
 const MobileScrollHelperScript := preload("res://scripts/ui/MobileScrollHelper.gd")
+const KeepnetHudButtonScript := preload("res://scripts/ui/components/KeepnetHudButton.gd")
+const PlayerXpHudScript := preload("res://scripts/ui/components/PlayerXpHud.gd")
 const MainHUDControllerScript := preload("res://scripts/ui/controllers/MainHUDController.gd")
 const PopupManagerScript := preload("res://scripts/ui/controllers/PopupManager.gd")
 const CatchPopupControllerScript := preload("res://scripts/ui/controllers/CatchPopupController.gd")
@@ -34,8 +36,8 @@ const STYLE_BOTTOM_NAV_BUTTON := "BottomNavButton"
 const STYLE_BOTTOM_NAV_ACTIVE := "BottomNavActive"
 const BASE_SCREEN_SIZE := Vector2(960.0, 540.0)
 const HUD_HEIGHT := 44.0
-const LEFT_NAV_WIDTH := 140.0
-const LEFT_NAV_HEIGHT := 286.0
+const LEFT_NAV_WIDTH := 58.0
+const LEFT_NAV_HEIGHT := 222.0
 const ACTION_BAR_HEIGHT := 46.0
 const MENU_BACKDROP_Z := 300
 const MENU_PANEL_Z := 301
@@ -102,7 +104,6 @@ const ROD_TARGET_POS := Vector2(590.0, 382.0)
 @onready var map_button: Button = $MapButton
 @onready var profile_button: Button = $ProfileButton
 @onready var feed_button: Button = $FeedButton
-@onready var auto_button: Button = $AutoButton
 @onready var bait_button: Button = $BaitButton
 @onready var timer_label: Label = $TimerLabel
 @onready var tackle_label: Label = $TackleLabel
@@ -292,6 +293,8 @@ var is_modal_open := false
 var _current_modal_name := ""
 var cast_button_visual: TextureRect
 var stop_fishing_button: Button
+var keepnet_hud_button: Button
+var player_xp_hud: Control
 var rod_sprite: Sprite2D
 var rod_shadow_sprite: Sprite2D
 var top_hud_container: HBoxContainer
@@ -571,7 +574,6 @@ func _ensure_ui_canvas_layer() -> void:
 		profile_button,
 		encyclopedia_button,
 		feed_button,
-		auto_button,
 		bait_button,
 		timer_label,
 		tackle_label,
@@ -913,24 +915,27 @@ func _ensure_mobile_ui_containers() -> void:
 	_reparent_node(clock_label, weather_hud_content_parent)
 	_reparent_node(weather_label, weather_hud_content_parent)
 
-	for node in [feed_button, bait_button, tackle_button, auto_button]:
+	for node in [feed_button, bait_button, tackle_button]:
 		_reparent_node(node, quick_actions_container)
 	quick_actions_container.move_child(feed_button, 0)
 	quick_actions_container.move_child(bait_button, 1)
 	quick_actions_container.move_child(tackle_button, 2)
-	quick_actions_container.move_child(auto_button, 3)
 
 	if nav_fish_button.get_parent() == bottom_nav_container:
 		_reparent_node(nav_fish_button, ui_canvas_layer)
 	nav_fish_button.visible = false
+	if basket_button != null:
+		_reparent_node(basket_button, ui_canvas_layer)
+		basket_button.visible = false
+		basket_button.disabled = true
+		basket_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	for node in [basket_button, inventory_button, shop_button, harbor_button, map_button]:
+	for node in [inventory_button, shop_button, harbor_button, map_button]:
 		_reparent_node(node, bottom_nav_container)
-	bottom_nav_container.move_child(basket_button, 0)
-	bottom_nav_container.move_child(inventory_button, 1)
-	bottom_nav_container.move_child(shop_button, 2)
-	bottom_nav_container.move_child(harbor_button, 3)
-	bottom_nav_container.move_child(map_button, 4)
+	bottom_nav_container.move_child(inventory_button, 0)
+	bottom_nav_container.move_child(shop_button, 1)
+	bottom_nav_container.move_child(harbor_button, 2)
+	bottom_nav_container.move_child(map_button, 3)
 
 	for node in [encyclopedia_button, profile_button]:
 		if node != null:
@@ -987,6 +992,35 @@ func _ensure_stop_fishing_button() -> void:
 	stop_fishing_button.add_theme_constant_override("h_separation", 0)
 	stop_fishing_button.pressed.connect(_on_stop_fishing_button_pressed)
 	ui_canvas_layer.add_child(stop_fishing_button)
+
+
+func _ensure_keepnet_hud_button() -> void:
+	if keepnet_hud_button != null:
+		return
+
+	keepnet_hud_button = KeepnetHudButtonScript.new()
+	keepnet_hud_button.name = "KeepnetHudButton"
+	keepnet_hud_button.tooltip_text = "Садок"
+	keepnet_hud_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	keepnet_hud_button.focus_mode = Control.FOCUS_NONE
+	keepnet_hud_button.visible = true
+	keepnet_hud_button.z_index = 260
+	if ui_theme != null and keepnet_hud_button.has_method("set_icon_texture"):
+		keepnet_hud_button.call("set_icon_texture", ui_theme.get_side_menu_icon("keepnet"))
+	keepnet_hud_button.pressed.connect(_on_basket_button_pressed)
+	ui_canvas_layer.add_child(keepnet_hud_button)
+
+
+func _ensure_player_xp_hud() -> void:
+	if player_xp_hud != null:
+		return
+
+	player_xp_hud = PlayerXpHudScript.new()
+	player_xp_hud.name = "PlayerXpHud"
+	player_xp_hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	player_xp_hud.visible = true
+	player_xp_hud.z_index = 270
+	ui_canvas_layer.add_child(player_xp_hud)
 
 
 func _make_reeling_color_rect(node_name: String, parent: Node, z: int) -> ColorRect:
@@ -1886,6 +1920,8 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	_ensure_mobile_ui_containers()
 	_ensure_cast_button_visual()
 	_ensure_stop_fishing_button()
+	_ensure_keepnet_hud_button()
+	_ensure_player_xp_hud()
 	_ensure_hud_icons()
 
 	var sx: float = screen_size.x / BASE_SCREEN_SIZE.x
@@ -1994,7 +2030,7 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	spot_option_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
 	action_panel.visible = true
-	var action_panel_rect := _scale_rect(Rect2(174.0, 476.0, 520.0, 48.0), screen_size)
+	var action_panel_rect := _scale_rect(Rect2(174.0, 476.0, 392.0, 48.0), screen_size)
 	_anchor_control(action_panel, 0.0, 0.0, 0.0, 0.0, action_panel_rect.position.x, action_panel_rect.position.y, action_panel_rect.end.x, action_panel_rect.end.y)
 	action_panel.z_index = 100
 	action_panel.add_theme_stylebox_override(
@@ -2003,6 +2039,12 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	)
 
 	quick_actions_container.visible = false
+
+	if player_xp_hud != null:
+		var xp_hud_height: float = clamp(16.0 * ui_scale, 14.0, 20.0)
+		_anchor_control(player_xp_hud, 0.0, 0.0, 0.0, 0.0, 0.0, screen_size.y - xp_hud_height, screen_size.x, screen_size.y)
+		player_xp_hud.z_index = 270
+		_update_player_xp_hud(false)
 
 	var cast_center := _scale_point(Vector2(902.0, 400.0), screen_size)
 	var cast_margin: float = 8.0 * ui_scale
@@ -2019,7 +2061,7 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	action_glow.visible = true
 	action_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	for quick_button in [feed_button, bait_button, tackle_button, auto_button]:
+	for quick_button in [feed_button, bait_button, tackle_button]:
 		_reparent_node(quick_button, ui_canvas_layer)
 
 	var quick_size := Vector2(quick_button_width, quick_button_height)
@@ -2027,7 +2069,6 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	_layout_action_button(feed_button, "Прикормка", _scale_point(Vector2(188.0, 481.0), screen_size), quick_size, false)
 	_layout_action_button(bait_button, "Наживка", _scale_point(Vector2(314.0, 481.0), screen_size), quick_size, true)
 	_layout_action_button(tackle_button, "Снасти", _scale_point(Vector2(440.0, 481.0), screen_size), quick_size, true)
-	_layout_action_button(auto_button, "Авто", _scale_point(Vector2(566.0, 481.0), screen_size), quick_size, false)
 
 	_anchor_control(fish_button, 0.0, 0.0, 0.0, 0.0, cast_rect.position.x, cast_rect.position.y, cast_rect.end.x, cast_rect.end.y)
 	fish_button.z_index = 104
@@ -2056,12 +2097,34 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 		_apply_primary_fishing_action_style(stop_fishing_button, stop_size)
 		_apply_stop_fishing_button_symbol_style(stop_fishing_button, stop_edge)
 
+	if keepnet_hud_button != null:
+		var keepnet_edge: float = clamp(cast_button_size.x * 0.68, 72.0, 92.0)
+		var keepnet_size := Vector2(keepnet_edge, keepnet_edge)
+		var side_menu_rect := _scale_rect(Rect2(38.0, 150.0, LEFT_NAV_WIDTH, LEFT_NAV_HEIGHT), screen_size)
+		var keepnet_gap: float = max(8.0, 10.0 * ui_scale)
+		var keepnet_bottom_gap: float = max(2.0, 4.0 * ui_scale)
+		var visible_side_menu_height: float = 48.0 * sy * 4.0 + 9.0 * ui_scale * 3.0
+		var desired_keepnet_y: float = side_menu_rect.position.y + visible_side_menu_height + keepnet_gap + keepnet_size.y * 0.5 + 16.0 * ui_scale
+		var desired_keepnet_x: float = side_menu_rect.position.x + keepnet_size.x * 0.5 + 2.0 * ui_scale
+		var keepnet_center := Vector2(desired_keepnet_x, desired_keepnet_y)
+		var keepnet_min_x: float = keepnet_size.x * 0.5 + cast_margin
+		var keepnet_max_x: float = max(keepnet_min_x, screen_size.x - keepnet_size.x * 0.5 - cast_margin)
+		var keepnet_min_y: float = keepnet_size.y * 0.5 + cast_margin
+		var keepnet_max_y: float = max(keepnet_min_y, action_panel_rect.position.y - keepnet_size.y * 0.5 - keepnet_bottom_gap)
+		keepnet_center.x = clamp(keepnet_center.x, keepnet_min_x, keepnet_max_x)
+		keepnet_center.y = clamp(keepnet_center.y, keepnet_min_y, keepnet_max_y)
+		var keepnet_rect := Rect2(keepnet_center - keepnet_size * 0.5, keepnet_size)
+		_anchor_control(keepnet_hud_button, 0.0, 0.0, 0.0, 0.0, keepnet_rect.position.x, keepnet_rect.position.y, keepnet_rect.end.x, keepnet_rect.end.y)
+		keepnet_hud_button.z_index = 260
+		keepnet_hud_button.custom_minimum_size = keepnet_size
+		keepnet_hud_button.size = keepnet_size
+		_update_keepnet_hud_button(false)
+
 	_set_action_button_icon(feed_button, "hud_feed", 19.0)
 	_set_action_button_icon(bait_button, "hud_bait", 19.0)
 	var primary_icon_size: float = clamp(cast_button_size.x * 0.88, 88.0, 110.0)
 	_set_primary_fishing_button_icon(fish_button, _get_primary_fishing_action_icon(), primary_icon_size)
 	_set_action_button_icon(tackle_button, "hud_tackle", 19.0)
-	_set_action_button_icon(auto_button, "hud_auto", 19.0)
 	_refresh_fish_button_presentation()
 
 	bottom_nav_panel.visible = true
@@ -2075,24 +2138,26 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	bottom_nav_container.mouse_filter = Control.MOUSE_FILTER_PASS
 	bottom_nav_container.add_theme_constant_override("separation", int(9.0 * ui_scale))
 
-	var nav_buttons: Array = [nav_fish_button, basket_button, inventory_button, shop_button, harbor_button, map_button]
-	var nav_labels: Array = ["Ловля", "Садок", "Инвентарь", "Магазин", "Гавань", "Карта"]
+	var nav_buttons: Array = [nav_fish_button, inventory_button, shop_button, harbor_button, map_button]
+	var nav_labels: Array = ["Ловля", "Инвентарь", "Магазин", "Гавань", "Карта"]
 	var nav_button_size := _scale_size(Vector2(LEFT_NAV_WIDTH - 18.0, 42.0), screen_size)
 	for i in nav_buttons.size():
 		_layout_nav_button(nav_buttons[i], nav_labels[i], Vector2.ZERO, nav_button_size, i == 0)
-	var nav_icons: Array = ["fish", "keepnet", "inventory", "shop", "harbor", "map"]
+	var nav_icons: Array = ["fish", "inventory", "shop", "harbor", "map"]
 	for i in nav_buttons.size():
 		_set_button_icon(nav_buttons[i], nav_icons[i], 12.0)
 
 	nav_fish_button.visible = false
-	var side_menu_buttons: Array = [basket_button, inventory_button, shop_button, harbor_button, map_button]
-	var side_menu_labels: Array = ["Садок", "Инвентарь", "Магазин", "Гавань", "Карта"]
-	var side_menu_icons: Array = ["keepnet", "inventory", "shop", "harbor", "map"]
+	var side_menu_buttons: Array = [inventory_button, shop_button, harbor_button, map_button]
+	var side_menu_labels: Array = ["Инвентарь", "Магазин", "Гавань", "Карта"]
+	var side_menu_icons: Array = ["inventory", "shop", "harbor", "map"]
 	var side_menu_button_size := _scale_size(Vector2(LEFT_NAV_WIDTH, 48.0), screen_size)
 	for i in side_menu_buttons.size():
 		_layout_side_menu_button(side_menu_buttons[i], side_menu_labels[i], side_menu_icons[i], side_menu_button_size, false)
 
-	basket_button.visible = true
+	basket_button.visible = false
+	basket_button.disabled = true
+	basket_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	map_button.disabled = false
 	harbor_button.disabled = false
@@ -2305,6 +2370,7 @@ func _layout_side_menu_button(button: Button, label: String, icon_name: String, 
 	button.text = ""
 	button.icon = null
 	button.expand_icon = false
+	button.tooltip_text = label
 	if button.get_parent() is Container:
 		button.custom_minimum_size = button_size
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -2321,29 +2387,24 @@ func _layout_side_menu_button(button: Button, label: String, icon_name: String, 
 	button.add_theme_constant_override("icon_max_width", 0)
 
 	var icon_rect := _ensure_side_menu_icon(button)
-	var text_label := _ensure_side_menu_label(button)
-	var arrow_label := _ensure_side_menu_arrow(button)
 	var scale_factor: float = clamp(button_size.y / 48.0, 0.78, 1.22)
-	var icon_size := Vector2(37.0, 37.0) * scale_factor
-	var left_pad := 6.5 * scale_factor
-	var arrow_width := 12.0 * scale_factor
-	var text_x := 50.0 * scale_factor
-	var font_size := int(round(13.0 * scale_factor))
+	var icon_edge: float = clamp(min(button_size.x, button_size.y) * 0.76, 32.0 * scale_factor, 40.0 * scale_factor)
+	var icon_size := Vector2(icon_edge, icon_edge)
 
 	icon_rect.texture = ui_theme.get_side_menu_icon(icon_name)
-	icon_rect.position = Vector2(left_pad, (button_size.y - icon_size.y) * 0.5)
+	icon_rect.position = (button_size - icon_size) * 0.5
 	icon_rect.size = icon_size
 	icon_rect.visible = icon_rect.texture != null
 
-	text_label.text = label
-	text_label.position = Vector2(text_x, 0.0)
-	text_label.size = Vector2(max(button_size.x - text_x - arrow_width - 8.0 * scale_factor, 56.0), button_size.y)
-	text_label.add_theme_font_size_override("font_size", font_size)
+	var text_label := button.get_node_or_null("SideMenuText") as Label
+	if text_label != null:
+		text_label.text = ""
+		text_label.visible = false
 
-	arrow_label.text = ">"
-	arrow_label.position = Vector2(button_size.x - arrow_width - 9.0 * scale_factor, 0.0)
-	arrow_label.size = Vector2(arrow_width, button_size.y)
-	arrow_label.add_theme_font_size_override("font_size", font_size + 1)
+	var arrow_label := button.get_node_or_null("SideMenuArrow") as Label
+	if arrow_label != null:
+		arrow_label.text = ""
+		arrow_label.visible = false
 
 	_refresh_side_menu_button_state(button, active)
 
@@ -2353,8 +2414,6 @@ func _refresh_side_menu_button_state(button: Button, active: bool) -> void:
 
 	ui_theme.apply_side_menu_button_style(button, active)
 	button.modulate = Color(1.0, 1.0, 1.0, 1.0 if active else 0.92)
-	var text_color := Color(0.94, 0.98, 0.91, 1.0) if active else Color(0.86, 0.91, 0.84, 0.96)
-	var arrow_color := Color(0.76, 1.0, 0.58, 0.96) if active else Color(0.84, 0.90, 0.78, 0.86)
 	var icon_color := Color(1.0, 1.0, 0.94, 1.0) if active else Color(0.94, 0.96, 0.86, 0.92)
 
 	var icon_rect := button.get_node_or_null("SideMenuIcon") as TextureRect
@@ -2363,11 +2422,11 @@ func _refresh_side_menu_button_state(button: Button, active: bool) -> void:
 
 	var text_label := button.get_node_or_null("SideMenuText") as Label
 	if text_label != null:
-		text_label.add_theme_color_override("font_color", text_color if not button.disabled else Color(0.60, 0.64, 0.58, 0.52))
+		text_label.visible = false
 
 	var arrow_label := button.get_node_or_null("SideMenuArrow") as Label
 	if arrow_label != null:
-		arrow_label.add_theme_color_override("font_color", arrow_color if not button.disabled else Color(0.60, 0.64, 0.58, 0.42))
+		arrow_label.visible = false
 
 func _ensure_side_menu_icon(button: Button) -> TextureRect:
 	var icon_rect := button.get_node_or_null("SideMenuIcon") as TextureRect
@@ -2379,30 +2438,6 @@ func _ensure_side_menu_icon(button: Button) -> TextureRect:
 		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		button.add_child(icon_rect)
 	return icon_rect
-
-func _ensure_side_menu_label(button: Button) -> Label:
-	var text_label := button.get_node_or_null("SideMenuText") as Label
-	if text_label == null:
-		text_label = Label.new()
-		text_label.name = "SideMenuText"
-		text_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		text_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		text_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		text_label.clip_text = true
-		text_label.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
-		button.add_child(text_label)
-	return text_label
-
-func _ensure_side_menu_arrow(button: Button) -> Label:
-	var arrow_label := button.get_node_or_null("SideMenuArrow") as Label
-	if arrow_label == null:
-		arrow_label = Label.new()
-		arrow_label.name = "SideMenuArrow"
-		arrow_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		arrow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		arrow_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		button.add_child(arrow_label)
-	return arrow_label
 
 func _set_button_icon(button: Button, icon_name: String, icon_size: float = 20.0) -> void:
 	if ui_theme == null or icon_name.is_empty():
@@ -2471,7 +2506,6 @@ func _refresh_fish_button_presentation() -> void:
 		cast_button_visual.z_index = fish_button.z_index - 1
 		cast_button_visual.visible = false
 	_cast_button_hovered = false
-	_cast_button_pressed = false
 	_apply_primary_fishing_action_style(fish_button, target_size)
 	fish_button.add_theme_font_size_override("font_size", 12)
 	fish_button.clip_text = true
@@ -2480,6 +2514,7 @@ func _refresh_fish_button_presentation() -> void:
 	fish_button.text = ""
 	var icon_size: float = clamp(min(target_size.x, target_size.y) * 0.88, 88.0, 110.0)
 	_set_primary_fishing_button_icon(fish_button, _get_primary_fishing_action_icon(), icon_size)
+	_apply_primary_action_press_scale()
 	_refresh_stop_fishing_button_presentation()
 
 
@@ -2508,6 +2543,7 @@ func _can_cancel_current_fishing_wait() -> bool:
 func _update_cast_button_visual() -> void:
 	if cast_button_visual == null or ui_theme == null:
 		return
+	_apply_primary_action_press_scale()
 
 	var active_hook_input: bool = _fishing_ui_state == FishingUiState.WAITING and bool(FishingManager.get("use_new_bite_system"))
 	var use_cast_texture := _use_cast_png_button and (_fishing_ui_state == FishingUiState.IDLE or (_fishing_ui_state == FishingUiState.WAITING and not active_hook_input))
@@ -2530,6 +2566,22 @@ func _update_cast_button_visual() -> void:
 		texture_state = "hover"
 
 	cast_button_visual.texture = ui_theme.get_pull_button_texture(texture_state) if use_pull_texture else ui_theme.get_cast_button_texture(texture_state)
+
+
+func _apply_primary_action_press_scale() -> void:
+	if fish_button == null:
+		return
+
+	var target_scale := 1.0
+	if _cast_button_pressed and not fish_button.disabled:
+		target_scale = 1.06
+	elif _cast_button_hovered and not fish_button.disabled:
+		target_scale = 1.035
+	fish_button.pivot_offset = fish_button.size * 0.5
+	fish_button.scale = Vector2.ONE * target_scale
+	if cast_button_visual != null:
+		cast_button_visual.pivot_offset = cast_button_visual.size * 0.5
+		cast_button_visual.scale = Vector2.ONE * target_scale
 
 func _is_fish_button_pointer_event(event: InputEvent) -> bool:
 	if is_modal_open:
@@ -2735,7 +2787,6 @@ func _setup_layout() -> void:
 		profile_button,
 		encyclopedia_button,
 		feed_button,
-		auto_button,
 		bait_button,
 		timer_label,
 		tackle_label,
@@ -3076,14 +3127,13 @@ func _setup_layout() -> void:
 	fish_button.size = Vector2(left_width, 64)
 	fish_button.add_theme_font_size_override("font_size", 24)
 
-	basket_button.text = "Садок"
-	basket_button.position = Vector2(margin, 332)
-	basket_button.size = Vector2((left_width - 12.0) * 0.5, 48)
-	basket_button.add_theme_font_size_override("font_size", 20)
+	basket_button.visible = false
+	basket_button.disabled = true
+	basket_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	inventory_button.text = "Инвентарь"
-	inventory_button.position = Vector2(margin + (left_width + 12.0) * 0.5, 332)
-	inventory_button.size = Vector2((left_width - 12.0) * 0.5, 48)
+	inventory_button.position = Vector2(margin, 332)
+	inventory_button.size = Vector2(left_width, 48)
 	inventory_button.add_theme_font_size_override("font_size", 18)
 
 	timer_label.position = Vector2(margin, 396)
@@ -3195,9 +3245,10 @@ func _setup_layout() -> void:
 
 	var action_button_gap: float = 8.0
 	var main_action_size := Vector2(224.0, 64.0)
-	var side_action_width: float = clamp((action_width - main_action_size.x - action_button_gap * 4.0) / 4.0, 72.0, 86.0)
+	var side_action_count: float = 3.0
+	var side_action_width: float = clamp((action_width - main_action_size.x - action_button_gap * side_action_count) / side_action_count, 72.0, 86.0)
 	var side_action_size := Vector2(side_action_width, 56.0)
-	var action_total_width: float = side_action_size.x * 4.0 + main_action_size.x + action_button_gap * 4.0
+	var action_total_width: float = side_action_size.x * side_action_count + main_action_size.x + action_button_gap * side_action_count
 	var action_start_x: float = action_x + max((action_width - action_total_width) * 0.5, 12.0)
 	var side_action_y: float = action_y + (action_height - side_action_size.y) * 0.5
 	var main_action_y: float = action_y + (action_height - main_action_size.y) * 0.5
@@ -3230,20 +3281,11 @@ func _setup_layout() -> void:
 	tackle_button.add_theme_font_size_override("font_size", 12)
 	_apply_button_style(tackle_button, STYLE_SECONDARY_BUTTON)
 
-	auto_button.text = "Авто"
-	auto_button.position = Vector2(tackle_button.position.x + side_action_size.x + action_button_gap, side_action_y)
-	auto_button.size = side_action_size
-	auto_button.z_index = 8
-	auto_button.add_theme_font_size_override("font_size", 12)
-	auto_button.disabled = true
-	_apply_button_style(auto_button, STYLE_SECONDARY_BUTTON)
-
 	var nav_buttons: Array = [
 		nav_fish_button,
 		inventory_button,
 		shop_button,
 		harbor_button,
-		basket_button,
 		map_button
 	]
 	var nav_texts: Array = [
@@ -3255,8 +3297,8 @@ func _setup_layout() -> void:
 		"⌖ Карта",
 		"◎ Профиль"
 	]
-	nav_texts = ["Ловля", "Инвентарь", "Магазин", "Атлас", "Садок", "Карта", "Профиль"]
-	nav_texts = ["Ловля", "Инвентарь", "Магазин", "Гавань", "Садок", "Карта"]
+	nav_texts = ["Ловля", "Инвентарь", "Магазин", "Атлас", "Карта", "Профиль"]
+	nav_texts = ["Ловля", "Инвентарь", "Магазин", "Гавань", "Карта"]
 	var nav_gap := 6.0
 	var nav_x := bottom_nav_panel.position.x + 10.0
 	var nav_y := bottom_nav_y + 3.0
@@ -4282,7 +4324,15 @@ func _connect_signals() -> void:
 
 func _update_ui() -> void:
 	fishing_hud_ui._update_ui()
+	_update_player_xp_hud()
 	_refresh_stop_fishing_button_presentation()
+
+
+func _update_player_xp_hud(animate := true) -> void:
+	if player_xp_hud == null:
+		return
+	if player_xp_hud.has_method("set_progress"):
+		player_xp_hud.call("set_progress", PlayerData.level, PlayerData.current_xp, PlayerData.xp_to_next_level, animate)
 
 func _on_global_time_changed(_time_state: Dictionary) -> void:
 	_update_time_hud()
@@ -4626,6 +4676,20 @@ func _get_primary_waterbody_spot(waterbody_id: String) -> String:
 
 func _update_basket_ui() -> void:
 	keepnet_ui._update_basket_ui()
+	_update_keepnet_hud_button()
+
+
+func _update_keepnet_hud_button(animate := true) -> void:
+	if keepnet_hud_button == null:
+		return
+
+	var locked := _fishing_ui_state == FishingUiState.WAITING or _fishing_ui_state == FishingUiState.FIGHTING or is_cast_animating
+	keepnet_hud_button.visible = true
+	keepnet_hud_button.disabled = locked
+	keepnet_hud_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	keepnet_hud_button.tooltip_text = "Садок: %d/%d" % [InventoryManager.inventory.size(), InventoryManager.max_items]
+	if keepnet_hud_button.has_method("set_counts"):
+		keepnet_hud_button.call("set_counts", InventoryManager.inventory.size(), InventoryManager.max_items, animate)
 
 func _get_keepnet_summary() -> Dictionary:
 	return keepnet_ui._get_keepnet_summary()

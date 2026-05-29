@@ -3,6 +3,7 @@ extends Node
 const PRIMARY_SUPPLIER_IDS := [
 	"local_market",
 	"fish_shop",
+	"cannery",
 	"restaurant",
 	"wholesale_buyer",
 	"collector",
@@ -12,7 +13,8 @@ const PRIMARY_SUPPLIER_IDS := [
 const DEFAULT_REPUTATION_BONUS_CAP := 0.18
 const SUPPLIER_REPUTATION_BONUS_CAPS := {
 	"local_market": 0.0,
-	"fish_shop": 0.02
+	"fish_shop": 0.02,
+	"cannery": 0.03
 }
 
 const SUPPLIERS := {
@@ -39,6 +41,20 @@ const SUPPLIERS := {
 		"accepts_text": "Обычные и редкие виды, свежий мелкий улов тоже берёт.",
 		"contracts_text": "Заказы на ходовую свежую рыбу.",
 		"unlock_text": "Открыта сразу."
+	},
+	"cannery": {
+		"name": "Консервный завод",
+		"description": "Принимает даже старую рыбу. Платит меньше за свежую, но лучше остальных за несвежую.",
+		"price_multiplier": 0.85,
+		"min_status": "undersized",
+		"min_reputation": 10,
+		"accepted_fish_ids": [],
+		"accepted_rarity_types": [],
+		"freshness_price_floor": 0.50,
+		"max_freshness_age_hours": -1.0,
+		"accepts_text": "Почти любая рыба, включая несвежую и почти испорченную.",
+		"contracts_text": "Массовые партии дешёвой и старой рыбы.",
+		"unlock_text": "Нужна репутация у консервного завода: 10."
 	},
 	"restaurant": {
 		"name": "Ресторан",
@@ -119,7 +135,33 @@ const SUPPLIERS := {
 }
 
 func get_supplier(supplier_id: String) -> Dictionary:
-	return (SUPPLIERS.get(supplier_id, {}) as Dictionary).duplicate(true)
+	var supplier: Dictionary = (SUPPLIERS.get(supplier_id, {}) as Dictionary).duplicate(true)
+	_apply_supplier_freshness_defaults(supplier_id, supplier)
+	return supplier
+
+
+func _apply_supplier_freshness_defaults(supplier_id: String, supplier: Dictionary) -> void:
+	if supplier.is_empty():
+		return
+	match supplier_id:
+		"local_market":
+			if not supplier.has("max_freshness_age_hours"):
+				supplier["max_freshness_age_hours"] = 36.0
+		"fish_shop":
+			if not supplier.has("max_freshness_age_hours"):
+				supplier["max_freshness_age_hours"] = 24.0
+		"restaurant":
+			if not supplier.has("max_freshness_age_hours"):
+				supplier["max_freshness_age_hours"] = 12.0
+		"wholesale_buyer":
+			if not supplier.has("max_freshness_age_hours"):
+				supplier["max_freshness_age_hours"] = 36.0
+		"collector":
+			if not supplier.has("max_freshness_age_hours"):
+				supplier["max_freshness_age_hours"] = 48.0
+		"export_company":
+			if not supplier.has("max_freshness_age_hours"):
+				supplier["max_freshness_age_hours"] = 24.0
 
 
 func get_supplier_ids() -> Array:
@@ -189,6 +231,9 @@ func can_buy(catch_data: Dictionary, supplier_id: String) -> bool:
 	if not accepted_rarity_types.is_empty() and not accepted_rarity_types.has(rarity_type):
 		if not accepts_trophy_or_rare or status != FishStatusSystem.STATUS_TROPHY:
 			return false
+
+	if not _meets_freshness_requirement(supplier, catch_data):
+		return false
 
 	return true
 
@@ -329,7 +374,7 @@ func get_supplier_reputation_bonus(supplier_id: String, reputation_override: int
 	return minf(float(maxi(reputation, 0)) / 1000.0, cap)
 
 
-func get_supplier_summary(limit: int = 6) -> Array:
+func get_supplier_summary(limit: int = 0) -> Array:
 	var items: Array = []
 	for supplier_id in PRIMARY_SUPPLIER_IDS:
 		var supplier: Dictionary = get_supplier(str(supplier_id))
@@ -399,6 +444,13 @@ func _get_rejection_reason(catch_data: Dictionary, supplier_id: String) -> Strin
 	if not accepted_rarity_types.is_empty() and not accepted_rarity_types.has(rarity_type):
 		return "Нужна подходящая редкость"
 	return "Не принимается: %s" % status_title
+
+
+func _meets_freshness_requirement(supplier: Dictionary, catch_data: Dictionary) -> bool:
+	var max_freshness_age_hours := float(supplier.get("max_freshness_age_hours", -1.0))
+	if max_freshness_age_hours < 0.0:
+		return true
+	return FishFreshnessManager.get_fish_age_game_hours(catch_data) <= max_freshness_age_hours
 
 
 func _get_reputation(supplier_id: String) -> int:

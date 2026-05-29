@@ -45,7 +45,6 @@ const ICON_WEATHER_RAINY := preload("res://assets/ui/icons/icon_weather_rainy.pn
 const ICON_WEATHER_STORM := preload("res://assets/ui/icons/icon_weather_storm.png")
 const ICON_WEATHER_FOG := preload("res://assets/ui/icons/icon_weather_fog.png")
 const ICON_HOOK := preload("res://assets/ui/icons/icon_hook.png")
-const ICON_AUTO := preload("res://assets/ui/icons/icon_auto.png")
 const ICON_LOCATION := preload("res://assets/ui/icons/icon_location.png")
 const ICON_SETTINGS := preload("res://assets/ui/icons/icon_settings.png")
 const ICON_LINE := preload("res://assets/ui/icons/icon_line.png")
@@ -56,7 +55,6 @@ const HUD_ICON_ACTION_PULL_OUT := preload("res://assets/ui/icons/hud/action_pull
 const HUD_ICON_FEED := preload("res://assets/ui/icons/hud/feed.svg")
 const HUD_ICON_BAIT := preload("res://assets/ui/icons/hud/bait.svg")
 const HUD_ICON_TACKLE := preload("res://assets/ui/icons/hud/tackle.svg")
-const HUD_ICON_AUTO := preload("res://assets/ui/icons/hud/auto.svg")
 const SIDE_MENU_ICON_KEEPNET := preload("res://assets/ui/icons/side_menu/optimized/sadok.png")
 const SIDE_MENU_ICON_INVENTORY := preload("res://assets/ui/icons/side_menu/optimized/inventory.png")
 const SIDE_MENU_ICON_SHOP := preload("res://assets/ui/icons/side_menu/optimized/shop.png")
@@ -320,8 +318,6 @@ func get_icon(icon_name: String) -> Texture2D:
 			return HUD_ICON_BAIT
 		"hud_tackle":
 			return HUD_ICON_TACKLE
-		"hud_auto":
-			return HUD_ICON_AUTO
 		"hook", "cast":
 			return ICON_HOOK
 		"fish", "fishing":
@@ -362,8 +358,6 @@ func get_icon(icon_name: String) -> Texture2D:
 			return ICON_WEATHER_FOG
 		"time":
 			return ICON_TIME
-		"auto":
-			return ICON_AUTO
 		"line":
 			return ICON_LINE
 		_:

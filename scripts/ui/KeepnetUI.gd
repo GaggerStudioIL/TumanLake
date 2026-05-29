@@ -1,4 +1,4 @@
-# Handles the keepnet window: fish cards, stats, and sell requests.
+# Handles the keepnet window as a catch viewer. Selling stays in the harbor UI.
 extends RefCounted
 
 const EmptyStateCardScript := preload("res://scripts/ui/components/EmptyStateCard.gd")
@@ -126,15 +126,18 @@ func _update_basket_ui() -> void:
 		_hide_fish_details()
 	main.basket_button.text = "Садок"
 	var summary = _get_keepnet_summary()
-	main.basket_stats_label.text = "Рыб: %d    Вес: %s    Стоимость: %s" % [
+	main.basket_stats_label.text = "Рыб: %d/%d    Вес: %s    Оценка: %s" % [
 		fish_count,
+		InventoryManager.max_items,
 		UIFormatters.format_weight_kg(float(summary.get("weight", 0.0))),
 		UIFormatters.format_money(float(summary.get("price", 0)))
 	]
 	main.basket_contents_label.visible = false
 	_update_empty_state_card(fish_count)
 	main.basket_scroll.visible = fish_count > 0
-	main.basket_sell_all_button.disabled = fish_count == 0 or main._fishing_ui_state == FishingUiState.WAITING or main._fishing_ui_state == FishingUiState.FIGHTING
+	main.basket_sell_all_button.visible = false
+	main.basket_sell_all_button.disabled = true
+	main.basket_sell_all_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	if main.basket_panel.visible:
 		_rebuild_keepnet_cards()
@@ -179,13 +182,13 @@ func _rebuild_keepnet_cards() -> void:
 
 	var available_width: float = maxf(main.basket_scroll.size.x - 8.0, 240.0)
 	var columns := 1
-	if available_width >= 1040.0:
+	if available_width >= 1180.0:
 		columns = 3
-	elif available_width >= 620.0:
+	elif available_width >= 780.0:
 		columns = 2
-	var gap = 10.0
+	var gap = 12.0
 	var card_width: float = floor((available_width - gap * float(columns - 1)) / float(columns))
-	var card_height = 150.0
+	var card_height = 218.0
 	main.basket_cards_grid.columns = columns
 	main.basket_cards_grid.custom_minimum_size = Vector2(available_width, 0.0)
 
@@ -222,14 +225,18 @@ func _create_keepnet_card(fish: Dictionary, fish_index: int, card_size: Vector2)
 		"status": fish_status_id,
 		"rarity": str(fish.get("rarityType", "common")),
 		"price": price,
-		"buyer_name": _get_best_supplier_name(fish),
+		"length": float(main._get_catch_length_cm(fish)),
+		"caught_label": _format_caught_at(fish),
+		"bait_label": _format_caught_bait(fish),
+		"tackle_label": _format_caught_tackle(fish),
+		"spot_label": _format_caught_location(fish),
+		"freshness_title": FishFreshnessManager.get_freshness_title(fish),
 		"is_trophy": fish_status_id == "trophy",
 		"badge_text": _get_keepnet_tier_label(tier) if tier == "trophy" or tier == "rarity" else "",
 		"badge_type": "trophy" if tier == "trophy" else ("rare" if tier == "rarity" else ""),
 		"card_size": card_size
 	}, "keepnet")
 	card.set_pressed_callback(_show_fish_details.bind(fish_index))
-	card.set_action_button("Продать", _on_keepnet_sell_fish_pressed.bind(fish_index))
 	return card
 
 
@@ -246,9 +253,11 @@ func _show_fish_details(fish_index: int) -> void:
 	var price: int = InventoryManager.get_fish_sell_price(fish)
 	var status_title: String = _get_short_fish_status_title(fish)
 	var freshness_title: String = FishFreshnessManager.get_freshness_title(fish)
-	var market_demand: float = _get_market_demand(fish)
-	var supplier_name: String = _get_best_supplier_name(fish)
 	var rarity_title: String = _get_rarity_title(fish)
+	var caught_label := _format_caught_at(fish)
+	var bait_label := _format_caught_bait(fish)
+	var tackle_label := _format_caught_tackle(fish)
+	var location_label := _format_caught_location(fish)
 
 	fish_details_overlay = ColorRect.new()
 	fish_details_overlay.name = "BasketFishDetailsOverlay"
@@ -259,7 +268,7 @@ func _show_fish_details(fish_index: int) -> void:
 	fish_details_overlay.z_index = 80
 	main.basket_panel.add_child(fish_details_overlay)
 
-	var dialog_size := Vector2(minf(520.0, main.basket_panel.size.x - 56.0), minf(400.0, main.basket_panel.size.y - 56.0))
+	var dialog_size := Vector2(minf(560.0, main.basket_panel.size.x - 56.0), minf(430.0, main.basket_panel.size.y - 56.0))
 	var dialog := Panel.new()
 	dialog.name = "BasketFishDetailsDialog"
 	dialog.position = (main.basket_panel.size - dialog_size) * 0.5
@@ -306,7 +315,7 @@ func _show_fish_details(fish_index: int) -> void:
 	box.add_child(body)
 
 	var preview := Panel.new()
-	preview.custom_minimum_size = Vector2(150.0, 112.0)
+	preview.custom_minimum_size = Vector2(178.0, 132.0)
 	preview.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	var tier := str(fish.get("catch_rank", "normal"))
 	if _get_fish_status_id(fish) == "trophy":
@@ -314,7 +323,7 @@ func _show_fish_details(fish_index: int) -> void:
 	var slot_rarity: String = "epic" if tier == "rarity" else ("legendary" if tier == "trophy" else "common")
 	theme.apply_rarity_slot_style(preview, slot_rarity)
 	body.add_child(preview)
-	_add_fish_preview(preview, fish, Vector2(150.0, 112.0))
+	_add_fish_preview(preview, fish, Vector2(178.0, 132.0))
 
 	var info := VBoxContainer.new()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -331,46 +340,39 @@ func _show_fish_details(fish_index: int) -> void:
 	info.add_child(name_label)
 
 	var stats := Label.new()
-	stats.text = "Вес: %s\nДлина: %s\nСтатус: %s\nРедкость: %s\nСвежесть: %s\nСпрос: %s\nЛучший покупатель: %s\nЦена: %s" % [
-		UIFormatters.format_weight_kg(weight),
-		UIFormatters.format_length_cm(length_cm),
-		status_title,
-		rarity_title,
-		freshness_title,
-		UIFormatters.format_market_multiplier(market_demand),
-		supplier_name,
-		UIFormatters.format_money(float(price))
+	var detail_lines: Array = [
+		"Вес: %s" % UIFormatters.format_weight_kg(weight),
+		"Длина: %s" % UIFormatters.format_length_cm(length_cm),
+		"Статус: %s" % status_title,
+		"Редкость: %s" % rarity_title,
+		"Свежесть: %s" % freshness_title,
+		"Оценка в гавани: %s" % UIFormatters.format_money(float(price))
 	]
+	if not caught_label.is_empty():
+		detail_lines.append("Поймана: %s" % caught_label)
+	if not bait_label.is_empty():
+		detail_lines.append("Поймано на: %s" % bait_label)
+	if not tackle_label.is_empty():
+		detail_lines.append("Оснастка: %s" % tackle_label)
+	if not location_label.is_empty():
+		detail_lines.append("Место: %s" % location_label)
+	stats.text = "\n".join(detail_lines)
 	stats.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	stats.add_theme_font_size_override("font_size", 13)
 	stats.add_theme_color_override("font_color", Color(0.78, 0.90, 0.84, 0.96))
 	info.add_child(stats)
-
-	var buyers := Label.new()
-	buyers.text = "Покупатели:\n%s" % _get_buyer_offer_text(fish)
-	buyers.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	buyers.add_theme_font_size_override("font_size", 12)
-	buyers.add_theme_color_override("font_color", Color(0.72, 0.86, 0.80, 0.94))
-	info.add_child(buyers)
 
 	var footer := HBoxContainer.new()
 	footer.custom_minimum_size = Vector2(0.0, 42.0)
 	footer.add_theme_constant_override("separation", 10)
 	box.add_child(footer)
 	var hint := Label.new()
-	hint.text = "Нажмите «Продать», чтобы сдать рыбу лучшему доступному покупателю."
+	hint.text = "Садок теперь только для просмотра. Продажа улова доступна в гавани."
 	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.add_theme_color_override("font_color", Color(0.66, 0.78, 0.74, 0.90))
 	footer.add_child(hint)
-
-	var sell_button := Button.new()
-	sell_button.text = "Продать"
-	sell_button.custom_minimum_size = Vector2(132.0, 42.0)
-	main._apply_button_style(sell_button, main.STYLE_PRIMARY_BUTTON)
-	sell_button.pressed.connect(_on_keepnet_sell_fish_pressed.bind(fish_index))
-	footer.add_child(sell_button)
 
 
 func _hide_fish_details() -> void:
@@ -416,6 +418,151 @@ func _add_fish_preview(parent: Control, fish: Dictionary, preview_size: Vector2)
 	fallback_label.add_theme_font_size_override("font_size", 28)
 	fallback_label.add_theme_color_override("font_color", Color(0.72, 0.90, 0.86, 0.88))
 	parent.add_child(fallback_label)
+
+
+func _format_caught_at(fish: Dictionary) -> String:
+	var caught_total_minutes := float(fish.get("caught_at_total_game_minutes", -1.0))
+	var current_total_minutes := _get_current_total_game_minutes()
+	if caught_total_minutes >= 0.0 and current_total_minutes >= caught_total_minutes:
+		return _format_elapsed_catch_time(current_total_minutes - caught_total_minutes)
+
+	var caught_real_time := float(fish.get("caught_at_real_unix_time", 0.0))
+	if caught_real_time > 0.0:
+		var elapsed_real_minutes := maxf((Time.get_unix_time_from_system() - caught_real_time) / 60.0, 0.0)
+		return _format_elapsed_catch_time(elapsed_real_minutes)
+
+	var legacy_value := str(fish.get("caught_at", ""))
+	if not legacy_value.is_empty():
+		return legacy_value
+
+	return ""
+
+
+func _get_current_total_game_minutes() -> float:
+	var time_manager: Node = main.get_node_or_null("/root/TimeManager") if main != null else null
+	if time_manager == null:
+		return -1.0
+
+	var total_value = time_manager.get("total_game_minutes")
+	if total_value != null:
+		return float(total_value)
+
+	var current_value = time_manager.get("current_game_minutes")
+	if current_value != null:
+		return float(current_value)
+
+	return -1.0
+
+
+func _format_elapsed_catch_time(elapsed_minutes: float) -> String:
+	var minutes := maxi(roundi(elapsed_minutes), 0)
+	if minutes <= 0:
+		return "только что"
+	if minutes < 60:
+		return "%d %s назад" % [minutes, _plural_ru(minutes, "минуту", "минуты", "минут")]
+
+	var hours := int(floor(float(minutes) / 60.0))
+	var remaining_minutes := minutes % 60
+	if hours < 24:
+		if remaining_minutes <= 0:
+			return "%d %s назад" % [hours, _plural_ru(hours, "час", "часа", "часов")]
+		return "%d %s %d %s назад" % [
+			hours,
+			_plural_ru(hours, "час", "часа", "часов"),
+			remaining_minutes,
+			_plural_ru(remaining_minutes, "минуту", "минуты", "минут")
+		]
+
+	var days := int(floor(float(hours) / 24.0))
+	return "%d %s назад" % [days, _plural_ru(days, "день", "дня", "дней")]
+
+
+func _plural_ru(value: int, one: String, few: String, many: String) -> String:
+	var abs_value := absi(value)
+	var last_two := abs_value % 100
+	if last_two >= 11 and last_two <= 14:
+		return many
+	var last_digit := abs_value % 10
+	if last_digit == 1:
+		return one
+	if last_digit >= 2 and last_digit <= 4:
+		return few
+	return many
+
+
+func _format_caught_bait(fish: Dictionary) -> String:
+	var labels: Array = []
+	var bait_name := str(fish.get("bait_name", fish.get("bait_label", "")))
+	if not bait_name.is_empty():
+		labels.append(bait_name)
+
+	var bait_types_value = fish.get("bait_types", [])
+	if bait_types_value is Array:
+		for bait_type in bait_types_value:
+			var label := _format_bait_type_name(str(bait_type))
+			if not label.is_empty() and not labels.has(label):
+				labels.append(label)
+
+	var bait_type := str(fish.get("bait_type", ""))
+	if not bait_type.is_empty():
+		var bait_label := _format_bait_type_name(bait_type)
+		if not bait_label.is_empty() and not labels.has(bait_label):
+			labels.append(bait_label)
+
+	var secondary_bait_type := str(fish.get("secondary_bait_type", ""))
+	if not secondary_bait_type.is_empty():
+		var secondary_label := _format_bait_type_name(secondary_bait_type)
+		if not secondary_label.is_empty() and not labels.has(secondary_label):
+			labels.append(secondary_label)
+
+	return ", ".join(labels)
+
+
+func _format_bait_type_name(bait_type: String) -> String:
+	match bait_type.strip_edges().to_lower():
+		"worm":
+			return "червь"
+		"bread":
+			return "хлеб"
+		"dough":
+			return "тесто"
+		"maggot":
+			return "опарыш"
+		"bloodworm":
+			return "мотыль"
+		"corn":
+			return "кукуруза"
+		_:
+			return bait_type
+
+
+func _format_caught_tackle(fish: Dictionary) -> String:
+	var tackle_name := str(fish.get("tackle_name", fish.get("rod_name", "")))
+	if not tackle_name.is_empty():
+		return tackle_name
+
+	var tackle_type := str(fish.get("tackle_type", fish.get("tackle_kind", ""))).strip_edges().to_lower()
+	match tackle_type:
+		"float":
+			return "поплавочная"
+		"feeder":
+			return "фидерная"
+		"spinning":
+			return "спиннинг"
+		"bottom":
+			return "донная"
+		_:
+			return tackle_type
+
+
+func _format_caught_location(fish: Dictionary) -> String:
+	var waterbody_name := str(fish.get("waterbody_name", ""))
+	var spot_name := str(fish.get("spot_name", ""))
+	if not waterbody_name.is_empty() and not spot_name.is_empty():
+		return "%s, %s" % [waterbody_name, spot_name]
+	if not spot_name.is_empty():
+		return spot_name
+	return waterbody_name
 
 
 func _get_buyer_offer_text(fish: Dictionary) -> String:

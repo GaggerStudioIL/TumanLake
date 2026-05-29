@@ -284,6 +284,7 @@ func start_fishing(spot_id: String) -> void:
 	catch_data["spot_name"] = spot["name"]
 	catch_data["waterbody_id"] = str(spot.get("waterbody_id", PlayerData.current_waterbody))
 	catch_data["waterbody_name"] = str(spot.get("waterbody_name", ""))
+	_attach_catch_context_metadata(catch_data)
 	catch_data = FishFreshnessManager.stamp_catch(catch_data)
 
 	_start_reeling(catch_data)
@@ -529,7 +530,41 @@ func _prepare_catch_data_for_bite(fish_id: String, bite_data: Dictionary = {}) -
 	catch_data["spot_name"] = str(_active_spot.get("name", "-"))
 	catch_data["waterbody_id"] = str(_active_spot.get("waterbody_id", PlayerData.current_waterbody))
 	catch_data["waterbody_name"] = str(_active_spot.get("waterbody_name", ""))
+	_attach_catch_context_metadata(catch_data)
 	return FishFreshnessManager.stamp_catch(catch_data)
+
+
+func _attach_catch_context_metadata(catch_data: Dictionary) -> void:
+	var bait_id := str(_tackle_stats.get("bait_id", ""))
+	if not bait_id.is_empty():
+		catch_data["bait_id"] = bait_id
+
+	var bait_type := str(_tackle_stats.get("bait_type", ""))
+	if not bait_type.is_empty():
+		catch_data["bait_type"] = bait_type
+
+	var secondary_bait_id := str(_tackle_stats.get("secondary_bait_id", ""))
+	if not secondary_bait_id.is_empty():
+		catch_data["secondary_bait_id"] = secondary_bait_id
+
+	var secondary_bait_type := str(_tackle_stats.get("secondary_bait_type", ""))
+	if not secondary_bait_type.is_empty():
+		catch_data["secondary_bait_type"] = secondary_bait_type
+
+	var bait_types_value = _tackle_stats.get("bait_types", [])
+	if bait_types_value is Array and not bait_types_value.is_empty():
+		catch_data["bait_types"] = (bait_types_value as Array).duplicate()
+
+	var current_tackle := PlayerData.current_tackle
+	if current_tackle is Dictionary:
+		var rod = current_tackle.get("rod", {})
+		if rod is Dictionary:
+			var rod_name := str(rod.get("name", ""))
+			if not rod_name.is_empty():
+				catch_data["tackle_name"] = rod_name
+
+	catch_data["tackle_type"] = str(_tackle_stats.get("tackle_type", "float"))
+	catch_data["fishing_depth"] = float(_tackle_stats.get("fishing_depth", PlayerData.fishing_depth))
 
 
 func _build_bite_window_data(fish_id: String, catch_data: Dictionary, balance_data: Dictionary) -> Dictionary:
@@ -1549,8 +1584,8 @@ func _finish_reeling_success() -> void:
 		_emit_fishing_failure(
 			FAILURE_UNKNOWN,
 			"Садок заполнен",
-			"Садок заполнен. Продайте рыбу перед новой ловлей.",
-			"Откройте садок и освободите место.",
+			"Садок заполнен. Вернитесь в гавань и продайте часть улова.",
+			"Продажа теперь доступна через покупателей в гавани.",
 			{"severity": "low", "catch_data": catch_data}
 		)
 

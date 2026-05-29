@@ -3,6 +3,7 @@ extends Node
 const DEFAULT_BUYER_IDS := [
 	"local_market",
 	"fish_shop",
+	"cannery",
 	"restaurant",
 	"wholesale_buyer",
 	"collector",
@@ -72,6 +73,10 @@ func get_buyer_rejection_reason(buyer_id: String, fish_instance: Dictionary) -> 
 	if float(supplier.get("min_weight_kg", 0.0)) > 0.0 and float(prepared.get("weight", 0.0)) < float(supplier.get("min_weight_kg", 0.0)):
 		return "Нужен вес от %.1f кг" % float(supplier.get("min_weight_kg", 0.0))
 
+	var freshness_reason := _get_freshness_rejection_reason(supplier, prepared)
+	if not freshness_reason.is_empty():
+		return freshness_reason
+
 	var accepted_fish_ids: Array = _as_array(supplier.get("accepted_fish_ids", []))
 	if not accepted_fish_ids.is_empty() and not accepted_fish_ids.has(fish_id):
 		return "Этот вид не принимается"
@@ -81,7 +86,7 @@ func get_buyer_rejection_reason(buyer_id: String, fish_instance: Dictionary) -> 
 
 
 func prepare_fish_for_access(fish_instance: Dictionary) -> Dictionary:
-	var result := fish_instance.duplicate(true)
+	var result := FishFreshnessManager.ensure_catch_freshness_metadata(fish_instance)
 	var fish_id := str(result.get("id", result.get("fish_id", "")))
 	var fish: Dictionary = FishDatabase.get_fish(fish_id)
 	if fish.is_empty():
@@ -124,7 +129,24 @@ func _can_accept_prepared_fish(supplier: Dictionary, _buyer_id: String, prepared
 		if not accepts_trophy_or_rare or status != FishStatusSystem.STATUS_TROPHY:
 			return false
 
+	if not _meets_freshness_requirement(supplier, prepared):
+		return false
+
 	return true
+
+
+func _meets_freshness_requirement(supplier: Dictionary, prepared: Dictionary) -> bool:
+	var max_freshness_age_hours := float(supplier.get("max_freshness_age_hours", -1.0))
+	if max_freshness_age_hours < 0.0:
+		return true
+	return FishFreshnessManager.get_fish_age_game_hours(prepared) <= max_freshness_age_hours
+
+
+func _get_freshness_rejection_reason(supplier: Dictionary, prepared: Dictionary) -> String:
+	if _meets_freshness_requirement(supplier, prepared):
+		return ""
+	var freshness_title := FishFreshnessManager.get_freshness_title(prepared)
+	return "Рыба слишком старая: %s" % freshness_title
 
 
 func _get_supplier(buyer_id: String) -> Dictionary:

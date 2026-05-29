@@ -104,12 +104,11 @@ func refresh() -> void:
 	section_title_label.text = _get_section_title(current_section)
 	footer_panel.visible = current_section == SECTION_SALE
 	if sidebar_panel != null:
-		sidebar_panel.visible = true
+		sidebar_panel.visible = current_section != SECTION_SALE
 
 	match current_section:
 		SECTION_SALE:
 			_build_sale_section()
-			_build_buyers_sidebar()
 			_refresh_sale_footer()
 		SECTION_SUPPLIERS:
 			_build_suppliers_section()
@@ -803,9 +802,9 @@ func _sell_selected_fish_batch(requests: Array, sales_service: Node) -> Dictiona
 
 func _after_batch_sale_result(result: Dictionary) -> void:
 	var sold_count := int(result.get("sold_count", 0))
-	var message := str(result.get("message", ""))
+	var message := _format_batch_sale_result_message(result)
 	if message.is_empty():
-		message = _format_batch_sale_result_message(result)
+		message = str(result.get("message", ""))
 
 	if sold_count > 0:
 		selected_fish.clear()
@@ -947,7 +946,112 @@ func _get_last_sale_summary() -> Dictionary:
 	return {}
 
 
+func _use_harbor_sale_notice_formatter() -> bool:
+	return true
+
+
+func _format_legacy_sale_notice(title: String, earned: int, summary: Dictionary) -> String:
+	if earned <= 0:
+		return _format_sale_error_message(str(summary.get("error", "")), "Продажа не удалась.")
+
+	var sold_count := int(summary.get("sold_count", 0))
+	var sale_count := maxi(sold_count, 1)
+	var buyer_name := _format_buyer_name(summary)
+	var message := "%s: %d\nПолучено: %s\nПокупатель: %s" % [
+		title,
+		sale_count,
+		UIFormatters.format_money(float(earned)),
+		buyer_name
+	]
+	return _append_sale_extras(message, int(summary.get("contract_reward_total", 0)), summary)
+
+
+func _format_single_sale_notice(result: Dictionary) -> String:
+	if not bool(result.get("success", false)):
+		return _format_sale_error_message(str(result.get("message", result.get("error", ""))), "Продажа не удалась.")
+
+	var fish_name := "Рыба"
+	var fish_value = result.get("fish", {})
+	if fish_value is Dictionary:
+		fish_name = str((fish_value as Dictionary).get("name", fish_name))
+
+	var message := "Продано: %s\nПолучено: %s\nПокупатель: %s" % [
+		fish_name,
+		UIFormatters.format_money(float(int(result.get("total", result.get("price", 0))))),
+		_format_buyer_name(result)
+	]
+	return _append_sale_extras(message, int(result.get("contract_reward", 0)), result.get("summary", {}))
+
+
+func _format_batch_sale_notice(result: Dictionary, title: String) -> String:
+	var sold_count := int(result.get("sold_count", 0))
+	if sold_count <= 0:
+		var errors = result.get("errors", [])
+		if errors is Array and not errors.is_empty():
+			return _format_sale_error_message(str(errors[0]), "Продажа не удалась.")
+		return _format_sale_error_message(str(result.get("message", result.get("error", ""))), "Продажа не удалась.")
+
+	var message := "%s: %d\nПолучено: %s\nПокупатель: %s" % [
+		title,
+		sold_count,
+		UIFormatters.format_money(float(int(result.get("total_price", result.get("total", 0))))),
+		_format_buyer_name(result)
+	]
+	var skipped := int(result.get("not_eligible_count", 0)) + int(result.get("failed_count", 0))
+	if skipped > 0:
+		message += "\nНе продано: %d" % skipped
+	return _append_sale_extras(message, int(result.get("contract_reward_total", 0)), result)
+
+
+func _append_sale_extras(message: String, contract_reward: int, summary_value) -> String:
+	var result := message
+	var completed_contracts_count := 0
+	if summary_value is Dictionary:
+		var completed_contracts = (summary_value as Dictionary).get("completed_contracts", [])
+		if completed_contracts is Array:
+			completed_contracts_count = completed_contracts.size()
+
+	if contract_reward > 0 and completed_contracts_count > 0:
+		result += "\nКонтракты: +%s, закрыто %d" % [UIFormatters.format_money(float(contract_reward)), completed_contracts_count]
+	elif contract_reward > 0:
+		result += "\nКонтракты: +%s" % UIFormatters.format_money(float(contract_reward))
+	elif completed_contracts_count > 0:
+		result += "\nЗакрыто контрактов: %d" % completed_contracts_count
+	return result
+
+
+func _format_buyer_name(data: Dictionary) -> String:
+	var buyer_name := str(data.get("buyer_name", data.get("supplier_name", ""))).strip_edges()
+	if not buyer_name.is_empty():
+		return buyer_name
+
+	var buyer_id := str(data.get("buyer_id", data.get("supplier_id", ""))).strip_edges()
+	if not buyer_id.is_empty():
+		var supplier := _get_supplier_data(buyer_id)
+		if not supplier.is_empty():
+			return str(supplier.get("name", buyer_id))
+		return buyer_id
+
+	var supplier_totals = data.get("supplier_totals", {})
+	if supplier_totals is Dictionary:
+		var supplier_ids := (supplier_totals as Dictionary).keys()
+		if supplier_ids.size() == 1:
+			return _format_buyer_name({"buyer_id": str(supplier_ids[0])})
+		if supplier_ids.size() > 1:
+			return "Несколько покупателей"
+	return "Покупатель"
+
+
+func _format_sale_error_message(raw_message: String, fallback: String) -> String:
+	var message := raw_message.strip_edges()
+	if message.is_empty():
+		message = fallback
+	return message
+
+
 func _format_sale_result_message(title: String, earned: int, summary: Dictionary) -> String:
+	if _use_harbor_sale_notice_formatter():
+		return _format_legacy_sale_notice(title, earned, summary)
 	if earned <= 0:
 		var error := str(summary.get("error", "Нет подходящей рыбы для продажи."))
 		return error if not error.is_empty() else "Нет подходящей рыбы для продажи."
@@ -970,6 +1074,8 @@ func _format_sale_result_message(title: String, earned: int, summary: Dictionary
 
 
 func _format_single_sale_result_message(result: Dictionary) -> String:
+	if _use_harbor_sale_notice_formatter():
+		return _format_single_sale_notice(result)
 	var success := bool(result.get("success", false))
 	if not success:
 		var error := str(result.get("message", result.get("error", "Продажа не удалась.")))
@@ -995,6 +1101,8 @@ func _format_single_sale_result_message(result: Dictionary) -> String:
 
 
 func _format_batch_sale_result_message(result: Dictionary) -> String:
+	if _use_harbor_sale_notice_formatter():
+		return _format_batch_sale_notice(result, "Продано рыб")
 	var sold_count := int(result.get("sold_count", 0))
 	var failed_count := int(result.get("failed_count", 0))
 	var total := int(result.get("total_price", result.get("total", 0)))
@@ -1017,6 +1125,8 @@ func _format_batch_sale_result_message(result: Dictionary) -> String:
 
 
 func _format_sell_all_matching_result_message(result: Dictionary) -> String:
+	if _use_harbor_sale_notice_formatter():
+		return _format_batch_sale_notice(result, "Продано рыб")
 	var sold_count := int(result.get("sold_count", 0))
 	var total := int(result.get("total_price", result.get("total", 0)))
 	var buyer_name := str(result.get("buyer_name", result.get("buyer_id", "покупатель")))
@@ -1605,7 +1715,7 @@ func _get_primary_supplier_ids() -> Array:
 		var value = supplier_manager.call("get_primary_supplier_ids")
 		if value is Array:
 			return value
-	return ["local_market", "fish_shop", "restaurant", "wholesale_buyer", "collector", "export_company"]
+	return ["local_market", "fish_shop", "cannery", "restaurant", "wholesale_buyer", "collector", "export_company"]
 
 
 func _get_reputation_info(supplier_id: String) -> Dictionary:
@@ -1667,6 +1777,8 @@ func _short_supplier_accepts(supplier_id: String, fallback: String) -> String:
 			return "все виды"
 		"fish_shop":
 			return "обычные и редкие виды"
+		"cannery":
+			return "почти любую, даже старую"
 		"restaurant":
 			return "зачётную рыбу"
 		"wholesale_buyer":
@@ -1685,6 +1797,8 @@ func _short_supplier_contracts(supplier_id: String, fallback: String) -> String:
 			return "вес / количество"
 		"fish_shop":
 			return "ходовая рыба"
+		"cannery":
+			return "массовая переработка"
 		"restaurant":
 			return "зачётные поставки"
 		"wholesale_buyer":

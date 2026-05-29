@@ -133,7 +133,6 @@ func _refresh_bottom_nav_styles() -> void:
 	elif main.waterbody_panel != null and main.waterbody_panel.visible:
 		active_tab = "map"
 	var nav_data: Array = [
-		[main.basket_button, "sell"],
 		[main.inventory_button, "inventory"],
 		[main.shop_button, "shop"],
 		[main.harbor_button, "harbor"],
@@ -151,7 +150,6 @@ func _refresh_bottom_nav_styles() -> void:
 	main._apply_action_button_style(main.feed_button, false)
 	main._apply_action_button_style(main.bait_button, bait_active)
 	main._apply_action_button_style(main.tackle_button, active_tab == "tackle")
-	main._apply_action_button_style(main.auto_button, false)
 
 
 func _get_main_hud_text() -> String:

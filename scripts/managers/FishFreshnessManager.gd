@@ -1,15 +1,18 @@
 extends Node
 
-const VERY_FRESH_SECONDS := 30.0 * 60.0
-const FRESH_SECONDS := 2.0 * 60.0 * 60.0
-const NORMAL_SECONDS := 6.0 * 60.0 * 60.0
-const SPOILED_SECONDS := 12.0 * 60.0 * 60.0
+const VERY_FRESH_HOURS := 6.0
+const FRESH_HOURS := 12.0
+const NORMAL_HOURS := 24.0
+const STALE_HOURS := 36.0
+const ALMOST_SPOILED_HOURS := 48.0
 
-const VERY_FRESH_PRICE_MULTIPLIER := 1.10
-const FRESH_PRICE_MULTIPLIER := 1.00
-const NORMAL_PRICE_MULTIPLIER := 0.80
-const LOSING_FRESHNESS_PRICE_MULTIPLIER := 0.50
-const SPOILED_PRICE_MULTIPLIER := 0.15
+const VERY_FRESH_PRICE_MULTIPLIER := 1.00
+const FRESH_PRICE_MULTIPLIER := 0.95
+const NORMAL_PRICE_MULTIPLIER := 0.85
+const STALE_PRICE_MULTIPLIER := 0.70
+const ALMOST_SPOILED_PRICE_MULTIPLIER := 0.50
+const SPOILED_PRICE_MULTIPLIER := 0.20
+
 
 func stamp_catch(catch_data: Dictionary) -> Dictionary:
 	var result := catch_data.duplicate(true)
@@ -29,49 +32,105 @@ func ensure_catch_freshness_metadata(catch_data: Dictionary) -> Dictionary:
 
 
 func get_fish_age_seconds(catch_data: Dictionary) -> float:
+	return get_fish_age_game_hours(catch_data) * 60.0 * 60.0
+
+
+func get_fish_age_game_hours(catch_data: Dictionary) -> float:
+	return get_fish_age_game_minutes(catch_data) / 60.0
+
+
+func get_fish_age_game_minutes(catch_data: Dictionary) -> float:
 	var ensured := ensure_catch_freshness_metadata(catch_data)
-	var caught_at := float(ensured.get("caught_at_real_unix_time", 0.0))
+	var caught_at_total_game_minutes := float(ensured.get("caught_at_total_game_minutes", -1.0))
+	var time_manager := _get_time_manager()
+	if time_manager != null and caught_at_total_game_minutes >= 0.0:
+		var current_total_game_minutes := float(time_manager.get("total_game_minutes"))
+		return maxf(current_total_game_minutes - caught_at_total_game_minutes, 0.0)
+
+	var caught_at_real_time := float(ensured.get("caught_at_real_unix_time", 0.0))
 	var now := _get_real_unix_time()
-	if caught_at <= 0.0 or now <= 0.0:
+	if caught_at_real_time <= 0.0 or now <= 0.0:
 		return 0.0
 
-	return maxf(now - caught_at, 0.0)
+	return maxf(now - caught_at_real_time, 0.0) / 60.0
 
 
 func get_freshness_ratio(catch_data: Dictionary) -> float:
-	var age_seconds := get_fish_age_seconds(catch_data)
-	return clampf(1.0 - age_seconds / SPOILED_SECONDS, 0.0, 1.0)
+	var age_hours := get_fish_age_game_hours(catch_data)
+	return clampf(1.0 - age_hours / ALMOST_SPOILED_HOURS, 0.0, 1.0)
+
+
+func get_freshness_key(catch_data: Dictionary) -> String:
+	var age_hours := get_fish_age_game_hours(catch_data)
+	if age_hours <= VERY_FRESH_HOURS:
+		return "very_fresh"
+	if age_hours <= FRESH_HOURS:
+		return "fresh"
+	if age_hours <= NORMAL_HOURS:
+		return "normal"
+	if age_hours <= STALE_HOURS:
+		return "stale"
+	if age_hours <= ALMOST_SPOILED_HOURS:
+		return "almost_spoiled"
+	return "spoiled"
 
 
 func get_freshness_title(catch_data: Dictionary) -> String:
-	var age_seconds := get_fish_age_seconds(catch_data)
-	if age_seconds <= VERY_FRESH_SECONDS:
-		return "Очень свежая"
-	if age_seconds <= FRESH_SECONDS:
-		return "Свежая"
-	if age_seconds <= NORMAL_SECONDS:
-		return "Нормальная"
-	if age_seconds <= SPOILED_SECONDS:
-		return "Теряет свежесть"
-	return "Испорчена"
+	match get_freshness_key(catch_data):
+		"very_fresh":
+			return "Очень свежая"
+		"fresh":
+			return "Свежая"
+		"normal":
+			return "Нормальная"
+		"stale":
+			return "Несвежая"
+		"almost_spoiled":
+			return "Почти испорченная"
+		_:
+			return "Испорченная"
 
 
-func get_price_multiplier(catch_data: Dictionary) -> float:
-	var age_seconds := get_fish_age_seconds(catch_data)
-	if age_seconds <= VERY_FRESH_SECONDS:
-		return VERY_FRESH_PRICE_MULTIPLIER
-	if age_seconds <= FRESH_SECONDS:
-		return FRESH_PRICE_MULTIPLIER
-	if age_seconds <= NORMAL_SECONDS:
-		return NORMAL_PRICE_MULTIPLIER
-	if age_seconds <= SPOILED_SECONDS:
-		return LOSING_FRESHNESS_PRICE_MULTIPLIER
-	return SPOILED_PRICE_MULTIPLIER
+func get_price_multiplier(catch_data: Dictionary, buyer_id: String = "") -> float:
+	var base_multiplier := _get_base_price_multiplier_for_key(get_freshness_key(catch_data))
+	var freshness_floor := _get_buyer_freshness_floor(buyer_id)
+	if freshness_floor > 0.0:
+		return maxf(base_multiplier, freshness_floor)
+	return base_multiplier
 
 
 func get_adjusted_price(catch_data: Dictionary) -> int:
 	var base_price := int(catch_data.get("price", 0))
 	return max(roundi(float(max(base_price, 0)) * get_price_multiplier(catch_data)), 0)
+
+
+func _get_base_price_multiplier_for_key(freshness_key: String) -> float:
+	match freshness_key:
+		"very_fresh":
+			return VERY_FRESH_PRICE_MULTIPLIER
+		"fresh":
+			return FRESH_PRICE_MULTIPLIER
+		"normal":
+			return NORMAL_PRICE_MULTIPLIER
+		"stale":
+			return STALE_PRICE_MULTIPLIER
+		"almost_spoiled":
+			return ALMOST_SPOILED_PRICE_MULTIPLIER
+		_:
+			return SPOILED_PRICE_MULTIPLIER
+
+
+func _get_buyer_freshness_floor(buyer_id: String) -> float:
+	if buyer_id.is_empty():
+		return 0.0
+	var supplier_manager := get_node_or_null("/root/SupplierManager")
+	if supplier_manager == null or not supplier_manager.has_method("get_supplier"):
+		return 0.0
+	var value = supplier_manager.call("get_supplier", buyer_id)
+	if not (value is Dictionary):
+		return 0.0
+	var supplier: Dictionary = value
+	return float(supplier.get("freshness_price_floor", 0.0))
 
 
 func _write_current_time_metadata(catch_data: Dictionary) -> void:

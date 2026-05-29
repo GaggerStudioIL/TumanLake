@@ -110,7 +110,7 @@ func load_game() -> void:
 	PlayerData.set_current_tackle(save_data.get("current_tackle", {}))
 
 	InventoryManager.inventory = save_data.get("inventory", [])
-	InventoryManager.max_items = int(save_data.get("max_items", 20))
+	InventoryManager.max_items = maxi(int(save_data.get("max_items", 30)), 30)
 	_load_economy_save_data(save_data.get("economy", {}))
 	var time_manager := _get_time_manager()
 	var should_save_after_time_load := false
@@ -220,5 +220,6 @@ func _migrate_save_data(save_data: Dictionary) -> Dictionary:
 		if not result.has("inventory") or typeof(result.get("inventory")) != TYPE_ARRAY:
 			result["inventory"] = []
 		if not result.has("max_items"):
-			result["max_items"] = 20
+			result["max_items"] = 30
+		result["max_items"] = maxi(int(result.get("max_items", 30)), 30)
 	return result

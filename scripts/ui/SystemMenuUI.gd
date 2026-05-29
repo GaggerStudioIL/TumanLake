@@ -2,10 +2,12 @@
 extends RefCounted
 
 const WeatherUIHelperScript := preload("res://scripts/ui/helpers/WeatherUIHelper.gd")
+const MENU_WEATHER_ICON := preload("res://assets/ui/icons/menu_weather.png")
 
-const BUTTON_BASE_SIZE := Vector2(60.0, 50.0)
-const PANEL_BASE_WIDTH := 256.0
-const ITEM_BASE_HEIGHT := 56.0
+const BUTTON_BASE_SIZE := Vector2(58.0, 50.0)
+const PANEL_BASE_WIDTH := 238.0
+const ITEM_BASE_HEIGHT := 52.0
+const ITEM_ICON_BASE_SIZE := 38.0
 
 var main
 var root: Control
@@ -29,6 +31,8 @@ var forecast_scroll: ScrollContainer
 var forecast_list: VBoxContainer
 var forecast_close_button: Button
 var _is_disabled := false
+var _menu_tween: Tween
+var _menu_open_position := Vector2.ZERO
 
 
 func setup(main_ref) -> void:
@@ -52,12 +56,15 @@ func layout(screen_size: Vector2) -> void:
 		clampf(BUTTON_BASE_SIZE.x * ui_scale, 56.0, 68.0),
 		clampf(BUTTON_BASE_SIZE.y * ui_scale, 48.0, 58.0)
 	)
-	var panel_width: float = clampf(PANEL_BASE_WIDTH * ui_scale, 228.0, 286.0)
-	var item_height: float = clampf(ITEM_BASE_HEIGHT * ui_scale, 50.0, 60.0)
-	var panel_padding: float = 11.0 * ui_scale
-	var panel_height: float = item_height * 4.0 + panel_padding * 2.0 + 6.0 * ui_scale * 3.0
+	var panel_width: float = clampf(PANEL_BASE_WIDTH * ui_scale, 220.0, 266.0)
+	var item_height: float = clampf(ITEM_BASE_HEIGHT * ui_scale, 50.0, 58.0)
+	var item_gap: float = clampf(5.0 * ui_scale, 4.0, 7.0)
+	var item_count: int = menu_items_box.get_child_count() if menu_items_box != null else 4
+	var panel_padding: float = clampf(10.0 * ui_scale, 9.0, 13.0)
+	var panel_height: float = item_height * float(item_count) + panel_padding * 2.0 + item_gap * float(maxi(item_count - 1, 0))
 	var button_x: float = screen_size.x - margin_x - button_size.x
 	var button_y: float = margin_y
+	var icon_size: int = int(clampf(ITEM_ICON_BASE_SIZE * ui_scale, 34.0, 44.0))
 
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.position = Vector2.ZERO
@@ -81,20 +88,22 @@ func layout(screen_size: Vector2) -> void:
 	menu_button.add_theme_font_size_override("font_size", int(28.0 * ui_scale))
 	_apply_menu_button_style()
 
-	dropdown_panel.position = Vector2(screen_size.x - margin_x - panel_width, button_y + button_size.y + 8.0 * ui_scale)
+	_menu_open_position = Vector2(screen_size.x - margin_x - panel_width, button_y + button_size.y + 8.0 * ui_scale)
+	dropdown_panel.position = _menu_open_position
 	dropdown_panel.size = Vector2(panel_width, panel_height)
 	dropdown_panel.custom_minimum_size = dropdown_panel.size
 	_apply_panel_style(dropdown_panel)
+	dropdown_panel.pivot_offset = Vector2(dropdown_panel.size.x, 0.0)
 
 	menu_items_box.position = Vector2(panel_padding, panel_padding)
 	menu_items_box.size = Vector2(panel_width - panel_padding * 2.0, panel_height - panel_padding * 2.0)
-	menu_items_box.add_theme_constant_override("separation", int(6.0 * ui_scale))
+	menu_items_box.add_theme_constant_override("separation", int(item_gap))
 
 	for item in [profile_item, atlas_item, forecast_item, settings_item]:
 		item.custom_minimum_size = Vector2(menu_items_box.size.x, item_height)
-		item.add_theme_font_size_override("font_size", int(16.0 * ui_scale))
-		item.add_theme_constant_override("icon_max_width", int(30.0 * ui_scale))
-		item.add_theme_constant_override("h_separation", int(11.0 * ui_scale))
+		item.add_theme_font_size_override("font_size", int(clampf(15.0 * ui_scale, 14.0, 17.0)))
+		item.add_theme_constant_override("icon_max_width", icon_size)
+		item.add_theme_constant_override("h_separation", int(clampf(13.0 * ui_scale, 12.0, 16.0)))
 		_apply_menu_item_style(item)
 
 	if settings_panel != null:
@@ -159,9 +168,15 @@ func is_forecast_open() -> bool:
 
 
 func close_menu() -> void:
+	if is_instance_valid(_menu_tween):
+		_menu_tween.kill()
 	if dropdown_panel != null:
 		dropdown_panel.visible = false
+		dropdown_panel.modulate = Color(1.0, 1.0, 1.0, 1.0)
+		dropdown_panel.scale = Vector2.ONE
+		dropdown_panel.position = _menu_open_position
 	if outside_close != null:
+		outside_close.modulate = Color(1.0, 1.0, 1.0, 1.0)
 		outside_close.visible = false
 
 
@@ -213,7 +228,7 @@ func _ensure_menu_nodes() -> void:
 
 	outside_close = ColorRect.new()
 	outside_close.name = "SystemMenuOutsideClose"
-	outside_close.color = Color(0.0, 0.0, 0.0, 0.0)
+	outside_close.color = Color(0.0, 0.0, 0.0, 0.055)
 	outside_close.mouse_filter = Control.MOUSE_FILTER_STOP
 	outside_close.visible = false
 	outside_close.z_index = 0
@@ -350,19 +365,38 @@ func _ensure_forecast_nodes() -> void:
 	forecast_close_button.pressed.connect(_on_forecast_close_pressed)
 
 
+func _get_menu_item_icon(icon_name: String) -> Texture2D:
+	if main == null or main.ui_theme == null:
+		return null
+
+	var texture: Texture2D = null
+	match icon_name:
+		"profile", "encyclopedia", "atlas", "settings":
+			if main.ui_theme.has_method("get_side_menu_icon"):
+				texture = main.ui_theme.get_side_menu_icon(icon_name)
+		"weather":
+			texture = MENU_WEATHER_ICON
+
+	if texture == null and main.ui_theme.has_method("get_icon"):
+		texture = main.ui_theme.get_icon(icon_name)
+	return texture
+
+
 func _create_menu_item(text: String, icon_name: String) -> Button:
 	var item := Button.new()
 	item.text = text
+	item.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	item.focus_mode = Control.FOCUS_NONE
 	item.mouse_filter = Control.MOUSE_FILTER_STOP
 	item.clip_text = false
+	item.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
 	if main.ui_theme != null:
-		item.icon = main.ui_theme.get_icon(icon_name)
+		item.icon = _get_menu_item_icon(icon_name)
 		item.expand_icon = true
 		item.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		item.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
-		item.add_theme_constant_override("icon_max_width", 32)
-		item.add_theme_constant_override("h_separation", 12)
+		item.add_theme_constant_override("icon_max_width", int(ITEM_ICON_BASE_SIZE))
+		item.add_theme_constant_override("h_separation", 14)
 	return item
 
 
@@ -372,8 +406,35 @@ func _on_menu_button_pressed() -> void:
 	if is_menu_open():
 		close_menu()
 	else:
-		outside_close.visible = true
-		dropdown_panel.visible = true
+		_open_menu()
+
+
+func _open_menu() -> void:
+	if outside_close == null or dropdown_panel == null:
+		return
+
+	if is_instance_valid(_menu_tween):
+		_menu_tween.kill()
+
+	outside_close.visible = true
+	outside_close.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	dropdown_panel.visible = true
+	dropdown_panel.position = _menu_open_position + Vector2(0.0, -6.0)
+	dropdown_panel.scale = Vector2(0.985, 0.985)
+	dropdown_panel.modulate = Color(1.0, 1.0, 1.0, 0.0)
+
+	if main != null:
+		_menu_tween = main.create_tween()
+		_menu_tween.set_parallel(true)
+		_menu_tween.tween_property(outside_close, "modulate:a", 1.0, 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		_menu_tween.tween_property(dropdown_panel, "modulate:a", 1.0, 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		_menu_tween.tween_property(dropdown_panel, "position", _menu_open_position, 0.14).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		_menu_tween.tween_property(dropdown_panel, "scale", Vector2.ONE, 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	else:
+		outside_close.modulate = Color(1.0, 1.0, 1.0, 1.0)
+		dropdown_panel.modulate = Color(1.0, 1.0, 1.0, 1.0)
+		dropdown_panel.position = _menu_open_position
+		dropdown_panel.scale = Vector2.ONE
 
 
 func _on_profile_pressed() -> void:
@@ -515,15 +576,15 @@ func _clear_children(node: Node) -> void:
 
 
 func _apply_menu_button_style() -> void:
-	var normal := _make_style(Color(0.035, 0.058, 0.060, 0.82), Color(0.68, 0.94, 0.88, 0.32), 14, 5, Color(0.0, 0.0, 0.0, 0.24))
-	var hover := _make_style(Color(0.054, 0.098, 0.096, 0.92), Color(0.78, 1.0, 0.95, 0.52), 14, 7, Color(0.22, 0.86, 0.82, 0.14))
-	var pressed := _make_style(Color(0.040, 0.130, 0.118, 0.96), Color(0.80, 1.0, 0.92, 0.64), 14, 3, Color(0.0, 0.0, 0.0, 0.16))
-	var disabled := _make_style(Color(0.030, 0.040, 0.042, 0.46), Color(0.58, 0.64, 0.62, 0.14), 14, 1, Color.TRANSPARENT)
+	var normal := _make_style(Color(0.026, 0.044, 0.044, 0.78), Color(0.74, 0.96, 0.86, 0.32), 15, 5, Color(0.0, 0.0, 0.0, 0.22))
+	var hover := _make_style(Color(0.046, 0.082, 0.076, 0.88), Color(0.84, 1.0, 0.88, 0.54), 15, 7, Color(0.18, 0.66, 0.48, 0.13))
+	var pressed := _make_style(Color(0.038, 0.112, 0.092, 0.94), Color(0.82, 1.0, 0.86, 0.62), 15, 3, Color(0.0, 0.0, 0.0, 0.16))
+	var disabled := _make_style(Color(0.030, 0.040, 0.042, 0.44), Color(0.58, 0.64, 0.62, 0.12), 15, 1, Color.TRANSPARENT)
 	menu_button.add_theme_stylebox_override("normal", normal)
 	menu_button.add_theme_stylebox_override("hover", hover)
 	menu_button.add_theme_stylebox_override("pressed", pressed)
 	menu_button.add_theme_stylebox_override("disabled", disabled)
-	menu_button.add_theme_color_override("font_color", Color(0.90, 1.0, 0.96, 1.0))
+	menu_button.add_theme_color_override("font_color", Color(0.88, 1.0, 0.94, 1.0))
 	menu_button.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 0.94, 1.0))
 	menu_button.add_theme_color_override("font_pressed_color", Color(0.80, 1.0, 0.92, 1.0))
 	menu_button.add_theme_color_override("font_disabled_color", Color(0.62, 0.70, 0.68, 0.54))
@@ -532,23 +593,40 @@ func _apply_menu_button_style() -> void:
 func _apply_panel_style(panel: Panel) -> void:
 	panel.add_theme_stylebox_override(
 		"panel",
-		_make_style(Color(0.020, 0.036, 0.038, 0.88), Color(0.66, 0.92, 0.86, 0.28), 12, 8, Color(0.0, 0.0, 0.0, 0.34))
+		_make_style(Color(0.018, 0.034, 0.034, 0.78), Color(0.74, 0.94, 0.78, 0.26), 16, 10, Color(0.0, 0.0, 0.0, 0.28))
 	)
 
 
 func _apply_menu_item_style(button: Button) -> void:
-	button.add_theme_stylebox_override("normal", _make_style(Color(0.052, 0.080, 0.078, 0.72), Color(0.66, 0.86, 0.80, 0.18), 10, 2, Color.TRANSPARENT))
-	button.add_theme_stylebox_override("hover", _make_style(Color(0.074, 0.130, 0.122, 0.90), Color(0.78, 1.0, 0.92, 0.42), 10, 5, Color(0.18, 0.72, 0.68, 0.12)))
-	button.add_theme_stylebox_override("pressed", _make_style(Color(0.060, 0.160, 0.132, 0.96), Color(0.84, 1.0, 0.90, 0.56), 10, 1, Color.TRANSPARENT))
-	button.add_theme_stylebox_override("disabled", _make_style(Color(0.040, 0.050, 0.052, 0.46), Color(0.58, 0.64, 0.62, 0.14), 10, 1, Color.TRANSPARENT))
-	button.add_theme_color_override("font_color", Color(0.90, 0.98, 0.94, 1.0))
+	button.add_theme_stylebox_override("normal", _make_menu_row_style(Color(0.052, 0.074, 0.068, 0.36), Color.TRANSPARENT, 12, 0, Color.TRANSPARENT, 0))
+	button.add_theme_stylebox_override("hover", _make_menu_row_style(Color(0.070, 0.118, 0.098, 0.76), Color(0.78, 1.0, 0.86, 0.32), 12, 4, Color(0.16, 0.66, 0.48, 0.12), 1))
+	button.add_theme_stylebox_override("pressed", _make_menu_row_style(Color(0.056, 0.142, 0.112, 0.88), Color(0.82, 1.0, 0.86, 0.44), 12, 1, Color.TRANSPARENT, 1))
+	button.add_theme_stylebox_override("disabled", _make_menu_row_style(Color(0.040, 0.050, 0.052, 0.36), Color.TRANSPARENT, 12, 0, Color.TRANSPARENT, 0))
+	button.add_theme_color_override("font_color", Color(0.90, 0.98, 0.92, 0.98))
 	button.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 0.94, 1.0))
 	button.add_theme_color_override("font_pressed_color", Color(0.84, 1.0, 0.90, 1.0))
 	button.add_theme_color_override("font_disabled_color", Color(0.60, 0.68, 0.65, 0.62))
-	button.add_theme_color_override("icon_normal_color", Color(0.94, 0.96, 0.86, 0.94))
+	button.add_theme_color_override("icon_normal_color", Color(0.98, 1.0, 0.86, 0.98))
 	button.add_theme_color_override("icon_hover_color", Color(1.0, 1.0, 0.94, 1.0))
 	button.add_theme_color_override("icon_pressed_color", Color(0.84, 1.0, 0.90, 1.0))
 	button.add_theme_color_override("icon_disabled_color", Color(0.60, 0.64, 0.58, 0.48))
+
+
+func _make_menu_row_style(
+	bg_color: Color,
+	border_color: Color,
+	radius: int,
+	shadow_size: int = 0,
+	shadow_color: Color = Color.TRANSPARENT,
+	border_width: int = 1
+) -> StyleBoxFlat:
+	var style := _make_style(bg_color, border_color, radius, shadow_size, shadow_color)
+	style.set_border_width_all(border_width)
+	style.content_margin_left = 14.0
+	style.content_margin_top = 0.0
+	style.content_margin_right = 14.0
+	style.content_margin_bottom = 0.0
+	return style
 
 
 func _make_style(

@@ -3,6 +3,7 @@ extends RefCounted
 const DEFAULT_BUYER_IDS := [
 	"local_market",
 	"fish_shop",
+	"cannery",
 	"restaurant",
 	"wholesale_buyer",
 	"collector",
@@ -221,7 +222,7 @@ func _calculate_simulated_price_breakdown(fish: Dictionary, buyer_id: String, re
 	if price_service == null or not price_service.has_method("calculate_breakdown"):
 		return {"final_price": maxi(int(fish.get("price", 1)), 1)}
 
-	var value = price_service.call("calculate_breakdown", fish, "local_market", true)
+	var value = price_service.call("calculate_breakdown", fish, buyer_id, true)
 	if not (value is Dictionary):
 		return {"final_price": maxi(int(fish.get("price", 1)), 1)}
 

@@ -19,7 +19,6 @@ func setup(main_ref, navigation_ref, connect_buttons: bool = false) -> void:
 func build_menu(parent: Control) -> void:
 	if parent == null:
 		return
-	_reparent_button(_get_button("keepnet"), parent)
 	_reparent_button(_get_button("inventory"), parent)
 	_reparent_button(_get_button("shop"), parent)
 	_reparent_button(_get_button("harbor"), parent)
@@ -40,17 +39,19 @@ func clear_active() -> void:
 func refresh() -> void:
 	if main == null:
 		return
-	_refresh_button("keepnet", "sell")
 	_refresh_button("inventory", "inventory")
 	_refresh_button("shop", "shop")
 	_refresh_button("harbor", "harbor")
 	_refresh_button("map", "map")
+	if main.basket_button != null:
+		main.basket_button.visible = false
+		main.basket_button.disabled = true
+		main.basket_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if main.nav_fish_button != null:
 		main.nav_fish_button.visible = false
 
 
 func _connect_menu_signals() -> void:
-	_connect_button("keepnet")
 	_connect_button("inventory")
 	_connect_button("shop")
 	_connect_button("harbor")
@@ -85,8 +86,6 @@ func _reparent_button(button: Button, parent: Control) -> void:
 func _get_button(id: String) -> Button:
 	if main == null:
 		return null
-	if id == "keepnet":
-		return main.basket_button
 	if id == "inventory":
 		return main.inventory_button
 	if id == "shop":

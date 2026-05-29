@@ -58,23 +58,23 @@ func refresh() -> void:
 
 
 func _build_keepnet() -> void:
-	var card_size := _card_size(Vector2(360.0, 150.0))
+	var card_size := _card_size(Vector2(420.0, 218.0))
 	_add_pressed_overlay()
 	var accent := _accent_color()
-	var fish_slot := _make_fish_slot(Rect2(Vector2(12.0, 14.0), Vector2(108.0, 58.0)), accent)
+	var fish_slot := _make_fish_slot(Rect2(Vector2(14.0, 16.0), Vector2(152.0, 104.0)), accent)
 	add_child(fish_slot)
 
 	var badge_type := str(display_data.get("badge_type", ""))
 	var badge_text := str(display_data.get("badge_text", ""))
 	var badge_visible := not badge_text.is_empty()
-	var text_x := 132.0
+	var text_x := 182.0
 	var badge_width := 96.0
 	var title_right_gap := badge_width + 22.0 if badge_visible else 12.0
 	var text_width := maxf(card_size.x - text_x - title_right_gap, 120.0)
 
-	var name_label := _make_label(str(display_data.get("name", "-")), 15, Color(0.94, 1.0, 0.91, 1.0))
-	name_label.position = Vector2(text_x, 12.0)
-	name_label.size = Vector2(text_width, 24.0)
+	var name_label := _make_label(str(display_data.get("name", "-")), 18, Color(0.94, 1.0, 0.91, 1.0))
+	name_label.position = Vector2(text_x, 15.0)
+	name_label.size = Vector2(text_width, 28.0)
 	name_label.clip_text = true
 	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	add_child(name_label)
@@ -89,27 +89,47 @@ func _build_keepnet() -> void:
 	var stats_label := _make_label("%s | %s" % [
 		UIFormatters.format_weight_kg(float(display_data.get("weight", 0.0))),
 		UIFormatters.format_fish_status(status)
-	], 12, Color(0.76, 0.88, 0.80, 0.92))
-	stats_label.position = Vector2(text_x, 42.0)
-	stats_label.size = Vector2(card_size.x - text_x - 12.0, 18.0)
+	], 13, Color(0.76, 0.88, 0.80, 0.92))
+	stats_label.position = Vector2(text_x, 48.0)
+	stats_label.size = Vector2(card_size.x - text_x - 12.0, 20.0)
 	stats_label.clip_text = true
 	add_child(stats_label)
 
-	var price_label := _make_label("", 12, Color(1.0, 0.86, 0.48, 1.0))
-	price_label.position = Vector2(text_x, 62.0)
-	price_label.size = Vector2(card_size.x - text_x - 12.0, 20.0)
+	var length_value := float(display_data.get("length", 0.0))
+	if length_value > 0.0:
+		var length_label := _make_label(UIFormatters.format_length_cm(length_value), 12, Color(0.70, 0.84, 0.78, 0.92))
+		length_label.position = Vector2(text_x, 71.0)
+		length_label.size = Vector2(card_size.x - text_x - 12.0, 18.0)
+		add_child(length_label)
+
+	var price_label := _make_label("", 13, Color(1.0, 0.86, 0.48, 1.0))
+	price_label.position = Vector2(text_x, 94.0)
+	price_label.size = Vector2(card_size.x - text_x - 12.0, 22.0)
 	PriceLabelScript.set_price(price_label, float(display_data.get("price", 0)))
 	add_child(price_label)
 
-	var buyer_label := _make_label(str(display_data.get("buyer_name", "")), 12, Color(0.84, 0.96, 0.88, 0.96))
-	buyer_label.position = Vector2(12.0, 102.0)
-	buyer_label.size = Vector2(card_size.x - 122.0, 34.0)
-	buyer_label.clip_text = true
-	buyer_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	buyer_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	add_child(buyer_label)
+	var detail_lines: Array = []
+	var caught_label := str(display_data.get("caught_label", ""))
+	var bait_label := str(display_data.get("bait_label", ""))
+	var spot_label := str(display_data.get("spot_label", ""))
+	var freshness_title := str(display_data.get("freshness_title", ""))
+	if not caught_label.is_empty():
+		detail_lines.append("Поймана: %s" % caught_label)
+	if not bait_label.is_empty():
+		detail_lines.append("Поймано на: %s" % bait_label)
+	if not spot_label.is_empty():
+		detail_lines.append("Место: %s" % spot_label)
+	if not freshness_title.is_empty():
+		detail_lines.append("Свежесть: %s" % freshness_title)
+	if detail_lines.is_empty():
+		detail_lines.append("Откройте карточку для подробностей.")
 
-	_add_action_button(Rect2(Vector2(card_size.x - 104.0, card_size.y - 46.0), Vector2(92.0, 36.0)))
+	var details_label := _make_label("\n".join(detail_lines.slice(0, 4)), 12, Color(0.78, 0.90, 0.84, 0.94))
+	details_label.position = Vector2(14.0, 132.0)
+	details_label.size = Vector2(card_size.x - 28.0, card_size.y - 146.0)
+	details_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	details_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	add_child(details_label)
 
 
 func _build_harbor_sell() -> void:

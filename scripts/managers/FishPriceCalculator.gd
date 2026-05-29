@@ -80,7 +80,7 @@ func calculate_breakdown(catch_data: Dictionary, supplier_id: String = "", inclu
 		target_supplier_id = "local_market"
 	supplier_multiplier = _get_adjusted_supplier_multiplier(status, supplier_multiplier, mass_common)
 
-	var raw_freshness_multiplier: float = FishFreshnessManager.get_price_multiplier(catch_data) if include_freshness else 1.0
+	var raw_freshness_multiplier: float = FishFreshnessManager.get_price_multiplier(catch_data, target_supplier_id) if include_freshness else 1.0
 	var freshness_multiplier: float = _get_adjusted_freshness_multiplier(raw_freshness_multiplier, mass_common)
 	var final_price: float = maxf(base_value * rarity_multiplier * quality_multiplier * market_multiplier * supplier_multiplier * freshness_multiplier, 1.0)
 
