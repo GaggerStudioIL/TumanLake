@@ -121,6 +121,9 @@ func _ensure_keepnet_ui_nodes() -> void:
 
 
 func _update_basket_ui() -> void:
+	if InventoryManager.has_method("purge_zero_value_fish") and int(InventoryManager.call("purge_zero_value_fish")) > 0:
+		_hide_fish_details()
+
 	var fish_count: int = InventoryManager.inventory.size()
 	if fish_count == 0:
 		_hide_fish_details()

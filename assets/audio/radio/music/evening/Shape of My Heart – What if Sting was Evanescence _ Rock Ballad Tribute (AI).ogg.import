@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://0pkytfgue6l8"
+path="res://.godot/imported/Shape of My Heart – What if Sting was Evanescence _ Rock Ballad Tribute (AI).ogg-4cd7f92638e7d82826de9849f640d91d.oggvorbisstr"
+
+[deps]
+
+source_file="res://assets/audio/radio/music/evening/Shape of My Heart – What if Sting was Evanescence _ Rock Ballad Tribute (AI).ogg"
+dest_files=["res://.godot/imported/Shape of My Heart – What if Sting was Evanescence _ Rock Ballad Tribute (AI).ogg-4cd7f92638e7d82826de9849f640d91d.oggvorbisstr"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

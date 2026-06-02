@@ -245,7 +245,7 @@ func _get_visible_inventory_items() -> Array:
 			filtered_items.append(item)
 	items = filtered_items
 
-	if main._inventory_category == "all" or main._inventory_category == "fish":
+	if _should_show_keepnet_fish_in_inventory() and (main._inventory_category == "all" or main._inventory_category == "fish"):
 		for i in InventoryManager.inventory.size():
 			var fish: Dictionary = InventoryManager.inventory[i]
 			var base_price := int(fish.get("price", 0))
@@ -267,6 +267,9 @@ func _get_visible_inventory_items() -> Array:
 			})
 
 	return items
+
+func _should_show_keepnet_fish_in_inventory() -> bool:
+	return false
 
 func _should_show_inventory_item(item: Dictionary) -> bool:
 	var category := str(item.get("category", "misc"))

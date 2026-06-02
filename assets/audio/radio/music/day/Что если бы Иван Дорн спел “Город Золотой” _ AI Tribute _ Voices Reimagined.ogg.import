@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://bvvp0027mgpiq"
+path="res://.godot/imported/Что если бы Иван Дорн спел “Город Золотой” _ AI Tribute _ Voices Reimagined.ogg-629126ea4dc251522271e2454156c102.oggvorbisstr"
+
+[deps]
+
+source_file="res://assets/audio/radio/music/day/Что если бы Иван Дорн спел “Город Золотой” _ AI Tribute _ Voices Reimagined.ogg"
+dest_files=["res://.godot/imported/Что если бы Иван Дорн спел “Город Золотой” _ AI Tribute _ Voices Reimagined.ogg-629126ea4dc251522271e2454156c102.oggvorbisstr"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

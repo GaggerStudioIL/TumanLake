@@ -241,9 +241,9 @@ func get_button_style(kind: String = "secondary", state: String = "normal") -> S
 	return make_style(bg, border, radius, shadow_size, shadow)
 
 func get_tackle_panel_style(strong := false) -> StyleBoxFlat:
-	var bg := Color(0.020, 0.070, 0.098, 0.94) if strong else Color(0.030, 0.100, 0.130, 0.78)
-	var border := Color(0.52, 0.78, 0.86, 0.34)
-	var style := make_style(bg, border, 8, 8, Color(0.0, 0.0, 0.0, 0.30))
+	var bg := Color(0.012, 0.036, 0.052, 0.94) if strong else Color(0.020, 0.072, 0.092, 0.76)
+	var border := Color(0.42, 0.84, 0.94, 0.38)
+	var style := make_style(bg, border, 7, 8, Color(0.0, 0.0, 0.0, 0.34))
 	style.content_margin_left = 12.0
 	style.content_margin_top = 10.0
 	style.content_margin_right = 12.0
@@ -251,21 +251,21 @@ func get_tackle_panel_style(strong := false) -> StyleBoxFlat:
 	return style
 
 func get_tackle_slot_style(state: String = "empty") -> StyleBoxFlat:
-	var bg := Color(0.034, 0.105, 0.136, 0.80)
-	var border := Color(0.52, 0.78, 0.86, 0.32)
+	var bg := Color(0.020, 0.078, 0.098, 0.82)
+	var border := Color(0.42, 0.84, 0.94, 0.34)
 	var shadow := Color(0.0, 0.0, 0.0, 0.22)
 	var shadow_size := 5
 
 	match state:
 		"selected":
-			bg = Color(0.050, 0.150, 0.166, 0.92)
-			border = Color(0.86, 0.68, 0.30, 0.84)
-			shadow = Color(0.85, 0.55, 0.12, 0.18)
+			bg = Color(0.056, 0.118, 0.126, 0.94)
+			border = Color(0.96, 0.72, 0.28, 0.88)
+			shadow = Color(0.92, 0.56, 0.12, 0.22)
 			shadow_size = 8
 		"filled":
-			bg = Color(0.034, 0.128, 0.116, 0.84)
-			border = Color(0.50, 0.86, 0.52, 0.62)
-			shadow = Color(0.18, 0.65, 0.34, 0.14)
+			bg = Color(0.022, 0.110, 0.100, 0.84)
+			border = Color(0.45, 0.90, 0.58, 0.56)
+			shadow = Color(0.18, 0.65, 0.34, 0.16)
 		"locked":
 			bg = Color(0.034, 0.045, 0.052, 0.66)
 			border = Color(0.46, 0.50, 0.52, 0.24)

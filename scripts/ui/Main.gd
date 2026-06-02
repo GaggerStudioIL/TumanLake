@@ -16,6 +16,8 @@ const UIThemeScript := preload("res://scripts/ui/UITheme.gd")
 const MobileScrollHelperScript := preload("res://scripts/ui/MobileScrollHelper.gd")
 const KeepnetHudButtonScript := preload("res://scripts/ui/components/KeepnetHudButton.gd")
 const PlayerXpHudScript := preload("res://scripts/ui/components/PlayerXpHud.gd")
+const TumanFmHudScript := preload("res://scripts/ui/components/TumanFmHud.gd")
+const FloatDepthRadialControlScript := preload("res://scripts/ui/components/FloatDepthRadialControl.gd")
 const MainHUDControllerScript := preload("res://scripts/ui/controllers/MainHUDController.gd")
 const PopupManagerScript := preload("res://scripts/ui/controllers/PopupManager.gd")
 const CatchPopupControllerScript := preload("res://scripts/ui/controllers/CatchPopupController.gd")
@@ -26,6 +28,7 @@ const NAVIGATION_CONTROLLER_PATH := "res://scripts/ui/controllers/NavigationCont
 const SIDE_MENU_CONTROLLER_PATH := "res://scripts/ui/controllers/SideMenuController.gd"
 const FishHarborScene := preload("res://scenes/economy/FishHarbor.tscn")
 const TUMAN_LAKE_THEME := preload("res://themes/TumanLakeUI.tres")
+const DEPTH_HOOK_ICON := preload("res://assets/ui/icons/icon_depth_hook.png")
 
 const SHOW_DEBUG_PANEL := false
 const STYLE_HUD_PANEL := "HUDPanel"
@@ -44,19 +47,25 @@ const MENU_PANEL_Z := 301
 const MODAL_TAP_GUARD_MSEC := 320
 const WATER_SURFACE_Y := 402.0
 const FLOAT_DEFAULT_POS := Vector2(500.0, 402.0)
-const ROD_ANCHOR_POS := Vector2(1108.0, 646.0)
-const ROD_TARGET_POS := Vector2(590.0, 382.0)
+const ROD_ANCHOR_POS := Vector2(610.0, 562.0)
+const ROD_TARGET_POS := Vector2(480.0, 210.0)
+const CAST_CONTROL_CENTER_BASE := Vector2(720.0, 280.0)
+const CAST_CHARGE_TIME := 1.5
+const MIN_CAST_POWER := 0.05
+const MAX_CAST_POWER := 1.0
+const MIN_SHORE_DEPTH := 0.16
+const DEPTH_TOLERANCE := 0.05
+const ALPHA_TESTER_BONUS_MONEY := 5000.0
+const ALPHA_TESTER_BONUS_MESSAGE := "Привет альфа тестер, для удобного теста мы даем тебе 5000 монет."
 
 @onready var background: ColorRect = $Background
 @onready var scene_gradient: ColorRect = $SceneGradient
-@onready var mist_layer: ColorRect = $MistLayer
 @onready var noise_layer: ColorRect = $NoiseLayer
 @onready var sun_glow_layer: ColorRect = $SunGlowLayer
 @onready var far_forest_layer: ColorRect = $FarForestLayer
 @onready var mid_forest_layer: ColorRect = $MidForestLayer
 @onready var lake_layer: ColorRect = $LakeLayer
 @onready var reflection_layer: ColorRect = $ReflectionLayer
-@onready var foreground_mist_layer: ColorRect = $ForegroundMistLayer
 @onready var vignette_layer: ColorRect = $VignetteLayer
 @onready var water_panel: Panel = $WaterPanel
 @onready var fishing_presence_layer: Node2D = $FishingPresenceLayer
@@ -207,6 +216,7 @@ var tackle_title_divider_left: ColorRect
 var tackle_title_divider_right: ColorRect
 var tackle_title_label: Label
 var tackle_current_label: Label
+var tackle_rod_name_label: Label
 var tackle_picker_title_label: Label
 var tackle_visual_title_label: Label
 var tackle_visual_rod_line: Line2D
@@ -236,6 +246,7 @@ var tackle_float_button: Button
 var tackle_hook_button: Button
 var tackle_bait_button: Button
 var tackle_bait_2_button: Button
+var tackle_info_button: Button
 var tackle_equip_button: Button
 var tackle_repair_button: Button
 var tackle_discard_button: Button
@@ -292,9 +303,16 @@ var modal_input_shield: ColorRect
 var is_modal_open := false
 var _current_modal_name := ""
 var cast_button_visual: TextureRect
+var cast_power_indicator_track: Panel
+var cast_power_indicator_fill: ColorRect
 var stop_fishing_button: Button
+var depth_hud_minus_button: Button
+var depth_hud_plus_button: Button
+var depth_hud_label: Label
+var depth_radial_control: FloatDepthRadialControl
 var keepnet_hud_button: Button
 var player_xp_hud: Control
+var tuman_fm_hud: Control
 var rod_sprite: Sprite2D
 var rod_shadow_sprite: Sprite2D
 var top_hud_container: HBoxContainer
@@ -314,7 +332,6 @@ var time_hud_icon: TextureRect
 var weather_hud_icon: TextureRect
 var lake_bg_base_rect: TextureRect
 var lake_bg_foreground_rect: TextureRect
-var lake_bg_mist_rect: TextureRect
 var water_overlay_rect: TextureRect
 var time_color_overlay: ColorRect
 var time_celestial_overlay: ColorRect
@@ -332,6 +349,8 @@ enum FishingUiState {
 var _fishing_ui_state: int = FishingUiState.IDLE
 var is_cast_animating := false
 var _pending_cast_spot_id := ""
+var _pending_cast_valid := true
+var _pending_cast_depth_context: Dictionary = {}
 var _active_nav_tab: String = "fish"
 var _inventory_category: String = "all"
 var _inventory_page: int = 0
@@ -365,6 +384,10 @@ var _presence_caught_timer := 0.0
 var _presence_has_layout := false
 var _cast_button_hovered := false
 var _cast_button_pressed := false
+var _cast_charge_active := false
+var _cast_charge_hold_time := 0.0
+var _cast_charge_power := MIN_CAST_POWER
+var _cast_release_action_guard_msec := 0
 var _fish_button_action_guard_msec := 0
 var _fish_button_pointer_action_active := false
 var _modal_tap_guard_until_msec := 0
@@ -380,6 +403,8 @@ var _water_zone_top := 0.0
 var _water_zone_bottom := 0.0
 var _rod_anchor_pos := Vector2.ZERO
 var _rod_target_pos := Vector2.ZERO
+var _depth_hud_refresh_queued := false
+var _depth_hud_visibility_check_accumulator := 0.0
 var _last_detailed_failure_msec := -100000
 var reeling_panel_frame: Panel
 var tension_slack_zone: ColorRect
@@ -422,6 +447,7 @@ func _ready() -> void:
 	SaveManager.load_game()
 	_setup_ui_controllers()
 	_ensure_ui_canvas_layer()
+	_ensure_tuman_fm_hud()
 	_ensure_system_menu_ui()
 	_ensure_fish_harbor_ui()
 	failure_popup_ui.setup(self)
@@ -439,16 +465,29 @@ func _ready() -> void:
 	_connect_signals()
 	_reset_reeling_ui()
 	_update_ui()
+	_grant_alpha_tester_bonus_if_needed()
 	_ensure_mobile_scroll_helper()
 
 func _process(delta: float) -> void:
 	_update_fishing_presence(delta)
+	_update_cast_charge(delta)
 	_update_catch_reward_input_lock()
 	_update_modal_tap_guard()
 	_update_time_hud()
+	_update_depth_hud_visibility_watchdog(delta)
 
 func _input(event: InputEvent) -> void:
 	if is_modal_open or _is_modal_tap_guard_active():
+		return
+
+	if _is_depth_radial_pointer_event(event):
+		return
+
+	if _cast_charge_active and _is_cast_charge_release_event(event):
+		_cast_button_pressed = false
+		_update_cast_button_visual()
+		_on_reel_button_up()
+		get_viewport().set_input_as_handled()
 		return
 
 	if not _is_fish_button_pointer_event(event):
@@ -459,7 +498,7 @@ func _input(event: InputEvent) -> void:
 		_cast_button_pressed = true
 		_update_cast_button_visual()
 		_on_reel_button_down()
-		if not fish_button.disabled:
+		if not _cast_charge_active and not fish_button.disabled:
 			_fish_button_pointer_action_active = true
 			_trigger_fish_button_action(true)
 	else:
@@ -469,6 +508,14 @@ func _input(event: InputEvent) -> void:
 		call_deferred("_clear_fish_button_pointer_action_active")
 
 	get_viewport().set_input_as_handled()
+
+func _is_cast_charge_release_event(event: InputEvent) -> bool:
+	if event is InputEventMouseButton:
+		var mouse_event := event as InputEventMouseButton
+		return mouse_event.button_index == MOUSE_BUTTON_LEFT and not mouse_event.pressed
+	if event is InputEventScreenTouch:
+		return not (event as InputEventScreenTouch).pressed
+	return false
 
 func _unhandled_input(event: InputEvent) -> void:
 	if system_menu_ui != null and system_menu_ui.is_menu_open() and event.is_action_pressed("ui_cancel"):
@@ -606,6 +653,17 @@ func _ensure_ui_canvas_layer() -> void:
 	_ensure_modal_layer()
 	_move_modal_roots_to_layer()
 	_refresh_modal_input_blocker()
+	_ensure_tuman_fm_hud()
+
+
+func _ensure_tuman_fm_hud() -> void:
+	if tuman_fm_hud == null:
+		tuman_fm_hud = TumanFmHudScript.new()
+		tuman_fm_hud.name = "TumanFmHud"
+	if ui_canvas_layer != null and tuman_fm_hud.get_parent() != ui_canvas_layer:
+		_reparent_node(tuman_fm_hud, ui_canvas_layer)
+	if tuman_fm_hud.has_method("setup"):
+		tuman_fm_hud.call("setup", self)
 
 func _ensure_fish_harbor_ui() -> void:
 	_ensure_modal_layer()
@@ -740,11 +798,13 @@ func open_modal(modal_name: String) -> void:
 	if modal_input_shield != null:
 		modal_input_shield.visible = true
 		modal_input_shield.mouse_filter = Control.MOUSE_FILTER_STOP
+	_request_depth_hud_refresh()
 
 func close_modal(modal_name: String = "") -> void:
 	if modal_name == "" or _current_modal_name == modal_name:
 		_current_modal_name = ""
 	_refresh_modal_input_blocker()
+	_request_depth_hud_refresh()
 
 func close_current_modal() -> void:
 	match _current_modal_name:
@@ -840,6 +900,7 @@ func _refresh_modal_input_blocker() -> void:
 	if modal_input_shield != null:
 		modal_input_shield.visible = has_open_modal or _is_modal_tap_guard_active()
 		modal_input_shield.mouse_filter = Control.MOUSE_FILTER_STOP
+	_request_depth_hud_refresh()
 
 func _is_any_modal_visible() -> bool:
 	for control in [
@@ -977,6 +1038,29 @@ func _ensure_cast_button_visual() -> void:
 	)
 
 
+func _ensure_cast_power_indicator() -> void:
+	if cast_power_indicator_track != null and cast_power_indicator_fill != null:
+		return
+
+	cast_power_indicator_track = Panel.new()
+	cast_power_indicator_track.name = "CastPowerIndicator"
+	cast_power_indicator_track.visible = false
+	cast_power_indicator_track.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cast_power_indicator_track.z_index = 266
+	cast_power_indicator_track.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	cast_power_indicator_track.add_theme_stylebox_override(
+		"panel",
+		_make_panel_style(Color(0.020, 0.058, 0.062, 0.82), Color(0.80, 1.0, 0.90, 0.34), 5, 2, Color(0.0, 0.0, 0.0, 0.22))
+	)
+	ui_canvas_layer.add_child(cast_power_indicator_track)
+
+	cast_power_indicator_fill = ColorRect.new()
+	cast_power_indicator_fill.name = "CastPowerFill"
+	cast_power_indicator_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cast_power_indicator_fill.color = Color(0.72, 1.0, 0.80, 0.92)
+	cast_power_indicator_track.add_child(cast_power_indicator_fill)
+
+
 func _ensure_stop_fishing_button() -> void:
 	if stop_fishing_button != null:
 		return
@@ -992,6 +1076,62 @@ func _ensure_stop_fishing_button() -> void:
 	stop_fishing_button.add_theme_constant_override("h_separation", 0)
 	stop_fishing_button.pressed.connect(_on_stop_fishing_button_pressed)
 	ui_canvas_layer.add_child(stop_fishing_button)
+
+
+func _ensure_depth_hud_controls() -> void:
+	if depth_hud_minus_button == null:
+		depth_hud_minus_button = Button.new()
+		depth_hud_minus_button.name = "DepthHudMinusButton"
+		depth_hud_minus_button.text = "-"
+		depth_hud_minus_button.tooltip_text = "Уменьшить глубину"
+		depth_hud_minus_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		depth_hud_minus_button.focus_mode = Control.FOCUS_NONE
+		depth_hud_minus_button.visible = false
+		depth_hud_minus_button.z_index = 261
+		depth_hud_minus_button.add_theme_constant_override("h_separation", 0)
+		depth_hud_minus_button.pressed.connect(_on_tackle_depth_button_pressed.bind(-0.1))
+		ui_canvas_layer.add_child(depth_hud_minus_button)
+
+	if depth_hud_plus_button == null:
+		depth_hud_plus_button = Button.new()
+		depth_hud_plus_button.name = "DepthHudPlusButton"
+		depth_hud_plus_button.text = "+"
+		depth_hud_plus_button.tooltip_text = "Увеличить глубину"
+		depth_hud_plus_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		depth_hud_plus_button.focus_mode = Control.FOCUS_NONE
+		depth_hud_plus_button.visible = false
+		depth_hud_plus_button.z_index = 261
+		depth_hud_plus_button.add_theme_constant_override("h_separation", 0)
+		depth_hud_plus_button.pressed.connect(_on_tackle_depth_button_pressed.bind(0.1))
+		ui_canvas_layer.add_child(depth_hud_plus_button)
+
+	if depth_hud_label == null:
+		depth_hud_label = Label.new()
+		depth_hud_label.name = "DepthHudLabel"
+		depth_hud_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		depth_hud_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		depth_hud_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		depth_hud_label.visible = false
+		depth_hud_label.z_index = 261
+		depth_hud_label.add_theme_color_override("font_color", Color(0.96, 1.0, 0.90, 1.0))
+		depth_hud_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.70))
+		depth_hud_label.add_theme_constant_override("shadow_offset_x", 1)
+		depth_hud_label.add_theme_constant_override("shadow_offset_y", 1)
+		ui_canvas_layer.add_child(depth_hud_label)
+
+	if depth_radial_control == null:
+		depth_radial_control = FloatDepthRadialControlScript.new()
+		depth_radial_control.name = "FloatDepthRadialControl"
+		depth_radial_control.visible = false
+		depth_radial_control.z_index = 3
+		depth_radial_control.mouse_filter = Control.MOUSE_FILTER_PASS
+		depth_radial_control.depth_changed.connect(_on_depth_radial_control_changed)
+		depth_radial_control.depth_change_committed.connect(_on_depth_radial_control_committed)
+		depth_radial_control.set_hook_texture(DEPTH_HOOK_ICON)
+		if fish_button != null:
+			fish_button.add_child(depth_radial_control)
+		else:
+			ui_canvas_layer.add_child(depth_radial_control)
 
 
 func _ensure_keepnet_hud_button() -> void:
@@ -1351,6 +1491,27 @@ func _hide_time_of_day_layers() -> void:
 		if overlay != null:
 			overlay.visible = false
 
+func _disable_legacy_environment_visuals() -> void:
+	for layer in [
+		scene_gradient,
+		noise_layer,
+		sun_glow_layer,
+		far_forest_layer,
+		mid_forest_layer,
+		lake_layer,
+		reflection_layer,
+		vignette_layer,
+		water_panel,
+		lake_bg_base_rect,
+		lake_bg_foreground_rect,
+		water_overlay_rect
+	]:
+		if layer == null:
+			continue
+		layer.visible = false
+		if layer is Control:
+			(layer as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+
 func _make_time_color_material() -> ShaderMaterial:
 	return _make_scene_shader_material("""
 		shader_type canvas_item;
@@ -1471,18 +1632,6 @@ func _setup_atmosphere_materials() -> void:
 		}
 	""")
 
-	mist_layer.material = _make_scene_shader_material("""
-		shader_type canvas_item;
-		void fragment() {
-			vec2 uv = UV;
-			float drift = TIME * 0.025;
-			float haze = sin((uv.x * 8.0) + (uv.y * 3.0) + drift * 10.0) * 0.5 + 0.5;
-			float band = smoothstep(0.10, 0.42, uv.y) * (1.0 - smoothstep(0.62, 0.94, uv.y));
-			float alpha = (0.090 + haze * 0.070) * band;
-			COLOR = vec4(0.64, 0.82, 0.78, alpha);
-		}
-	""")
-
 	noise_layer.material = _make_scene_shader_material("""
 		shader_type canvas_item;
 		float random(vec2 value) {
@@ -1567,18 +1716,6 @@ func _setup_atmosphere_materials() -> void:
 			float fine_lines = sin(uv.y * 210.0 + uv.x * 9.0 - TIME * 0.42) * 0.5 + 0.5;
 			float alpha = center * mask * (lines * 0.09 + fine_lines * 0.035);
 			COLOR = vec4(0.86, 0.98, 0.76, alpha);
-		}
-	""")
-
-	foreground_mist_layer.material = _make_scene_shader_material("""
-		shader_type canvas_item;
-		void fragment() {
-			vec2 uv = UV;
-			float drift = TIME * 0.018;
-			float fog = sin((uv.x + drift) * 11.0 + uv.y * 4.0) * 0.5 + 0.5;
-			float lower_band = smoothstep(0.52, 0.70, uv.y) * (1.0 - smoothstep(0.95, 1.0, uv.y));
-			float horizon_band = smoothstep(0.34, 0.43, uv.y) * (1.0 - smoothstep(0.47, 0.60, uv.y));
-			COLOR = vec4(0.72, 0.88, 0.82, (fog * 0.075 + 0.045) * (lower_band + horizon_band * 0.8));
 		}
 	""")
 
@@ -1846,45 +1983,6 @@ func _setup_cinematic_environment_materials() -> void:
 		}
 	""")
 
-	mist_layer.material = _make_scene_shader_material("""
-		shader_type canvas_item;
-		void fragment() {
-			vec2 uv = UV;
-			float drift = TIME * 0.018;
-			float noise = sin((uv.x + drift) * 13.0 + uv.y * 6.0) * 0.5 + 0.5;
-			float horizon = smoothstep(0.36, 0.43, uv.y) * (1.0 - smoothstep(0.51, 0.62, uv.y));
-			float near_water = smoothstep(0.50, 0.70, uv.y) * (1.0 - smoothstep(0.84, 1.0, uv.y));
-			COLOR = vec4(0.72, 0.86, 0.80, (0.060 + noise * 0.095) * (horizon + near_water * 0.42));
-		}
-	""")
-
-	foreground_mist_layer.material = _make_scene_shader_material("""
-		shader_type canvas_item;
-		float random(vec2 value) {
-			return fract(sin(dot(value, vec2(39.346, 11.135))) * 32758.5453);
-		}
-		void fragment() {
-			vec2 uv = UV;
-			float lower = smoothstep(0.74, 0.99, uv.y);
-			float right_bank = smoothstep(0.72, 0.92, uv.x) * smoothstep(0.64, 0.92, uv.y);
-			float left_bank = (1.0 - smoothstep(0.00, 0.18, uv.x)) * smoothstep(0.70, 0.98, uv.y);
-			float cell = floor(uv.x * 120.0);
-			float seed = random(vec2(cell, 8.2));
-			float blade_x = abs(fract(uv.x * 120.0 + seed * 0.2) - 0.5);
-			float blade_height = 0.10 + seed * 0.23;
-			float blade_mask = (right_bank + left_bank * 0.72) * smoothstep(1.0 - blade_height, 1.0 - blade_height * 0.18, uv.y) * (1.0 - smoothstep(0.006, 0.040, blade_x));
-			float ground = lower * (right_bank * 0.72 + left_bank * 0.42);
-			float fog = smoothstep(0.58, 0.78, uv.y) * (1.0 - smoothstep(0.90, 1.0, uv.y)) * (0.42 + sin(uv.x * 11.0 + TIME * 0.25) * 0.12);
-			vec3 grass = mix(vec3(0.050, 0.105, 0.050), vec3(0.145, 0.220, 0.085), seed);
-			vec3 ground_color = vec3(0.060, 0.050, 0.036);
-			vec3 fog_color = vec3(0.64, 0.78, 0.72);
-			vec3 color = mix(ground_color, grass, blade_mask);
-			color = mix(color, fog_color, fog * 0.45);
-			float alpha = clamp(ground * 0.72 + blade_mask * 0.92 + fog * 0.18, 0.0, 0.96);
-			COLOR = vec4(color, alpha);
-		}
-	""")
-
 	noise_layer.material = _make_scene_shader_material("""
 		shader_type canvas_item;
 		float random(vec2 value) {
@@ -1919,7 +2017,9 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	_ensure_compact_hud_panels()
 	_ensure_mobile_ui_containers()
 	_ensure_cast_button_visual()
+	_ensure_cast_power_indicator()
 	_ensure_stop_fishing_button()
+	_ensure_depth_hud_controls()
 	_ensure_keepnet_hud_button()
 	_ensure_player_xp_hud()
 	_ensure_hud_icons()
@@ -1963,8 +2063,12 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	top_hud_container.add_theme_constant_override("separation", int(9.0 * ui_scale))
 	top_hud_spacer.custom_minimum_size = _scale_size(Vector2(150.0, 1.0), screen_size)
 
-	top_hud_panel.visible = false
-	top_hud_panel.custom_minimum_size = Vector2.ZERO
+	top_hud_panel.visible = true
+	top_hud_panel.custom_minimum_size = _scale_size(Vector2(154.0, HUD_HEIGHT), screen_size)
+	top_hud_panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	top_hud_panel.size_flags_vertical = Control.SIZE_FILL
+	top_hud_panel.z_index = 100
+	_apply_weather_hud_panel_style(top_hud_panel)
 
 	time_hud_panel.custom_minimum_size = _scale_size(Vector2(178.0, HUD_HEIGHT), screen_size)
 	time_hud_panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
@@ -1988,8 +2092,14 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	level_label.visible = false
 	xp_progress_bar.visible = false
 
-	money_label.visible = false
+	money_label.visible = true
 	money_label.z_index = 102
+	money_label.position = _scale_point(Vector2(42.0, 0.0), screen_size)
+	money_label.size = _scale_size(Vector2(108.0, HUD_HEIGHT), screen_size)
+	money_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	money_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	money_label.add_theme_font_size_override("font_size", int(clamp(16.0 * ui_scale, 15.0, 19.0)))
+	money_label.clip_text = true
 
 	clock_label.visible = true
 	clock_label.z_index = 102
@@ -2011,7 +2121,12 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	_apply_weather_hud_text_style(ui_scale)
 
 	if money_hud_icon != null:
-		money_hud_icon.visible = false
+		money_hud_icon.visible = true
+		money_hud_icon.position = _scale_point(Vector2(9.0, 8.0), screen_size)
+		money_hud_icon.size = _scale_size(Vector2(28.0, 28.0), screen_size)
+		money_hud_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		money_hud_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		money_hud_icon.modulate = Color(1.0, 1.0, 1.0, 0.96)
 	if time_hud_icon != null:
 		time_hud_icon.visible = false
 	if weather_hud_icon != null:
@@ -2046,7 +2161,7 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 		player_xp_hud.z_index = 270
 		_update_player_xp_hud(false)
 
-	var cast_center := _scale_point(Vector2(902.0, 400.0), screen_size)
+	var cast_center := _scale_point(CAST_CONTROL_CENTER_BASE, screen_size)
 	var cast_margin: float = 8.0 * ui_scale
 	var cast_min_x: float = cast_button_size.x * 0.5 + cast_margin
 	var cast_max_x: float = max(cast_min_x, screen_size.x - cast_button_size.x * 0.5 - cast_margin)
@@ -2083,6 +2198,7 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 		_anchor_control(cast_button_visual, 0.0, 0.0, 0.0, 0.0, cast_rect.position.x, cast_rect.position.y, cast_rect.end.x, cast_rect.end.y)
 		cast_button_visual.z_index = 103
 		cast_button_visual.size = cast_button_size
+	_layout_cast_power_indicator()
 	if stop_fishing_button != null:
 		var stop_edge: float = clamp(cast_button_size.x * 0.33, 32.0, 46.0)
 		var stop_size := Vector2(stop_edge, stop_edge)
@@ -2210,17 +2326,14 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	ui_theme.apply_meter_track_style(progress_track, progress_fill, Color(0.58, 0.82, 0.28, 1.0))
 	fight_hint_label.visible = false
 
-func _get_adaptive_rod_anchor(screen_size: Vector2, ui_scale: float) -> Vector2:
-	return Vector2(
-		screen_size.x + 58.0 * ui_scale,
-		screen_size.y + 18.0 * ui_scale
-	)
+func _get_adaptive_rod_anchor(screen_size: Vector2, _ui_scale: float) -> Vector2:
+	var sx: float = screen_size.x / BASE_SCREEN_SIZE.x
+	var sy: float = screen_size.y / BASE_SCREEN_SIZE.y
+	return Vector2(ROD_ANCHOR_POS.x * sx, ROD_ANCHOR_POS.y * sy)
 
 func _get_adaptive_rod_tip(screen_size: Vector2, sy: float) -> Vector2:
-	return Vector2(
-		screen_size.x * 0.640,
-		min(screen_size.y * 0.705, _water_zone_bottom + 26.0 * sy)
-	)
+	var sx: float = screen_size.x / BASE_SCREEN_SIZE.x
+	return Vector2(ROD_TARGET_POS.x * sx, ROD_TARGET_POS.y * sy)
 
 func _ensure_compact_hud_panels() -> void:
 	if time_hud_panel == null:
@@ -2516,6 +2629,7 @@ func _refresh_fish_button_presentation() -> void:
 	_set_primary_fishing_button_icon(fish_button, _get_primary_fishing_action_icon(), icon_size)
 	_apply_primary_action_press_scale()
 	_refresh_stop_fishing_button_presentation()
+	_refresh_depth_hud_controls()
 
 
 func _refresh_stop_fishing_button_presentation() -> void:
@@ -2527,6 +2641,229 @@ func _refresh_stop_fishing_button_presentation() -> void:
 	stop_fishing_button.disabled = not should_show
 	if should_show:
 		stop_fishing_button.text = "X"
+
+
+func _request_depth_hud_refresh() -> void:
+	if _depth_hud_refresh_queued:
+		return
+	_depth_hud_refresh_queued = true
+	call_deferred("_refresh_depth_hud_after_ui_state_change")
+
+
+func _refresh_depth_hud_after_ui_state_change() -> void:
+	_depth_hud_refresh_queued = false
+	if not is_inside_tree():
+		return
+	if fish_button != null:
+		_refresh_fish_button_presentation()
+	else:
+		_refresh_depth_hud_controls()
+
+
+func _update_depth_hud_visibility_watchdog(delta: float) -> void:
+	if depth_radial_control == null:
+		return
+	_depth_hud_visibility_check_accumulator += delta
+	if _depth_hud_visibility_check_accumulator < 0.15:
+		return
+	_depth_hud_visibility_check_accumulator = 0.0
+	var should_show := _should_show_depth_hud_controls()
+	if _is_depth_hud_control_out_of_sync(should_show):
+		_refresh_depth_hud_controls()
+
+
+func _is_depth_hud_control_out_of_sync(should_show: bool) -> bool:
+	if depth_radial_control == null:
+		return false
+	if depth_radial_control.visible != should_show:
+		return true
+	if not should_show:
+		return false
+	if fish_button == null or not fish_button.visible or not fish_button.is_visible_in_tree():
+		return true
+	if depth_radial_control.get_parent() != fish_button:
+		return true
+	if not depth_radial_control.is_visible_in_tree():
+		return true
+	if fish_button.icon != null:
+		return true
+	if not depth_radial_control.size.is_equal_approx(_get_depth_radial_control_size()):
+		return true
+	return false
+
+
+func _get_depth_radial_control_size() -> Vector2:
+	if fish_button == null:
+		return Vector2.ZERO
+	return Vector2(fish_button.size.x, fish_button.size.y * 1.36)
+
+
+func _refresh_depth_hud_controls() -> void:
+	_ensure_depth_hud_controls()
+	for old_node in [depth_hud_minus_button, depth_hud_plus_button, depth_hud_label]:
+		if old_node != null:
+			old_node.visible = false
+			if old_node is Button:
+				(old_node as Button).disabled = true
+	if depth_radial_control == null or fish_button == null:
+		return
+
+	var should_show: bool = _should_show_depth_hud_controls()
+	depth_radial_control.visible = should_show
+	depth_radial_control.mouse_filter = Control.MOUSE_FILTER_PASS if should_show else Control.MOUSE_FILTER_IGNORE
+	if not should_show:
+		if ui_theme != null:
+			var restore_icon_size: float = clamp(min(fish_button.size.x, fish_button.size.y) * 0.88, 88.0, 110.0)
+			_set_primary_fishing_button_icon(fish_button, _get_primary_fishing_action_icon(), restore_icon_size)
+		return
+
+	if depth_radial_control.get_parent() != fish_button:
+		_reparent_node(depth_radial_control, fish_button)
+	var depth_control_size := _get_depth_radial_control_size()
+	_anchor_control(depth_radial_control, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, depth_control_size.x, depth_control_size.y)
+	depth_radial_control.size = depth_control_size
+	depth_radial_control.z_index = 3
+	var depth_range := PlayerData.get_current_spot_depth_range()
+	depth_radial_control.set_depth_range(float(depth_range.get("min", 0.2)), float(depth_range.get("max", 6.0)))
+	depth_radial_control.set_depth_value(PlayerData.fishing_depth, false)
+	depth_radial_control.set_hook_texture(DEPTH_HOOK_ICON)
+	fish_button.icon = null
+	return
+
+	var viewport_size := get_viewport_rect().size
+	var ui_scale: float = min(viewport_size.x / BASE_SCREEN_SIZE.x, viewport_size.y / BASE_SCREEN_SIZE.y)
+	var fish_rect := Rect2(fish_button.position, fish_button.size)
+	var margin := 8.0 * ui_scale
+	var circle_edge: float = clamp(fish_button.size.x * 0.34, 38.0, 48.0)
+	var circle_size := Vector2(circle_edge, circle_edge)
+	var minus_center := fish_rect.position + Vector2(-28.0 * ui_scale, 28.0 * ui_scale)
+	var plus_center := fish_rect.position + Vector2(18.0 * ui_scale, -14.0 * ui_scale)
+
+	minus_center.x = clamp(minus_center.x, circle_edge * 0.5 + margin, viewport_size.x - circle_edge * 0.5 - margin)
+	plus_center.x = clamp(plus_center.x, circle_edge * 0.5 + margin, viewport_size.x - circle_edge * 0.5 - margin)
+	minus_center.y = clamp(minus_center.y, circle_edge * 0.5 + margin, viewport_size.y - circle_edge * 0.5 - margin)
+	plus_center.y = clamp(plus_center.y, circle_edge * 0.5 + margin, viewport_size.y - circle_edge * 0.5 - margin)
+
+	var minus_rect := Rect2(minus_center - circle_size * 0.5, circle_size)
+	var plus_rect := Rect2(plus_center - circle_size * 0.5, circle_size)
+	_anchor_control(depth_hud_minus_button, 0.0, 0.0, 0.0, 0.0, minus_rect.position.x, minus_rect.position.y, minus_rect.end.x, minus_rect.end.y)
+	_anchor_control(depth_hud_plus_button, 0.0, 0.0, 0.0, 0.0, plus_rect.position.x, plus_rect.position.y, plus_rect.end.x, plus_rect.end.y)
+	depth_hud_minus_button.size = circle_size
+	depth_hud_plus_button.size = circle_size
+	depth_hud_minus_button.add_theme_font_size_override("font_size", int(clamp(circle_edge * 0.52, 20.0, 26.0)))
+	depth_hud_plus_button.add_theme_font_size_override("font_size", int(clamp(circle_edge * 0.52, 20.0, 26.0)))
+	_apply_depth_hud_button_style(depth_hud_minus_button)
+	_apply_depth_hud_button_style(depth_hud_plus_button)
+
+	var label_size := Vector2(clamp(78.0 * ui_scale, 70.0, 92.0), clamp(28.0 * ui_scale, 24.0, 32.0))
+	var label_pos := plus_rect.position + Vector2(circle_edge + 4.0 * ui_scale, circle_edge * 0.5 - label_size.y * 0.5)
+	label_pos.x = clamp(label_pos.x, margin, viewport_size.x - label_size.x - margin)
+	label_pos.y = clamp(label_pos.y, margin, viewport_size.y - label_size.y - margin)
+	_anchor_control(depth_hud_label, 0.0, 0.0, 0.0, 0.0, label_pos.x, label_pos.y, label_pos.x + label_size.x, label_pos.y + label_size.y)
+	depth_hud_label.text = "%.1f м" % PlayerData.fishing_depth
+	depth_hud_label.add_theme_font_size_override("font_size", int(clamp(16.0 * ui_scale, 15.0, 19.0)))
+
+
+func _should_show_depth_hud_controls() -> bool:
+	if is_cast_animating or _is_catch_reward_open() or _is_menu_overlay_open():
+		return false
+	if _fishing_ui_state != FishingUiState.IDLE:
+		return false
+	if not _is_current_tackle_depth_adjustable():
+		return false
+	return true
+
+
+func _is_current_tackle_depth_adjustable() -> bool:
+	var rod: Dictionary = PlayerData.current_tackle.get("rod", {})
+	if rod.is_empty():
+		return false
+	var rod_id := str(rod.get("id", "")).to_lower()
+	var rod_name := str(rod.get("name", "")).to_lower()
+	var rod_description := str(rod.get("description", "")).to_lower()
+	if rod_id.contains("pole") or rod_id.contains("match"):
+		return true
+	if rod_name.contains("мах") or rod_name.contains("match") or rod_description.contains("мах"):
+		return true
+	return str(PlayerData.current_tackle.get("float", {}).get("id", "")) != ""
+
+
+func get_physical_depth_at_cast_power(cast_power: float, spot_max_depth: float) -> float:
+	var safe_max_depth: float = max(spot_max_depth, MIN_SHORE_DEPTH)
+	return lerp(MIN_SHORE_DEPTH, safe_max_depth, clamp(cast_power, 0.0, 1.0))
+
+
+func is_float_depth_valid_for_cast(float_depth: float, water_depth_at_cast: float) -> bool:
+	return float_depth <= water_depth_at_cast + DEPTH_TOLERANCE
+
+
+func is_depth_in_effective_fish_range(depth: float, spot_data: Dictionary) -> bool:
+	if spot_data.is_empty():
+		return true
+	# spot.min_depth / effective_min_depth = рабочая глубина рыбы, not physical shore depth.
+	var effective_min_depth: float = float(spot_data.get("min_depth", 0.2))
+	var effective_max_depth: float = float(spot_data.get("max_depth", 6.0))
+	return depth >= min(effective_min_depth, effective_max_depth) and depth <= max(effective_min_depth, effective_max_depth)
+
+
+func _build_cast_depth_context(cast_power: float, hold_time: float) -> Dictionary:
+	var spot: Dictionary = SpotDatabase.get_spot(PlayerData.current_spot)
+	var spot_max_depth: float = PlayerData.fishing_depth
+	var spot_min_depth: float = PlayerData.fishing_depth
+	var has_spot_min_depth := false
+	if not spot.is_empty():
+		spot_max_depth = float(spot.get("max_depth", spot.get("depth", PlayerData.fishing_depth)))
+		spot_min_depth = float(spot.get("min_depth", spot.get("depth", spot_max_depth)))
+		has_spot_min_depth = spot.has("min_depth")
+
+	var safe_power: float = clamp(cast_power, 0.0, 1.0)
+	var water_depth_at_cast := get_physical_depth_at_cast_power(safe_power, spot_max_depth)
+	var float_depth := float(PlayerData.fishing_depth)
+	var valid := is_float_depth_valid_for_cast(float_depth, water_depth_at_cast)
+	return {
+		"hold_time": hold_time,
+		"cast_power": safe_power,
+		"shore_depth": MIN_SHORE_DEPTH,
+		"spot_min_depth": spot_min_depth,
+		"spot_max_depth": max(spot_max_depth, MIN_SHORE_DEPTH),
+		"has_spot_min_depth": has_spot_min_depth,
+		"water_depth_at_cast": water_depth_at_cast,
+		"float_depth": float_depth,
+		"valid": valid,
+		"effective_depth_ok": is_depth_in_effective_fish_range(float_depth, spot)
+	}
+
+
+func _debug_log_cast_depth(context: Dictionary) -> void:
+	var valid := bool(context.get("valid", false))
+	print("[CastDepth] hold_time=%.2f, cast_power=%.2f, shore_depth=%.2f, spot_max_depth=%.1f, water_depth_at_cast=%.2f, float_depth=%.1f, valid=%s" % [
+		float(context.get("hold_time", 0.0)),
+		float(context.get("cast_power", 0.0)),
+		float(context.get("shore_depth", MIN_SHORE_DEPTH)),
+		float(context.get("spot_max_depth", MIN_SHORE_DEPTH)),
+		float(context.get("water_depth_at_cast", MIN_SHORE_DEPTH)),
+		float(context.get("float_depth", PlayerData.fishing_depth)),
+		"true" if valid else "false"
+	])
+	if bool(context.get("has_spot_min_depth", false)):
+		print("[CastDepth] spot_min_depth=%.1f is treated as effective fish depth, not physical shore depth" % float(context.get("spot_min_depth", 0.0)))
+	if valid:
+		print("[Cast] valid=true, starting fishing")
+	else:
+		print("[Cast] invalid: float laid down, bait not consumed")
+
+
+func _apply_depth_hud_button_style(button: Button) -> void:
+	var normal := _make_primary_action_circle_style(Color(0.030, 0.075, 0.084, 0.92), Color(0.86, 1.0, 0.90, 0.56), 24, 5, Color(0.0, 0.0, 0.0, 0.24))
+	var hover := _make_primary_action_circle_style(Color(0.055, 0.128, 0.120, 0.98), Color(1.0, 0.84, 0.42, 0.78), 24, 7, Color(0.18, 0.64, 0.48, 0.18))
+	var pressed := _make_primary_action_circle_style(Color(0.116, 0.128, 0.070, 1.0), Color(1.0, 0.78, 0.30, 0.90), 24, 3, Color(0.0, 0.0, 0.0, 0.18))
+	button.add_theme_stylebox_override("normal", normal)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("pressed", pressed)
+	button.add_theme_stylebox_override("focus", hover)
+	button.add_theme_color_override("font_color", Color(0.96, 1.0, 0.92, 1.0))
+	button.add_theme_color_override("font_hover_color", Color(1.0, 0.90, 0.56, 1.0))
+	button.add_theme_color_override("font_pressed_color", Color(1.0, 0.78, 0.32, 1.0))
 
 
 func _can_cancel_current_fishing_wait() -> bool:
@@ -2583,6 +2920,91 @@ func _apply_primary_action_press_scale() -> void:
 		cast_button_visual.pivot_offset = cast_button_visual.size * 0.5
 		cast_button_visual.scale = Vector2.ONE * target_scale
 
+
+func _layout_cast_power_indicator() -> void:
+	if cast_power_indicator_track == null or fish_button == null:
+		return
+
+	var viewport_size := get_viewport_rect().size
+	var ui_scale: float = min(viewport_size.x / BASE_SCREEN_SIZE.x, viewport_size.y / BASE_SCREEN_SIZE.y)
+	var bar_size := Vector2(clamp(fish_button.size.x * 0.66, 68.0, 96.0), clamp(7.0 * ui_scale, 5.0, 8.0))
+	var gap: float = clamp(8.0 * ui_scale, 6.0, 10.0)
+	var bar_pos := fish_button.position + Vector2((fish_button.size.x - bar_size.x) * 0.5, -bar_size.y - gap)
+	bar_pos.x = clamp(bar_pos.x, 8.0 * ui_scale, viewport_size.x - bar_size.x - 8.0 * ui_scale)
+	bar_pos.y = clamp(bar_pos.y, 8.0 * ui_scale, viewport_size.y - bar_size.y - 8.0 * ui_scale)
+	_anchor_control(cast_power_indicator_track, 0.0, 0.0, 0.0, 0.0, bar_pos.x, bar_pos.y, bar_pos.x + bar_size.x, bar_pos.y + bar_size.y)
+	cast_power_indicator_track.size = bar_size
+	cast_power_indicator_track.z_index = max(fish_button.z_index + 4, 266)
+
+
+func _update_cast_power_indicator() -> void:
+	if cast_power_indicator_track == null or cast_power_indicator_fill == null:
+		return
+
+	_layout_cast_power_indicator()
+	var inner_margin := 1.5
+	var progress: float = clamp(_cast_charge_power, 0.0, 1.0)
+	var fill_width: float = max((cast_power_indicator_track.size.x - inner_margin * 2.0) * progress, 0.0)
+	cast_power_indicator_fill.position = Vector2(inner_margin, inner_margin)
+	cast_power_indicator_fill.size = Vector2(fill_width, max(cast_power_indicator_track.size.y - inner_margin * 2.0, 1.0))
+	cast_power_indicator_fill.color = Color(0.72, 1.0, 0.80, lerp(0.68, 1.0, progress))
+
+
+func _set_cast_power_indicator_visible(visible: bool) -> void:
+	_ensure_cast_power_indicator()
+	if cast_power_indicator_track != null:
+		cast_power_indicator_track.visible = visible
+	if visible:
+		_update_cast_power_indicator()
+
+
+func _can_begin_cast_charge() -> bool:
+	if fish_button == null or fish_button.disabled:
+		return false
+	if _should_ignore_base_ui_press() or is_cast_animating:
+		return false
+	if _fishing_ui_state != FishingUiState.IDLE:
+		return false
+	return true
+
+
+func _start_cast_charge() -> void:
+	if not _can_begin_cast_charge():
+		return
+	_cast_charge_active = true
+	_cast_charge_hold_time = 0.0
+	_cast_charge_power = MIN_CAST_POWER
+	_set_cast_power_indicator_visible(true)
+
+
+func _cancel_cast_charge() -> void:
+	_cast_charge_active = false
+	_cast_charge_hold_time = 0.0
+	_cast_charge_power = MIN_CAST_POWER
+	_set_cast_power_indicator_visible(false)
+
+
+func _update_cast_charge(delta: float) -> void:
+	if not _cast_charge_active:
+		return
+	if not _can_begin_cast_charge():
+		_cancel_cast_charge()
+		return
+	_cast_charge_hold_time += delta
+	_cast_charge_power = clamp(_cast_charge_hold_time / CAST_CHARGE_TIME, MIN_CAST_POWER, MAX_CAST_POWER)
+	_update_cast_power_indicator()
+
+
+func _release_cast_charge() -> void:
+	if not _cast_charge_active:
+		return
+	var hold_time := _cast_charge_hold_time
+	var cast_power: float = clamp(hold_time / CAST_CHARGE_TIME, MIN_CAST_POWER, MAX_CAST_POWER)
+	_cancel_cast_charge()
+	_cast_release_action_guard_msec = Time.get_ticks_msec() + 220
+	_on_fish_button_pressed(cast_power, hold_time)
+
+
 func _is_fish_button_pointer_event(event: InputEvent) -> bool:
 	if is_modal_open:
 		return false
@@ -2600,6 +3022,21 @@ func _is_fish_button_pointer_event(event: InputEvent) -> bool:
 		return false
 
 	return fish_button.get_global_rect().has_point(mouse_event.position)
+
+
+func _is_depth_radial_pointer_event(event: InputEvent) -> bool:
+	if depth_radial_control == null or not depth_radial_control.visible or not depth_radial_control.is_visible_in_tree():
+		return false
+	if not _should_show_depth_hud_controls():
+		return false
+	if event is InputEventMouseButton:
+		var mouse_event := event as InputEventMouseButton
+		if mouse_event.button_index != MOUSE_BUTTON_LEFT:
+			return false
+		if depth_radial_control.is_adjusting_depth():
+			return true
+		return mouse_event.pressed and depth_radial_control.is_depth_gesture_global_point(mouse_event.position)
+	return false
 
 func _arm_modal_tap_guard() -> void:
 	_ensure_modal_input_shield()
@@ -2646,10 +3083,15 @@ func _trigger_fish_button_action(from_pointer_event: bool = false) -> void:
 	if _should_ignore_base_ui_press():
 		return
 
+	if _cast_charge_active:
+		return
+
 	if _fish_button_pointer_action_active and not from_pointer_event:
 		return
 
 	var now := Time.get_ticks_msec()
+	if now < _cast_release_action_guard_msec:
+		return
 	if now - _fish_button_action_guard_msec < 120:
 		return
 
@@ -2750,14 +3192,12 @@ func _setup_layout() -> void:
 
 	for node in [
 		scene_gradient,
-		mist_layer,
 		noise_layer,
 		sun_glow_layer,
 		far_forest_layer,
 		mid_forest_layer,
 		lake_layer,
 		reflection_layer,
-		foreground_mist_layer,
 		vignette_layer,
 		water_panel,
 		float_marker,
@@ -2860,12 +3300,14 @@ func _setup_layout() -> void:
 		tackle_title_label,
 		tackle_current_label,
 		tackle_rod_button,
+		tackle_rod_name_label,
 		tackle_line_button,
 		tackle_leader_button,
 		tackle_float_button,
 		tackle_hook_button,
 		tackle_bait_button,
 		tackle_bait_2_button,
+		tackle_info_button,
 		tackle_item_list,
 		tackle_details_label,
 		tackle_compare_label,
@@ -2911,8 +3353,6 @@ func _setup_layout() -> void:
 		mid_forest_layer,
 		lake_layer,
 		reflection_layer,
-		mist_layer,
-		foreground_mist_layer,
 		noise_layer,
 		vignette_layer
 	]:
@@ -2929,12 +3369,12 @@ func _setup_layout() -> void:
 	mid_forest_layer.z_index = -16
 	lake_layer.z_index = -15
 	reflection_layer.z_index = -14
-	mist_layer.z_index = -13
-	foreground_mist_layer.z_index = -12
 	noise_layer.z_index = -11
 	vignette_layer.z_index = 3
 	_setup_atmosphere_materials()
 	fishing_presence_ui._layout_environment_scene(screen_size)
+	if day_night_controller != null:
+		_disable_legacy_environment_visuals()
 	_ensure_time_of_day_layers()
 	_layout_time_of_day_layers(screen_size)
 	_apply_time_atmosphere()
@@ -3417,6 +3857,8 @@ func _setup_layout() -> void:
 	_apply_gameplay_screen_composition(screen_size)
 	if system_menu_ui != null and system_menu_ui.has_method("layout"):
 		system_menu_ui.layout(screen_size)
+	if tuman_fm_hud != null and tuman_fm_hud.has_method("layout"):
+		tuman_fm_hud.call("layout", screen_size)
 
 	for primary_label in [title_label, money_label, level_label, fight_title_label, tension_label, progress_label, basket_title_label, shop_title_label, tackle_title_label]:
 		_apply_label_style(primary_label, true)
@@ -3660,12 +4102,13 @@ func _setup_layout() -> void:
 	var tackle_content_y: float = tackle_header_height + 6.0
 	var tackle_action_y: float = tackle_panel_height - tackle_padding - tackle_action_height
 	var tackle_content_height: float = max(tackle_action_y - tackle_content_y - 8.0, 320.0)
-	var tackle_left_width: float = clamp(tackle_inner_width * 0.27, 235.0, 255.0)
-	var tackle_center_width: float = clamp(tackle_inner_width * 0.36, 305.0, 330.0)
-	var tackle_right_width: float = tackle_inner_width - tackle_left_width - tackle_center_width - tackle_gap * 2.0
+	var tackle_right_content_height: float = max(tackle_panel_height - tackle_padding - tackle_content_y, 360.0)
+	var tackle_left_width: float = clamp(tackle_inner_width * 0.31, 268.0, 292.0)
+	var tackle_right_width: float = tackle_inner_width - tackle_left_width - tackle_gap
+	var tackle_center_width: float = max(tackle_right_width - 28.0, 320.0)
 	var tackle_left_x := tackle_padding
-	var tackle_center_x: float = tackle_left_x + tackle_left_width + tackle_gap
-	var tackle_right_x: float = tackle_center_x + tackle_center_width + tackle_gap
+	var tackle_right_x: float = tackle_left_x + tackle_left_width + tackle_gap
+	var tackle_center_x: float = tackle_right_x + 14.0
 
 	tackle_backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
 	tackle_backdrop.position = Vector2.ZERO
@@ -3691,32 +4134,34 @@ func _setup_layout() -> void:
 	tackle_title_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.38))
 	tackle_title_label.add_theme_constant_override("shadow_offset_y", 1)
 
-	tackle_title_divider_left.position = Vector2(tackle_width * 0.5 - 136.0, 41.0)
-	tackle_title_divider_left.size = Vector2(120.0, 2.0)
+	tackle_title_divider_left.position = Vector2(tackle_width * 0.5 - 210.0, 42.0)
+	tackle_title_divider_left.size = Vector2(420.0, 2.0)
 	tackle_title_divider_left.color = Color(0.82, 0.58, 0.24, 0.72)
-	tackle_title_divider_right.position = Vector2(tackle_width * 0.5 + 16.0, 41.0)
-	tackle_title_divider_right.size = Vector2(120.0, 2.0)
+	tackle_title_divider_right.visible = false
+	tackle_title_divider_right.position = Vector2.ZERO
+	tackle_title_divider_right.size = Vector2.ZERO
 	tackle_title_divider_right.color = Color(0.82, 0.58, 0.24, 0.72)
 
 	tackle_left_panel.position = Vector2(tackle_left_x, tackle_content_y)
 	tackle_left_panel.size = Vector2(tackle_left_width, tackle_content_height)
 	ui_theme.apply_tackle_panel_style(tackle_left_panel)
 
-	tackle_center_panel.position = Vector2(tackle_center_x, tackle_content_y)
-	tackle_center_panel.size = Vector2(tackle_center_width, tackle_content_height)
+	tackle_center_panel.position = Vector2(tackle_center_x, tackle_content_y + 8.0)
+	tackle_center_panel.size = Vector2(tackle_center_width, tackle_right_content_height - 16.0)
+	tackle_center_panel.z_index = MENU_PANEL_Z + 4
 	ui_theme.apply_tackle_panel_style(tackle_center_panel)
 
 	tackle_right_panel.position = Vector2(tackle_right_x, tackle_content_y)
-	tackle_right_panel.size = Vector2(tackle_right_width, tackle_content_height)
+	tackle_right_panel.size = Vector2(tackle_right_width, tackle_right_content_height)
 	ui_theme.apply_tackle_panel_style(tackle_right_panel)
 
-	tackle_action_bar_panel.position = Vector2(tackle_padding, tackle_action_y)
-	tackle_action_bar_panel.size = Vector2(tackle_inner_width, tackle_action_height)
+	tackle_action_bar_panel.position = Vector2(tackle_left_x, tackle_action_y)
+	tackle_action_bar_panel.size = Vector2(tackle_left_width, tackle_action_height)
 	ui_theme.apply_tackle_panel_style(tackle_action_bar_panel)
 
 	var tackle_category_buttons: Array = [tackle_line_button, tackle_leader_button, tackle_hook_button, tackle_float_button, tackle_bait_button, tackle_bait_2_button]
-	var slot_gap := 6.0
-	var tackle_slot_height: float = clamp((tackle_content_height - 16.0 - slot_gap * 5.0) / 6.0, 52.0, 60.0)
+	var slot_gap := 7.0
+	var tackle_slot_height: float = clamp((tackle_content_height - 16.0 - slot_gap * 5.0) / 6.0, 52.0, 58.0)
 	for i in tackle_category_buttons.size():
 		var tackle_category_button: Button = tackle_category_buttons[i]
 		tackle_category_button.position = Vector2(tackle_left_x + 9.0, tackle_content_y + 8.0 + float(i) * (tackle_slot_height + slot_gap))
@@ -3730,7 +4175,7 @@ func _setup_layout() -> void:
 	tackle_visual_title_label.add_theme_color_override("font_color", Color(0.96, 0.88, 0.62, 1.0))
 
 	var visual_top: float = tackle_content_y + 38.0
-	var visual_bottom: float = tackle_content_y + tackle_content_height - 18.0
+	var visual_bottom: float = tackle_content_y + tackle_right_content_height - 18.0
 	var line_x: float = tackle_center_x + tackle_center_width * 0.55
 	var rod_tip := Vector2(line_x + 10.0, visual_top)
 	var rod_base := Vector2(tackle_center_x + tackle_center_width * 0.88, visual_bottom - 4.0)
@@ -3781,6 +4226,7 @@ func _setup_layout() -> void:
 
 	tackle_picker_title_label.position = Vector2(tackle_center_x + 14.0, tackle_content_y + 8.0)
 	tackle_picker_title_label.size = Vector2(tackle_center_width - 28.0, 28.0)
+	tackle_picker_title_label.z_index = MENU_PANEL_Z + 5
 	tackle_picker_title_label.add_theme_font_size_override("font_size", 15)
 	tackle_picker_title_label.add_theme_color_override("font_color", Color(0.96, 0.88, 0.62, 1.0))
 
@@ -3789,16 +4235,26 @@ func _setup_layout() -> void:
 	var tackle_list_x: float = tackle_center_x + 14.0
 	var tackle_list_y: float = tackle_content_y + 43.0
 	var tackle_list_width: float = tackle_center_width - 28.0
-	var tackle_list_height: float = max(tackle_content_height - 44.0 - tackle_pager_height - tackle_pager_gap - 12.0, 124.0)
+	var tackle_list_height: float = max(tackle_right_content_height - 44.0 - tackle_pager_height - tackle_pager_gap - 12.0, 124.0)
 	tackle_item_list.position = Vector2(tackle_list_x, tackle_list_y)
 	tackle_item_list.size = Vector2(tackle_list_width, tackle_list_height)
-	tackle_item_list.max_columns = 1
-	tackle_item_list.icon_mode = ItemList.ICON_MODE_LEFT
-	tackle_item_list.fixed_icon_size = Vector2i(30, 30)
+	tackle_item_list.z_index = MENU_PANEL_Z + 5
+	if _tackle_category == "rod":
+		tackle_item_list.max_columns = 2
+		tackle_item_list.icon_mode = ItemList.ICON_MODE_TOP
+		tackle_item_list.fixed_icon_size = Vector2i(172, 56)
+		tackle_item_list.fixed_column_width = int(max((tackle_list_width - 14.0) * 0.5, 176.0))
+	else:
+		tackle_item_list.max_columns = 1
+		tackle_item_list.icon_mode = ItemList.ICON_MODE_LEFT
+		tackle_item_list.fixed_icon_size = Vector2i(30, 30)
+		tackle_item_list.fixed_column_width = 0
 	ui_theme.apply_item_list_style(tackle_item_list)
 	tackle_item_list.add_theme_font_size_override("font_size", 13)
 	tackle_item_list.add_theme_color_override("font_color", Color(0.84, 0.94, 0.90, 0.96))
 	tackle_item_list.add_theme_color_override("font_selected_color", Color(0.98, 1.0, 0.94, 1.0))
+	tackle_item_list.add_theme_constant_override("h_separation", 10)
+	tackle_item_list.add_theme_constant_override("v_separation", 12)
 
 	if tackle_prev_page_button != null and tackle_next_page_button != null and tackle_page_label != null:
 		var tackle_pager_y: float = tackle_list_y + tackle_list_height + tackle_pager_gap
@@ -3821,24 +4277,44 @@ func _setup_layout() -> void:
 		tackle_page_label.add_theme_font_size_override("font_size", 11)
 		tackle_page_label.add_theme_color_override("font_color", Color(0.82, 0.94, 0.90, 0.92))
 
-	tackle_rod_button.position = Vector2(tackle_right_x + 9.0, tackle_content_y + 8.0)
-	tackle_rod_button.size = Vector2(tackle_right_width - 18.0, 66.0)
-	tackle_rod_button.add_theme_font_size_override("font_size", 12)
+	var tackle_final_panel_height: float = 106.0
+	var final_panel_y: float = tackle_content_y + tackle_right_content_height - tackle_final_panel_height - 8.0
+	var rod_showcase_y: float = tackle_content_y + 8.0
+	var rod_showcase_height: float = max(tackle_content_y + tackle_right_content_height - rod_showcase_y - 8.0, 220.0)
+
+	tackle_rod_button.position = Vector2(tackle_right_x + 12.0, rod_showcase_y)
+	tackle_rod_button.size = Vector2(tackle_right_width - 24.0, rod_showcase_height)
+	tackle_rod_button.add_theme_font_size_override("font_size", 13)
 	tackle_rod_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 
-	tackle_rod_stats_panel.position = Vector2(tackle_right_x + 9.0, tackle_rod_button.position.y + tackle_rod_button.size.y + 8.0)
-	tackle_rod_stats_panel.size = Vector2(tackle_right_width - 18.0, 88.0)
+	if tackle_rod_name_label != null:
+		tackle_rod_name_label.position = Vector2(tackle_right_x + 28.0, rod_showcase_y + 12.0)
+		tackle_rod_name_label.size = Vector2(tackle_right_width - 100.0, 48.0)
+		tackle_rod_name_label.z_index = MENU_PANEL_Z + 5
+		tackle_rod_name_label.add_theme_font_size_override("font_size", 16)
+		tackle_rod_name_label.add_theme_color_override("font_color", Color(1.0, 0.84, 0.48, 1.0))
+		tackle_rod_name_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.72))
+		tackle_rod_name_label.add_theme_constant_override("shadow_offset_x", 1)
+		tackle_rod_name_label.add_theme_constant_override("shadow_offset_y", 1)
+
+	if tackle_info_button != null:
+		tackle_info_button.position = Vector2(tackle_right_x + tackle_right_width - 52.0, rod_showcase_y + 10.0)
+		tackle_info_button.size = Vector2(34.0, 34.0)
+		tackle_info_button.z_index = MENU_PANEL_Z + 6
+
+	tackle_rod_stats_panel.position = Vector2(tackle_right_x + 12.0, rod_showcase_y)
+	tackle_rod_stats_panel.size = Vector2(tackle_right_width - 24.0, 94.0)
 	ui_theme.apply_tackle_panel_style(tackle_rod_stats_panel)
 
 	tackle_current_label.position = Vector2(tackle_right_x + 19.0, tackle_rod_stats_panel.position.y + 8.0)
 	tackle_current_label.size = Vector2(tackle_right_width - 38.0, tackle_rod_stats_panel.size.y - 16.0)
-	tackle_current_label.add_theme_font_size_override("font_size", 11)
+	tackle_current_label.add_theme_font_size_override("font_size", 12)
 	tackle_current_label.add_theme_color_override("font_color", Color(0.88, 0.96, 0.92, 0.96))
 	tackle_current_label.clip_text = true
 
 	var details_panel_y: float = tackle_rod_stats_panel.position.y + tackle_rod_stats_panel.size.y + 8.0
-	tackle_rod_description_panel.position = Vector2(tackle_right_x + 9.0, details_panel_y)
-	tackle_rod_description_panel.size = Vector2(tackle_right_width - 18.0, 112.0)
+	tackle_rod_description_panel.position = Vector2(tackle_right_x + 12.0, details_panel_y)
+	tackle_rod_description_panel.size = Vector2(tackle_right_width - 24.0, max(final_panel_y - details_panel_y - 8.0, 90.0))
 	ui_theme.apply_tackle_panel_style(tackle_rod_description_panel)
 
 	tackle_details_label.position = Vector2(tackle_right_x + 19.0, details_panel_y + 8.0)
@@ -3847,27 +4323,25 @@ func _setup_layout() -> void:
 	tackle_details_label.add_theme_color_override("font_color", Color(0.78, 0.88, 0.86, 0.96))
 	tackle_details_label.clip_text = true
 
-	var final_panel_y: float = tackle_rod_description_panel.position.y + tackle_rod_description_panel.size.y + 8.0
-	var final_panel_height: float = max(tackle_content_y + tackle_content_height - final_panel_y - 8.0, 78.0)
 	tackle_final_stats_panel.position = Vector2(tackle_right_x + 9.0, final_panel_y)
-	tackle_final_stats_panel.size = Vector2(tackle_right_width - 18.0, final_panel_height)
+	tackle_final_stats_panel.size = Vector2(tackle_right_width - 18.0, tackle_final_panel_height)
 	ui_theme.apply_tackle_panel_style(tackle_final_stats_panel)
 
 	tackle_compare_label.position = Vector2(tackle_right_x + 19.0, final_panel_y + 8.0)
 	tackle_compare_label.size = Vector2(tackle_right_width - 38.0, max(tackle_final_stats_panel.size.y - 16.0, 58.0))
-	tackle_compare_label.add_theme_font_size_override("font_size", 11)
+	tackle_compare_label.add_theme_font_size_override("font_size", 10)
 	tackle_compare_label.add_theme_color_override("font_color", Color(0.78, 0.90, 0.86, 0.94))
 	tackle_compare_label.clip_text = true
 
-	tackle_hint_label.position = Vector2(tackle_right_x + 20.0, tackle_content_y + tackle_content_height - 32.0)
-	tackle_hint_label.size = Vector2(tackle_right_width - 40.0, 28.0)
+	tackle_hint_label.position = Vector2(tackle_left_x + 16.0, tackle_action_y + 47.0)
+	tackle_hint_label.size = Vector2(tackle_left_width - 32.0, 18.0)
 	tackle_hint_label.add_theme_font_size_override("font_size", 11)
 	tackle_hint_label.add_theme_color_override("font_color", Color(0.82, 0.72, 0.48, 0.92))
 	tackle_hint_label.clip_text = true
 
-	tackle_depth_label.position = Vector2(tackle_padding + 16.0, tackle_action_y + 14.0)
-	tackle_depth_label.size = Vector2(174.0, 40.0)
-	tackle_depth_label.add_theme_font_size_override("font_size", 15)
+	tackle_depth_label.position = Vector2(tackle_padding + 16.0, tackle_action_y + 10.0)
+	tackle_depth_label.size = Vector2(174.0, 24.0)
+	tackle_depth_label.add_theme_font_size_override("font_size", 13)
 	tackle_depth_label.add_theme_color_override("font_color", Color(0.92, 0.96, 0.90, 0.96))
 
 	tackle_depth_minus_button.position = Vector2(tackle_depth_label.position.x + tackle_depth_label.size.x + 8.0, tackle_action_y + 10.0)
@@ -3880,25 +4354,25 @@ func _setup_layout() -> void:
 	tackle_depth_plus_button.add_theme_font_size_override("font_size", 20)
 	_apply_button_style(tackle_depth_plus_button, STYLE_SECONDARY_BUTTON)
 
-	var equip_width: float = min(190.0, tackle_inner_width * 0.22)
-	var tackle_secondary_width: float = min(124.0, tackle_inner_width * 0.15)
-	var tackle_action_button_y: float = tackle_action_y + 9.0
-	tackle_equip_button.position = Vector2(tackle_padding + tackle_inner_width * 0.5 - equip_width * 0.5, tackle_action_button_y)
-	tackle_equip_button.size = Vector2(equip_width, 50.0)
+	var equip_width: float = min(154.0, tackle_left_width - 32.0)
+	var tackle_secondary_width: float = min(96.0, tackle_left_width * 0.34)
+	var tackle_action_button_y: float = tackle_action_y + 7.0
+	tackle_equip_button.position = Vector2(tackle_left_x + 16.0, tackle_action_button_y)
+	tackle_equip_button.size = Vector2(equip_width, 38.0)
 	ui_theme.apply_tackle_primary_action_style(tackle_equip_button)
 	if tackle_repair_button != null:
-		tackle_repair_button.position = Vector2(tackle_equip_button.position.x + equip_width + 10.0, tackle_action_button_y)
-		tackle_repair_button.size = Vector2(tackle_secondary_width, 50.0)
+		tackle_repair_button.position = Vector2(tackle_left_x + tackle_left_width - tackle_secondary_width - 12.0, tackle_action_button_y)
+		tackle_repair_button.size = Vector2(tackle_secondary_width, 38.0)
 		_apply_button_style(tackle_repair_button, STYLE_SECONDARY_BUTTON)
 	if tackle_discard_button != null:
-		tackle_discard_button.position = Vector2(tackle_equip_button.position.x + equip_width + 10.0, tackle_action_button_y)
-		tackle_discard_button.size = Vector2(tackle_secondary_width, 50.0)
+		tackle_discard_button.position = Vector2(tackle_left_x + tackle_left_width - tackle_secondary_width - 12.0, tackle_action_button_y)
+		tackle_discard_button.size = Vector2(tackle_secondary_width, 38.0)
 		_apply_button_style(tackle_discard_button, STYLE_SECONDARY_BUTTON)
 
-	var close_width: float = min(194.0, tackle_inner_width * 0.22)
-	tackle_close_button.position = Vector2(tackle_padding + tackle_inner_width - close_width - 16.0, tackle_action_y + 10.0)
-	tackle_close_button.size = Vector2(close_width, 48.0)
-	tackle_close_button.add_theme_font_size_override("font_size", 15)
+	var close_width: float = 108.0
+	tackle_close_button.position = Vector2(tackle_width - tackle_padding - close_width, 8.0)
+	tackle_close_button.size = Vector2(close_width, 34.0)
+	tackle_close_button.add_theme_font_size_override("font_size", 13)
 	ui_theme.apply_close_button_style(tackle_close_button)
 
 	var waterbody_width: float = screen_size.x
@@ -4328,6 +4802,17 @@ func _update_ui() -> void:
 	_refresh_stop_fishing_button_presentation()
 
 
+func _grant_alpha_tester_bonus_if_needed() -> void:
+	if PlayerData.alpha_tester_bonus_claimed:
+		return
+
+	PlayerData.money += ALPHA_TESTER_BONUS_MONEY
+	PlayerData.alpha_tester_bonus_claimed = true
+	_update_ui()
+	_show_toast(ALPHA_TESTER_BONUS_MESSAGE, true)
+	SaveManager.save_game()
+
+
 func _update_player_xp_hud(animate := true) -> void:
 	if player_xp_hud == null:
 		return
@@ -4354,6 +4839,11 @@ func _update_time_hud() -> void:
 	weather_label.text = _get_time_of_day_title()
 
 func _apply_time_atmosphere() -> void:
+	if day_night_controller != null:
+		_disable_legacy_environment_visuals()
+		_apply_time_of_day_overlays()
+		return
+
 	var settings := _get_atmosphere_settings()
 
 	if settings.is_empty():
@@ -4364,8 +4854,6 @@ func _apply_time_atmosphere() -> void:
 	sun_glow_layer.modulate = settings.get("sun", Color.WHITE)
 	lake_layer.modulate = settings.get("water", Color.WHITE)
 	reflection_layer.modulate = settings.get("water", Color.WHITE)
-	mist_layer.modulate = settings.get("mist", Color.WHITE)
-	foreground_mist_layer.modulate = settings.get("mist", Color.WHITE)
 	far_forest_layer.modulate = settings.get("scene", Color.WHITE)
 	mid_forest_layer.modulate = settings.get("scene", Color.WHITE)
 	vignette_layer.modulate = settings.get("vignette", Color.WHITE)
@@ -4631,7 +5119,6 @@ func _get_atmosphere_settings() -> Dictionary:
 		"scene": Color(1.10, 1.03, 0.90, 1.0),
 		"sun": Color(1.16, 0.92, 0.58, 0.88),
 		"water": Color(0.90, 1.02, 0.96, 1.0),
-		"mist": Color(1.03, 0.98, 0.86, 0.82),
 		"vignette": Color(0.95, 0.92, 0.80, 0.78)
 	}
 
@@ -4913,6 +5400,32 @@ func _on_tackle_item_activated(index: int) -> void:
 
 func _on_tackle_equip_button_pressed() -> void:
 	var selected_item := _get_selected_tackle_item()
+	if selected_item.is_empty() and tackle_ui != null and tackle_ui.has_method("is_item_picker_open") and not bool(tackle_ui.is_item_picker_open()):
+		var validation_service: Node = get_node_or_null("/root/TackleValidationService")
+		var validation: Dictionary = {}
+		if validation_service != null and validation_service.has_method("validate_current_tackle"):
+			var validation_result = validation_service.call("validate_current_tackle")
+			if typeof(validation_result) == TYPE_DICTIONARY:
+				validation = validation_result
+		var issues: Array = PlayerData.get_tackle_setup_issues()
+		var tackle_ready: bool = bool(validation.get("usable", issues.is_empty())) and issues.is_empty()
+		if not tackle_ready:
+			var block_text := PlayerData.get_tackle_block_reason()
+			result_label.text = block_text if block_text != "" else "Снасть не готова."
+			_show_toast(result_label.text, false)
+			_update_tackle_ui()
+			return
+		if _fishing_ui_state != FishingUiState.IDLE:
+			result_label.text = "Снасть можно менять только перед забросом."
+			_show_toast(result_label.text, false)
+			_update_tackle_ui()
+			return
+		result_label.text = "Снасть экипирована и готова к ловле."
+		_show_toast(result_label.text, true)
+		SaveManager.save_game()
+		_update_ui()
+		return
+
 	var validation_service := get_node_or_null("/root/TackleValidationService")
 	var block_reason := str(validation_service.call("get_equip_block_reason", _tackle_category, selected_item)) if validation_service != null and validation_service.has_method("get_equip_block_reason") else PlayerData.get_equip_block_reason(selected_item, _tackle_category)
 
@@ -4973,6 +5486,27 @@ func _on_tackle_depth_button_pressed(delta: float) -> void:
 	_show_toast(depth_message, true)
 	SaveManager.save_game()
 	_update_ui()
+
+func _on_depth_radial_control_changed(value: float) -> void:
+	if _fishing_ui_state != FishingUiState.IDLE:
+		return
+	PlayerData.set_fishing_depth(value)
+	if depth_radial_control != null:
+		depth_radial_control.set_depth_value(PlayerData.fishing_depth, false)
+
+
+func _on_depth_radial_control_committed(value: float) -> void:
+	if _fishing_ui_state != FishingUiState.IDLE:
+		return
+	PlayerData.set_fishing_depth(value)
+	if depth_radial_control != null:
+		depth_radial_control.set_depth_value(PlayerData.fishing_depth, false)
+	var depth_message := "Глубина: %.1f м" % PlayerData.fishing_depth
+	result_label.text = "Выставлена глубина снасти: %.1f м" % PlayerData.fishing_depth
+	_show_toast(depth_message, true)
+	SaveManager.save_game()
+	_update_ui()
+
 
 func _on_tackle_close_button_pressed() -> void:
 	_arm_modal_tap_guard()
@@ -5126,9 +5660,8 @@ func _on_spot_selected(index: int) -> void:
 
 	PlayerData.set_current_spot(str(spot_option_button.get_item_metadata(index)))
 	var spot := SpotDatabase.get_spot(PlayerData.current_spot)
-	result_label.text = "Выбрано: %s\nГлубина: %.1f-%.1f м | снасть %.1f м" % [
+	result_label.text = "Выбрано: %s\nГлубина воды: до %.1f м | снасть %.1f м" % [
 		spot["name"],
-		float(spot.get("min_depth", spot.get("depth", 0.0))),
 		float(spot.get("max_depth", spot.get("depth", 0.0))),
 		PlayerData.fishing_depth
 	]
@@ -5136,7 +5669,7 @@ func _on_spot_selected(index: int) -> void:
 	SaveManager.save_game()
 	_update_ui()
 
-func _on_fish_button_pressed() -> void:
+func _on_fish_button_pressed(cast_power: float = MIN_CAST_POWER, cast_hold_time: float = 0.0) -> void:
 	if _is_catch_reward_open():
 		return
 
@@ -5176,17 +5709,22 @@ func _on_fish_button_pressed() -> void:
 		_update_ui()
 		return
 
+	var cast_depth_context := _build_cast_depth_context(cast_power, cast_hold_time)
+	_debug_log_cast_depth(cast_depth_context)
+
 	_hide_modal_roots_except("")
 	_refresh_modal_input_blocker()
 	SaveManager.save_game()
 
 	_pending_cast_spot_id = PlayerData.current_spot
+	_pending_cast_valid = bool(cast_depth_context.get("valid", true))
+	_pending_cast_depth_context = cast_depth_context
 	is_cast_animating = true
 	timer_label.text = "Заброс..."
 	result_label.text = "Снасть летит к воде..."
 	_call_audio_manager("play_cast")
 	if fishing_presence_ui != null:
-		fishing_presence_ui.start_cast_visual()
+		fishing_presence_ui.start_cast_visual(float(cast_depth_context.get("cast_power", cast_power)))
 	_update_ui()
 
 
@@ -5206,6 +5744,8 @@ func _cancel_current_fishing_wait() -> void:
 
 	_pending_reward_catch = {}
 	_pending_cast_spot_id = ""
+	_pending_cast_valid = true
+	_pending_cast_depth_context = {}
 	is_cast_animating = false
 	_presence_bite_timer = 0.0
 	_presence_caught_timer = 0.0
@@ -5224,10 +5764,16 @@ func _cancel_current_fishing_wait() -> void:
 
 
 func _on_reel_button_down() -> void:
+	if _can_begin_cast_charge():
+		_start_cast_charge()
+		return
 	if _fishing_ui_state == FishingUiState.FIGHTING and FishingManager.is_reeling:
 		FishingManager.set_reel_input(true)
 
 func _on_reel_button_up() -> void:
+	if _cast_charge_active:
+		_release_cast_charge()
+		return
 	FishingManager.set_reel_input(false)
 
 func _on_sell_all_button_pressed() -> void:
@@ -5312,6 +5858,11 @@ func _open_fishing_screen() -> void:
 func close_game_panels_before_opening_new_one(_screen_id: String = "") -> void:
 	if system_menu_ui != null:
 		system_menu_ui.close_menu()
+	if _is_catch_reward_open():
+		return
+	_hide_modal_roots_except("")
+	_refresh_modal_input_blocker()
+	_request_depth_hud_refresh()
 
 
 func _close_profile_and_encyclopedia(reset_nav: bool = false) -> void:
@@ -5692,6 +6243,8 @@ func _on_discard_confirmed() -> void:
 func _return_to_idle_after_result() -> void:
 	_pending_reward_catch = {}
 	_pending_cast_spot_id = ""
+	_pending_cast_valid = true
+	_pending_cast_depth_context = {}
 	is_cast_animating = false
 	_hide_catch_reward_popup(false)
 	if fishing_presence_ui != null:
@@ -5716,10 +6269,30 @@ func _on_cast_visual_finished() -> void:
 		return
 
 	var spot_id := _pending_cast_spot_id
+	var cast_valid := _pending_cast_valid
+	var cast_depth_context := _pending_cast_depth_context.duplicate(true)
 	_pending_cast_spot_id = ""
+	_pending_cast_valid = true
+	_pending_cast_depth_context = {}
 	is_cast_animating = false
 
 	if spot_id == "":
+		_update_ui()
+		return
+
+	if not cast_valid:
+		_fishing_ui_state = FishingUiState.IDLE
+		if fishing_presence_ui != null and fishing_presence_ui.has_method("play_float_lay_down_animation"):
+			fishing_presence_ui.play_float_lay_down_animation()
+		var shallow_message := "Слишком мелко. Забросьте дальше или уменьшите глубину."
+		result_label.text = shallow_message
+		timer_label.text = "Готов к забросу"
+		_show_toast(shallow_message, false)
+		if not cast_depth_context.is_empty():
+			fight_status_label.text = "Глубина воды: %.1f м | Снасть: %.1f м" % [
+				float(cast_depth_context.get("water_depth_at_cast", MIN_SHORE_DEPTH)),
+				float(cast_depth_context.get("float_depth", PlayerData.fishing_depth))
+			]
 		_update_ui()
 		return
 

@@ -4,7 +4,12 @@ extends RefCounted
 var main
 var theme
 const TACKLE_ITEMS_PER_PAGE := 7
+const TACKLE_COLOR_GOLD := Color(0.94, 0.70, 0.28, 1.0)
+const TACKLE_COLOR_TEXT := Color(0.88, 0.96, 0.94, 0.96)
+const TACKLE_COLOR_SUCCESS := Color(0.46, 0.95, 0.60, 1.0)
+const TACKLE_COLOR_WARNING := Color(1.0, 0.64, 0.28, 1.0)
 var _picker_open := false
+var _rod_info_open := false
 var _texture_cache: Dictionary = {}
 
 enum FishingUiState {
@@ -30,6 +35,7 @@ func open() -> void:
 	main.tackle_backdrop.visible = true
 	main.tackle_panel.visible = true
 	_picker_open = false
+	_rod_info_open = false
 	main._selected_tackle_item_id = ""
 	refresh()
 	if main.has_method("refresh_mobile_scroll_helper"):
@@ -55,8 +61,190 @@ func close_item_picker(refresh_ui := true) -> void:
 func refresh() -> void:
 	_update_tackle_ui()
 
+func refresh_ui() -> void:
+	if main.tackle_panel == null:
+		return
+
+	_refresh_visible_tackle_items()
+	refresh_slots()
+	refresh_selected_item()
+	refresh_stats()
+	refresh_validation_status()
+
+func refresh_slots() -> void:
+	main.tackle_title_label.text = "Сборка снасти"
+	main.tackle_depth_label.visible = false
+	main.tackle_depth_minus_button.visible = false
+	main.tackle_depth_plus_button.visible = false
+
+	var slot_buttons: Array = [
+		[main.tackle_line_button, "line"],
+		[main.tackle_leader_button, "leader"],
+		[main.tackle_hook_button, "hook"],
+		[main.tackle_float_button, "float"],
+		[main.tackle_bait_button, "bait"],
+		[main.tackle_bait_2_button, "bait_2"]
+	]
+
+	for item in slot_buttons:
+		var button: Button = item[0]
+		var category: String = item[1]
+		button.text = _get_tackle_slot_button_text(category)
+		button.icon = _get_tackle_slot_texture(category)
+		button.expand_icon = false
+		button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
+		button.add_theme_constant_override("icon_max_width", 40 if button.icon != null else 0)
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		button.clip_text = true
+		button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		theme.apply_tackle_slot_button_style(button, _get_tackle_slot_state(category))
+		button.add_theme_font_size_override("font_size", 12)
+		button.add_theme_constant_override("h_separation", 12)
+
+	main.tackle_rod_button.text = ""
+	main.tackle_rod_button.tooltip_text = "Выбрать удочку"
+	main.tackle_rod_button.icon = _get_rod_button_texture()
+	main.tackle_rod_button.expand_icon = main.tackle_rod_button.icon != null
+	main.tackle_rod_button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	main.tackle_rod_button.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
+	main.tackle_rod_button.add_theme_constant_override("icon_max_width", 999 if main.tackle_rod_button.icon != null else 0)
+	main.tackle_rod_button.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	main.tackle_rod_button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	main.tackle_rod_button.clip_text = true
+	main.tackle_rod_button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	theme.apply_tackle_slot_button_style(main.tackle_rod_button, _get_tackle_slot_state("rod"))
+	main.tackle_rod_button.add_theme_font_size_override("font_size", 13)
+	if main.tackle_rod_name_label != null:
+		main.tackle_rod_name_label.text = _get_rod_showcase_title_text()
+		main.tackle_rod_name_label.tooltip_text = _get_rod_showcase_name()
+	if main.tackle_info_button != null:
+		main.tackle_info_button.visible = true
+		main.tackle_info_button.text = "×" if _picker_open else "i"
+		main.tackle_info_button.tooltip_text = "Закрыть выбор" if _picker_open else "Информация об удочке"
+		_apply_info_button_style(main.tackle_info_button, _rod_info_open or _picker_open)
+		main.tackle_info_button.add_theme_font_size_override("font_size", 18)
+		main.tackle_info_button.add_theme_constant_override("h_separation", 0)
+	_refresh_rod_surface_visibility()
+
+
+func _apply_info_button_style(button: Button, active: bool) -> void:
+	button.add_theme_stylebox_override("normal", _make_info_button_style(active, "normal"))
+	button.add_theme_stylebox_override("hover", _make_info_button_style(active, "hover"))
+	button.add_theme_stylebox_override("pressed", _make_info_button_style(active, "pressed"))
+	button.add_theme_stylebox_override("focus", _make_info_button_style(true, "normal"))
+	button.add_theme_color_override("font_color", TACKLE_COLOR_GOLD if active else Color(0.76, 0.92, 0.96, 1.0))
+	button.add_theme_color_override("font_hover_color", Color(1.0, 0.88, 0.58, 1.0))
+	button.add_theme_color_override("font_pressed_color", Color(0.96, 0.76, 0.42, 1.0))
+
+
+func _make_info_button_style(active: bool, state: String) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.018, 0.062, 0.084, 0.92)
+	style.border_color = TACKLE_COLOR_GOLD if active else Color(0.44, 0.84, 0.92, 0.64)
+	if state == "hover":
+		style.bg_color = Color(0.035, 0.095, 0.120, 0.96)
+		style.border_color = TACKLE_COLOR_GOLD
+	elif state == "pressed":
+		style.bg_color = Color(0.060, 0.075, 0.070, 0.98)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(18)
+	style.shadow_color = Color(0.0, 0.0, 0.0, 0.24)
+	style.shadow_size = 5
+	return style
+
+func refresh_selected_item() -> void:
+	var selected_item := _get_selected_tackle_item()
+	if main._tackle_category == "bait_2" and not PlayerData.can_use_second_bait():
+		main.tackle_details_label.text = "Описание\nНаживка 2 открывается навыком «Бутерброд». До изучения она не участвует в проверке снасти."
+	elif _rod_info_open and not _picker_open:
+		main.tackle_details_label.text = _get_rod_description_text()
+	elif _picker_open and selected_item.is_empty():
+		main.tackle_details_label.text = "Описание\nНет предметов для слота «%s». Купите их в магазине или проверьте инвентарь." % _get_tackle_slot_title(main._tackle_category)
+	elif _picker_open:
+		main.tackle_details_label.text = _get_selected_item_card_text(selected_item)
+	else:
+		main.tackle_details_label.text = _get_rod_description_text()
+
+func refresh_stats() -> void:
+	main.tackle_current_label.text = _get_rod_stats_grid_text()
+	main.tackle_compare_label.text = _get_final_tackle_stats_text()
+	_refresh_rod_surface_visibility()
+
+func refresh_validation_status() -> void:
+	var selected_item: Dictionary = _get_selected_tackle_item()
+	var block_reason: String = _get_equip_block_reason(selected_item, main._tackle_category) if not selected_item.is_empty() else ""
+	var validation: Dictionary = _get_current_tackle_validation()
+	var issues: Array = PlayerData.get_tackle_setup_issues()
+	var tackle_valid: bool = bool(validation.get("usable", issues.is_empty())) and issues.is_empty()
+	var can_change_tackle: bool = main._fishing_ui_state == FishingUiState.IDLE
+	var can_equip_selected: bool = _picker_open and not selected_item.is_empty() and block_reason == "" and not _is_tackle_item_equipped(selected_item) and can_change_tackle
+
+	main.tackle_hint_label.visible = true
+	main.tackle_hint_label.text = _get_validation_status_line(issues, tackle_valid)
+	main.tackle_hint_label.add_theme_color_override("font_color", TACKLE_COLOR_SUCCESS if tackle_valid else TACKLE_COLOR_WARNING)
+	main.tackle_compare_label.add_theme_color_override("font_color", TACKLE_COLOR_TEXT if tackle_valid else Color(0.96, 0.78, 0.54, 0.96))
+
+	main.tackle_equip_button.visible = true
+	if _picker_open:
+		main.tackle_equip_button.disabled = not can_equip_selected
+		if not can_change_tackle:
+			main.tackle_equip_button.text = "Только вне ловли"
+		elif _is_tackle_item_equipped(selected_item):
+			main.tackle_equip_button.text = "Уже экипировано"
+		elif main._tackle_category == "bait_2" and not PlayerData.can_use_second_bait():
+			main.tackle_equip_button.text = "Закрыто"
+		elif selected_item.is_empty():
+			main.tackle_equip_button.text = "Нет предметов"
+		elif block_reason != "":
+			main.tackle_equip_button.text = "Недоступно"
+		else:
+			main.tackle_equip_button.text = "Экипировать"
+	else:
+		main.tackle_equip_button.disabled = true
+		main.tackle_equip_button.text = "Уже экипировано" if tackle_valid else "Не готово"
+
+	var can_repair: bool = _picker_open and not selected_item.is_empty() and _can_repair_item(selected_item)
+	var can_discard: bool = _picker_open and not selected_item.is_empty() and _can_discard_item(selected_item)
+	if main.tackle_repair_button != null:
+		main.tackle_repair_button.visible = can_repair
+		main.tackle_repair_button.disabled = not can_repair
+		main.tackle_repair_button.text = "Починить"
+	if main.tackle_discard_button != null:
+		main.tackle_discard_button.visible = can_discard
+		main.tackle_discard_button.disabled = not can_discard
+		main.tackle_discard_button.text = "Выбросить"
+
+func on_slot_pressed(slot_type: String) -> void:
+	_set_tackle_category(slot_type)
+
+func on_equip_pressed() -> void:
+	main._on_tackle_equip_button_pressed()
+
+func on_close_pressed() -> void:
+	main._on_tackle_close_button_pressed()
+
 func is_open() -> bool:
 	return main != null and main.tackle_panel != null and main.tackle_panel.visible
+
+func is_item_picker_open() -> bool:
+	return _picker_open
+
+func _refresh_rod_surface_visibility() -> void:
+	var locked_second_bait: bool = main._tackle_category == "bait_2" and not PlayerData.can_use_second_bait()
+	var show_picker: bool = _picker_open and not locked_second_bait
+	var show_info: bool = _rod_info_open and not show_picker
+	var show_showcase: bool = not show_info and not show_picker
+	main.tackle_rod_button.visible = show_showcase
+	if main.tackle_rod_name_label != null:
+		main.tackle_rod_name_label.visible = show_showcase
+	main.tackle_rod_stats_panel.visible = show_info
+	main.tackle_rod_description_panel.visible = show_info
+	main.tackle_current_label.visible = show_info
+	main.tackle_details_label.visible = show_info
+	main.tackle_final_stats_panel.visible = show_info
+	main.tackle_compare_label.visible = show_info
 
 func _ensure_tackle_ui_nodes() -> void:
 	if main.tackle_panel != null:
@@ -190,6 +378,13 @@ func _ensure_tackle_ui_nodes() -> void:
 	main.tackle_rod_button.text = "Удочки"
 	main.tackle_panel.add_child(main.tackle_rod_button)
 
+	main.tackle_rod_name_label = Label.new()
+	main.tackle_rod_name_label.name = "TackleRodNameLabel"
+	main.tackle_rod_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	main.tackle_rod_name_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	main.tackle_rod_name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	main.tackle_panel.add_child(main.tackle_rod_name_label)
+
 	main.tackle_line_button = Button.new()
 	main.tackle_line_button.name = "TackleLineButton"
 	main.tackle_line_button.text = "Лески"
@@ -219,6 +414,14 @@ func _ensure_tackle_ui_nodes() -> void:
 	main.tackle_bait_2_button.name = "TackleBait2Button"
 	main.tackle_bait_2_button.text = "Наживка 2"
 	main.tackle_panel.add_child(main.tackle_bait_2_button)
+
+	main.tackle_info_button = Button.new()
+	main.tackle_info_button.name = "TackleInfoButton"
+	main.tackle_info_button.text = "i"
+	main.tackle_info_button.focus_mode = Control.FOCUS_NONE
+	main.tackle_info_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	main.tackle_info_button.pressed.connect(_on_tackle_info_button_pressed)
+	main.tackle_panel.add_child(main.tackle_info_button)
 
 	main.tackle_item_list = ItemList.new()
 	main.tackle_item_list.name = "TackleItemList"
@@ -338,7 +541,8 @@ func _update_tackle_pager(page_count: int, total_count: int) -> void:
 	if main.tackle_prev_page_button == null or main.tackle_next_page_button == null or main.tackle_page_label == null:
 		return
 
-	var has_pages := _picker_open and total_count > TACKLE_ITEMS_PER_PAGE
+	var items_per_page := _get_tackle_items_per_page()
+	var has_pages: bool = _picker_open and total_count > items_per_page
 	main.tackle_prev_page_button.visible = has_pages
 	main.tackle_next_page_button.visible = has_pages
 	main.tackle_page_label.visible = has_pages
@@ -351,23 +555,25 @@ func _update_tackle_ui() -> void:
 	if main.tackle_panel == null:
 		return
 
+	refresh_ui()
+
+
+func _refresh_visible_tackle_items() -> void:
 	var item_category := _get_item_category_for_slot(main._tackle_category)
 	if main._tackle_category == "bait_2" and not PlayerData.can_use_second_bait():
 		main._visible_tackle_items = []
 	else:
 		main._visible_tackle_items = _get_visible_tackle_items_for_category(item_category)
-	main.tackle_title_label.text = "Сборка снасти"
-	main.tackle_current_label.text = _get_rod_assembly_summary_text()
-	main.tackle_depth_label.text = "Глубина: %.1f м" % PlayerData.fishing_depth
-	main.tackle_hint_label.text = _get_tackle_setup_status_or_hints_text()
 	main.tackle_item_list.clear()
+	_configure_tackle_item_list_for_category(main._tackle_category)
 
 	var total_count: int = main._visible_tackle_items.size()
-	var page_count: int = max(ceili(float(total_count) / float(TACKLE_ITEMS_PER_PAGE)), 1)
+	var items_per_page := _get_tackle_items_per_page()
+	var page_count: int = max(ceili(float(total_count) / float(items_per_page)), 1)
 	main._tackle_page = clampi(main._tackle_page, 0, page_count - 1)
 
-	var page_start: int = main._tackle_page * TACKLE_ITEMS_PER_PAGE
-	var page_end: int = mini(page_start + TACKLE_ITEMS_PER_PAGE, total_count)
+	var page_start: int = main._tackle_page * items_per_page
+	var page_end: int = mini(page_start + items_per_page, total_count)
 	var selected_index := -1
 
 	for i in total_count:
@@ -404,91 +610,39 @@ func _update_tackle_ui() -> void:
 
 	_update_tackle_picker_visibility()
 	_update_tackle_pager(page_count, total_count)
-	_update_tackle_visual_scheme()
 
-	var selected_item = _get_selected_tackle_item()
-	var hints_text = _get_tackle_setup_hints_text(4)
-	if main._tackle_category == "bait_2" and not PlayerData.can_use_second_bait():
-		main.tackle_details_label.text = "Наживка 2\nНужен навык «Бутерброд»."
-		main.tackle_compare_label.text = _get_final_tackle_stats_text()
-	elif not _picker_open:
-		main.tackle_details_label.text = _get_rod_description_text()
-		main.tackle_compare_label.text = _get_final_tackle_stats_text()
-	elif selected_item.is_empty():
-		main.tackle_details_label.text = "Нет предметов этого типа.\nКупите их в магазине."
-		main.tackle_compare_label.text = "Выбран слот: %s\n\nПодсказки:\n%s" % [_get_tackle_slot_title(main._tackle_category), hints_text]
+
+func _get_tackle_items_per_page() -> int:
+	return 8 if main._tackle_category == "rod" else TACKLE_ITEMS_PER_PAGE
+
+
+func _configure_tackle_item_list_for_category(category: String) -> void:
+	if category == "rod":
+		main.tackle_item_list.max_columns = 2
+		main.tackle_item_list.icon_mode = ItemList.ICON_MODE_TOP
+		main.tackle_item_list.fixed_icon_size = Vector2i(172, 56)
+		main.tackle_item_list.fixed_column_width = int(max((main.tackle_item_list.size.x - 14.0) * 0.5, 176.0))
+		main.tackle_item_list.max_text_lines = 2
+		main.tackle_item_list.same_column_width = true
+		main.tackle_item_list.add_theme_constant_override("h_separation", 10)
+		main.tackle_item_list.add_theme_constant_override("v_separation", 12)
 	else:
-		main.tackle_details_label.text = _get_tackle_item_details_text(selected_item)
-		main.tackle_compare_label.text = "%s\n\nПодсказки:\n%s" % [_get_tackle_compare_text(selected_item), hints_text]
-
-	var block_reason := _get_equip_block_reason(selected_item, main._tackle_category) if not selected_item.is_empty() else ""
-	var can_equip = not selected_item.is_empty() and block_reason == ""
-	if main._tackle_category == "bait_2" and not PlayerData.can_use_second_bait():
-		can_equip = false
-	var can_repair := not selected_item.is_empty() and _can_repair_item(selected_item)
-	var can_discard := not selected_item.is_empty() and _can_discard_item(selected_item)
-	main.tackle_equip_button.visible = true
-	main.tackle_equip_button.disabled = not can_equip or _is_tackle_item_equipped(selected_item) or main._fishing_ui_state != FishingUiState.IDLE
-	if main.tackle_repair_button != null:
-		main.tackle_repair_button.visible = _picker_open and can_repair
-		main.tackle_repair_button.disabled = not can_repair
-		main.tackle_repair_button.text = "Починить"
-	if main.tackle_discard_button != null:
-		main.tackle_discard_button.visible = _picker_open and can_discard
-		main.tackle_discard_button.disabled = not can_discard
-		main.tackle_discard_button.text = "Выбросить"
-
-	if not _picker_open:
-		main.tackle_equip_button.text = "Сейчас используется"
-	elif main._fishing_ui_state != FishingUiState.IDLE and can_equip:
-		main.tackle_equip_button.text = "Только вне ловли"
-	elif _is_tackle_item_equipped(selected_item):
-		main.tackle_equip_button.text = "Экипировано"
-	elif main._tackle_category == "bait_2" and not PlayerData.can_use_second_bait():
-		main.tackle_equip_button.text = "Закрыто"
-	elif selected_item.is_empty():
-		main.tackle_equip_button.text = "Нет предметов"
-	elif block_reason != "":
-		main.tackle_equip_button.text = "Недоступно"
-	else:
-		main.tackle_equip_button.text = "Экипировать"
-
-	var category_buttons: Array = [
-		[main.tackle_rod_button, "rod"],
-		[main.tackle_line_button, "line"],
-		[main.tackle_leader_button, "leader"],
-		[main.tackle_hook_button, "hook"],
-		[main.tackle_float_button, "float"],
-		[main.tackle_bait_button, "bait"],
-		[main.tackle_bait_2_button, "bait_2"]
-	]
-
-	for item in category_buttons:
-		var button: Button = item[0]
-		var category: String = item[1]
-		button.text = _get_tackle_slot_button_text(category)
-		button.icon = _get_tackle_slot_texture(category)
-		button.expand_icon = button.icon != null
-		button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
-		button.add_theme_constant_override("icon_max_width", 42 if button.icon != null else 0)
-		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		button.clip_text = true
-		button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-		theme.apply_tackle_slot_button_style(button, _get_tackle_slot_state(category))
-		button.add_theme_font_size_override("font_size", 12)
+		main.tackle_item_list.max_columns = 1
+		main.tackle_item_list.icon_mode = ItemList.ICON_MODE_LEFT
+		main.tackle_item_list.fixed_icon_size = Vector2i(30, 30)
+		main.tackle_item_list.fixed_column_width = 0
+		main.tackle_item_list.max_text_lines = 3
+		main.tackle_item_list.same_column_width = false
+		main.tackle_item_list.add_theme_constant_override("h_separation", 8)
+		main.tackle_item_list.add_theme_constant_override("v_separation", 6)
 
 
 func _get_tackle_slot_button_text(category: String) -> String:
 	if category == "bait_2" and not PlayerData.can_use_second_bait():
-		return "%s  %s     🔒\n%s\n%s" % [
-			_get_tackle_slot_icon(category),
-			_get_tackle_slot_title(category),
-			"Нужен навык «Бутерброд»",
-			"Слот закрыт"
-		]
-	return "%s  %s     %s\n%s\n%s" % [
-		_get_tackle_slot_icon(category),
+		return "%s  🔒\nНужен навык «Бутерброд»\nСлот заблокирован" % _get_tackle_slot_title(category)
+	if category == "rod":
+		return _get_rod_card_text()
+	return "%s  %s\nНадето: %s\n%s" % [
 		_get_tackle_slot_title(category),
 		_get_tackle_slot_status_icon(category),
 		_get_tackle_slot_equipped_name(category),
@@ -496,15 +650,122 @@ func _get_tackle_slot_button_text(category: String) -> String:
 	]
 
 
+func _get_rod_card_text() -> String:
+	var rod: Dictionary = PlayerData.current_tackle.get("rod", {})
+	var rod_name := str(rod.get("name", "Не установлено"))
+	var rarity := _get_rarity_title(str(rod.get("rarity", "common")))
+	return "Удочка        %s\n%s\n%s" % [
+		_get_tackle_slot_status_icon("rod"),
+		_short_tackle_slot_text(rod_name, 38),
+		rarity
+	]
+
+
+func _get_rod_showcase_name() -> String:
+	var rod: Dictionary = PlayerData.current_tackle.get("rod", {})
+	return str(rod.get("name", "Удочка не выбрана"))
+
+
+func _get_rod_showcase_title_text() -> String:
+	return "Удочка\n%s" % _short_tackle_slot_text(_get_rod_showcase_name(), 42)
+
+
+func _get_selected_item_card_text(item: Dictionary) -> String:
+	var category_title := _get_tackle_slot_title(main._tackle_category)
+	var item_text := _get_tackle_item_details_text(item)
+	return "Выбор: %s\n%s" % [category_title, item_text]
+
+
+func _get_rod_stats_grid_text() -> String:
+	var rod: Dictionary = PlayerData.current_tackle.get("rod", {})
+	var stats := PlayerData.get_tackle_stats()
+	var rarity := _get_rarity_title(str(rod.get("rarity", "common")))
+	var rod_class := _format_tackle_stat_value("rod_class", str(rod.get("rod_class", stats.get("rod_class", "medium"))))
+	var length := _format_tackle_stat_value("length_m", rod.get("length_m", stats.get("length_m", 0.0)))
+	var max_fish := _format_tackle_stat_value("max_fish_weight", rod.get("max_fish_weight", stats.get("max_fish_weight", 0.0)))
+	var condition := "%d%%" % roundi(PlayerData.get_tackle_condition("rod") * 100.0)
+	var control := _format_tackle_stat_value("control_bonus", stats.get("control_bonus", rod.get("control_bonus", 0.0)))
+	return "Редкость: %s        Класс: %s\nДлина: %s        Макс. рыба: %s\nСостояние: %s        Контроль: %s" % [
+		rarity,
+		rod_class,
+		length,
+		max_fish,
+		condition,
+		control
+	]
+
+
+func _get_current_tackle_validation() -> Dictionary:
+	var validation_service := _validation_service()
+	if validation_service != null and validation_service.has_method("validate_current_tackle"):
+		var result = validation_service.call("validate_current_tackle")
+		if typeof(result) == TYPE_DICTIONARY:
+			return result
+	var issues := PlayerData.get_tackle_setup_issues()
+	return {
+		"usable": issues.is_empty(),
+		"reason": "" if issues.is_empty() else PlayerData.get_tackle_block_reason()
+	}
+
+
+func _get_validation_status_line(issues: Array, tackle_valid: bool) -> String:
+	if tackle_valid:
+		return "Готова для ловли"
+	if issues.is_empty():
+		return "Не готово"
+	return "Не готово — %s" % str(issues[0])
+
+
 func _get_tackle_slot_texture(category: String) -> Texture2D:
 	if category == "bait_2" and not PlayerData.can_use_second_bait():
 		return null
 	var current: Dictionary = PlayerData.current_tackle.get(category, {})
-	return _get_item_texture(current)
+	var texture := _get_item_texture(current)
+	if texture != null:
+		return texture
+	return _get_slot_placeholder_texture(category)
+
+
+func _get_rod_button_texture() -> Texture2D:
+	var rod: Dictionary = PlayerData.current_tackle.get("rod", {})
+	var showcase_path := _get_showcase_rod_image_path(rod)
+	if showcase_path != "":
+		var showcase_texture := _load_texture_resource(showcase_path)
+		if showcase_texture != null:
+			return showcase_texture
+	var texture := _get_item_texture(rod)
+	if texture != null:
+		return texture
+	return _get_slot_placeholder_texture("rod")
+
+
+func _get_showcase_rod_image_path(rod: Dictionary) -> String:
+	match str(rod.get("id", "")):
+		"titan_hook_ultra_match":
+			return "res://assets/ui/tackle/rods/titan_hook_ultra_match_full.png"
+		_:
+			return ""
+
+
+func _get_slot_placeholder_texture(category: String) -> Texture2D:
+	# TODO: add dedicated leader and float slot icons when the final art pass is ready.
+	match category:
+		"rod":
+			return theme.get_icon("rod") if theme != null and theme.has_method("get_icon") else null
+		"line":
+			return theme.get_icon("line") if theme != null and theme.has_method("get_icon") else null
+		"hook":
+			return theme.get_icon("hook") if theme != null and theme.has_method("get_icon") else null
+		"bait", "bait_2":
+			return theme.get_icon("bait") if theme != null and theme.has_method("get_icon") else null
+		_:
+			return null
 
 
 func _get_item_texture(item: Dictionary) -> Texture2D:
 	var path := str(item.get("image_path", ""))
+	if path == "":
+		path = _get_default_item_image_path(item)
 	if path == "":
 		return null
 	if _texture_cache.has(path):
@@ -527,6 +788,28 @@ func _load_texture_resource(path: String) -> Texture2D:
 			return ImageTexture.create_from_image(image)
 
 	return null
+
+
+func _get_default_item_image_path(item: Dictionary) -> String:
+	var item_id := str(item.get("id", ""))
+	var category := str(item.get("category", item.get("type", "")))
+	if item_id.is_empty():
+		return ""
+
+	var path := ""
+	match category:
+		"rod":
+			path = "res://assets/ui/shop/rods/%s.png" % item_id
+		"line":
+			path = "res://assets/ui/shop/lines/%s.png" % item_id
+		"bait":
+			path = "res://assets/ui/shop/baits/%s.png" % item_id
+		_:
+			path = ""
+
+	if path != "" and ResourceLoader.exists(path):
+		return path
+	return ""
 
 
 func _get_tackle_slot_icon(category: String) -> String:
@@ -638,10 +921,12 @@ func _get_tackle_slot_equipped_name(category: String) -> String:
 	var current: Dictionary = PlayerData.current_tackle.get(category, {})
 	if category == "bait_2" and not PlayerData.can_use_second_bait():
 		return "Закрыта"
+	if str(current.get("id", "")) == "":
+		return "Не установлено"
 	if category == "leader" and str(current.get("id", "")) == "":
-		return "Не установлен"
+		return "Не установлено"
 	if ["bait", "bait_2"].has(category) and str(current.get("id", "")) == "":
-		return "Не установлена"
+		return "Не установлено"
 	var equipped_name := str(current.get("name", "-"))
 
 	if category == "bait":
@@ -669,15 +954,16 @@ func _short_tackle_slot_text(value: String, max_chars: int) -> String:
 func _update_tackle_picker_visibility() -> void:
 	var locked_second_bait: bool = main._tackle_category == "bait_2" and not PlayerData.can_use_second_bait()
 	var picker_visible: bool = _picker_open and not locked_second_bait
+	main.tackle_center_panel.visible = picker_visible
 	main.tackle_item_list.visible = picker_visible
 	main.tackle_picker_title_label.visible = picker_visible
-	main.tackle_hint_label.visible = false
+	main.tackle_hint_label.visible = true
 	main.tackle_picker_title_label.text = "Выберите: %s" % _get_tackle_slot_title(main._tackle_category)
+	main.tackle_picker_title_label.add_theme_color_override("font_color", TACKLE_COLOR_GOLD)
 
-	var visual_visible: bool = not picker_visible
 	for node in _get_tackle_visual_nodes():
 		if node != null:
-			node.visible = visual_visible
+			node.visible = false
 
 
 func _get_tackle_visual_nodes() -> Array:
@@ -722,28 +1008,31 @@ func _update_tackle_visual_scheme() -> void:
 
 func _get_rod_description_text() -> String:
 	var rod: Dictionary = PlayerData.current_tackle.get("rod", {})
-	var description := str(rod.get("description", "Надёжная базовая удочка для спокойной ловли у берега."))
-	description = _short_tackle_slot_text(description, 88)
+	var description := str(rod.get("description", "Надёжная маховая снасть для спокойной ловли у берега."))
+	description = _short_tackle_slot_text(description, 150)
 	var fit_names := _get_fit_fish_names()
-	return "Описание\n%s\nПодходит для: %s" % [
+	return "Описание\n%s\n\nПодходит для\n%s" % [
 		description,
-		"  •  ".join(fit_names) if not fit_names.is_empty() else "Подберите место и глубину"
+		"  •  ".join(fit_names) if not fit_names.is_empty() else "Подберите место, глубину и наживку"
 	]
 
 
 func _get_final_tackle_stats_text() -> String:
 	var stats := PlayerData.get_tackle_stats()
 	var issues: Array = PlayerData.get_tackle_setup_issues()
-	var status := "Снасть готова" if issues.is_empty() else "Проверьте снасть"
-	var bait_2_text := "нужен навык"
+	var status := "В сборке" if issues.is_empty() else "Не готово"
+	var bait_text := _get_tackle_slot_equipped_name("bait")
 	if PlayerData.can_use_second_bait():
-		bait_2_text = _get_tackle_slot_equipped_name("bait_2")
+		var bait_2_text := _get_tackle_slot_equipped_name("bait_2")
+		if bait_2_text != "Не установлено":
+			bait_text = "%s + %s" % [bait_text, bait_2_text]
 
-	return "Итоговая снасть\nЛеска: %s   Крючок: %s\nНаживка: %s\nНаживка 2: %s\nСтатус: %s" % [
+	return "Итоговые характеристики снасти\nПрочность лески: %s\nРазмер крючка: %s\nНаживка: %s\nВидимость: %s\nКонтроль: %s\nСтатус: %s" % [
 		_format_tackle_stat_value("max_load", stats.get("line_strength", 0.0)),
 		_format_tackle_stat_value("hook_size", stats.get("hook_size", 12)),
-		_get_tackle_slot_equipped_name("bait"),
-		bait_2_text,
+		bait_text,
+		_format_visibility_title(float(stats.get("visibility_penalty", stats.get("visibility", 0.0)))),
+		_format_tackle_stat_value("control_bonus", stats.get("control_bonus", 0.0)),
 		status
 	]
 
@@ -759,30 +1048,67 @@ func _format_visibility_title(value: float) -> String:
 func _get_fit_fish_names() -> Array:
 	var spot := SpotDatabase.get_spot(PlayerData.current_spot)
 	var fish_ids: Array = spot.get("available_fish", [])
+	var tackle_stats := PlayerData.get_tackle_stats()
+	var hook_size: int = int(tackle_stats.get("hook_size", 12))
+	var line_strength: float = float(tackle_stats.get("line_strength", 1.0))
+	var max_fish_weight: float = float(tackle_stats.get("max_fish_weight", 1.0))
+	var tackle_weight_limit: float = max(max_fish_weight * 1.32, line_strength * 2.25)
 	var names: Array = []
+	var fallback_names: Array = []
 	for fish_id in fish_ids:
 		var fish := FishDatabase.get_fish(str(fish_id))
 		if fish.is_empty():
 			continue
-		names.append(str(fish.get("name", "-")))
+		if float(fish.get("min_weight", 0.0)) > tackle_weight_limit:
+			continue
+		var min_hook_size := int(fish.get("min_hook_size", 0))
+		var max_hook_size := int(fish.get("max_hook_size", 99))
+		var hook_fits := hook_size >= min_hook_size and hook_size <= max_hook_size
+		var bait_fits := _bait_targets_fish(tackle_stats, str(fish_id))
+		if hook_fits and bait_fits:
+			names.append(str(fish.get("name", "-")))
+		elif hook_fits and fallback_names.size() < 4:
+			fallback_names.append(str(fish.get("name", "-")))
 		if names.size() >= 4:
 			break
+	if names.is_empty():
+		names = fallback_names
 	return names
 
 
 func _set_tackle_category(category: String) -> void:
+	if category == main._tackle_category and _picker_open:
+		_picker_open = false
+		main._selected_tackle_item_id = ""
+		_update_tackle_ui()
+		return
+
 	main._tackle_category = category
 	main._tackle_page = 0
 	main._selected_tackle_item_id = ""
+	_rod_info_open = false
 	_picker_open = not (category == "bait_2" and not PlayerData.can_use_second_bait())
 	if not _picker_open and category == "bait_2":
 		main._show_toast("Нужен навык «Бутерброд».", false)
 	_update_tackle_ui()
 
 
+func _on_tackle_info_button_pressed() -> void:
+	if _picker_open:
+		_picker_open = false
+		main._selected_tackle_item_id = ""
+		_update_tackle_ui()
+		return
+
+	_rod_info_open = not _rod_info_open
+	_picker_open = false
+	main._selected_tackle_item_id = ""
+	_update_tackle_ui()
+
+
 func _on_tackle_item_selected(index: int) -> void:
 	_picker_open = true
-	var item_index: int = main._tackle_page * TACKLE_ITEMS_PER_PAGE + index
+	var item_index: int = main._tackle_page * _get_tackle_items_per_page() + index
 	if item_index < 0 or item_index >= main._visible_tackle_items.size():
 		main._selected_tackle_item_id = ""
 	else:
@@ -792,7 +1118,7 @@ func _on_tackle_item_selected(index: int) -> void:
 
 
 func _on_tackle_item_activated(index: int) -> void:
-	var item_index: int = main._tackle_page * TACKLE_ITEMS_PER_PAGE + index
+	var item_index: int = main._tackle_page * _get_tackle_items_per_page() + index
 	if item_index < 0 or item_index >= main._visible_tackle_items.size():
 		return
 
@@ -819,7 +1145,7 @@ func _on_tackle_prev_page_pressed() -> void:
 
 func _on_tackle_next_page_pressed() -> void:
 	var total_count: int = _get_visible_tackle_items_for_category(_get_item_category_for_slot(main._tackle_category)).size()
-	var page_count: int = max(ceili(float(total_count) / float(TACKLE_ITEMS_PER_PAGE)), 1)
+	var page_count: int = max(ceili(float(total_count) / float(_get_tackle_items_per_page())), 1)
 	if main._tackle_page >= page_count - 1:
 		return
 
@@ -859,6 +1185,9 @@ func _get_tackle_item_display_text(item: Dictionary) -> String:
 
 	if str(item.get("category", "")) == "bait":
 		return "%s x%d%s" % [name, quantity, equipped_marker]
+
+	if str(item.get("category", "")) == "rod":
+		return "%s%s" % [_short_tackle_slot_text(name, 24), equipped_marker]
 
 	if ["rod", "line", "leader", "hook"].has(str(item.get("category", ""))):
 		var status := PlayerData.get_item_condition_title(item)

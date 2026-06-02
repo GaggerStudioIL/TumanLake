@@ -3,6 +3,17 @@ extends Node
 var inventory: Array = []
 var max_items: int = 30
 var last_sale_summary: Dictionary = {}
+var last_zero_value_cleanup_count := 0
+
+const ZERO_VALUE_CHECK_BUYERS := [
+	"local_market",
+	"fish_shop",
+	"cannery",
+	"restaurant",
+	"wholesale_buyer",
+	"collector",
+	"export_company"
+]
 
 func add_fish(catch_data: Dictionary) -> bool:
 	if inventory.size() >= max_items:
@@ -29,6 +40,95 @@ func remove_fish(catch_data: Dictionary) -> bool:
 		return true
 
 	return false
+
+
+func purge_zero_value_fish() -> int:
+	var removed_count := 0
+
+	for index in range(inventory.size() - 1, -1, -1):
+		var item = inventory[index]
+		if typeof(item) != TYPE_DICTIONARY:
+			inventory.remove_at(index)
+			removed_count += 1
+			continue
+
+		var catch_data: Dictionary = _prepare_sale_catch_data(item)
+		if is_zero_value_fish(catch_data):
+			inventory.remove_at(index)
+			removed_count += 1
+
+	last_zero_value_cleanup_count = removed_count
+	if removed_count > 0:
+		print("Removed zero-value fish from keepnet: %d" % removed_count)
+	return removed_count
+
+
+func remove_zero_value_fish() -> int:
+	return purge_zero_value_fish()
+
+
+func is_zero_value_fish(catch_data: Dictionary) -> bool:
+	if catch_data.is_empty():
+		return true
+
+	return _get_best_positive_cleanup_price(catch_data) <= 0
+
+
+func _get_best_positive_cleanup_price(catch_data: Dictionary) -> int:
+	var best_price := 0
+
+	for buyer_id_value in _get_zero_value_check_buyers():
+		var buyer_id := str(buyer_id_value)
+		var offer: Dictionary = _get_cleanup_offer_for_buyer(catch_data, buyer_id)
+		if bool(offer.get("accepted", false)):
+			best_price = maxi(best_price, int(offer.get("price", 0)))
+
+	return best_price
+
+
+func _get_zero_value_check_buyers() -> Array:
+	var result: Array = []
+	var supplier_manager: Node = get_node_or_null("/root/SupplierManager")
+	if supplier_manager != null and supplier_manager.has_method("get_primary_supplier_ids"):
+		var value = supplier_manager.call("get_primary_supplier_ids")
+		if value is Array:
+			result = value.duplicate()
+
+	if result.is_empty():
+		result = ZERO_VALUE_CHECK_BUYERS.duplicate()
+
+	if not result.has("cannery"):
+		result.append("cannery")
+	return result
+
+
+func _get_cleanup_offer_for_buyer(catch_data: Dictionary, buyer_id: String) -> Dictionary:
+	var sales_service := _sales_service()
+	if sales_service != null and sales_service.has_method("get_offer_for_buyer"):
+		var service_value = sales_service.call("get_offer_for_buyer", catch_data, buyer_id)
+		if service_value is Dictionary:
+			return service_value
+
+	var supplier_manager: Node = get_node_or_null("/root/SupplierManager")
+	if supplier_manager != null and supplier_manager.has_method("get_buyer_offer"):
+		var supplier_value = supplier_manager.call("get_buyer_offer", catch_data, buyer_id)
+		if supplier_value is Dictionary:
+			return supplier_value
+
+	if buyer_id == "local_market":
+		return {
+			"buyer_id": buyer_id,
+			"supplier_id": buyer_id,
+			"accepted": true,
+			"price": get_fish_sell_price(catch_data)
+		}
+
+	return {
+		"buyer_id": buyer_id,
+		"supplier_id": buyer_id,
+		"accepted": false,
+		"price": 0
+	}
 
 
 func sell_all() -> int:

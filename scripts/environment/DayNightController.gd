@@ -2,22 +2,26 @@ extends Node2D
 
 const StarsLayerScript := preload("res://scripts/environment/StarsLayer.gd")
 
-@export var sun_size: float = 44.0
+const SHOW_ENVIRONMENT_DEBUG := false
+
+@export var sun_size: float = 72.0
 @export var show_dynamic_sun: bool = true
 @export var remove_static_sun_from_art: bool = true
 @export var moon_size: float = 54.0
-@export var sun_arc_height: float = 0.48
-@export var moon_arc_height: float = 0.34
-@export var night_tint_strength: float = 0.64
-@export var sunset_tint_strength: float = 0.38
-@export var max_stars_alpha: float = 0.46
+@export var sun_arc_height: float = 0.28
+@export var moon_arc_height: float = 0.24
+@export var night_tint_strength: float = 0.48
+@export var sunset_tint_strength: float = 0.30
+@export var max_stars_alpha: float = 0.40
 @export var star_count: int = 58
 @export var horizon_y_ratio: float = 0.60
+@export var sun_horizon_y_ratio: float = 0.44
+@export var sun_start_x_ratio: float = 0.36
+@export var sun_end_x_ratio: float = 0.88
+@export var moon_horizon_y_ratio: float = 0.37
+@export var moon_start_x_ratio: float = 0.42
+@export var moon_end_x_ratio: float = 0.82
 @export var sky_padding_ratio: float = 0.10
-@export var midday_mist_alpha: float = 0.008
-@export var morning_mist_alpha: float = 0.56
-@export var evening_mist_alpha: float = 0.24
-@export var night_mist_alpha: float = 0.16
 
 const SKY_PATH := "res://assets/environment/lake/sky_morning_no_sun.png"
 const SUN_PATH := "res://assets/environment/lake/sun.png"
@@ -25,15 +29,223 @@ const MOON_PATH := "res://assets/environment/lake/moon.png"
 const MOUNTAINS_PATH := "res://assets/environment/lake/mountains_morning.png.png"
 const FOREST_PATH := "res://assets/environment/lake/forest_morning.png.png"
 const WATER_PATH := "res://assets/environment/lake/Water_morning.png.png"
-const MIST_PATH := "res://assets/environment/lake/Mist_01.png.png"
 const LIGHT_OVERLAY_PATH := "res://assets/environment/lake/Light_overlay.png.png"
 const FOREGROUND_GRASS_PATH := "res://assets/environment/lake/Foreground_grass.png.png"
+const FOREGROUND_GRASS_FALLBACK_PATH := "res://assets/environment/lake/Foregraund_grass.png.png"
+const OLD_OAK_PIER_ASSET_ROOT := "res://assets/environment/agamin_lake/spots/old_oak_pier"
+const QUIET_WATER_PIER_ASSET_ROOT := "res://assets/environment/agamin_lake/spots/quiet_water_pier"
+const MORNING_PIER_ASSET_ROOT := "res://assets/environment/agamin_lake/spots/morning_pier"
+const OLD_BOAT_PIER_ASSET_ROOT := "res://assets/environment/agamin_lake/spots/old_boat_pier"
+const DEEP_PIER_ASSET_ROOT := "res://assets/environment/agamin_lake/spots/deep_pier"
+const COLD_WATER_ASSET_ROOT := "res://assets/environment/agamin_lake/spots/cold_water"
+const DARK_HOLE_ASSET_ROOT := "res://assets/environment/agamin_lake/spots/dark_hole"
+const MIST_PIER_ASSET_ROOT := "res://assets/environment/agamin_lake/spots/mist_pier"
+const REEDS_PIER_ASSET_ROOT := "res://assets/environment/agamin_lake/spots/reeds_pier"
+const GREEN_DUCKWEED_ASSET_ROOT := "res://assets/environment/agamin_lake/spots/green_duckweed"
+const FROG_BACKWATER_ASSET_ROOT := "res://assets/environment/agamin_lake/spots/frog_backwater"
+const OLD_OAK_PIER_VISUAL_PROFILE := {
+	"profile_key": "old_oak_pier",
+	"spot_id": "old_oak_pier",
+	"visual_tag": "old_oak",
+	"sky": OLD_OAK_PIER_ASSET_ROOT + "/old_oak_pier_sky.png",
+	"background": OLD_OAK_PIER_ASSET_ROOT + "/old_oak_pier_scene.png",
+	"show_water": false,
+	"show_forest": false,
+	"show_light_overlay": false,
+	"show_foreground": false,
+	"mist_enabled": false
+}
+const QUIET_WATER_PIER_VISUAL_PROFILE := {
+	"profile_key": "quiet_water_pier",
+	"spot_id": "quiet_water_pier",
+	"visual_tag": "quiet_water",
+	"sky": QUIET_WATER_PIER_ASSET_ROOT + "/quiet_water_pier_sky.png",
+	"background": QUIET_WATER_PIER_ASSET_ROOT + "/quiet_water_pier_scene.png",
+	"water_shimmer": QUIET_WATER_PIER_ASSET_ROOT + "/quiet_water_pier_water.png",
+	"foreground": QUIET_WATER_PIER_ASSET_ROOT + "/quiet_water_pier_foreground.png",
+	"show_water": true,
+	"show_forest": false,
+	"show_light_overlay": false,
+	"show_foreground": true,
+	"mist_enabled": false
+}
+const MORNING_PIER_VISUAL_PROFILE := {
+	"profile_key": "morning_pier",
+	"spot_id": "morning_pier",
+	"visual_tag": "open_water",
+	"sky": MORNING_PIER_ASSET_ROOT + "/morning_pier_sky.png",
+	"background": MORNING_PIER_ASSET_ROOT + "/morning_pier_scene.png",
+	"water_shimmer": MORNING_PIER_ASSET_ROOT + "/morning_pier_water.png",
+	"foreground": MORNING_PIER_ASSET_ROOT + "/morning_pier_foreground.png",
+	"show_water": true,
+	"show_forest": false,
+	"show_light_overlay": false,
+	"show_foreground": true,
+	"foreground_z": 5,
+	"mist_enabled": false
+}
+const OLD_BOAT_PIER_VISUAL_PROFILE := {
+	"profile_key": "old_boat_pier",
+	"spot_id": "old_boat_pier",
+	"visual_tag": "snag_boat",
+	"sky": OLD_BOAT_PIER_ASSET_ROOT + "/old_boat_pier_sky.png",
+	"background": OLD_BOAT_PIER_ASSET_ROOT + "/old_boat_pier_scene.png",
+	"water_shimmer": OLD_BOAT_PIER_ASSET_ROOT + "/old_boat_pier_water.png",
+	"foreground": OLD_BOAT_PIER_ASSET_ROOT + "/old_boat_pier_foreground.png",
+	"show_water": true,
+	"show_forest": false,
+	"show_light_overlay": false,
+	"show_foreground": true,
+	"foreground_z": 5,
+	"mist_enabled": false
+}
+const DEEP_PIER_VISUAL_PROFILE := {
+	"profile_key": "deep_pier",
+	"spot_id": "deep_pier",
+	"visual_tag": "deep",
+	"sky": DEEP_PIER_ASSET_ROOT + "/deep_pier_sky.png",
+	"background": DEEP_PIER_ASSET_ROOT + "/deep_pier_scene.png",
+	"water_shimmer": DEEP_PIER_ASSET_ROOT + "/deep_pier_water.png",
+	"foreground": DEEP_PIER_ASSET_ROOT + "/deep_pier_foreground.png",
+	"show_water": true,
+	"show_forest": false,
+	"show_light_overlay": false,
+	"show_foreground": true,
+	"foreground_z": 5,
+	"mist_enabled": false
+}
+const COLD_WATER_VISUAL_PROFILE := {
+	"profile_key": "cold_water",
+	"spot_id": "cold_water",
+	"visual_tag": "cold_water",
+	"sky": COLD_WATER_ASSET_ROOT + "/cold_water_sky.png",
+	"background": COLD_WATER_ASSET_ROOT + "/cold_water_scene.png",
+	"water_shimmer": COLD_WATER_ASSET_ROOT + "/cold_water_water.png",
+	"foreground": COLD_WATER_ASSET_ROOT + "/cold_water_foreground.png",
+	"show_water": true,
+	"show_forest": false,
+	"show_light_overlay": false,
+	"show_foreground": true,
+	"foreground_z": 5,
+	"mist_enabled": false
+}
+const DARK_HOLE_VISUAL_PROFILE := {
+	"profile_key": "dark_hole",
+	"spot_id": "dark_hole",
+	"visual_tag": "deep_hole",
+	"sky": DARK_HOLE_ASSET_ROOT + "/dark_hole_sky.png",
+	"background": DARK_HOLE_ASSET_ROOT + "/dark_hole_scene.png",
+	"water_shimmer": DARK_HOLE_ASSET_ROOT + "/dark_hole_water.png",
+	"foreground": DARK_HOLE_ASSET_ROOT + "/dark_hole_foreground.png",
+	"show_water": true,
+	"show_forest": false,
+	"show_light_overlay": false,
+	"show_foreground": true,
+	"foreground_z": 5,
+	"mist_enabled": false
+}
+const MIST_PIER_VISUAL_PROFILE := {
+	"profile_key": "mist_pier",
+	"spot_id": "mist_pier",
+	"visual_tag": "mist",
+	"sky": MIST_PIER_ASSET_ROOT + "/mostik_tuman_sky.png",
+	"background": MIST_PIER_ASSET_ROOT + "/mostik_tuman_background.png",
+	"foreground": MIST_PIER_ASSET_ROOT + "/mostik_tuman_foreground.png",
+	"show_water": false,
+	"show_forest": false,
+	"show_light_overlay": false,
+	"mist_enabled": false
+}
+const REEDS_PIER_VISUAL_PROFILE := {
+	"profile_key": "reeds_pier",
+	"spot_id": "reeds_pier",
+	"visual_tag": "reeds",
+	"sky": REEDS_PIER_ASSET_ROOT + "/kamishovi_most_sky.png",
+	"background": REEDS_PIER_ASSET_ROOT + "/kamishovi_most_background.png",
+	"water_shimmer": REEDS_PIER_ASSET_ROOT + "/kamishovi_most_water.png",
+	"foreground": REEDS_PIER_ASSET_ROOT + "/kamishovi_most_foreground.png",
+	"show_water": true,
+	"show_forest": false,
+	"show_light_overlay": false,
+	"water_rect": [0.0, 0.0, 1.0, 1.0],
+	"water_stretch_scale": true,
+	"water_z": -1,
+	"water_under_spot_layers": true,
+	"foreground_material": "reeds_foreground_cutout",
+	"foreground_stretch_scale": true,
+	"mist_enabled": false
+}
+const GREEN_DUCKWEED_VISUAL_PROFILE := {
+	"profile_key": "green_duckweed",
+	"spot_id": "green_duckweed",
+	"visual_tag": "duckweed",
+	"sky": GREEN_DUCKWEED_ASSET_ROOT + "/green_duckweed_sky.png",
+	"background": GREEN_DUCKWEED_ASSET_ROOT + "/green_duckweed_scene.png",
+	"show_water": false,
+	"show_forest": false,
+	"show_light_overlay": false,
+	"show_foreground": false,
+	"celestial_z": 1,
+	"sun_start_x_ratio": 0.56,
+	"sun_end_x_ratio": 1.05,
+	"sun_horizon_y_ratio": 0.30,
+	"sun_arc_height": 0.22,
+	"sun_size": 58.0,
+	"moon_start_x_ratio": 0.54,
+	"moon_end_x_ratio": 0.98,
+	"moon_horizon_y_ratio": 0.31,
+	"moon_arc_height": 0.20,
+	"mist_enabled": false
+}
+const FROG_BACKWATER_VISUAL_PROFILE := {
+	"profile_key": "frog_backwater",
+	"spot_id": "frog_backwater",
+	"visual_tag": "frog_backwater",
+	"sky": FROG_BACKWATER_ASSET_ROOT + "/frog_backwater_sky.png",
+	"background": FROG_BACKWATER_ASSET_ROOT + "/frog_backwater_scene.png",
+	"show_water": false,
+	"show_forest": false,
+	"show_light_overlay": false,
+	"show_foreground": false,
+	"mist_enabled": false
+}
+const SPOT_VISUAL_PROFILES := {
+	"old_oak_pier": OLD_OAK_PIER_VISUAL_PROFILE,
+	"quiet_water_pier": QUIET_WATER_PIER_VISUAL_PROFILE,
+	"morning_pier": MORNING_PIER_VISUAL_PROFILE,
+	"old_boat_pier": OLD_BOAT_PIER_VISUAL_PROFILE,
+	"deep_pier": DEEP_PIER_VISUAL_PROFILE,
+	"cold_water": COLD_WATER_VISUAL_PROFILE,
+	"dark_hole": DARK_HOLE_VISUAL_PROFILE,
+	"mist_pier": MIST_PIER_VISUAL_PROFILE,
+	"reeds_pier": REEDS_PIER_VISUAL_PROFILE,
+	"green_duckweed": GREEN_DUCKWEED_VISUAL_PROFILE,
+	"frog_backwater": FROG_BACKWATER_VISUAL_PROFILE
+}
+const VISUAL_TAG_VISUAL_PROFILES := {
+	"old_oak": OLD_OAK_PIER_VISUAL_PROFILE,
+	"quiet_water": QUIET_WATER_PIER_VISUAL_PROFILE,
+	"open_water": MORNING_PIER_VISUAL_PROFILE,
+	"snag_boat": OLD_BOAT_PIER_VISUAL_PROFILE,
+	"deep": DEEP_PIER_VISUAL_PROFILE,
+	"cold_water": COLD_WATER_VISUAL_PROFILE,
+	"deep_hole": DARK_HOLE_VISUAL_PROFILE,
+	"mist": MIST_PIER_VISUAL_PROFILE,
+	"reeds": REEDS_PIER_VISUAL_PROFILE,
+	"duckweed": GREEN_DUCKWEED_VISUAL_PROFILE,
+	"frog_backwater": FROG_BACKWATER_VISUAL_PROFILE
+}
 
 const MINUTES_PER_DAY := 1440.0
 const DAWN_START := 300.0
 const DAY_START := 480.0
 const SUNSET_START := 1080.0
 const NIGHT_START := 1260.0
+const CELESTIAL_LAYER_Z := 1
+const STARS_LAYER_Z := 0
+const MOON_SPRITE_Z := 0
+const SUN_SPRITE_Z := 0
+const MOUNTAINS_LAYER_Z := 2
 
 var _time_manager: Node
 var _viewport_size: Vector2 = Vector2.ZERO
@@ -46,11 +258,13 @@ var _stars_layer: Node2D
 var _mountains_layer: TextureRect
 var _forest_layer: TextureRect
 var _water_layer: TextureRect
-var _mist_layer: TextureRect
 var _light_overlay_layer: TextureRect
 var _night_tint_overlay: ColorRect
 var _sunset_tint_overlay: ColorRect
 var _foreground_grass_layer: TextureRect
+var _last_debug_phase := ""
+var _last_debug_viewport := Vector2.ZERO
+var _warned_missing_visual_paths := {}
 
 func _ready() -> void:
 	_ensure_nodes()
@@ -70,13 +284,14 @@ func layout_environment(screen_size: Vector2) -> void:
 	_ensure_nodes()
 	_viewport_size = screen_size
 	position = Vector2.ZERO
+	z_as_relative = false
+	z_index = -110
 
 	for rect in [
 		_sky_layer,
 		_mountains_layer,
 		_forest_layer,
 		_water_layer,
-		_mist_layer,
 		_light_overlay_layer,
 		_night_tint_overlay,
 		_sunset_tint_overlay,
@@ -86,12 +301,18 @@ func layout_environment(screen_size: Vector2) -> void:
 			continue
 		rect.position = Vector2.ZERO
 		rect.size = screen_size
+		if rect is TextureRect:
+			(rect as TextureRect).expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			(rect as TextureRect).stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+
+	_apply_visual_profile_layout(_get_current_visual_profile(), screen_size)
 
 	if _stars_layer != null and _stars_layer.has_method("set_viewport_size"):
 		_stars_layer.call("set_viewport_size", screen_size)
 	if _stars_layer != null and _stars_layer.has_method("set_horizon_y_ratio"):
 		_stars_layer.call("set_horizon_y_ratio", horizon_y_ratio)
 
+	_debug_print_layout()
 	update_day_night_visuals()
 
 func update_day_night_visuals(_time_state: Dictionary = {}) -> void:
@@ -137,17 +358,23 @@ func update_sun_position(minutes: float) -> void:
 		[NIGHT_START, 0.70],
 		[MINUTES_PER_DAY, 0.0]
 	])
-	var position: Vector2 = get_celestial_position(sun_t, sun_arc_height)
+	var visual_profile := _get_current_visual_profile()
+	var profile_sun_arc_height := _get_profile_float(visual_profile, "sun_arc_height", sun_arc_height)
+	var profile_sun_size := _get_profile_float(visual_profile, "sun_size", sun_size)
+	var position: Vector2 = get_celestial_position(sun_t, profile_sun_arc_height, false, visual_profile)
 	var screen_scale: float = clampf(_viewport_size.y / 540.0, 0.82, 1.35)
 	var sun_color := Color(1.04, lerpf(0.98, 0.70, sun_warmth), lerpf(0.86, 0.44, sun_warmth), 1.0)
+	var halo_color := Color(1.0, lerpf(0.90, 0.62, sun_warmth), lerpf(0.58, 0.26, sun_warmth), 1.0)
 	var material := _sun_sprite.material as ShaderMaterial
 	if material != null:
 		material.set_shader_parameter("light_color", sun_color)
-		material.set_shader_parameter("texture_mix", lerpf(0.04, 0.12, sun_warmth))
-		material.set_shader_parameter("halo_strength", lerpf(0.32, 0.24, sun_warmth))
+		material.set_shader_parameter("halo_color", halo_color)
+		material.set_shader_parameter("texture_mix", lerpf(0.015, 0.045, sun_warmth))
+		material.set_shader_parameter("halo_strength", lerpf(0.58, 0.72, sun_warmth))
+		material.set_shader_parameter("ray_strength", lerpf(0.08, 0.13, sun_warmth))
 
 	_sun_sprite.position = position
-	_sun_sprite.scale = _get_sprite_uniform_scale(_sun_sprite, sun_size * screen_scale)
+	_sun_sprite.scale = _get_sprite_uniform_scale(_sun_sprite, profile_sun_size * screen_scale)
 	_sun_sprite.visible = sun_alpha > 0.01
 	_sun_sprite.modulate = Color(
 		1.0,
@@ -162,11 +389,14 @@ func update_moon_position(minutes: float) -> void:
 	var moon_t: float = clampf(moon_minutes / maxf(night_length, 1.0), 0.0, 1.0)
 	var moon_arc: float = sin(moon_t * PI)
 	var moon_alpha: float = _fade_between(moon_minutes, 0.0, 75.0) * (1.0 - _fade_between(moon_minutes, night_length - 75.0, night_length))
-	var position: Vector2 = get_celestial_position(moon_t, moon_arc_height, true)
+	var visual_profile := _get_current_visual_profile()
+	var profile_moon_arc_height := _get_profile_float(visual_profile, "moon_arc_height", moon_arc_height)
+	var profile_moon_size := _get_profile_float(visual_profile, "moon_size", moon_size)
+	var position: Vector2 = get_celestial_position(moon_t, profile_moon_arc_height, true, visual_profile)
 	var screen_scale: float = clampf(_viewport_size.y / 540.0, 0.82, 1.35)
 
 	_moon_sprite.position = position
-	_moon_sprite.scale = _get_sprite_uniform_scale(_moon_sprite, moon_size * screen_scale)
+	_moon_sprite.scale = _get_sprite_uniform_scale(_moon_sprite, profile_moon_size * screen_scale)
 	_moon_sprite.visible = moon_alpha > 0.01
 	_moon_sprite.modulate = Color(0.80, 0.90, 1.0, moon_alpha * 0.92)
 
@@ -238,21 +468,6 @@ func update_scene_tint(minutes: float, _phase: String = "") -> void:
 		[NIGHT_START, Color(0.30, 0.48, 0.64, 1.0)],
 		[MINUTES_PER_DAY, Color(0.34, 0.50, 0.68, 1.0)]
 	])
-	var mist_alpha: float = _sample_time_value(minutes, [
-		[0.0, night_mist_alpha],
-		[240.0, morning_mist_alpha * 0.82],
-		[300.0, morning_mist_alpha],
-		[390.0, morning_mist_alpha * 0.72],
-		[510.0, 0.12],
-		[600.0, 0.035],
-		[720.0, midday_mist_alpha],
-		[990.0, midday_mist_alpha],
-		[1050.0, 0.035],
-		[1110.0, 0.10],
-		[1230.0, evening_mist_alpha],
-		[NIGHT_START, night_mist_alpha],
-		[MINUTES_PER_DAY, night_mist_alpha]
-	])
 	var light_alpha: float = _sample_time_value(minutes, [
 		[0.0, 0.0],
 		[DAWN_START + 60.0, 0.34],
@@ -269,12 +484,12 @@ func update_scene_tint(minutes: float, _phase: String = "") -> void:
 	_mountains_layer.modulate = land_modulate
 	_forest_layer.modulate = land_modulate.lerp(Color(0.78, 0.92, 0.92, 1.0), 0.06)
 	_water_layer.modulate = water_modulate
-	_apply_mist_alpha(mist_alpha)
 	var light_warmth: float = clampf(sunset_strength, 0.0, 1.0)
 	_light_overlay_layer.modulate = Color(1.0, lerpf(0.96, 0.82, light_warmth), lerpf(0.82, 0.58, light_warmth), light_alpha)
 	_foreground_grass_layer.modulate = land_modulate.lerp(Color(0.28, 0.40, 0.52, 1.0), night_strength * 0.18)
 	_apply_sunset_tint(sunset_strength)
 	_apply_night_tint(night_strength)
+	_debug_print_visual_state(minutes, _phase, night_strength, sunset_strength, light_alpha)
 
 func _apply_sunset_tint(sunset_strength: float) -> void:
 	var strength: float = clampf(sunset_strength * sunset_tint_strength, 0.0, 1.0)
@@ -301,19 +516,6 @@ func _apply_night_tint(night_strength: float) -> void:
 
 	_night_tint_overlay.color = Color(0.02, 0.05, 0.13, strength * 0.88)
 
-func _apply_mist_alpha(mist_alpha: float) -> void:
-	var alpha: float = clampf(mist_alpha, 0.0, 1.0)
-	var material := _mist_layer.material as ShaderMaterial
-	if material != null:
-		material.set_shader_parameter("alpha_factor", alpha)
-		material.set_shader_parameter("horizon_y", horizon_y_ratio)
-		var center_water_clear: float = lerpf(0.98, 0.74, clampf(alpha / maxf(morning_mist_alpha, 0.01), 0.0, 1.0))
-		material.set_shader_parameter("center_water_clear", center_water_clear)
-		_mist_layer.modulate = Color.WHITE
-		return
-
-	_mist_layer.modulate = Color(0.86, 0.95, 1.0, alpha)
-
 func get_time_phase(minutes: float = -1.0) -> String:
 	var current_minutes: float = _get_current_game_minutes() if minutes < 0.0 else fposmod(minutes, MINUTES_PER_DAY)
 	if current_minutes >= DAWN_START and current_minutes < DAY_START:
@@ -324,14 +526,40 @@ func get_time_phase(minutes: float = -1.0) -> String:
 		return "sunset"
 	return "night"
 
-func get_celestial_position(phase_t: float, arc_height: float, moon: bool = false) -> Vector2:
+func get_celestial_position(
+	phase_t: float,
+	arc_height: float,
+	moon: bool = false,
+	profile: Dictionary = {}
+) -> Vector2:
 	if _viewport_size == Vector2.ZERO:
 		_viewport_size = get_viewport_rect().size
 
+	var active_profile := profile
+	if active_profile.is_empty():
+		active_profile = _get_current_visual_profile()
 	var safe_t: float = clampf(phase_t, 0.0, 1.0)
-	var padding_x: float = _viewport_size.x * sky_padding_ratio
-	var horizon_y: float = _viewport_size.y * horizon_y_ratio
-	var x: float = lerpf(padding_x, _viewport_size.x - padding_x, safe_t)
+	var horizon_ratio := _get_profile_float(
+		active_profile,
+		"moon_horizon_y_ratio" if moon else "sun_horizon_y_ratio",
+		moon_horizon_y_ratio if moon else sun_horizon_y_ratio
+	)
+	var start_x_ratio := _get_profile_float(
+		active_profile,
+		"moon_start_x_ratio" if moon else "sun_start_x_ratio",
+		moon_start_x_ratio if moon else sun_start_x_ratio
+	)
+	var end_x_ratio := _get_profile_float(
+		active_profile,
+		"moon_end_x_ratio" if moon else "sun_end_x_ratio",
+		moon_end_x_ratio if moon else sun_end_x_ratio
+	)
+	var horizon_y: float = _viewport_size.y * horizon_ratio
+	var x: float
+	if moon:
+		x = lerpf(_viewport_size.x * start_x_ratio, _viewport_size.x * end_x_ratio, safe_t)
+	else:
+		x = lerpf(_viewport_size.x * start_x_ratio, _viewport_size.x * end_x_ratio, safe_t)
 	var arc: float = sin(safe_t * PI)
 	var y: float = horizon_y - arc * _viewport_size.y * arc_height
 	if moon:
@@ -339,51 +567,67 @@ func get_celestial_position(phase_t: float, arc_height: float, moon: bool = fals
 	return Vector2(x, y)
 
 func _ensure_nodes() -> void:
+	z_as_relative = false
+	z_index = -110
+
 	if _environment_root == null:
 		_environment_root = Node2D.new()
 		_environment_root.name = "EnvironmentRoot"
 		add_child(_environment_root)
 
-	_sky_layer = _ensure_texture_layer(_sky_layer, "SkyLayer", SKY_PATH, 0)
+	var visual_profile := _get_current_visual_profile()
+	var sky_path := _get_profile_texture_path(visual_profile, "sky", SKY_PATH, "sky")
+	var background_path := _get_profile_texture_path(visual_profile, "background", MOUNTAINS_PATH, "background")
+	var forest_path := _get_profile_texture_path(visual_profile, "forest", FOREST_PATH, "forest")
+	var water_path := _get_profile_texture_path(visual_profile, "water_shimmer", WATER_PATH, "water_shimmer")
+	var light_overlay_path := _get_profile_texture_path(visual_profile, "light_overlay", LIGHT_OVERLAY_PATH, "light_overlay")
+	var foreground_path := _get_profile_texture_path(
+		visual_profile,
+		"foreground",
+		FOREGROUND_GRASS_PATH,
+		"foreground",
+		[FOREGROUND_GRASS_FALLBACK_PATH]
+	)
+
+	_sky_layer = _ensure_texture_layer(_sky_layer, "SkyLayer", sky_path, 0)
 
 	if _celestial_layer == null:
 		_celestial_layer = Node2D.new()
 		_celestial_layer.name = "CelestialLayer"
-		_celestial_layer.z_index = 1
 		_environment_root.add_child(_celestial_layer)
+	_celestial_layer.z_as_relative = true
+	_celestial_layer.z_index = int(visual_profile.get("celestial_z", CELESTIAL_LAYER_Z))
 
 	if _stars_layer == null:
 		_stars_layer = StarsLayerScript.new()
 		_stars_layer.name = "StarsLayer"
-		_stars_layer.z_index = 0
 		_stars_layer.set("star_count", star_count)
 		_stars_layer.set("max_alpha", 1.0)
 		_celestial_layer.add_child(_stars_layer)
+	_stars_layer.z_as_relative = true
+	_stars_layer.z_index = STARS_LAYER_Z
 
 	if _sun_sprite == null:
-		_sun_sprite = _ensure_sprite("SunSprite", SUN_PATH, 1)
+		_sun_sprite = _ensure_sprite("SunSprite", SUN_PATH, SUN_SPRITE_Z)
 		_sun_sprite.material = _make_sun_disc_material()
+	_sun_sprite.z_as_relative = true
+	_sun_sprite.z_index = SUN_SPRITE_Z
 
 	if _moon_sprite == null:
-		_moon_sprite = _ensure_sprite("MoonSprite", MOON_PATH, 2)
+		_moon_sprite = _ensure_sprite("MoonSprite", MOON_PATH, MOON_SPRITE_Z)
+	_moon_sprite.z_as_relative = true
+	_moon_sprite.z_index = MOON_SPRITE_Z
 
-	_mountains_layer = _ensure_texture_layer(_mountains_layer, "MountainsLayer", MOUNTAINS_PATH, 2)
-	_forest_layer = _ensure_texture_layer(_forest_layer, "ForestLayer", FOREST_PATH, 3)
-	_water_layer = _ensure_texture_layer(_water_layer, "WaterLayer", WATER_PATH, 4)
-	_mist_layer = _ensure_texture_layer(_mist_layer, "MistLayer", MIST_PATH, 5)
-	_light_overlay_layer = _ensure_texture_layer(_light_overlay_layer, "LightOverlayLayer", LIGHT_OVERLAY_PATH, 6)
+	_mountains_layer = _ensure_texture_layer(_mountains_layer, "MountainsLayer", background_path, MOUNTAINS_LAYER_Z)
+	_forest_layer = _ensure_texture_layer(_forest_layer, "ForestLayer", forest_path, 3)
+	_water_layer = _ensure_texture_layer(_water_layer, "WaterLayer", water_path, 4)
+	_light_overlay_layer = _ensure_texture_layer(_light_overlay_layer, "LightOverlayLayer", light_overlay_path, 5)
 	_sunset_tint_overlay = _ensure_color_layer(_sunset_tint_overlay, "SunsetTintOverlay", 7)
-	_foreground_grass_layer = _ensure_texture_layer(_foreground_grass_layer, "ForegroundGrassLayer", FOREGROUND_GRASS_PATH, 8)
-	_night_tint_overlay = _ensure_color_layer(_night_tint_overlay, "NightTintOverlay", 9)
-	if _mist_layer.material == null:
-		_mist_layer.material = _make_mist_material()
-	if remove_static_sun_from_art:
-		if _mountains_layer.material == null:
-			_mountains_layer.material = _make_static_sun_removal_material("mountains")
-		if _water_layer.material == null:
-			_water_layer.material = _make_static_sun_removal_material("water")
-		if _light_overlay_layer.material == null:
-			_light_overlay_layer.material = _make_static_sun_removal_material("light")
+	_night_tint_overlay = _ensure_color_layer(_night_tint_overlay, "NightTintOverlay", 8)
+	_foreground_grass_layer = _ensure_texture_layer(_foreground_grass_layer, "ForegroundGrassLayer", foreground_path, 9)
+	_apply_visual_profile_state(visual_profile)
+	if _viewport_size != Vector2.ZERO:
+		_apply_visual_profile_layout(visual_profile, _viewport_size)
 	if _sunset_tint_overlay.material == null:
 		_sunset_tint_overlay.material = _make_sunset_tint_material()
 	if _night_tint_overlay.material == null:
@@ -394,14 +638,23 @@ func _ensure_texture_layer(layer: TextureRect, layer_name: String, path: String,
 		layer = TextureRect.new()
 		layer.name = layer_name
 		layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		layer.z_as_relative = true
-		layer.z_index = z
 		layer.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		layer.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 		_environment_root.add_child(layer)
 
-	if layer.texture == null:
+	layer.z_as_relative = true
+	layer.z_index = z
+	layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+
+	var current_path := str(layer.get_meta("environment_texture_path", ""))
+	if layer.texture == null or current_path != path:
 		layer.texture = _load_texture(path)
+		layer.set_meta("environment_texture_path", path)
+		if layer.texture == null:
+			push_warning("Environment texture is missing: %s" % path)
+
+	layer.visible = layer.texture != null
 
 	return layer
 
@@ -410,10 +663,12 @@ func _ensure_color_layer(layer: ColorRect, layer_name: String, z: int) -> ColorR
 		layer = ColorRect.new()
 		layer.name = layer_name
 		layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		layer.z_as_relative = true
-		layer.z_index = z
 		layer.color = Color.TRANSPARENT
 		_environment_root.add_child(layer)
+
+	layer.z_as_relative = true
+	layer.z_index = z
+	layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	return layer
 
@@ -429,50 +684,198 @@ func _ensure_sprite(sprite_name: String, path: String, z: int) -> Sprite2D:
 	_celestial_layer.add_child(sprite)
 	return sprite
 
+func _get_current_visual_profile() -> Dictionary:
+	var spot := _get_current_spot_data()
+	var spot_id := str(spot.get("id", ""))
+	if SPOT_VISUAL_PROFILES.has(spot_id):
+		return (SPOT_VISUAL_PROFILES[spot_id] as Dictionary).duplicate(true)
+
+	var visual_tag := str(spot.get("visual_tag", ""))
+	if VISUAL_TAG_VISUAL_PROFILES.has(visual_tag):
+		return (VISUAL_TAG_VISUAL_PROFILES[visual_tag] as Dictionary).duplicate(true)
+
+	return {
+		"profile_key": "default",
+		"show_forest": true,
+		"show_light_overlay": true,
+		"mist_enabled": false
+	}
+
+func _get_current_spot_data() -> Dictionary:
+	var player_data := get_node_or_null("/root/PlayerData")
+	var spot_database := get_node_or_null("/root/SpotDatabase")
+	var spot_id := ""
+	if player_data != null:
+		spot_id = str(player_data.get("current_spot"))
+
+	if spot_database != null and spot_database.has_method("get_spot") and spot_id != "":
+		var raw_spot = spot_database.call("get_spot", spot_id)
+		if typeof(raw_spot) == TYPE_DICTIONARY:
+			return raw_spot
+
+	return {"id": spot_id}
+
+func _get_profile_float(profile: Dictionary, key: String, default_value: float) -> float:
+	if profile.has(key):
+		return float(profile.get(key))
+
+	return default_value
+
+func _get_profile_texture_path(
+	profile: Dictionary,
+	key: String,
+	default_path: String,
+	label: String,
+	extra_fallbacks: Array = []
+) -> String:
+	var requested_path := str(profile.get(key, ""))
+	var candidates := []
+	if requested_path != "":
+		candidates.append(requested_path)
+	for fallback_path in extra_fallbacks:
+		candidates.append(str(fallback_path))
+	candidates.append(default_path)
+
+	var resolved_path := _resolve_texture_path(candidates)
+	if requested_path != "" and resolved_path != requested_path:
+		_warn_missing_visual_asset(label, requested_path, resolved_path)
+
+	return resolved_path
+
+func _warn_missing_visual_asset(label: String, requested_path: String, fallback_path: String) -> void:
+	var warning_key := "%s|%s" % [label, requested_path]
+	if _warned_missing_visual_paths.has(warning_key):
+		return
+
+	_warned_missing_visual_paths[warning_key] = true
+	push_warning(
+		"Missing environment asset for %s: %s. Using fallback: %s" %
+		[label, requested_path, fallback_path]
+	)
+
+func _apply_visual_profile_state(profile: Dictionary) -> void:
+	var profile_key := str(profile.get("profile_key", "default"))
+	var uses_spot_profile := profile_key != "default"
+
+	if _forest_layer != null:
+		_forest_layer.visible = _forest_layer.texture != null and bool(profile.get("show_forest", true))
+	if _water_layer != null:
+		_water_layer.visible = _water_layer.texture != null and bool(profile.get("show_water", true))
+	if _light_overlay_layer != null:
+		_light_overlay_layer.visible = _light_overlay_layer.texture != null and bool(profile.get("show_light_overlay", true))
+	if _foreground_grass_layer != null:
+		_foreground_grass_layer.visible = _foreground_grass_layer.texture != null and bool(profile.get("show_foreground", true))
+
+	if remove_static_sun_from_art and not uses_spot_profile:
+		_set_static_sun_layer_material(_mountains_layer, "static_sun_mountains", "mountains")
+		_set_static_sun_layer_material(_water_layer, "static_sun_water", "water")
+		_set_static_sun_layer_material(_light_overlay_layer, "static_sun_light", "light")
+	else:
+		_set_layer_material(_mountains_layer, "none", null)
+		_set_layer_material(_water_layer, "none", null)
+		_set_layer_material(_light_overlay_layer, "none", null)
+
+	if str(profile.get("foreground_material", "")) == "mist_pier_cutout":
+		_set_mist_pier_foreground_material(_foreground_grass_layer)
+	elif str(profile.get("foreground_material", "")) == "reeds_foreground_cutout":
+		_set_reeds_foreground_material(_foreground_grass_layer)
+	else:
+		_set_layer_material(_foreground_grass_layer, "none", null)
+
+func _apply_visual_profile_layout(profile: Dictionary, screen_size: Vector2) -> void:
+	if _foreground_grass_layer != null:
+		_foreground_grass_layer.z_index = int(profile.get("foreground_z", 9))
+		if bool(profile.get("foreground_stretch_scale", false)):
+			_foreground_grass_layer.stretch_mode = TextureRect.STRETCH_SCALE
+
+	if _water_layer == null or not profile.has("water_rect"):
+		return
+
+	var rect_data: Array = profile.get("water_rect", [])
+	if rect_data.size() < 4:
+		return
+
+	_water_layer.position = Vector2(float(rect_data[0]) * screen_size.x, float(rect_data[1]) * screen_size.y)
+	_water_layer.size = Vector2(float(rect_data[2]) * screen_size.x, float(rect_data[3]) * screen_size.y)
+	_water_layer.z_as_relative = true
+	_water_layer.z_index = int(profile.get("water_z", _water_layer.z_index))
+	if bool(profile.get("water_under_spot_layers", false)):
+		_move_water_under_spot_layers()
+	if bool(profile.get("water_stretch_scale", false)):
+		_water_layer.stretch_mode = TextureRect.STRETCH_SCALE
+
+func _move_water_under_spot_layers() -> void:
+	if _environment_root == null or _sky_layer == null or _water_layer == null:
+		return
+	if _water_layer.get_parent() != _environment_root or _sky_layer.get_parent() != _environment_root:
+		return
+
+	if _water_layer.get_index() != 0:
+		_environment_root.move_child(_water_layer, 0)
+
+func _set_static_sun_layer_material(layer: CanvasItem, material_key: String, layer_kind: String) -> void:
+	if layer == null:
+		return
+	if str(layer.get_meta("environment_material_key", "")) == material_key:
+		return
+
+	_set_layer_material(layer, material_key, _make_static_sun_removal_material(layer_kind))
+
+func _set_mist_pier_foreground_material(layer: CanvasItem) -> void:
+	if layer == null:
+		return
+	var material_key := "mist_pier_foreground_cutout"
+	if str(layer.get_meta("environment_material_key", "")) == material_key:
+		return
+
+	_set_layer_material(layer, material_key, _make_mist_pier_foreground_material())
+
+func _set_reeds_foreground_material(layer: CanvasItem) -> void:
+	if layer == null:
+		return
+	var material_key := "reeds_foreground_cutout"
+	if str(layer.get_meta("environment_material_key", "")) == material_key:
+		return
+
+	_set_layer_material(layer, material_key, _make_reeds_foreground_material())
+
+func _set_layer_material(layer: CanvasItem, material_key: String, material: Material) -> void:
+	if layer == null:
+		return
+	if str(layer.get_meta("environment_material_key", "")) == material_key:
+		return
+
+	layer.material = material
+	layer.set_meta("environment_material_key", material_key)
+
 func _make_sun_disc_material() -> ShaderMaterial:
 	var shader := Shader.new()
 	shader.code = """
 		shader_type canvas_item;
 
 		uniform vec4 light_color : source_color = vec4(1.0, 0.84, 0.50, 1.0);
-		uniform float texture_mix = 0.16;
-		uniform float halo_strength = 0.24;
+		uniform vec4 halo_color : source_color = vec4(1.0, 0.78, 0.42, 1.0);
+		uniform float texture_mix = 0.02;
+		uniform float halo_strength = 0.62;
+		uniform float ray_strength = 0.10;
 
 		void fragment() {
 			vec4 vertex_color = COLOR;
 			vec4 tex = texture(TEXTURE, UV);
 			vec2 centered = UV * 2.0 - 1.0;
 			float dist = length(centered);
-			float soft_disk = 1.0 - smoothstep(0.52, 0.92, dist);
-			float soft_halo = 1.0 - smoothstep(0.20, 1.08, dist);
-			vec3 color = mix(light_color.rgb, tex.rgb, texture_mix);
-			float alpha = tex.a * vertex_color.a * (soft_disk * 0.74 + soft_halo * halo_strength);
-			COLOR = vec4(color * vertex_color.rgb, alpha * light_color.a);
-		}
-	"""
-	var material := ShaderMaterial.new()
-	material.shader = shader
-	return material
-
-func _make_mist_material() -> ShaderMaterial:
-	var shader := Shader.new()
-	shader.code = """
-		shader_type canvas_item;
-
-		uniform float alpha_factor = 0.18;
-		uniform float horizon_y = 0.60;
-		uniform float center_water_clear = 0.72;
-
-		void fragment() {
-			vec4 tex = texture(TEXTURE, UV);
-			float center_clear = 1.0 - smoothstep(0.0, 0.42, abs(UV.x - 0.52));
-			float water_contact = smoothstep(horizon_y - 0.05, horizon_y + 0.18, UV.y);
-			water_contact *= 1.0 - smoothstep(horizon_y + 0.16, 0.98, UV.y);
-			float lower_softening = smoothstep(horizon_y + 0.04, 1.0, UV.y) * 0.14;
-			float contact_relief = 1.0 - center_clear * water_contact * center_water_clear - lower_softening;
-			vec3 mist_color = tex.rgb * vec3(0.92, 0.98, 1.0);
-			float alpha = tex.a * alpha_factor * clamp(contact_relief, 0.04, 1.0);
-			COLOR = vec4(mist_color, alpha);
+			float core = 1.0 - smoothstep(0.00, 0.17, dist);
+			float hot_disk = 1.0 - smoothstep(0.14, 0.39, dist);
+			float soft_halo = 1.0 - smoothstep(0.24, 0.88, dist);
+			float outer_glow = 1.0 - smoothstep(0.50, 1.10, dist);
+			float horizontal_ray = (1.0 - smoothstep(0.0, 0.13, abs(centered.y))) * (1.0 - smoothstep(0.20, 1.08, abs(centered.x)));
+			float diagonal_ray = (1.0 - smoothstep(0.0, 0.10, abs(centered.x + centered.y * 0.72))) * (1.0 - smoothstep(0.12, 0.98, dist));
+			float ray = (horizontal_ray * 0.45 + diagonal_ray * 0.20) * ray_strength;
+			vec3 texture_detail = mix(vec3(1.0), tex.rgb, texture_mix);
+			vec3 sun_body = mix(halo_color.rgb, light_color.rgb, clamp(core + hot_disk * 0.62, 0.0, 1.0));
+			vec3 color = sun_body * texture_detail + halo_color.rgb * (soft_halo * 0.10 + outer_glow * 0.08);
+			float alpha = clamp(core * 0.96 + hot_disk * 0.78 + soft_halo * halo_strength * 0.34 + outer_glow * 0.14 + ray, 0.0, 1.0);
+			COLOR = vec4(color * vertex_color.rgb, alpha * vertex_color.a * light_color.a);
 		}
 	"""
 	var material := ShaderMaterial.new()
@@ -489,14 +892,22 @@ func _make_static_sun_removal_material(layer_kind: String) -> ShaderMaterial:
 				void fragment() {
 					vec4 vertex_color = COLOR;
 					vec4 tex = texture(TEXTURE, UV);
-					vec2 sun_uv = vec2(0.225, 0.620);
-					vec2 to_sun = (UV - sun_uv) * vec2(1.0, 1.45);
-					float disk = 1.0 - smoothstep(0.014, 0.055, length(to_sun));
-					float glow = 1.0 - smoothstep(0.030, 0.180, length(to_sun));
-					float horizon_wash = 1.0 - smoothstep(0.0, 0.230, abs(UV.x - sun_uv.x));
-					horizon_wash *= 1.0 - smoothstep(0.0, 0.070, abs(UV.y - sun_uv.y));
-					float mask = clamp(max(disk, glow * 0.72) + horizon_wash * 0.34, 0.0, 1.0);
-					tex.a *= 1.0 - mask * 0.96;
+					vec2 sun_uv = vec2(0.255, 0.535);
+					vec2 to_sun = (UV - sun_uv) * vec2(1.0, 1.32);
+					float disk = 1.0 - smoothstep(0.010, 0.050, length(to_sun));
+					float glow = 1.0 - smoothstep(0.035, 0.230, length(to_sun));
+					float horizon_wash = 1.0 - smoothstep(0.0, 0.360, abs(UV.x - sun_uv.x));
+					horizon_wash *= 1.0 - smoothstep(0.0, 0.125, abs(UV.y - sun_uv.y));
+					float mask = clamp(max(disk, glow * 0.82) + horizon_wash * 0.42, 0.0, 1.0);
+					float luminance = dot(tex.rgb, vec3(0.299, 0.587, 0.114));
+					float max_channel = max(tex.r, max(tex.g, tex.b));
+					float min_channel = min(tex.r, min(tex.g, tex.b));
+					float saturation = (max_channel - min_channel) / max(max_channel, 0.001);
+					float lower_artifact = smoothstep(0.62, 0.72, UV.y) * smoothstep(0.28, 0.58, luminance) * smoothstep(0.18, 0.46, saturation);
+					vec3 cooled = mix(vec3(luminance) * vec3(0.66, 0.72, 0.80), vec3(0.38, 0.47, 0.54), 0.38);
+					tex.rgb = mix(tex.rgb, cooled, mask * 0.88);
+					tex.a *= 1.0 - clamp(disk * 0.98 + glow * 0.70 + horizon_wash * 0.28, 0.0, 0.96);
+					tex.a *= 1.0 - clamp(lower_artifact * 0.96, 0.0, 0.96);
 					COLOR = tex * vertex_color;
 				}
 			"""
@@ -507,13 +918,15 @@ func _make_static_sun_removal_material(layer_kind: String) -> ShaderMaterial:
 				void fragment() {
 					vec4 vertex_color = COLOR;
 					vec4 tex = texture(TEXTURE, UV);
-					float lane = 1.0 - smoothstep(0.0, 0.155, abs(UV.x - 0.205));
-					lane *= smoothstep(0.610, 0.700, UV.y) * (1.0 - smoothstep(0.920, 1.0, UV.y));
-					float source_glow = 1.0 - smoothstep(0.0, 0.170, distance((UV - vec2(0.200, 0.705)) * vec2(1.0, 0.55)));
-					float mask = clamp(max(lane * 0.70, source_glow * 0.56), 0.0, 1.0);
-					vec3 cooled = tex.rgb * vec3(0.72, 0.82, 0.92);
-					tex.rgb = mix(tex.rgb, cooled, mask * 0.58);
-					tex.a *= 1.0 - mask * 0.18;
+					float water_area = smoothstep(0.700, 0.755, UV.y);
+					float lane = 1.0 - smoothstep(0.0, 0.175, abs(UV.x - 0.415));
+					lane *= smoothstep(0.610, 0.710, UV.y) * (1.0 - smoothstep(0.930, 1.0, UV.y));
+					float source_glow = 1.0 - smoothstep(0.0, 0.200, distance((UV - vec2(0.410, 0.735)) * vec2(1.0, 0.58)));
+					float mask = clamp(max(lane * 0.78, source_glow * 0.64), 0.0, 1.0);
+					float luminance = dot(tex.rgb, vec3(0.299, 0.587, 0.114));
+					vec3 cooled = mix(tex.rgb * vec3(0.58, 0.70, 0.84), vec3(luminance) * vec3(0.62, 0.70, 0.78), 0.45);
+					tex.rgb = mix(tex.rgb, cooled, mask * 0.78);
+					tex.a *= water_area * (1.0 - mask * 0.16);
 					COLOR = tex * vertex_color;
 				}
 			"""
@@ -528,11 +941,70 @@ func _make_static_sun_removal_material(layer_kind: String) -> ShaderMaterial:
 					float ray_band = 1.0 - smoothstep(0.0, 0.250, abs((UV.y - 0.08) - UV.x * 0.28));
 					ray_band *= 1.0 - smoothstep(0.0, 0.520, UV.x);
 					float mask = clamp(max(source * 0.90, ray_band * 0.34), 0.0, 1.0);
-					tex.a *= 1.0 - mask * 0.78;
+					tex.a *= 0.72;
+					tex.a *= 1.0 - mask * 0.96;
 					COLOR = tex * vertex_color;
 				}
 			"""
 
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	return material
+
+func _make_mist_pier_foreground_material() -> ShaderMaterial:
+	var shader := Shader.new()
+	shader.code = """
+		shader_type canvas_item;
+
+		void fragment() {
+			vec4 vertex_color = COLOR;
+			vec4 tex = texture(TEXTURE, UV);
+			float luminance = dot(tex.rgb, vec3(0.299, 0.587, 0.114));
+			float max_channel = max(tex.r, max(tex.g, tex.b));
+			float min_channel = min(tex.r, min(tex.g, tex.b));
+			float saturation = (max_channel - min_channel) / max(max_channel, 0.001);
+			float dark_detail = 1.0 - smoothstep(0.18, 0.46, luminance);
+			float color_detail = smoothstep(0.20, 0.48, saturation);
+			float detail = clamp(max(dark_detail, color_detail * 0.72), 0.0, 1.0);
+			float left_edge = 1.0 - smoothstep(0.18, 0.36, UV.x);
+			float right_edge = smoothstep(0.72, 0.90, UV.x);
+			float lower_edge = smoothstep(0.70, 0.86, UV.y);
+			float hanging_edge = (1.0 - smoothstep(0.00, 0.18, UV.y)) * (1.0 - smoothstep(0.16, 0.42, UV.x));
+			float lower_posts = dark_detail * smoothstep(0.54, 0.66, UV.y) * (1.0 - smoothstep(0.80, 0.92, UV.y));
+			float edge_keep = clamp(max(max(left_edge, right_edge), max(lower_edge, hanging_edge)), 0.0, 1.0);
+			float keep_alpha = clamp(edge_keep * detail + lower_posts * 0.86, 0.0, 1.0);
+			tex.a *= keep_alpha;
+			if (tex.a < 0.01) {
+				discard;
+			}
+			COLOR = tex * vertex_color;
+		}
+	"""
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	return material
+
+func _make_reeds_foreground_material() -> ShaderMaterial:
+	var shader := Shader.new()
+	shader.code = """
+		shader_type canvas_item;
+
+		void fragment() {
+			vec4 vertex_color = COLOR;
+			vec4 tex = texture(TEXTURE, UV);
+			float luminance = dot(tex.rgb, vec3(0.299, 0.587, 0.114));
+			float max_channel = max(tex.r, max(tex.g, tex.b));
+			float min_channel = min(tex.r, min(tex.g, tex.b));
+			float saturation = (max_channel - min_channel) / max(max_channel, 0.001);
+			float black_matte = 1.0 - smoothstep(0.015, 0.075, luminance);
+			float white_halo = smoothstep(0.84, 0.98, luminance) * (1.0 - smoothstep(0.08, 0.24, saturation));
+			tex.a *= 1.0 - clamp(black_matte + white_halo * 0.82, 0.0, 1.0);
+			if (tex.a < 0.01) {
+				discard;
+			}
+			COLOR = tex * vertex_color;
+		}
+	"""
 	var material := ShaderMaterial.new()
 	material.shader = shader
 	return material
@@ -623,6 +1095,14 @@ func _get_sprite_uniform_scale(sprite: Sprite2D, target_size: float) -> Vector2:
 	var scale: float = target_size / max_side
 	return Vector2(scale, scale)
 
+func _resolve_texture_path(paths: Array) -> String:
+	for path_value in paths:
+		var path := str(path_value)
+		if ResourceLoader.exists(path) or FileAccess.file_exists(path):
+			return path
+
+	return str(paths.front()) if not paths.is_empty() else ""
+
 func _load_texture(path: String) -> Texture2D:
 	if ResourceLoader.exists(path):
 		var texture: Resource = load(path)
@@ -681,3 +1161,58 @@ func _sample_time_color(minutes: float, anchors: Array) -> Color:
 		previous = current
 
 	return anchors[anchors.size() - 1][1]
+
+func _debug_print_layout() -> void:
+	if not SHOW_ENVIRONMENT_DEBUG:
+		return
+	if _last_debug_viewport.is_equal_approx(_viewport_size):
+		return
+	_last_debug_viewport = _viewport_size
+	print("Environment layout: viewport=%s layers=%s" % [_viewport_size, _get_layer_debug_summary()])
+
+func _debug_print_visual_state(
+	minutes: float,
+	phase: String,
+	night_strength: float,
+	sunset_strength: float,
+	light_alpha: float
+) -> void:
+	if not SHOW_ENVIRONMENT_DEBUG:
+		return
+	var phase_key := "%s:%d" % [phase, int(minutes / 30.0)]
+	if phase_key == _last_debug_phase:
+		return
+	_last_debug_phase = phase_key
+	print(
+		"Environment state: phase=%s minutes=%.1f night=%.2f sunset=%.2f light=%.2f viewport=%s" %
+		[phase, minutes, night_strength, sunset_strength, light_alpha, _viewport_size]
+	)
+
+func _get_layer_debug_summary() -> Array[String]:
+	var summary: Array[String] = []
+	for node in [
+		_sky_layer,
+		_stars_layer,
+		_sun_sprite,
+		_moon_sprite,
+		_mountains_layer,
+		_forest_layer,
+		_water_layer,
+		_light_overlay_layer,
+		_sunset_tint_overlay,
+		_night_tint_overlay,
+		_foreground_grass_layer
+	]:
+		if node == null:
+			continue
+		var item := str(node.name)
+		if node is TextureRect:
+			var texture := (node as TextureRect).texture
+			item += "=" + ("ok" if texture != null else "missing")
+		elif node is Sprite2D:
+			var texture := (node as Sprite2D).texture
+			item += "=" + ("ok" if texture != null else "missing")
+		else:
+			item += "=ok"
+		summary.append(item)
+	return summary

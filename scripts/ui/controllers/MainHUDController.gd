@@ -25,8 +25,8 @@ func refresh() -> void:
 func update_money() -> void:
 	if main == null or main.money_label == null:
 		return
-	main.money_label.visible = false
-	main.money_label.text = UIFormatters.format_money(PlayerData.money)
+	main.money_label.visible = true
+	main.money_label.text = UIFormatters.format_money_amount(PlayerData.money)
 
 
 func update_time() -> void:

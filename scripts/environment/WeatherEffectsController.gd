@@ -285,8 +285,7 @@ func _make_rain_material() -> ShaderMaterial:
 			vec2 uv = UV;
 			float near_rain = rain_layer(uv, 78.0, 14.0, 1.65, 0.018, 0.42, 11.0);
 			float far_rain = rain_layer(uv + vec2(0.19, 0.07), 52.0, 10.0, 1.20, 0.014, 0.34, 23.0);
-			float mist = smoothstep(0.42, 1.0, uv.y) * 0.030;
-			float alpha = clamp((near_rain * 0.135 + far_rain * 0.075 + mist) * intensity, 0.0, 0.24);
+			float alpha = clamp((near_rain * 0.135 + far_rain * 0.075) * intensity, 0.0, 0.24);
 			COLOR = vec4(rain_color.rgb, alpha);
 		}
 	"""

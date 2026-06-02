@@ -5,6 +5,10 @@ func format_money(value: float) -> String:
 	return "%s мон." % _format_number(value)
 
 
+func format_money_amount(value: float) -> String:
+	return _format_number(value)
+
+
 func format_weight_kg(value: float) -> String:
 	return "%.2f кг" % maxf(value, 0.0)
 

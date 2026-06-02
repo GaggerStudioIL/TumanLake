@@ -249,6 +249,9 @@ func sell_selected_fish(fish_ids: Array) -> int:
 
 
 func sell_all_fish_best_offer() -> int:
+	if InventoryManager != null and InventoryManager.has_method("purge_zero_value_fish"):
+		InventoryManager.purge_zero_value_fish()
+
 	var requests: Array = []
 	var inventory := _inventory()
 	for index in range(inventory.size() - 1, -1, -1):

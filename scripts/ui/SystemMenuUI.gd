@@ -4,10 +4,10 @@ extends RefCounted
 const WeatherUIHelperScript := preload("res://scripts/ui/helpers/WeatherUIHelper.gd")
 const MENU_WEATHER_ICON := preload("res://assets/ui/icons/menu_weather.png")
 
-const BUTTON_BASE_SIZE := Vector2(58.0, 50.0)
-const PANEL_BASE_WIDTH := 238.0
-const ITEM_BASE_HEIGHT := 52.0
-const ITEM_ICON_BASE_SIZE := 38.0
+const BUTTON_BASE_SIZE := Vector2(62.0, 54.0)
+const PANEL_BASE_WIDTH := 258.0
+const ITEM_BASE_HEIGHT := 58.0
+const ITEM_ICON_BASE_SIZE := 44.0
 
 var main
 var root: Control
@@ -23,6 +23,21 @@ var settings_backdrop: ColorRect
 var settings_panel: Panel
 var settings_title: Label
 var settings_message: Label
+var settings_music_label: Label
+var settings_music_slider: HSlider
+var settings_music_value_label: Label
+var settings_radio_label: Label
+var settings_radio_slider: HSlider
+var settings_radio_value_label: Label
+var settings_sfx_label: Label
+var settings_sfx_slider: HSlider
+var settings_sfx_value_label: Label
+var settings_vibration_label: Label
+var settings_vibration_toggle: CheckBox
+var settings_intro_label: Label
+var settings_intro_toggle: CheckBox
+var settings_source_label: Label
+var settings_source_option: OptionButton
 var settings_close_button: Button
 var forecast_backdrop: ColorRect
 var forecast_panel: Panel
@@ -33,6 +48,8 @@ var forecast_close_button: Button
 var _is_disabled := false
 var _menu_tween: Tween
 var _menu_open_position := Vector2.ZERO
+var _settings_dirty := false
+var _syncing_settings_controls := false
 
 
 func setup(main_ref) -> void:
@@ -64,7 +81,7 @@ func layout(screen_size: Vector2) -> void:
 	var panel_height: float = item_height * float(item_count) + panel_padding * 2.0 + item_gap * float(maxi(item_count - 1, 0))
 	var button_x: float = screen_size.x - margin_x - button_size.x
 	var button_y: float = margin_y
-	var icon_size: int = int(clampf(ITEM_ICON_BASE_SIZE * ui_scale, 34.0, 44.0))
+	var icon_size: int = int(clampf(ITEM_ICON_BASE_SIZE * ui_scale, 38.0, 52.0))
 
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.position = Vector2.ZERO
@@ -101,13 +118,13 @@ func layout(screen_size: Vector2) -> void:
 
 	for item in [profile_item, atlas_item, forecast_item, settings_item]:
 		item.custom_minimum_size = Vector2(menu_items_box.size.x, item_height)
-		item.add_theme_font_size_override("font_size", int(clampf(15.0 * ui_scale, 14.0, 17.0)))
+		item.add_theme_font_size_override("font_size", int(clampf(16.0 * ui_scale, 15.0, 19.0)))
 		item.add_theme_constant_override("icon_max_width", icon_size)
 		item.add_theme_constant_override("h_separation", int(clampf(13.0 * ui_scale, 12.0, 16.0)))
 		_apply_menu_item_style(item)
 
 	if settings_panel != null:
-		var panel_size := Vector2(clampf(380.0 * ui_scale, 340.0, 430.0), clampf(188.0 * ui_scale, 172.0, 210.0))
+		var panel_size := Vector2(clampf(536.0 * ui_scale, 476.0, 568.0), clampf(536.0 * ui_scale, 500.0, 560.0))
 		settings_backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
 		settings_backdrop.position = Vector2.ZERO
 		settings_backdrop.size = screen_size
@@ -115,16 +132,62 @@ func layout(screen_size: Vector2) -> void:
 		settings_panel.size = panel_size
 		settings_panel.custom_minimum_size = panel_size
 		_apply_panel_style(settings_panel)
-		settings_title.position = Vector2(24.0, 22.0)
-		settings_title.size = Vector2(panel_size.x - 48.0, 32.0)
-		settings_title.add_theme_font_size_override("font_size", int(22.0 * ui_scale))
-		settings_message.position = Vector2(24.0, 68.0)
-		settings_message.size = Vector2(panel_size.x - 48.0, 52.0)
-		settings_message.add_theme_font_size_override("font_size", int(15.0 * ui_scale))
-		settings_close_button.position = Vector2(panel_size.x - 148.0, panel_size.y - 58.0)
-		settings_close_button.size = Vector2(124.0, 42.0)
+		settings_title.position = Vector2(28.0, 18.0)
+		settings_title.size = Vector2(panel_size.x - 56.0, 40.0)
+		settings_title.add_theme_font_size_override("font_size", int(clampf(26.0 * ui_scale, 24.0, 30.0)))
+		settings_source_label.position = Vector2(32.0, 76.0)
+		settings_source_label.size = Vector2(160.0, 36.0)
+		settings_source_label.add_theme_font_size_override("font_size", int(clampf(17.0 * ui_scale, 16.0, 20.0)))
+		settings_source_option.position = Vector2(200.0, 70.0)
+		settings_source_option.size = Vector2(panel_size.x - 232.0, 48.0)
+		settings_source_option.add_theme_font_size_override("font_size", int(clampf(16.0 * ui_scale, 15.0, 19.0)))
+		_apply_option_button_style(settings_source_option)
+
+		_layout_settings_slider_row(
+			settings_music_label,
+			settings_music_slider,
+			settings_music_value_label,
+			Vector2(32.0, 124.0),
+			panel_size.x - 64.0,
+			ui_scale
+		)
+		_layout_settings_slider_row(
+			settings_radio_label,
+			settings_radio_slider,
+			settings_radio_value_label,
+			Vector2(32.0, 198.0),
+			panel_size.x - 64.0,
+			ui_scale
+		)
+		_layout_settings_slider_row(
+			settings_sfx_label,
+			settings_sfx_slider,
+			settings_sfx_value_label,
+			Vector2(32.0, 272.0),
+			panel_size.x - 64.0,
+			ui_scale
+		)
+		_layout_settings_toggle_row(
+			settings_vibration_label,
+			settings_vibration_toggle,
+			Vector2(32.0, 350.0),
+			panel_size.x - 64.0,
+			ui_scale
+		)
+		_layout_settings_toggle_row(
+			settings_intro_label,
+			settings_intro_toggle,
+			Vector2(32.0, 400.0),
+			panel_size.x - 64.0,
+			ui_scale
+		)
+		settings_message.position = Vector2(32.0, panel_size.y - 86.0)
+		settings_message.size = Vector2(panel_size.x - 64.0, 28.0)
+		settings_message.add_theme_font_size_override("font_size", int(clampf(14.0 * ui_scale, 13.0, 16.0)))
+		settings_close_button.position = Vector2(panel_size.x - 158.0, panel_size.y - 58.0)
+		settings_close_button.size = Vector2(130.0, 44.0)
 		settings_close_button.custom_minimum_size = settings_close_button.size
-		settings_close_button.add_theme_font_size_override("font_size", int(15.0 * ui_scale))
+		settings_close_button.add_theme_font_size_override("font_size", int(clampf(16.0 * ui_scale, 15.0, 19.0)))
 		_apply_menu_item_style(settings_close_button)
 
 	if forecast_panel != null:
@@ -167,6 +230,33 @@ func is_forecast_open() -> bool:
 	return forecast_panel != null and forecast_panel.visible
 
 
+func _layout_settings_slider_row(title_label: Label, slider: HSlider, value_label: Label, pos: Vector2, width: float, ui_scale: float) -> void:
+	if title_label == null or slider == null or value_label == null:
+		return
+	title_label.position = pos
+	title_label.size = Vector2(width * 0.62, 30.0)
+	title_label.add_theme_font_size_override("font_size", int(clampf(18.0 * ui_scale, 16.0, 21.0)))
+	value_label.position = pos + Vector2(width - 92.0, 0.0)
+	value_label.size = Vector2(92.0, 30.0)
+	value_label.add_theme_font_size_override("font_size", int(clampf(17.0 * ui_scale, 16.0, 20.0)))
+	slider.position = pos + Vector2(0.0, 36.0)
+	slider.size = Vector2(width, 34.0)
+	slider.custom_minimum_size = slider.size
+	_apply_settings_slider_style(slider)
+
+func _layout_settings_toggle_row(title_label: Label, toggle: CheckBox, pos: Vector2, width: float, ui_scale: float) -> void:
+	if title_label == null or toggle == null:
+		return
+	title_label.position = pos
+	title_label.size = Vector2(width * 0.62, 42.0)
+	title_label.add_theme_font_size_override("font_size", int(clampf(18.0 * ui_scale, 16.0, 21.0)))
+	toggle.position = pos + Vector2(width - 136.0, -3.0)
+	toggle.size = Vector2(136.0, 44.0)
+	toggle.custom_minimum_size = toggle.size
+	toggle.add_theme_font_size_override("font_size", int(clampf(16.0 * ui_scale, 15.0, 19.0)))
+	_apply_settings_toggle_style(toggle)
+
+
 func close_menu() -> void:
 	if is_instance_valid(_menu_tween):
 		_menu_tween.kill()
@@ -178,12 +268,14 @@ func close_menu() -> void:
 	if outside_close != null:
 		outside_close.modulate = Color(1.0, 1.0, 1.0, 1.0)
 		outside_close.visible = false
+	_refresh_main_depth_controls()
 
 
 func close_settings(reset_nav: bool = true) -> void:
 	if settings_panel == null or settings_backdrop == null:
 		return
 
+	_save_settings_if_dirty()
 	settings_panel.visible = false
 	settings_backdrop.visible = false
 	if main != null:
@@ -191,6 +283,7 @@ func close_settings(reset_nav: bool = true) -> void:
 		if reset_nav:
 			main._active_nav_tab = "fish"
 			main._refresh_bottom_nav_styles()
+	_refresh_main_depth_controls()
 
 
 func close_forecast(reset_nav: bool = true) -> void:
@@ -204,6 +297,7 @@ func close_forecast(reset_nav: bool = true) -> void:
 		if reset_nav:
 			main._active_nav_tab = "fish"
 			main._refresh_bottom_nav_styles()
+	_refresh_main_depth_controls()
 
 
 func set_disabled(disabled: bool) -> void:
@@ -223,7 +317,7 @@ func _ensure_menu_nodes() -> void:
 	root = Control.new()
 	root.name = "SystemMenuUI"
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.z_index = 190
+	root.z_index = 340
 	parent.add_child(root)
 
 	outside_close = ColorRect.new()
@@ -307,6 +401,127 @@ func _ensure_settings_nodes() -> void:
 	settings_message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	settings_message.add_theme_color_override("font_color", Color(0.78, 0.90, 0.86, 0.96))
 	settings_panel.add_child(settings_message)
+	settings_message.text = "Tuman FM отключает игровую музыку и включает отдельное радио у воды."
+
+	settings_source_label = Label.new()
+	settings_source_label.name = "SettingsSourceLabel"
+	settings_source_label.text = "Источник"
+	settings_source_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	settings_source_label.add_theme_color_override("font_color", Color(0.94, 1.0, 0.92, 1.0))
+	settings_panel.add_child(settings_source_label)
+
+	settings_source_option = OptionButton.new()
+	settings_source_option.name = "SettingsMusicSourceOption"
+	settings_source_option.focus_mode = Control.FOCUS_NONE
+	settings_source_option.mouse_filter = Control.MOUSE_FILTER_STOP
+	settings_source_option.add_item("Музыка игры", 0)
+	settings_source_option.add_item("Tuman FM", 1)
+	settings_source_option.item_selected.connect(_on_music_source_selected)
+	settings_panel.add_child(settings_source_option)
+
+	settings_music_label = Label.new()
+	settings_music_label.name = "SettingsMusicLabel"
+	settings_music_label.text = "Музыка"
+	settings_music_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	settings_music_label.add_theme_color_override("font_color", Color(0.94, 1.0, 0.92, 1.0))
+	settings_panel.add_child(settings_music_label)
+
+	settings_music_value_label = Label.new()
+	settings_music_value_label.name = "SettingsMusicValueLabel"
+	settings_music_value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	settings_music_value_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	settings_music_value_label.add_theme_color_override("font_color", Color(1.0, 0.86, 0.52, 1.0))
+	settings_panel.add_child(settings_music_value_label)
+
+	settings_music_slider = HSlider.new()
+	settings_music_slider.name = "SettingsMusicSlider"
+	settings_music_slider.min_value = 0.0
+	settings_music_slider.max_value = 100.0
+	settings_music_slider.step = 1.0
+	settings_music_slider.focus_mode = Control.FOCUS_NONE
+	settings_music_slider.mouse_filter = Control.MOUSE_FILTER_STOP
+	settings_music_slider.value_changed.connect(_on_music_volume_changed)
+	settings_panel.add_child(settings_music_slider)
+
+	settings_radio_label = Label.new()
+	settings_radio_label.name = "SettingsRadioLabel"
+	settings_radio_label.text = "Tuman FM"
+	settings_radio_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	settings_radio_label.add_theme_color_override("font_color", Color(0.94, 1.0, 0.92, 1.0))
+	settings_panel.add_child(settings_radio_label)
+
+	settings_radio_value_label = Label.new()
+	settings_radio_value_label.name = "SettingsRadioValueLabel"
+	settings_radio_value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	settings_radio_value_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	settings_radio_value_label.add_theme_color_override("font_color", Color(1.0, 0.86, 0.52, 1.0))
+	settings_panel.add_child(settings_radio_value_label)
+
+	settings_radio_slider = HSlider.new()
+	settings_radio_slider.name = "SettingsRadioSlider"
+	settings_radio_slider.min_value = 0.0
+	settings_radio_slider.max_value = 100.0
+	settings_radio_slider.step = 1.0
+	settings_radio_slider.focus_mode = Control.FOCUS_NONE
+	settings_radio_slider.mouse_filter = Control.MOUSE_FILTER_STOP
+	settings_radio_slider.value_changed.connect(_on_radio_volume_changed)
+	settings_panel.add_child(settings_radio_slider)
+
+	settings_sfx_label = Label.new()
+	settings_sfx_label.name = "SettingsSfxLabel"
+	settings_sfx_label.text = "Звуки"
+	settings_sfx_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	settings_sfx_label.add_theme_color_override("font_color", Color(0.94, 1.0, 0.92, 1.0))
+	settings_panel.add_child(settings_sfx_label)
+
+	settings_sfx_value_label = Label.new()
+	settings_sfx_value_label.name = "SettingsSfxValueLabel"
+	settings_sfx_value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	settings_sfx_value_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	settings_sfx_value_label.add_theme_color_override("font_color", Color(1.0, 0.86, 0.52, 1.0))
+	settings_panel.add_child(settings_sfx_value_label)
+
+	settings_sfx_slider = HSlider.new()
+	settings_sfx_slider.name = "SettingsSfxSlider"
+	settings_sfx_slider.min_value = 0.0
+	settings_sfx_slider.max_value = 100.0
+	settings_sfx_slider.step = 1.0
+	settings_sfx_slider.focus_mode = Control.FOCUS_NONE
+	settings_sfx_slider.mouse_filter = Control.MOUSE_FILTER_STOP
+	settings_sfx_slider.value_changed.connect(_on_sfx_volume_changed)
+	settings_panel.add_child(settings_sfx_slider)
+
+	settings_vibration_label = Label.new()
+	settings_vibration_label.name = "SettingsVibrationLabel"
+	settings_vibration_label.text = "Вибрация"
+	settings_vibration_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	settings_vibration_label.add_theme_color_override("font_color", Color(0.94, 1.0, 0.92, 1.0))
+	settings_panel.add_child(settings_vibration_label)
+
+	settings_vibration_toggle = CheckBox.new()
+	settings_vibration_toggle.name = "SettingsVibrationToggle"
+	settings_vibration_toggle.text = "Вкл"
+	settings_vibration_toggle.focus_mode = Control.FOCUS_NONE
+	settings_vibration_toggle.mouse_filter = Control.MOUSE_FILTER_STOP
+	settings_vibration_toggle.button_pressed = true
+	settings_vibration_toggle.toggled.connect(_on_vibration_toggled)
+	settings_panel.add_child(settings_vibration_toggle)
+
+	settings_intro_label = Label.new()
+	settings_intro_label.name = "SettingsIntroLabel"
+	settings_intro_label.text = "Интро"
+	settings_intro_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	settings_intro_label.add_theme_color_override("font_color", Color(0.94, 1.0, 0.92, 1.0))
+	settings_panel.add_child(settings_intro_label)
+
+	settings_intro_toggle = CheckBox.new()
+	settings_intro_toggle.name = "SettingsIntroToggle"
+	settings_intro_toggle.text = "Вкл"
+	settings_intro_toggle.focus_mode = Control.FOCUS_NONE
+	settings_intro_toggle.mouse_filter = Control.MOUSE_FILTER_STOP
+	settings_intro_toggle.button_pressed = true
+	settings_intro_toggle.toggled.connect(_on_intro_toggled)
+	settings_panel.add_child(settings_intro_toggle)
 
 	settings_close_button = Button.new()
 	settings_close_button.name = "SettingsCloseButton"
@@ -419,6 +634,7 @@ func _open_menu() -> void:
 	outside_close.visible = true
 	outside_close.modulate = Color(1.0, 1.0, 1.0, 0.0)
 	dropdown_panel.visible = true
+	_refresh_main_depth_controls()
 	dropdown_panel.position = _menu_open_position + Vector2(0.0, -6.0)
 	dropdown_panel.scale = Vector2(0.985, 0.985)
 	dropdown_panel.modulate = Color(1.0, 1.0, 1.0, 0.0)
@@ -435,6 +651,15 @@ func _open_menu() -> void:
 		dropdown_panel.modulate = Color(1.0, 1.0, 1.0, 1.0)
 		dropdown_panel.position = _menu_open_position
 		dropdown_panel.scale = Vector2.ONE
+
+
+func _refresh_main_depth_controls() -> void:
+	if main == null:
+		return
+	if main.has_method("_request_depth_hud_refresh"):
+		main.call("_request_depth_hud_refresh")
+	elif main.has_method("_refresh_depth_hud_controls"):
+		main.call_deferred("_refresh_depth_hud_controls")
 
 
 func _on_profile_pressed() -> void:
@@ -464,12 +689,172 @@ func _on_forecast_pressed() -> void:
 	main._refresh_bottom_nav_styles()
 
 
+func _get_audio_manager() -> Node:
+	if main == null:
+		return null
+	return main.get_node_or_null("/root/AudioManager")
+
+
+func _get_radio_manager() -> Node:
+	if main == null:
+		return null
+	return main.get_node_or_null("/root/RadioManager")
+
+func _get_fishing_manager() -> Node:
+	if main == null:
+		return null
+	return main.get_node_or_null("/root/FishingManager")
+
+func _get_save_manager() -> Node:
+	if main == null:
+		return null
+	return main.get_node_or_null("/root/SaveManager")
+
+
+func _sync_settings_controls_from_audio_manager() -> void:
+	var audio_manager := _get_audio_manager()
+	var radio_manager: Node = _get_radio_manager()
+	var fishing_manager: Node = _get_fishing_manager()
+	var save_manager: Node = _get_save_manager()
+	var settings: Dictionary = {}
+	if audio_manager != null and audio_manager.has_method("get_volume_settings"):
+		var value = audio_manager.call("get_volume_settings")
+		if value is Dictionary:
+			settings = value as Dictionary
+	var radio_settings: Dictionary = {}
+	if radio_manager != null and radio_manager.has_method("get_radio_settings"):
+		var radio_settings_value = radio_manager.call("get_radio_settings")
+		if radio_settings_value is Dictionary:
+			radio_settings = radio_settings_value as Dictionary
+
+	var music_value := float(settings.get("music_volume", 0.55))
+	var radio_volume_value := float(radio_settings.get("music_volume", 0.55))
+	var sfx_value := maxf(float(settings.get("sfx_volume", 0.75)), float(settings.get("ambient_volume", 0.72)))
+	var source := str(settings.get("music_source", "game"))
+	var radio_enabled := bool(radio_settings.get("radio_enabled", source == "radio"))
+	var vibration_enabled := true
+	if fishing_manager != null and fishing_manager.has_method("is_vibration_enabled"):
+		vibration_enabled = bool(fishing_manager.call("is_vibration_enabled"))
+	var intro_enabled := true
+	if save_manager != null and save_manager.has_method("is_intro_enabled"):
+		intro_enabled = bool(save_manager.call("is_intro_enabled"))
+
+	_syncing_settings_controls = true
+	if settings_music_slider != null:
+		settings_music_slider.set_value_no_signal(roundi(clampf(music_value, 0.0, 1.0) * 100.0))
+	if settings_radio_slider != null:
+		settings_radio_slider.set_value_no_signal(roundi(clampf(radio_volume_value, 0.0, 1.0) * 100.0))
+	if settings_sfx_slider != null:
+		settings_sfx_slider.set_value_no_signal(roundi(clampf(sfx_value, 0.0, 1.0) * 100.0))
+	if settings_source_option != null:
+		settings_source_option.select(1 if source == "radio" or radio_enabled else 0)
+	if settings_vibration_toggle != null:
+		settings_vibration_toggle.set_pressed_no_signal(vibration_enabled)
+	if settings_intro_toggle != null:
+		settings_intro_toggle.set_pressed_no_signal(intro_enabled)
+	_syncing_settings_controls = false
+	_update_settings_value_labels()
+	_settings_dirty = false
+
+
+func _update_settings_value_labels() -> void:
+	if settings_music_value_label != null and settings_music_slider != null:
+		settings_music_value_label.text = "%d%%" % roundi(settings_music_slider.value)
+	if settings_radio_value_label != null and settings_radio_slider != null:
+		settings_radio_value_label.text = "%d%%" % roundi(settings_radio_slider.value)
+	if settings_sfx_value_label != null and settings_sfx_slider != null:
+		settings_sfx_value_label.text = "%d%%" % roundi(settings_sfx_slider.value)
+	if settings_vibration_toggle != null:
+		settings_vibration_toggle.text = "Вкл" if settings_vibration_toggle.button_pressed else "Выкл"
+	if settings_intro_toggle != null:
+		settings_intro_toggle.text = "Вкл" if settings_intro_toggle.button_pressed else "Выкл"
+
+
+func _on_music_volume_changed(value: float) -> void:
+	_update_settings_value_labels()
+	if _syncing_settings_controls:
+		return
+	var audio_manager := _get_audio_manager()
+	if audio_manager != null and audio_manager.has_method("set_music_volume"):
+		audio_manager.call("set_music_volume", clampf(value / 100.0, 0.0, 1.0))
+	_settings_dirty = true
+
+
+func _on_radio_volume_changed(value: float) -> void:
+	_update_settings_value_labels()
+	if _syncing_settings_controls:
+		return
+	var radio_manager: Node = _get_radio_manager()
+	if radio_manager != null and radio_manager.has_method("set_music_volume"):
+		radio_manager.call("set_music_volume", clampf(value / 100.0, 0.0, 1.0))
+	_settings_dirty = true
+
+
+func _on_sfx_volume_changed(value: float) -> void:
+	_update_settings_value_labels()
+	if _syncing_settings_controls:
+		return
+	var normalized := clampf(value / 100.0, 0.0, 1.0)
+	var audio_manager := _get_audio_manager()
+	if audio_manager != null and audio_manager.has_method("set_volume_settings"):
+		audio_manager.call("set_volume_settings", {
+			"sfx_volume": normalized,
+			"ambient_volume": normalized
+		})
+	_settings_dirty = true
+
+func _on_vibration_toggled(enabled: bool) -> void:
+	_update_settings_value_labels()
+	if _syncing_settings_controls:
+		return
+	var fishing_manager: Node = _get_fishing_manager()
+	if fishing_manager != null and fishing_manager.has_method("set_vibration_enabled"):
+		fishing_manager.call("set_vibration_enabled", enabled)
+	_settings_dirty = true
+
+func _on_intro_toggled(enabled: bool) -> void:
+	_update_settings_value_labels()
+	if _syncing_settings_controls:
+		return
+	var save_manager: Node = _get_save_manager()
+	if save_manager != null and save_manager.has_method("set_intro_enabled"):
+		save_manager.call("set_intro_enabled", enabled)
+	_settings_dirty = true
+
+
+func _on_music_source_selected(index: int) -> void:
+	if _syncing_settings_controls:
+		return
+	var source := "radio" if index == 1 else "game"
+	var audio_manager := _get_audio_manager()
+	var radio_manager: Node = _get_radio_manager()
+	if audio_manager != null and audio_manager.has_method("set_music_source"):
+		audio_manager.call("set_music_source", source)
+	if radio_manager != null:
+		if radio_manager.has_method("set_music_volume") and settings_radio_slider != null:
+			radio_manager.call("set_music_volume", clampf(settings_radio_slider.value / 100.0, 0.0, 1.0))
+		if radio_manager.has_method("set_radio_enabled"):
+			radio_manager.call("set_radio_enabled", source == "radio")
+	_settings_dirty = true
+
+
+func _save_settings_if_dirty() -> void:
+	if not _settings_dirty:
+		return
+	if main != null:
+		var save_manager: Node = main.get_node_or_null("/root/SaveManager")
+		if save_manager != null and save_manager.has_method("save_game"):
+			save_manager.call("save_game")
+	_settings_dirty = false
+
+
 func _on_settings_pressed() -> void:
 	close_menu()
 	if main == null:
 		return
 
 	_ensure_settings_nodes()
+	_sync_settings_controls_from_audio_manager()
 	main.open_modal("settings")
 	settings_backdrop.visible = true
 	settings_panel.visible = true
@@ -573,6 +958,36 @@ func _clear_children(node: Node) -> void:
 	for child in node.get_children():
 		node.remove_child(child)
 		child.queue_free()
+
+
+func _apply_option_button_style(button: OptionButton) -> void:
+	button.add_theme_stylebox_override("normal", _make_menu_row_style(Color(0.052, 0.074, 0.068, 0.72), Color(0.78, 1.0, 0.86, 0.24), 14, 3, Color(0.0, 0.0, 0.0, 0.16), 1))
+	button.add_theme_stylebox_override("hover", _make_menu_row_style(Color(0.070, 0.118, 0.098, 0.86), Color(1.0, 0.84, 0.42, 0.42), 14, 4, Color(0.16, 0.66, 0.48, 0.12), 1))
+	button.add_theme_stylebox_override("pressed", _make_menu_row_style(Color(0.056, 0.142, 0.112, 0.92), Color(1.0, 0.84, 0.42, 0.50), 14, 2, Color.TRANSPARENT, 1))
+	button.add_theme_color_override("font_color", Color(0.94, 1.0, 0.92, 1.0))
+	button.add_theme_color_override("font_hover_color", Color(1.0, 0.94, 0.72, 1.0))
+	button.add_theme_color_override("font_pressed_color", Color(1.0, 0.84, 0.52, 1.0))
+
+
+func _apply_settings_slider_style(slider: HSlider) -> void:
+	var track := _make_style(Color(0.035, 0.060, 0.058, 0.96), Color(0.78, 1.0, 0.86, 0.22), 10, 1, Color.TRANSPARENT)
+	track.content_margin_top = 8.0
+	track.content_margin_bottom = 8.0
+	var fill := _make_style(Color(0.82, 0.58, 0.22, 0.90), Color(1.0, 0.84, 0.42, 0.36), 10, 3, Color(0.92, 0.58, 0.18, 0.18))
+	fill.content_margin_top = 8.0
+	fill.content_margin_bottom = 8.0
+	slider.add_theme_stylebox_override("slider", track)
+	slider.add_theme_stylebox_override("grabber_area", fill)
+	slider.add_theme_stylebox_override("grabber_area_highlight", fill)
+
+func _apply_settings_toggle_style(toggle: CheckBox) -> void:
+	toggle.add_theme_stylebox_override("normal", _make_menu_row_style(Color(0.052, 0.074, 0.068, 0.54), Color(0.78, 1.0, 0.86, 0.20), 12, 1, Color.TRANSPARENT, 1))
+	toggle.add_theme_stylebox_override("hover", _make_menu_row_style(Color(0.070, 0.118, 0.098, 0.82), Color(1.0, 0.84, 0.42, 0.42), 12, 3, Color(0.16, 0.66, 0.48, 0.10), 1))
+	toggle.add_theme_stylebox_override("pressed", _make_menu_row_style(Color(0.056, 0.142, 0.112, 0.90), Color(1.0, 0.84, 0.42, 0.48), 12, 1, Color.TRANSPARENT, 1))
+	toggle.add_theme_color_override("font_color", Color(0.94, 1.0, 0.92, 1.0))
+	toggle.add_theme_color_override("font_hover_color", Color(1.0, 0.94, 0.72, 1.0))
+	toggle.add_theme_color_override("font_pressed_color", Color(1.0, 0.84, 0.52, 1.0))
+	toggle.add_theme_constant_override("h_separation", 8)
 
 
 func _apply_menu_button_style() -> void:

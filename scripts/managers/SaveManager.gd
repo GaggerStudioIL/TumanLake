@@ -3,11 +3,18 @@ extends Node
 const SAVE_PATH := "user://save_game.json"
 const SAVE_VERSION := 1
 
+var intro_enabled: bool = true
+var _intro_setting_loaded_from_disk: bool = false
+
 func save_game() -> void:
+	if InventoryManager.has_method("purge_zero_value_fish"):
+		InventoryManager.purge_zero_value_fish()
+
 	var time_save_data := _get_time_save_data()
 	var save_data := {
 		"save_version": SAVE_VERSION,
 		"money": PlayerData.money,
+		"alpha_tester_bonus_claimed": PlayerData.alpha_tester_bonus_claimed,
 		"level": PlayerData.level,
 		"current_xp": PlayerData.current_xp,
 		"xp": PlayerData.current_xp,
@@ -35,6 +42,9 @@ func save_game() -> void:
 		"inventory": InventoryManager.inventory,
 		"max_items": InventoryManager.max_items,
 		"economy": _get_economy_save_data(),
+		"audio": _get_audio_save_data(),
+		"radio": _get_radio_save_data(),
+		"gameplay": _get_gameplay_save_data(),
 		"game_time": time_save_data,
 		"total_game_minutes": float(time_save_data.get("total_game_minutes", 525.0)),
 		"current_game_minutes": float(time_save_data.get("current_game_minutes", 525.0)),
@@ -85,6 +95,7 @@ func load_game() -> void:
 	save_data = _migrate_save_data(save_data as Dictionary)
 
 	PlayerData.money = float(save_data.get("money", 0.0))
+	PlayerData.alpha_tester_bonus_claimed = bool(save_data.get("alpha_tester_bonus_claimed", false))
 	PlayerData.set_progression(
 		int(save_data.get("level", 1)),
 		int(save_data.get("current_xp", save_data.get("xp", 0)))
@@ -112,6 +123,9 @@ func load_game() -> void:
 	InventoryManager.inventory = save_data.get("inventory", [])
 	InventoryManager.max_items = maxi(int(save_data.get("max_items", 30)), 30)
 	_load_economy_save_data(save_data.get("economy", {}))
+	_load_audio_save_data(save_data.get("audio", {}))
+	_load_radio_save_data(save_data.get("radio", {}))
+	_load_gameplay_save_data(save_data.get("gameplay", {}))
 	var time_manager := _get_time_manager()
 	var should_save_after_time_load := false
 	if time_manager != null and time_manager.has_method("load_time_from_save"):
@@ -128,9 +142,12 @@ func load_game() -> void:
 	var migrated_freshness := false
 	if InventoryManager.has_method("ensure_inventory_freshness_metadata"):
 		migrated_freshness = InventoryManager.ensure_inventory_freshness_metadata()
+	var removed_zero_value_fish := false
+	if InventoryManager.has_method("purge_zero_value_fish"):
+		removed_zero_value_fish = InventoryManager.purge_zero_value_fish() > 0
 
 	print("Game loaded")
-	if should_save_after_time_load or migrated_freshness or migrated_save:
+	if should_save_after_time_load or migrated_freshness or migrated_save or removed_zero_value_fish:
 		save_game()
 
 func delete_save() -> void:
@@ -143,6 +160,99 @@ func delete_save() -> void:
 
 func _get_time_manager() -> Node:
 	return get_node_or_null("/root/TimeManager")
+
+func _get_audio_manager() -> Node:
+	return get_node_or_null("/root/AudioManager")
+
+func _get_radio_manager() -> Node:
+	return get_node_or_null("/root/RadioManager")
+
+func _get_fishing_manager() -> Node:
+	return get_node_or_null("/root/FishingManager")
+
+func is_intro_enabled() -> bool:
+	if not _intro_setting_loaded_from_disk:
+		intro_enabled = _read_intro_enabled_from_save(intro_enabled)
+		_intro_setting_loaded_from_disk = true
+	return intro_enabled
+
+func set_intro_enabled(enabled: bool) -> void:
+	intro_enabled = enabled
+	_intro_setting_loaded_from_disk = true
+
+func _read_intro_enabled_from_save(fallback: bool = true) -> bool:
+	if not FileAccess.file_exists(SAVE_PATH):
+		return fallback
+
+	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	if file == null:
+		return fallback
+
+	var text := file.get_as_text()
+	file.close()
+
+	var json := JSON.new()
+	if json.parse(text) != OK or typeof(json.data) != TYPE_DICTIONARY:
+		return fallback
+
+	var save_data: Dictionary = json.data as Dictionary
+	var gameplay = save_data.get("gameplay", {})
+	if gameplay is Dictionary:
+		return bool((gameplay as Dictionary).get("intro_enabled", fallback))
+	return fallback
+
+func _get_audio_save_data() -> Dictionary:
+	var audio_manager := _get_audio_manager()
+	if audio_manager != null and audio_manager.has_method("get_volume_settings"):
+		var value = audio_manager.call("get_volume_settings")
+		if value is Dictionary:
+			return value as Dictionary
+	return {}
+
+func _load_audio_save_data(data) -> void:
+	if not (data is Dictionary):
+		return
+	var audio_manager := _get_audio_manager()
+	if audio_manager != null and audio_manager.has_method("set_volume_settings"):
+		audio_manager.call("set_volume_settings", data)
+
+func _get_radio_save_data() -> Dictionary:
+	var radio_manager: Node = _get_radio_manager()
+	if radio_manager != null and radio_manager.has_method("get_radio_settings"):
+		var value = radio_manager.call("get_radio_settings")
+		if value is Dictionary:
+			return value as Dictionary
+	return {}
+
+func _load_radio_save_data(data) -> void:
+	if not (data is Dictionary):
+		return
+	var radio_manager: Node = _get_radio_manager()
+	if radio_manager != null and radio_manager.has_method("set_radio_settings"):
+		radio_manager.call("set_radio_settings", data)
+
+func _get_gameplay_save_data() -> Dictionary:
+	var result := {
+		"intro_enabled": intro_enabled
+	}
+	var fishing_manager: Node = _get_fishing_manager()
+	if fishing_manager != null and fishing_manager.has_method("get_gameplay_settings"):
+		var value = fishing_manager.call("get_gameplay_settings")
+		if value is Dictionary:
+			for key in (value as Dictionary).keys():
+				result[key] = (value as Dictionary)[key]
+	if not result.has("vibration_enabled"):
+		result["vibration_enabled"] = true
+	return result
+
+func _load_gameplay_save_data(data) -> void:
+	if not (data is Dictionary):
+		return
+	intro_enabled = bool((data as Dictionary).get("intro_enabled", true))
+	_intro_setting_loaded_from_disk = true
+	var fishing_manager: Node = _get_fishing_manager()
+	if fishing_manager != null and fishing_manager.has_method("set_gameplay_settings"):
+		fishing_manager.call("set_gameplay_settings", data)
 
 func _get_time_save_data() -> Dictionary:
 	var time_manager := _get_time_manager()

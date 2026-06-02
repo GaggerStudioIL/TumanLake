@@ -75,6 +75,7 @@ var music_volume: float = 0.55:
 		music_volume = clampf(value, 0.0, 1.0)
 		_apply_music_volume()
 
+var music_source: String = "game"
 var music_fade_duration: float = 3.0
 var period_crossfade_duration: float = 6.0
 
@@ -152,6 +153,21 @@ func set_music_volume(value: float) -> void:
 func get_music_volume() -> float:
 	return music_volume
 
+func set_music_source(source: String) -> void:
+	var normalized := source.strip_edges().to_lower()
+	if not ["game", "radio"].has(normalized):
+		normalized = "game"
+	if music_source == normalized:
+		return
+	music_source = normalized
+	if music_source == "game":
+		start_music_for_current_period()
+	else:
+		stop_music(0.8)
+
+func get_music_source() -> String:
+	return music_source
+
 func set_volume_settings(settings: Dictionary) -> void:
 	if settings.has("master_volume"):
 		master_volume = clampf(float(settings["master_volume"]), 0.0, 1.0)
@@ -161,14 +177,23 @@ func set_volume_settings(settings: Dictionary) -> void:
 		sfx_volume = clampf(float(settings["sfx_volume"]), 0.0, 1.0)
 	if settings.has("music_volume"):
 		music_volume = clampf(float(settings["music_volume"]), 0.0, 1.0)
+	if settings.has("music_source"):
+		music_source = str(settings["music_source"]).strip_edges().to_lower()
+		if not ["game", "radio"].has(music_source):
+			music_source = "game"
 	_apply_volumes()
+	if music_source == "game":
+		start_music_for_current_period()
+	else:
+		stop_music(0.0)
 
 func get_volume_settings() -> Dictionary:
 	return {
 		"master_volume": master_volume,
 		"ambient_volume": ambient_volume,
 		"sfx_volume": sfx_volume,
-		"music_volume": music_volume
+		"music_volume": music_volume,
+		"music_source": music_source
 	}
 
 func play_splash() -> void:
@@ -207,9 +232,13 @@ func play_sfx(sfx_name: String) -> void:
 	player.play()
 
 func start_music_for_current_period() -> void:
+	if music_source != "game":
+		return
 	play_music_for_period(_get_current_period_key(), music_fade_duration)
 
 func play_music_for_period(period_key: String, fade_duration: float = -1.0) -> void:
+	if music_source != "game":
+		return
 	var normalized_period := _get_period_key(period_key)
 	if normalized_period == "":
 		_report_unknown_period(period_key)
@@ -226,6 +255,8 @@ func play_music_for_period(period_key: String, fade_duration: float = -1.0) -> v
 	play_random_track_for_period(normalized_period, resolved_fade_duration)
 
 func play_random_track_for_period(period_key: String, fade_duration: float) -> void:
+	if music_source != "game":
+		return
 	_ensure_players()
 
 	var normalized_period := _get_period_key(period_key)

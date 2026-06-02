@@ -40,7 +40,7 @@ func _update_ui() -> void:
 		main.main_hud_controller.refresh()
 	else:
 		main._update_time_hud()
-		main.money_label.text = UIFormatters.format_money(PlayerData.money)
+		main.money_label.text = UIFormatters.format_money_amount(PlayerData.money)
 		main.tackle_label.text = _get_main_hud_text()
 		main.level_label.text = "LVL %d  %d/%d XP" % [
 			PlayerData.level,

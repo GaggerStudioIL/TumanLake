@@ -87,6 +87,14 @@ var _critical_break_risk: float = 0.0
 var _high_fail_limit: float = 1.15
 var _low_fail_limit: float = 1.35
 var _target_progress_time: float = 6.0
+var vibration_enabled: bool = true
+var _fight_vibration_timer: float = 0.0
+var _fight_vibration_debug_timer: float = 0.0
+var _last_vibration_strength: float = 0.0
+var _last_vibration_label: String = "off"
+var _last_struggle_vibration_msec: int = 0
+var _safe_zone_strength_factor: float = 1.0
+var _safe_zone_size_ratio: float = 0.0
 
 const USE_NEW_BITE_SYSTEM := true
 const BITE_CHECK_INTERVAL := 1.0
@@ -105,6 +113,18 @@ const TENSION_VELOCITY_LIMIT := 0.72
 const BASE_FISH_DRAG := -0.055
 const PROGRESS_DECAY := 0.095
 const NEAR_ZONE_PROGRESS_MARGIN := 0.12
+const TENSION_FIGHT_DEBUG := false
+const MIN_FIGHT_DURATION := 6.5
+const MAX_FIGHT_DURATION := 36.0
+const SMALL_SAFE_ZONE_WIDTH := 0.35
+const MEDIUM_SAFE_ZONE_WIDTH := 0.25
+const LARGE_SAFE_ZONE_WIDTH := 0.16
+const TROPHY_SAFE_ZONE_WIDTH := 0.10
+const FIGHT_VIBRATION_MIN_INTERVAL := 0.15
+const FIGHT_VIBRATION_MAX_INTERVAL := 0.35
+const FIGHT_VIBRATION_MIN_MS := 20.0
+const FIGHT_VIBRATION_MAX_MS := 140.0
+const FIGHT_JERK_VIBRATION_MAX_MS := 220.0
 const FAILURE_NO_BITE := "NO_BITE"
 const FAILURE_BAD_DEPTH := "BAD_DEPTH"
 const FAILURE_BAD_BAIT := "BAD_BAIT"
@@ -917,6 +937,7 @@ func _get_depth_match_multiplier(fish: Dictionary) -> float:
 
 func _get_spot_depth_match_multiplier(spot: Dictionary) -> float:
 	var depth: float = float(_tackle_stats.get("fishing_depth", PlayerData.fishing_depth))
+	# spot.min_depth / effective_min_depth = рабочая глубина рыбы, not physical shore depth.
 	var min_depth: float = float(spot.get("min_depth", 0.2))
 	var max_depth: float = float(spot.get("max_depth", 6.0))
 	var reach_bonus: float = clamp(float(_tackle_stats.get("reach_bonus", 0.0)), -0.06, 0.22)
@@ -1107,6 +1128,285 @@ func _get_fish_size_class(fish: Dictionary, catch_weight: float = -1.0) -> Strin
 func set_reel_input(active: bool) -> void:
 	_reel_input_active = active and is_reeling
 
+func set_vibration_enabled(enabled: bool) -> void:
+	vibration_enabled = enabled
+	if not vibration_enabled:
+		stop_fight_vibration()
+
+func is_vibration_enabled() -> bool:
+	return vibration_enabled
+
+func get_gameplay_settings() -> Dictionary:
+	return {
+		"vibration_enabled": vibration_enabled
+	}
+
+func set_gameplay_settings(settings: Dictionary) -> void:
+	if settings.has("vibration_enabled"):
+		set_vibration_enabled(bool(settings.get("vibration_enabled", true)))
+
+func _resolve_fish_for_catch(fish_data: Dictionary) -> Dictionary:
+	var fish_id := str(fish_data.get("id", ""))
+	if fish_id != "":
+		var fish: Dictionary = FishDatabase.get_fish(fish_id)
+		if not fish.is_empty():
+			return fish
+	return fish_data
+
+func _get_fight_weight_ratio(fish_data: Dictionary, fish: Dictionary) -> float:
+	var weight: float = max(float(fish_data.get("weight", 0.0)), 0.0)
+	var min_weight: float = float(fish.get("min_weight", fish.get("minWeight", fish_data.get("minWeight", weight))))
+	var max_weight: float = float(fish.get("max_weight", fish.get("maxWeight", fish_data.get("maxWeight", max(weight, min_weight + 0.01)))))
+	var span: float = max(max_weight - min_weight, 0.01)
+	return clamp((weight - min_weight) / span, 0.0, 1.0)
+
+func _get_fight_catch_rank(fish_data: Dictionary, fish: Dictionary) -> String:
+	var rank := str(fish_data.get("catch_rank", ""))
+	if rank != "":
+		return rank
+	if fish.is_empty():
+		return "normal"
+	return FishDatabase.get_catch_rank(fish, float(fish_data.get("weight", 0.0)))
+
+func _get_fish_strength_factor(fish_data: Dictionary, fish: Dictionary) -> float:
+	var weight: float = max(float(fish_data.get("weight", 0.0)), 0.0)
+	var min_weight: float = float(fish.get("min_weight", fish.get("minWeight", fish_data.get("minWeight", weight))))
+	var max_weight: float = float(fish.get("max_weight", fish.get("maxWeight", fish_data.get("maxWeight", max(weight, min_weight + 0.01)))))
+	var average_weight: float = max((min_weight + max_weight) * 0.5, 0.05)
+	var relative_weight: float = clamp(weight / average_weight, 0.35, 3.4)
+	var species_strength: float = float(fish_data.get("strength", fish.get("strength", fish.get("base_fight_power", 1.0))))
+	var stamina: float = float(fish_data.get("stamina", fish.get("stamina", 1.0)))
+	var aggression: float = float(fish_data.get("aggression", fish.get("aggression", 0.5)))
+	var rank := _get_fight_catch_rank(fish_data, fish)
+	var trophy_bonus: float = 0.0
+	if bool(fish_data.get("is_trophy", false)) or bool(fish_data.get("is_trophy_status", false)) or rank == "trophy" or rank == "rarity":
+		trophy_bonus += 0.35
+	if bool(fish_data.get("is_rarity", false)) or rank == "rarity":
+		trophy_bonus += 0.25
+
+	var absolute_size_bonus: float = clamp(pow(max(weight, 0.05), 0.28) * 0.16, 0.0, 0.42)
+	var factor: float = (
+		species_strength * 0.52
+		+ relative_weight * 0.26
+		+ stamina * 0.10
+		+ aggression * 0.08
+		+ absolute_size_bonus
+		+ trophy_bonus
+	)
+	return clamp(factor, 0.45, 3.2)
+
+func get_safe_tension_zone(fish_data: Dictionary) -> Dictionary:
+	var fish: Dictionary = _resolve_fish_for_catch(fish_data)
+	var weight: float = max(float(fish_data.get("weight", 0.0)), 0.0)
+	var size_class := _get_fish_size_class(fish, weight)
+	var rank := _get_fight_catch_rank(fish_data, fish)
+	var strength_factor: float = _get_fish_strength_factor(fish_data, fish)
+	var size_ratio: float = _get_fight_weight_ratio(fish_data, fish)
+	var is_trophy_fish: bool = bool(fish_data.get("is_trophy", false)) or bool(fish_data.get("is_trophy_status", false)) or rank == "trophy" or rank == "rarity"
+	var width: float = MEDIUM_SAFE_ZONE_WIDTH
+
+	match size_class:
+		"small":
+			width = SMALL_SAFE_ZONE_WIDTH
+		"large":
+			width = LARGE_SAFE_ZONE_WIDTH
+		_:
+			width = MEDIUM_SAFE_ZONE_WIDTH
+
+	var strength_narrowing: float = clamp((strength_factor - 0.75) / 2.1, 0.0, 1.0)
+	width = lerp(width, TROPHY_SAFE_ZONE_WIDTH, strength_narrowing * 0.68)
+	width -= clamp(size_ratio * 0.045, 0.0, 0.045)
+	if is_trophy_fish:
+		width = min(width, lerp(0.13, TROPHY_SAFE_ZONE_WIDTH, clamp((strength_factor - 1.0) / 1.6, 0.0, 1.0)))
+	if rank == "rarity":
+		width = min(width, 0.12)
+
+	var behavior := str(fish_data.get("behavior_type", fish_data.get("behavior", fish.get("behavior_type", fish.get("behavior", _current_behavior)))))
+	var tuning: Dictionary = _get_behavior_tuning(behavior)
+	width *= float(tuning.get("green_width", 1.0))
+	var difficulty_pressure: float = _difficulty if is_reeling else float(fish_data.get("difficulty", fish.get("difficulty", 1.0)))
+	width -= clamp((difficulty_pressure - 1.0) * 0.025, 0.0, 0.08)
+
+	var tackle_width_bonus: float = clamp(
+		float(_tackle_stats.get("control_bonus", 0.0))
+		+ float(_tackle_stats.get("stability", 0.0))
+		+ float(_tackle_stats.get("green_zone_bonus", 0.0)),
+		0.0,
+		0.45
+	)
+	width = clamp(width + tackle_width_bonus * 0.18, TROPHY_SAFE_ZONE_WIDTH, 0.42)
+
+	var center: float = 0.54 + clamp((strength_factor - 1.0) * 0.025, -0.03, 0.05)
+	if size_class == "small":
+		center -= 0.02
+	elif size_class == "large":
+		center += 0.015
+	if is_trophy_fish:
+		center += 0.015
+	center = clamp(center, 0.43, 0.66)
+
+	var zone_min: float = clamp(center - width * 0.5, 0.16, 0.76)
+	var zone_max: float = clamp(center + width * 0.5, zone_min + TROPHY_SAFE_ZONE_WIDTH, 0.88)
+	return {
+		"min": zone_min,
+		"max": zone_max,
+		"width": zone_max - zone_min,
+		"strength": strength_factor,
+		"size_ratio": size_ratio,
+		"size_class": size_class
+	}
+
+func _get_target_fight_duration(catch_data: Dictionary, fish: Dictionary, tuning: Dictionary, rod_strength: float) -> float:
+	var weight: float = max(float(catch_data.get("weight", 0.0)), 0.0)
+	var size_class := _get_fish_size_class(fish, weight)
+	var rank := _get_fight_catch_rank(catch_data, fish)
+	var strength_factor: float = _get_fish_strength_factor(catch_data, fish)
+	var weight_ratio: float = _get_fight_weight_ratio(catch_data, fish)
+	var is_trophy_fish: bool = bool(catch_data.get("is_trophy", false)) or bool(catch_data.get("is_trophy_status", false)) or rank == "trophy" or rank == "rarity"
+	var base_duration: float = 10.0
+	var min_duration: float = MIN_FIGHT_DURATION
+
+	match size_class:
+		"small":
+			base_duration = lerp(6.5, 9.5, clamp((strength_factor - 0.45) / 0.85, 0.0, 1.0))
+			min_duration = MIN_FIGHT_DURATION
+		"large":
+			base_duration = lerp(15.0, 30.0, clamp((strength_factor - 1.0) / 1.75, 0.0, 1.0))
+			min_duration = 15.0
+		_:
+			base_duration = lerp(8.0, 15.0, clamp((strength_factor - 0.70) / 1.15, 0.0, 1.0))
+			min_duration = 8.0
+
+	if is_trophy_fish:
+		base_duration = max(base_duration, lerp(22.0, 34.0, clamp((strength_factor - 1.15) / 1.85, 0.0, 1.0)))
+		min_duration = 20.0
+	if rank == "rarity":
+		min_duration = 24.0
+
+	var stamina_factor: float = lerp(0.92, 1.24, clamp((_fish_stamina - 0.35) / 1.9, 0.0, 1.0))
+	var difficulty_factor: float = lerp(0.95, 1.24, clamp((_difficulty - 0.75) / 2.9, 0.0, 1.0))
+	var size_pressure: float = lerp(0.95, 1.12, weight_ratio)
+	var tackle_help: float = clamp(
+		float(_tackle_stats.get("control_bonus", 0.0)) * 0.45
+		+ float(_tackle_stats.get("hook_success_bonus", 0.0)) * 0.22
+		+ max(rod_strength - 1.0, 0.0) * 0.08,
+		0.0,
+		0.38
+	)
+	var duration: float = base_duration * stamina_factor * difficulty_factor * size_pressure * float(tuning.get("progress_time", 1.0)) / (1.0 + tackle_help)
+	return clamp(duration, min_duration, MAX_FIGHT_DURATION)
+
+func _calculate_fight_vibration_strength() -> float:
+	if not is_reeling:
+		return 0.0
+
+	var fish_intensity: float = clamp(
+		(_fish_strength - 0.30) / 2.20 * 0.42
+		+ (_fight_power - 0.35) / 4.40 * 0.30
+		+ _weight_ratio * 0.18
+		+ _fish_aggression * 0.10,
+		0.0,
+		1.0
+	)
+	var zone_pressure: float = 0.0
+	if _tension > _green_max:
+		zone_pressure = lerp(0.58, 1.0, inverse_lerp(_green_max, 1.0, _tension))
+	elif _tension >= _green_min:
+		zone_pressure = lerp(0.35, 0.64, _control_value)
+	else:
+		zone_pressure = lerp(0.0, 0.22, inverse_lerp(0.0, max(_green_min, 0.01), _tension))
+
+	var strength: float = 0.0
+	if _reel_input_active:
+		strength = zone_pressure * (0.72 + fish_intensity * 0.58)
+		if _tension < _green_min:
+			strength *= 0.45
+	else:
+		if _struggle_power > 0.45 and _tension >= _green_min * 0.82:
+			strength = (0.10 + fish_intensity * 0.16 + clamp(_struggle_power * 0.12, 0.0, 0.18))
+		else:
+			strength = 0.0
+
+	if _tension > _green_max:
+		strength += clamp(_critical_break_risk * 0.45 + (_high_danger_time / max(_high_fail_limit, 0.1)) * 0.22, 0.0, 0.45)
+
+	return clamp(strength, 0.0, 1.0)
+
+func _get_vibration_label(strength: float) -> String:
+	if strength <= 0.08:
+		return "off"
+	if strength < 0.32:
+		return "low"
+	if strength < 0.66:
+		return "medium"
+	return "strong"
+
+func update_fight_vibration(delta: float) -> void:
+	if not is_reeling or not vibration_enabled:
+		stop_fight_vibration()
+		return
+
+	var strength: float = _calculate_fight_vibration_strength()
+	_last_vibration_strength = strength
+	_last_vibration_label = _get_vibration_label(strength)
+	_debug_tension_fight(delta)
+
+	if strength <= 0.08:
+		_fight_vibration_timer = min(_fight_vibration_timer, FIGHT_VIBRATION_MAX_INTERVAL)
+		return
+
+	_fight_vibration_timer -= delta
+	if _fight_vibration_timer > 0.0:
+		return
+
+	trigger_fish_pull_vibration(strength)
+	_fight_vibration_timer = lerp(FIGHT_VIBRATION_MAX_INTERVAL, FIGHT_VIBRATION_MIN_INTERVAL, strength)
+
+func trigger_fish_pull_vibration(strength: float) -> void:
+	if not vibration_enabled:
+		return
+
+	var normalized: float = clamp(strength, 0.0, 1.0)
+	if normalized <= 0.05:
+		return
+
+	var duration_ms: int = roundi(lerp(FIGHT_VIBRATION_MIN_MS, FIGHT_VIBRATION_MAX_MS, normalized))
+	if _struggle_event == "short_jerk" or _struggle_event == "long_pull":
+		duration_ms = max(duration_ms, roundi(lerp(70.0, FIGHT_JERK_VIBRATION_MAX_MS, normalized)))
+	Input.vibrate_handheld(duration_ms, normalized)
+
+func _trigger_fish_pull_vibration(strength: float) -> void:
+	if not vibration_enabled:
+		return
+
+	var now_msec := Time.get_ticks_msec()
+	if now_msec - _last_struggle_vibration_msec < 120:
+		return
+	_last_struggle_vibration_msec = now_msec
+	trigger_fish_pull_vibration(strength)
+
+func stop_fight_vibration() -> void:
+	_fight_vibration_timer = 0.0
+	_fight_vibration_debug_timer = 0.0
+	_last_vibration_strength = 0.0
+	_last_vibration_label = "off"
+
+func _debug_tension_fight(delta: float) -> void:
+	if not TENSION_FIGHT_DEBUG:
+		return
+
+	_fight_vibration_debug_timer -= delta
+	if _fight_vibration_debug_timer > 0.0:
+		return
+
+	_fight_vibration_debug_timer = 1.0
+	print("[TensionFight] tension=%d%%, progress=%d%%, pulling=%s, vibration=%s" % [
+		roundi(_tension * 100.0),
+		roundi(_catch_progress * 100.0),
+		str(_reel_input_active),
+		_last_vibration_label
+	])
+
 func _process(delta: float) -> void:
 	if use_new_bite_system:
 		_update_active_bite_system(delta)
@@ -1117,6 +1417,7 @@ func _process(delta: float) -> void:
 	_update_struggle(delta)
 	_update_tension(delta)
 	_update_progress_and_danger(delta)
+	update_fight_vibration(delta)
 
 	if not is_reeling:
 		return
@@ -1219,31 +1520,36 @@ func _start_reeling(catch_data: Dictionary) -> void:
 	_last_fail_kind = ""
 	_tension_velocity = 0.0
 	_player_force = 0.0
+	stop_fight_vibration()
+	_last_struggle_vibration_msec = 0
 
-	var green_width: float = clamp(
-		(0.36 - (_difficulty - 1.0) * 0.075)
-		* float(tuning["green_width"])
-		* (1.0 + float(_tackle_stats.get("control_bonus", 0.0)) + float(_tackle_stats.get("stability", 0.0))),
-		0.14,
-		0.38
+	var safe_zone := get_safe_tension_zone(catch_data)
+	_safe_zone_strength_factor = float(safe_zone.get("strength", _fish_strength))
+	_safe_zone_size_ratio = float(safe_zone.get("size_ratio", _weight_ratio))
+	var green_width: float = clamp(float(safe_zone.get("width", 0.28)), TROPHY_SAFE_ZONE_WIDTH, 0.42)
+	var green_center: float = clamp(
+		(float(safe_zone.get("min", 0.38)) + float(safe_zone.get("max", 0.68))) * 0.5 + randf_range(-0.030, 0.030),
+		0.43,
+		0.66
 	)
-	green_width = clamp(green_width + clamp(float(_tackle_stats.get("green_zone_bonus", 0.0)), 0.0, 0.30), 0.14, 0.48)
-	var green_center: float = clamp(0.54 + randf_range(-0.045, 0.045), 0.43, 0.63)
-	_green_min = clamp(green_center - green_width * 0.5, 0.16, 0.72)
-	_green_max = clamp(green_center + green_width * 0.5, _green_min + 0.11, 0.88)
+	_green_min = clamp(green_center - green_width * 0.5, 0.16, 0.76)
+	_green_max = clamp(green_center + green_width * 0.5, _green_min + TROPHY_SAFE_ZONE_WIDTH, 0.88)
 	_tension = clamp((_green_min + _green_max) * 0.5 - 0.04, 0.18, 0.82)
 
 	var break_safety: float = line_break_resistance * line_durability * clamp(rod_strength, 0.7, 1.35)
 	var escape_safety: float = (1.0 / max(float(_tackle_stats.get("fish_escape_modifier", 1.0)), 0.2)) + float(_tackle_stats.get("hook_success_bonus", 0.0))
 	_high_fail_limit = clamp((1.30 * break_safety) / (_difficulty * float(tuning["danger"]) * (1.0 + overload_penalty * 0.45)), 0.42, 1.55)
 	_low_fail_limit = clamp((1.52 * escape_safety) / (_difficulty * float(tuning["danger"]) * (1.0 + _escape_risk)), 0.52, 1.85)
-	_target_progress_time = clamp(
-		(4.2 + _fish_stamina * 2.25 + _difficulty * 1.15 + _weight_ratio * _weight_difficulty * 1.25)
-		* float(tuning["progress_time"])
-		/ (1.0 + float(_tackle_stats.get("control_bonus", 0.0)) + float(_tackle_stats.get("hook_success_bonus", 0.0)) + max(rod_strength - 1.0, 0.0) * 0.18),
-		5.5,
-		14.0
-	)
+	_target_progress_time = _get_target_fight_duration(catch_data, fish, tuning, rod_strength)
+
+	print("[TensionFight] fish=%s, weight=%.2fkg, strength=%.2f, safe_zone=%d%%-%d%%, target_duration=%.1fs" % [
+		str(catch_data.get("name", fish.get("name", "-"))),
+		catch_weight,
+		_safe_zone_strength_factor,
+		roundi(_green_min * 100.0),
+		roundi(_green_max * 100.0),
+		_target_progress_time
+	])
 
 	reeling_started.emit(_current_catch, _get_reeling_state())
 	reeling_updated.emit(_get_reeling_state())
@@ -1325,6 +1631,11 @@ func _start_struggle_event(event_name: String) -> void:
 	_struggle_event = event_name
 	_struggle_label = label
 	_struggle_active = true
+	if event_name == "short_jerk" or event_name == "long_pull":
+		var jerk_strength: float = clamp(abs(_target_fish_force) * 0.56 + _safe_zone_strength_factor * 0.10 + _fight_power * 0.08, 0.0, 1.0)
+		if not _reel_input_active:
+			jerk_strength *= 0.42
+		_trigger_fish_pull_vibration(jerk_strength)
 
 func _pick_struggle_event() -> String:
 	var tuning: Dictionary = _get_behavior_tuning(_current_behavior)
@@ -1572,6 +1883,7 @@ func _finish_reeling_success() -> void:
 	is_reeling = false
 	fishing_state = FishingState.CAUGHT
 	_reel_input_active = false
+	stop_fight_vibration()
 	_current_catch = {}
 	_clear_active_bite_data()
 
@@ -1613,6 +1925,7 @@ func _finish_reeling_failed(message: String, fail_kind: String = "escape", reaso
 	is_reeling = false
 	fishing_state = FishingState.FAILED
 	_reel_input_active = false
+	stop_fight_vibration()
 	_clear_active_bite_data()
 	_emit_fishing_failure(
 		failure_reason,
@@ -1871,6 +2184,8 @@ func _award_catch_xp(catch_data: Dictionary) -> Dictionary:
 	var base_xp: int = int(catch_data.get("base_xp", 5))
 	var weight_bonus: int = max(roundi(float(catch_data.get("weight", 0.0)) * 2.0), 0)
 	var total_xp: int = base_xp + weight_bonus
+	total_xp = max(roundi(float(total_xp) * _get_catch_rank_xp_multiplier(catch_data)), 0)
+
 	var skill_effects := PlayerData.get_skill_effects()
 	var xp_multiplier: float = 1.0 + float(skill_effects.get("xp_bonus", 0.0))
 	var catch_rank := str(catch_data.get("catch_rank", "normal"))
@@ -1879,6 +2194,17 @@ func _award_catch_xp(catch_data: Dictionary) -> Dictionary:
 		xp_multiplier += float(skill_effects.get("trophy_xp_bonus", 0.0))
 	total_xp = max(roundi(float(total_xp) * max(xp_multiplier, 0.0)), 0)
 	return PlayerData.add_xp(total_xp)
+
+func _get_catch_rank_xp_multiplier(catch_data: Dictionary) -> float:
+	var catch_rank := str(catch_data.get("catch_rank", "normal"))
+	var fish_status := str(catch_data.get("fish_status", catch_data.get("status", "")))
+
+	if catch_rank == "rarity" or bool(catch_data.get("is_rarity", false)) or bool(catch_data.get("is_record_weight", false)):
+		return 2.0
+	if catch_rank == "trophy" or fish_status == "trophy" or bool(catch_data.get("is_trophy", false)) or bool(catch_data.get("is_trophy_status", false)):
+		return 1.5
+
+	return 1.0
 
 func _get_rarity_factor(rarity: String) -> float:
 	match rarity:
@@ -1986,6 +2312,7 @@ func _get_reeling_state() -> Dictionary:
 		"behavior": _current_behavior,
 		"fight_power": _fight_power,
 		"fish_strength": _fish_strength,
+		"fish_strength_factor": _safe_zone_strength_factor,
 		"fish_aggression": _fish_aggression,
 		"load_kg": load_kg,
 		"line_load_ratio": line_load_ratio,
@@ -2000,5 +2327,9 @@ func _get_reeling_state() -> Dictionary:
 		"input_active": _reel_input_active,
 		"status": tension_status,
 		"high_danger": clamp(_high_danger_time / _high_fail_limit, 0.0, 1.0),
-		"low_danger": clamp(_low_danger_time / _low_fail_limit, 0.0, 1.0)
+		"low_danger": clamp(_low_danger_time / _low_fail_limit, 0.0, 1.0),
+		"target_duration": _target_progress_time,
+		"safe_zone_width": _green_max - _green_min,
+		"vibration_strength": _last_vibration_strength,
+		"vibration_label": _last_vibration_label
 	}

@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://bja30lu2tadmy"
+path="res://.godot/imported/A. Vasiliev – I Still Miss You _ A Soul Ballad You’ll Feel in Your Bones.ogg-d3cb94593ca7c4f515ea02f43b9cc2ff.oggvorbisstr"
+
+[deps]
+
+source_file="res://assets/audio/radio/music/evening/A. Vasiliev – I Still Miss You _ A Soul Ballad You’ll Feel in Your Bones.ogg"
+dest_files=["res://.godot/imported/A. Vasiliev – I Still Miss You _ A Soul Ballad You’ll Feel in Your Bones.ogg-d3cb94593ca7c4f515ea02f43b9cc2ff.oggvorbisstr"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

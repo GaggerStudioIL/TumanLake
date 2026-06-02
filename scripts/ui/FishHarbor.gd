@@ -97,6 +97,11 @@ func refresh() -> void:
 	_hide_buyer_popup()
 	if current_section != SECTION_MARKET:
 		_close_market_history_popup()
+	var inventory_manager := _inventory_manager()
+	if inventory_manager != null and inventory_manager.has_method("purge_zero_value_fish"):
+		if int(inventory_manager.call("purge_zero_value_fish")) > 0:
+			selected_fish.clear()
+			selected_buyers.clear()
 	_sanitize_selection()
 	_refresh_tabs()
 	_clear_children(section_content)

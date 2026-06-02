@@ -43,6 +43,9 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	set_process_input(true)
 	set_process_unhandled_input(true)
+	if change_scene_on_finish and not _should_play_intro():
+		call_deferred("_change_to_target_scene")
+		return
 	_build_scene_defs()
 	_build_nodes()
 	_setup_animation_player()
@@ -86,6 +89,12 @@ func _is_input_armed() -> bool:
 
 func _arm_input(delay_seconds: float) -> void:
 	input_armed_at_msec = Time.get_ticks_msec() + int(delay_seconds * 1000.0)
+
+func _should_play_intro() -> bool:
+	var save_manager := get_node_or_null("/root/SaveManager")
+	if save_manager != null and save_manager.has_method("is_intro_enabled"):
+		return bool(save_manager.call("is_intro_enabled"))
+	return true
 
 func _build_scene_defs() -> void:
 	scene_defs = [

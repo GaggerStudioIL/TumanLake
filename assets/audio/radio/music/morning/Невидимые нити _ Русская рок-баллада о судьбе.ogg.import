@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://blqgck0ocyolk"
+path="res://.godot/imported/Невидимые нити _ Русская рок-баллада о судьбе.ogg-412e861f9eccd27d8caa99c8e4e3d3da.oggvorbisstr"
+
+[deps]
+
+source_file="res://assets/audio/radio/music/morning/Невидимые нити _ Русская рок-баллада о судьбе.ogg"
+dest_files=["res://.godot/imported/Невидимые нити _ Русская рок-баллада о судьбе.ogg-412e861f9eccd27d8caa99c8e4e3d3da.oggvorbisstr"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

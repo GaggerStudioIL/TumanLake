@@ -279,11 +279,7 @@ func _update_waterbody_spot_picker(waterbody: Dictionary) -> void:
 	for i in total_count:
 		var spot: Dictionary = main._visible_waterbody_spots[i]
 		var spot_id = str(spot.get("id", ""))
-		var label = "%s  %.1f-%.1f м" % [
-			str(spot.get("name", "-")),
-			float(spot.get("min_depth", 0.2)),
-			float(spot.get("max_depth", 6.0))
-		]
+		var label = _get_waterbody_spot_button_text(spot)
 		if waterbody_id == PlayerData.current_waterbody and spot_id == PlayerData.current_spot:
 			label = "%s  |  текущая" % label
 		spot_labels.append(label)
@@ -314,11 +310,7 @@ func _update_waterbody_spot_picker(waterbody: Dictionary) -> void:
 	for i in range(page_start, page_end):
 		var spot: Dictionary = main._visible_waterbody_spots[i]
 		var spot_id = str(spot.get("id", ""))
-		var label = "%s  %.1f-%.1f м" % [
-			str(spot.get("name", "-")),
-			float(spot.get("min_depth", 0.2)),
-			float(spot.get("max_depth", 6.0))
-		]
+		var label = _get_waterbody_spot_button_text(spot)
 		if waterbody_id == PlayerData.current_waterbody and spot_id == PlayerData.current_spot:
 			label = "%s  |  текущая" % label
 		page_labels.append(label)
@@ -380,6 +372,13 @@ func _update_waterbody_spot_buttons(page_labels: Array, page_current_flags: Arra
 		)
 
 
+func _get_waterbody_spot_button_text(spot: Dictionary) -> String:
+	return "%s  до %.1f м" % [
+		str(spot.get("name", "-")),
+		float(spot.get("max_depth", spot.get("depth", 6.0)))
+	]
+
+
 func _get_selected_waterbody_spot() -> Dictionary:
 	for spot in main._visible_waterbody_spots:
 		if str(spot.get("id", "")) == main._selected_waterbody_spot_id:
@@ -411,10 +410,9 @@ func _get_waterbody_spot_details_text(spot: Dictionary) -> String:
 		if fish_names.size() >= 7:
 			break
 
-	return "%s\n%s\nГлубина: %.1f-%.1f м  |  лучше %.1f м\nРыба: %s\n\n%s" % [
+	return "%s\n%s\nГлубина воды: у берега мелко, дальше до %.1f м\nРабочая глубина снасти: лучше %.1f м\nРыба: %s\n\n%s" % [
 		str(spot.get("name", "-")),
 		str(spot.get("spot_type", spot.get("type", "-"))),
-		float(spot.get("min_depth", 0.2)),
 		float(spot.get("max_depth", 6.0)),
 		float(spot.get("preferred_depth", spot.get("depth", 1.0))),
 		", ".join(fish_names),

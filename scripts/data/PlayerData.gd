@@ -1,5 +1,7 @@
 extends Node
 
+const PHYSICAL_SHORE_MIN_DEPTH := 0.16
+
 const TACKLE_CATALOG := {
 	"simple_pole_rod_4m": {
 		"id": "simple_pole_rod_4m",
@@ -470,6 +472,7 @@ const TACKLE_CATALOG := {
 		"category": "rod",
 		"rarity": "trophy",
 		"price": 1500,
+		"image_path": "res://assets/ui/shop/rods/titan_hook_ultra_match.png",
 		"description": "Топовая силовая universal удочка с максимальной длиной и запасом. Для поздней альфы.",
 		"stats": {
 			"length_m": 6.5,
@@ -2376,6 +2379,7 @@ const REPAIR_BLOCK_WEAR_PERCENT := 90
 const BROKEN_WEAR_PERCENT := 100
 
 var money: float = 0.0
+var alpha_tester_bonus_claimed := false
 var level: int = 1
 var current_xp: int = 0
 var xp_to_next_level: int = 175
@@ -2858,12 +2862,14 @@ func get_current_spot_depth_range() -> Dictionary:
 	var spot := SpotDatabase.get_spot(current_spot)
 
 	if spot.is_empty():
-		return {"min": 0.2, "max": 6.0, "preferred": clamp(fishing_depth, 0.2, 6.0)}
+		return {"min": PHYSICAL_SHORE_MIN_DEPTH, "max": 6.0, "preferred": clamp(fishing_depth, PHYSICAL_SHORE_MIN_DEPTH, 6.0)}
 
+	var max_depth: float = float(spot.get("max_depth", 6.0))
 	return {
-		"min": float(spot.get("min_depth", 0.2)),
-		"max": float(spot.get("max_depth", 6.0)),
-		"preferred": float(spot.get("preferred_depth", spot.get("depth", 1.2)))
+		# spot.min_depth is an effective fish-depth hint; the physical shore depth starts shallow on every spot.
+		"min": PHYSICAL_SHORE_MIN_DEPTH,
+		"max": max(max_depth, PHYSICAL_SHORE_MIN_DEPTH),
+		"preferred": clamp(float(spot.get("preferred_depth", spot.get("depth", 1.2))), PHYSICAL_SHORE_MIN_DEPTH, max(max_depth, PHYSICAL_SHORE_MIN_DEPTH))
 	}
 
 func _get_raw_tackle_catalog_item(item_id: String) -> Dictionary:
