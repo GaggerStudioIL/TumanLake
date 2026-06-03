@@ -154,6 +154,8 @@ const MIST_PIER_VISUAL_PROFILE := {
 	"show_water": false,
 	"show_forest": false,
 	"show_light_overlay": false,
+	"show_foreground": true,
+	"foreground_z": 5,
 	"mist_enabled": false
 }
 const REEDS_PIER_VISUAL_PROFILE := {
@@ -162,17 +164,12 @@ const REEDS_PIER_VISUAL_PROFILE := {
 	"visual_tag": "reeds",
 	"sky": REEDS_PIER_ASSET_ROOT + "/kamishovi_most_sky.png",
 	"background": REEDS_PIER_ASSET_ROOT + "/kamishovi_most_background.png",
-	"water_shimmer": REEDS_PIER_ASSET_ROOT + "/kamishovi_most_water.png",
 	"foreground": REEDS_PIER_ASSET_ROOT + "/kamishovi_most_foreground.png",
-	"show_water": true,
+	"show_water": false,
 	"show_forest": false,
 	"show_light_overlay": false,
-	"water_rect": [0.0, 0.0, 1.0, 1.0],
-	"water_stretch_scale": true,
-	"water_z": -1,
-	"water_under_spot_layers": true,
-	"foreground_material": "reeds_foreground_cutout",
-	"foreground_stretch_scale": true,
+	"show_foreground": true,
+	"foreground_z": 5,
 	"mist_enabled": false
 }
 const GREEN_DUCKWEED_VISUAL_PROFILE := {

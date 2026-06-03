@@ -28,6 +28,7 @@ const TEMPERATURE_NIGHT_SAMPLE_MINUTES := 23.0 * 60.0
 const SCHEDULED_MORNING_FORECAST_MINUTES := 7.0 * 60.0
 const SCHEDULED_NIGHT_FORECAST_MINUTES := 23.0 * 60.0
 const SCHEDULED_FORECAST_POLL_SECONDS := 1.0
+const RADIO_SETTINGS_VERSION := 2
 
 const MUSIC_DIRS := {
 	"morning": "res://assets/audio/radio/music/morning/",
@@ -62,7 +63,7 @@ const VOICE_FILE_ALIASES := {
 
 const JINGLE_DIR := "res://assets/audio/radio/jingles/"
 
-var radio_enabled: bool = false
+var radio_enabled: bool = true
 var current_station: String = STATION_TUMAN_FM
 var music_volume: float = 0.55
 var voice_volume: float = 0.85
@@ -149,6 +150,9 @@ func _ready() -> void:
 	_ensure_timers()
 	_connect_time_manager()
 	_apply_all_volumes()
+	if radio_enabled:
+		radio_enabled = false
+		start_radio()
 
 
 func _process(delta: float) -> void:
@@ -211,6 +215,12 @@ func toggle_radio() -> void:
 
 func set_radio_enabled(value: bool) -> void:
 	if value == radio_enabled:
+		if value:
+			_set_audio_manager_music_source("radio")
+			if music_player == null or not music_player.playing:
+				play_next_music_track()
+			if _message_timer != null and _message_timer.is_stopped():
+				_message_timer.start()
 		return
 	if value:
 		start_radio()
@@ -237,6 +247,7 @@ func set_jingle_volume(value: float) -> void:
 
 func get_radio_settings() -> Dictionary:
 	return {
+		"settings_version": RADIO_SETTINGS_VERSION,
 		"radio_enabled": radio_enabled,
 		"current_station": current_station,
 		"music_volume": music_volume,
@@ -251,6 +262,10 @@ func get_radio_settings() -> Dictionary:
 
 
 func set_radio_settings(settings: Dictionary) -> void:
+	var saved_settings_version := int(settings.get("settings_version", 0))
+	var legacy_settings := saved_settings_version < RADIO_SETTINGS_VERSION
+	var has_radio_enabled_setting := settings.has("radio_enabled")
+
 	if settings.has("current_station"):
 		current_station = str(settings.get("current_station", STATION_TUMAN_FM))
 	if settings.has("music_volume"):
@@ -270,8 +285,15 @@ func set_radio_settings(settings: Dictionary) -> void:
 	if settings.has("scheduled_weather_forecast_window_minutes"):
 		scheduled_weather_forecast_window_minutes = clampf(float(settings.get("scheduled_weather_forecast_window_minutes", scheduled_weather_forecast_window_minutes)), 1.0, 60.0)
 	_apply_all_volumes()
-	if settings.has("radio_enabled"):
-		set_radio_enabled(bool(settings.get("radio_enabled", radio_enabled)))
+	if has_radio_enabled_setting:
+		var enabled := bool(settings.get("radio_enabled", radio_enabled))
+		# Early alpha builds could persist false before the station was really initialized on Android.
+		# Once the current settings_version is saved, a deliberate "radio off" choice is respected normally.
+		if legacy_settings and not enabled:
+			enabled = true
+		set_radio_enabled(enabled)
+	elif legacy_settings:
+		set_radio_enabled(true)
 
 
 func is_radio_enabled() -> bool:
@@ -1348,6 +1370,13 @@ func _list_audio_files(directory_path: String) -> Array:
 			var extension := file_name.get_extension().to_lower()
 			if AUDIO_EXTENSIONS.has(extension):
 				files.append(directory_path.path_join(file_name))
+			elif extension == "import":
+				var imported_name := file_name.trim_suffix(".import")
+				var imported_extension := imported_name.get_extension().to_lower()
+				if AUDIO_EXTENSIONS.has(imported_extension):
+					var imported_path := directory_path.path_join(imported_name)
+					if ResourceLoader.exists(imported_path) or FileAccess.file_exists(imported_path):
+						files.append(imported_path)
 		file_name = dir.get_next()
 	dir.list_dir_end()
 	return files
@@ -1358,14 +1387,15 @@ func _get_audio_stream(path: String) -> AudioStream:
 		return _audio_stream_cache[path] as AudioStream
 
 	var stream: AudioStream = null
-	match path.get_extension().to_lower():
-		"ogg":
-			stream = AudioStreamOggVorbis.load_from_file(path)
-		"mp3":
-			stream = AudioStreamMP3.load_from_file(path)
-		_:
-			if ResourceLoader.exists(path):
-				stream = load(path) as AudioStream
+	if ResourceLoader.exists(path):
+		stream = load(path) as AudioStream
+
+	if stream == null:
+		match path.get_extension().to_lower():
+			"ogg":
+				stream = AudioStreamOggVorbis.load_from_file(path)
+			"mp3":
+				stream = AudioStreamMP3.load_from_file(path)
 
 	if stream != null:
 		_audio_stream_cache[path] = stream
