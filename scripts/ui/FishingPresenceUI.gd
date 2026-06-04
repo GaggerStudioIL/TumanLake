@@ -2,12 +2,15 @@
 extends RefCounted
 
 signal cast_visual_finished
+signal final_catch_visual_finished
 
 var main
 var theme
 var _rod_texture: Texture2D
 var _rod_uses_external_texture := false
 var _float_texture: Texture2D
+var _float_texture_path := ""
+var _float_texture_uses_custom := false
 var _ripple_texture: Texture2D
 var _drop_splash_texture: Texture2D
 var _regular_splash_texture: Texture2D
@@ -27,6 +30,15 @@ var _cast_power := 1.0
 var _float_laid_down := false
 var _float_lay_down_timer := 0.0
 var _last_cast_float_center := Vector2.ZERO
+var _wind_drift_offset := Vector2.ZERO
+var _bite_pull_timer := 0.0
+var _bite_pull_duration := 0.0
+var _bite_pull_strength := 0.0
+var _final_catch_active := false
+var _final_catch_timer := 0.0
+var _final_catch_start_center := Vector2.ZERO
+var _final_catch_signal_sent := false
+var _landed_hold_active := false
 var is_cast_animating := false
 var rod_visual_state: int = 0
 @export var bobber_waterline_offset: Vector2 = Vector2(0.0, 34.0)
@@ -82,6 +94,14 @@ const SPOT_FLOAT_PROFILES := {
 		"water_top": 258.0,
 		"water_bottom": 416.0
 	},
+	"reeds_pier": {
+		"float_base": Vector2(504.0, 394.0),
+		"shore_cast_target": Vector2(620.0, 404.0),
+		"near_cast_target": Vector2(600.0, 356.0),
+		"far_cast_target": Vector2(524.0, 252.0),
+		"water_top": 242.0,
+		"water_bottom": 416.0
+	},
 	"morning_pier": {
 		"float_base": Vector2(500.0, 402.0),
 		"shore_cast_target": Vector2(560.0, 408.0),
@@ -122,6 +142,14 @@ const SPOT_FLOAT_PROFILES := {
 		"water_top": 290.0,
 		"water_bottom": 416.0
 	},
+	"mist_pier": {
+		"float_base": Vector2(500.0, 394.0),
+		"shore_cast_target": Vector2(560.0, 406.0),
+		"near_cast_target": Vector2(520.0, 354.0),
+		"far_cast_target": Vector2(476.0, 296.0),
+		"water_top": 286.0,
+		"water_bottom": 414.0
+	},
 	"green_duckweed": {
 		"float_base": Vector2(510.0, 352.0),
 		"shore_cast_target": Vector2(560.0, 404.0),
@@ -140,10 +168,15 @@ const SPOT_FLOAT_PROFILES := {
 	}
 }
 const BOBBER_LINE_ATTACH_OFFSET := Vector2(0.0, -8.0)
-const BOBBER_FAR_VISUAL_SCALE := 0.50
-const BOBBER_NEAR_VISUAL_SCALE := 1.0
+const BOBBER_FAR_VISUAL_SCALE := 0.62
+const BOBBER_NEAR_VISUAL_SCALE := 1.08
 const CAST_PERSPECTIVE_FAR_Y_RATIO := 0.22
 const CAST_PERSPECTIVE_NEAR_Y_RATIO := 0.74
+const FLOAT_DRIFT_PIXELS_PER_MPS := 2.75
+const FLOAT_DRIFT_MAX_CAST := 74.0
+const FLOAT_DRIFT_MAX_IDLE := 48.0
+const FINAL_CATCH_VISUAL_DURATION := 1.05
+const FINAL_CATCH_SWAY_HOLD := 0.28
 
 enum FishingUiState {
 	IDLE,
@@ -192,6 +225,9 @@ func start_cast_visual(cast_power: float = 1.0) -> void:
 	_float_laid_down = false
 	_float_lay_down_timer = 0.0
 	_last_cast_float_center = Vector2.ZERO
+	_wind_drift_offset = Vector2.ZERO
+	_landed_hold_active = false
+	_reset_catch_motion_state()
 	is_cast_animating = true
 	if _drop_splash_sprite != null:
 		_drop_splash_sprite.visible = false
@@ -212,6 +248,9 @@ func stop_cast_visual() -> void:
 	_float_laid_down = false
 	_float_lay_down_timer = 0.0
 	_last_cast_float_center = Vector2.ZERO
+	_wind_drift_offset = Vector2.ZERO
+	_landed_hold_active = false
+	_reset_catch_motion_state()
 	is_cast_animating = false
 	if _drop_splash_sprite != null:
 		_drop_splash_sprite.visible = false
@@ -242,6 +281,8 @@ func play_float_lay_down_animation() -> void:
 	_cast_landed = true
 	_float_laid_down = true
 	_float_lay_down_timer = FLOAT_LAY_DOWN_DURATION
+	_landed_hold_active = false
+	_reset_catch_motion_state()
 	is_cast_animating = false
 	rod_visual_state = RodVisualState.FLOAT_IN_WATER
 
@@ -272,6 +313,8 @@ func reset_float_visuals() -> void:
 	_float_laid_down = false
 	_float_lay_down_timer = 0.0
 	_last_cast_float_center = Vector2.ZERO
+	_wind_drift_offset = Vector2.ZERO
+	_reset_catch_motion_state()
 	is_cast_animating = false
 	if main != null:
 		main._presence_bite_timer = 0.0
@@ -281,6 +324,40 @@ func reset_float_visuals() -> void:
 func reset_after_landing() -> void:
 	rod_visual_state = RodVisualState.LANDED
 	reset_float_visuals()
+
+func play_final_catch_animation() -> void:
+	if main == null:
+		final_catch_visual_finished.emit()
+		return
+	_cast_timer = 0.0
+	_drop_splash_timer = 0.0
+	_float_nudge_timer = 0.0
+	_float_nudge_duration = 0.0
+	_float_nudge_strength = 0.0
+	_bite_pull_timer = 0.0
+	_bite_pull_duration = 0.0
+	_bite_pull_strength = 0.0
+	_float_laid_down = false
+	_float_lay_down_timer = 0.0
+	_cast_landed = true
+	_landed_hold_active = false
+	is_cast_animating = false
+	_final_catch_active = true
+	_final_catch_timer = FINAL_CATCH_VISUAL_DURATION + FINAL_CATCH_SWAY_HOLD
+	_final_catch_signal_sent = false
+	_final_catch_start_center = main._float_visual_center
+	if _final_catch_start_center == Vector2.ZERO:
+		_final_catch_start_center = _last_cast_float_center if _last_cast_float_center != Vector2.ZERO else main._float_base_center
+	rod_visual_state = RodVisualState.LANDED
+
+func _reset_catch_motion_state() -> void:
+	_bite_pull_timer = 0.0
+	_bite_pull_duration = 0.0
+	_bite_pull_strength = 0.0
+	_final_catch_active = false
+	_final_catch_timer = 0.0
+	_final_catch_start_center = Vector2.ZERO
+	_final_catch_signal_sent = false
 
 func _hide_float_and_line_visuals() -> void:
 	if main == null:
@@ -313,6 +390,9 @@ func play_bite_signal(data: Dictionary) -> void:
 	rod_visual_state = RodVisualState.BITE
 	if main != null:
 		main._presence_bite_timer = max(float(data.get("bite_window_seconds", 1.4)), 0.8)
+	_bite_pull_duration = clamp(float(data.get("bite_window_seconds", 1.4)), 0.45, 1.10)
+	_bite_pull_timer = _bite_pull_duration
+	_bite_pull_strength = clamp(float(data.get("strength", 0.75)), 0.25, 1.0)
 	play_float_nudge({
 		"strength": float(data.get("strength", 0.75)),
 		"duration": min(float(data.get("bite_window_seconds", 1.4)), 0.9)
@@ -371,6 +451,18 @@ func _layout_lake_art_background(screen_size: Vector2) -> void:
 func _ensure_day_night_controller() -> void:
 	if main.day_night_controller != null:
 		main.day_night_controller.visible = true
+		if main.day_night_controller.has_method("set_time_manager"):
+			main.day_night_controller.call("set_time_manager", main._get_time_manager())
+		return
+
+	var existing_controller := main.get_node_or_null("DayNightController") as Node2D
+	if existing_controller != null:
+		existing_controller.visible = true
+		existing_controller.z_as_relative = false
+		existing_controller.z_index = -110
+		main.day_night_controller = existing_controller
+		if existing_controller.has_method("set_time_manager"):
+			existing_controller.call("set_time_manager", main._get_time_manager())
 		return
 
 	var controller := DAY_NIGHT_CONTROLLER_SCRIPT.new() as Node2D
@@ -490,8 +582,15 @@ func _ensure_rod_sprite_nodes() -> void:
 
 
 func _ensure_float_sprite_nodes() -> void:
-	if _float_texture == null:
-		_float_texture = _load_texture_resource(FLOAT_TEXTURE_PATH)
+	var desired_float_texture_path: String = _get_current_float_texture_path()
+	if _float_texture == null or desired_float_texture_path != _float_texture_path:
+		_float_texture_path = desired_float_texture_path
+		_float_texture = _load_texture_resource(_float_texture_path)
+		_float_texture_uses_custom = _float_texture_path != FLOAT_TEXTURE_PATH and _float_texture != null
+		if _float_texture == null and _float_texture_path != FLOAT_TEXTURE_PATH:
+			_float_texture_path = FLOAT_TEXTURE_PATH
+			_float_texture = _load_texture_resource(FLOAT_TEXTURE_PATH)
+			_float_texture_uses_custom = false
 
 	if _ripple_texture == null:
 		_ripple_texture = _load_texture_resource(RIPPLE_TEXTURE_PATH)
@@ -517,7 +616,7 @@ func _ensure_float_sprite_nodes() -> void:
 		_float_sprite = Sprite2D.new()
 		_float_sprite.name = "GameplayFloatSprite"
 		_float_sprite.centered = true
-		_float_sprite.region_enabled = true
+		_float_sprite.region_enabled = not _float_texture_uses_custom
 		_float_sprite.region_rect = FLOAT_TEXTURE_REGION
 		_float_sprite.z_as_relative = false
 		_float_sprite.z_index = 25
@@ -550,7 +649,9 @@ func _ensure_float_sprite_nodes() -> void:
 
 	if _float_sprite != null:
 		_float_sprite.texture = _float_texture
-		_float_sprite.region_rect = FLOAT_TEXTURE_REGION
+		_float_sprite.region_enabled = not _float_texture_uses_custom
+		if not _float_texture_uses_custom:
+			_float_sprite.region_rect = FLOAT_TEXTURE_REGION
 
 	if _regular_splash_sprite != null:
 		_regular_splash_sprite.texture = _regular_splash_texture
@@ -601,6 +702,28 @@ func _load_rod_texture() -> Texture2D:
 
 	_rod_uses_external_texture = false
 	return _create_rod_texture()
+
+
+func _get_current_float_texture_path() -> String:
+	var float_data: Dictionary = _get_current_float_data()
+	var path: String = str(float_data.get("image_path", ""))
+	if path != "" and (ResourceLoader.exists(path) or FileAccess.file_exists(path)):
+		return path
+	return FLOAT_TEXTURE_PATH
+
+
+func _get_current_float_data() -> Dictionary:
+	if PlayerData != null and PlayerData.has_method("get_current_float_data"):
+		var data = PlayerData.call("get_current_float_data")
+		if data is Dictionary:
+			return (data as Dictionary).duplicate(true)
+	return {}
+
+
+func _get_float_sprite_texture_size() -> Vector2:
+	if _float_texture_uses_custom and _float_texture != null:
+		return _float_texture.get_size()
+	return FLOAT_TEXTURE_REGION.size
 
 
 func _load_texture_resource(path: String) -> Texture2D:
@@ -969,11 +1092,15 @@ func _sample_cubic_curve(
 func _get_presence_state() -> String:
 	if _cast_timer > 0.0:
 		return "casting"
+	if _final_catch_active:
+		return "final_catch"
 	if _float_laid_down:
 		return "laid_down"
 
-	if rod_visual_state == RodVisualState.UNCASTED or rod_visual_state == RodVisualState.LANDED:
+	if rod_visual_state == RodVisualState.UNCASTED:
 		return "uncasted"
+	if rod_visual_state == RodVisualState.LANDED:
+		return "landed" if _landed_hold_active else "uncasted"
 	if rod_visual_state == RodVisualState.CASTING:
 		return "casting"
 	if rod_visual_state == RodVisualState.BITE:
@@ -1042,6 +1169,47 @@ func _ease_out_sine(value: float) -> float:
 func _ease_in_out_sine(value: float) -> float:
 	return 0.5 - cos(clamp(value, 0.0, 1.0) * PI) * 0.5
 
+func _get_final_catch_progress() -> float:
+	var total_duration := FINAL_CATCH_VISUAL_DURATION + FINAL_CATCH_SWAY_HOLD
+	if total_duration <= 0.0:
+		return 1.0
+	var elapsed := total_duration - _final_catch_timer
+	return clamp(elapsed / FINAL_CATCH_VISUAL_DURATION, 0.0, 1.0)
+
+func _get_final_catch_rod_tip(screen_size: Vector2, scene_scale: float) -> Vector2:
+	var vertical_tip := Vector2(main._rod_anchor_pos.x - 18.0 * scene_scale, screen_size.y * 0.17)
+	vertical_tip.x = clamp(vertical_tip.x, screen_size.x * 0.42, screen_size.x * 0.74)
+	vertical_tip.y = clamp(vertical_tip.y, screen_size.y * 0.10, screen_size.y * 0.28)
+	return vertical_tip
+
+func _get_final_catch_float_center(screen_size: Vector2, scene_scale: float) -> Vector2:
+	var rod_tip := _get_final_catch_rod_tip(screen_size, scene_scale)
+	var air_center := rod_tip + Vector2(10.0, 72.0) * scene_scale
+	air_center.x = clamp(air_center.x, screen_size.x * 0.35, screen_size.x * 0.78)
+	air_center.y = clamp(air_center.y, screen_size.y * 0.16, screen_size.y * 0.46)
+	return air_center
+
+func _get_landed_float_center(screen_size: Vector2, scene_scale: float) -> Vector2:
+	return _get_final_catch_float_center(screen_size, scene_scale)
+
+func _get_reeling_pull_target(screen_size: Vector2, scene_scale: float) -> Vector2:
+	var shore_target := Vector2(main._rod_anchor_pos.x - 84.0 * scene_scale, main._water_zone_bottom - 8.0 * scene_scale)
+	shore_target.x = clamp(shore_target.x, screen_size.x * 0.34, screen_size.x * 0.72)
+	shore_target.y = clamp(shore_target.y, main._water_zone_top, main._water_zone_bottom)
+	return shore_target
+
+func _get_reeling_progress_ratio() -> float:
+	var progress := 0.0
+	if main == null:
+		return progress
+	if main._last_reeling_state.has("progress"):
+		progress = max(progress, float(main._last_reeling_state.get("progress", 0.0)))
+	if main._last_reeling_state.has("catch_progress"):
+		progress = max(progress, float(main._last_reeling_state.get("catch_progress", 0.0)))
+	if main._last_reeling_state.has("landing_progress"):
+		progress = max(progress, float(main._last_reeling_state.get("landing_progress", 0.0)))
+	return clamp(progress, 0.0, 1.0)
+
 
 func _get_cast_float_center(_target_center: Vector2, scene_scale: float) -> Vector2:
 	var cast_t: float = _get_cast_progress()
@@ -1079,14 +1247,32 @@ func _get_cast_landing_target_for_power(spot_profile: Dictionary, _scene_scale: 
 	if spot_profile.has("far_cast_target"):
 		far_target = _get_spot_profile_point(spot_profile, "far_cast_target", far_target)
 
-	var raw_power := _get_normalized_cast_visual_power()
+	var raw_power: float = clamp(_get_normalized_cast_visual_power() + _get_effective_cast_power_adjustment(), 0.0, 1.0)
 	var visual_power: float = _ease_out_sine(raw_power)
 	var landing_target := near_target.lerp(far_target, visual_power)
 	if raw_power <= 0.06:
 		landing_target = shore_target.lerp(near_target, raw_power / 0.06)
 	landing_target.x = clamp(landing_target.x, screen_size.x * 0.20, screen_size.x * 0.80)
-	landing_target.y = clamp(landing_target.y, screen_size.y * 0.18, screen_size.y * 0.76)
+	var min_landing_y: float = screen_size.y * 0.18
+	var max_landing_y: float = screen_size.y * 0.76
+	if spot_profile.has("water_top") and spot_profile.has("water_bottom"):
+		var water_top: float = min(float(spot_profile["water_top"]), float(spot_profile["water_bottom"])) * screen_size.y / 540.0
+		var water_bottom: float = max(float(spot_profile["water_top"]), float(spot_profile["water_bottom"])) * screen_size.y / 540.0
+		min_landing_y = max(min_landing_y, water_top + 4.0 * _scene_scale)
+		max_landing_y = min(max_landing_y, water_bottom - 4.0 * _scene_scale)
+	if min_landing_y > max_landing_y:
+		max_landing_y = min_landing_y
+	landing_target.y = clamp(landing_target.y, min_landing_y, max_landing_y)
 	return landing_target
+
+func _get_effective_cast_power_adjustment() -> float:
+	var float_data: Dictionary = _get_current_float_data()
+	var cast_distance_bonus: float = clamp(float(float_data.get("cast_distance_bonus", 0.0)), -0.20, 0.25)
+	var wind_state: Dictionary = _get_effective_wind_state()
+	var wind_speed: float = max(float(wind_state.get("speed_mps", 0.0)), 0.0)
+	var wind_resistance: float = clamp(float(float_data.get("wind_resistance", 0.65)), 0.0, 1.0)
+	var wind_penalty: float = max(wind_speed - 2.0, 0.0) / 8.0 * (1.0 - wind_resistance * 0.65)
+	return cast_distance_bonus * 0.55 - wind_penalty * 0.20
 
 func _get_point_on_cast_corridor(target_y: float, fallback_x: float) -> Vector2:
 	if main == null:
@@ -1111,6 +1297,8 @@ func _get_cast_float_rotation_degrees() -> float:
 	return lerp(8.0, 0.0, _ease_out_sine((cast_t - CAST_LANDING_START_PROGRESS) / (1.0 - CAST_LANDING_START_PROGRESS)))
 
 func _get_bobber_waterline_offset_weight(state: String) -> float:
+	if state == "final_catch" or state == "landed":
+		return 0.0
 	if state != "casting":
 		return 1.0
 
@@ -1119,6 +1307,8 @@ func _get_bobber_waterline_offset_weight(state: String) -> float:
 
 func _get_bobber_perspective_scale(center: Vector2, state: String) -> float:
 	if main == null:
+		return 1.0
+	if state == "final_catch" or state == "landed":
 		return 1.0
 	if state != "casting" and not _uses_cast_landing_surface(state):
 		return 1.0
@@ -1145,7 +1335,30 @@ func _get_bobber_line_attach_point(center: Vector2, state: String, scene_scale: 
 
 
 func _uses_cast_landing_surface(state: String) -> bool:
-	return _last_cast_float_center != Vector2.ZERO and ["waiting", "bite", "reeling", "caught", "laid_down"].has(state)
+	return _last_cast_float_center != Vector2.ZERO and ["waiting", "bite", "reeling", "caught", "laid_down", "final_catch"].has(state)
+
+
+func _get_effective_wind_state() -> Dictionary:
+	var wind_manager: Node = main.get_node_or_null("/root/WindManager") if main != null else null
+	if wind_manager != null:
+		if wind_manager.has_method("get_effective_wind_state"):
+			var effective_state = wind_manager.call("get_effective_wind_state", str(PlayerData.current_spot))
+			if effective_state is Dictionary:
+				return (effective_state as Dictionary).duplicate(true)
+		if wind_manager.has_method("get_wind_state"):
+			var base_state = wind_manager.call("get_wind_state")
+			if base_state is Dictionary:
+				return (base_state as Dictionary).duplicate(true)
+
+	return {
+		"speed_mps": 0.0,
+		"direction_degrees": 0.0,
+		"direction_vector": Vector2.RIGHT,
+		"gust_strength": 0.0,
+		"gust_active": false,
+		"description": "Штиль",
+		"icon_key": "wind_calm"
+	}
 
 
 func _get_cast_rod_tip_target(rest_tip: Vector2, scene_scale: float) -> Vector2:
@@ -1209,6 +1422,77 @@ func _trigger_drop_splash() -> void:
 	_cast_landed = true
 
 
+func _get_wind_visual_motion() -> Dictionary:
+	var wind_state: Dictionary = _get_effective_wind_state()
+	var float_data: Dictionary = _get_current_float_data()
+	var speed: float = max(float(wind_state.get("speed_mps", 0.0)), 0.0)
+	var stability: float = clamp(float(float_data.get("stability", 0.75)), 0.0, 1.0)
+	var motion: float = clamp(speed / 6.0, 0.0, 1.0) * (1.0 - stability * 0.45)
+	var gust_motion: float = 0.0
+	if bool(wind_state.get("gust_active", false)):
+		gust_motion = clamp(float(wind_state.get("gust_strength", 0.0)) / 5.0, 0.0, 0.42) * (1.0 - stability * 0.35)
+	return {
+		"motion": motion,
+		"gust_motion": gust_motion
+	}
+
+
+func _get_current_float_glow_profile() -> Dictionary:
+	var float_data: Dictionary = _get_current_float_data()
+	var float_type: String = str(float_data.get("float_type", ""))
+	var night_bonus: float = float(float_data.get("night_bonus", 0.0))
+	var is_glowing_float: bool = float_type == "glow_feather" or night_bonus > 0.0
+
+	if not is_glowing_float:
+		return {
+			"active": false,
+			"power": 1.0,
+			"scale_bonus": 0.0,
+			"tint": Color(0.84, 1.0, 0.72, 1.0)
+		}
+
+	var is_night: bool = _is_current_time_night()
+	var pulse: float = 0.5 + sin(main._presence_time * 2.2) * 0.5
+	return {
+		"active": true,
+		"power": (2.15 if is_night else 1.55) + pulse * (0.35 if is_night else 0.18),
+		"scale_bonus": 0.75 if is_night else 0.46,
+		"tint": Color(0.78, 1.0, 0.20, 1.0) if is_night else Color(0.94, 1.0, 0.32, 1.0)
+	}
+
+
+func _is_current_time_night() -> bool:
+	if main == null:
+		return false
+
+	var time_manager: Node = main.get_node_or_null("/root/TimeManager")
+	if time_manager != null and time_manager.has_method("get_time_state"):
+		var state = time_manager.call("get_time_state")
+		if state is Dictionary:
+			return str((state as Dictionary).get("time_of_day", "")) == "night"
+	if time_manager != null:
+		return str(time_manager.get("time_of_day")) == "night"
+	return false
+
+
+func _update_float_glow_material(glow_profile: Dictionary) -> void:
+	if main == null or main.float_glow == null:
+		return
+
+	var glow_material: ShaderMaterial = main.float_glow.material as ShaderMaterial
+	if glow_material == null:
+		return
+
+	var tint: Color = Color(0.84, 1.0, 0.72, 1.0)
+	var tint_value = glow_profile.get("tint", tint)
+	if tint_value is Color:
+		tint = tint_value
+
+	var power: float = float(glow_profile.get("power", 1.0)) if bool(glow_profile.get("active", false)) else 1.0
+	glow_material.set_shader_parameter("glow_tint", tint)
+	glow_material.set_shader_parameter("glow_power", power)
+
+
 func _set_float_presence(center: Vector2, state: String, intensity: float) -> void:
 	if state == "uncasted":
 		_hide_float_and_line_visuals()
@@ -1225,7 +1509,7 @@ func _set_float_presence(center: Vector2, state: String, intensity: float) -> vo
 	var ripple_alpha = 0.86
 	var glow_alpha = 1.0
 	var reflection_alpha = 0.74
-	var surface_y: float = center.y if state == "casting" or _uses_cast_landing_surface(state) else clamp(center.y, main._water_zone_top, main._water_zone_bottom)
+	var surface_y: float = center.y if state == "casting" or state == "final_catch" or state == "landed" or _uses_cast_landing_surface(state) else clamp(center.y, main._water_zone_top, main._water_zone_bottom)
 	var bobber_center := _get_bobber_visual_center(center, state)
 
 	match state:
@@ -1284,10 +1568,49 @@ func _set_float_presence(center: Vector2, state: String, intensity: float) -> vo
 			reflection_scale = 1.08
 			marker_sink = -3.0 + sin(main._presence_time * 2.0) * 1.2
 			marker_tilt = sin(main._presence_time * 1.4) * 1.4
+		"final_catch":
+			var lift_t: float = _ease_in_out_sine(_get_final_catch_progress())
+			ripple_scale = 0.0
+			glow_scale = 0.82 + lift_t * 0.10
+			reflection_scale = 0.0
+			marker_height = 18.0
+			marker_width = 4.8
+			marker_sink = 0.0
+			marker_tilt = sin(main._presence_time * 4.8) * (3.0 + lift_t * 3.0)
+			ripple_alpha = 0.0
+			glow_alpha = 0.58
+			reflection_alpha = 0.0
+		"landed":
+			ripple_scale = 0.0
+			glow_scale = 0.88 + sin(main._presence_time * 2.2) * 0.02
+			reflection_scale = 0.0
+			marker_height = 18.0
+			marker_width = 4.8
+			marker_sink = 0.0
+			marker_tilt = sin(main._presence_time * 3.0) * 2.2
+			ripple_alpha = 0.0
+			glow_alpha = 0.55
+			reflection_alpha = 0.0
 		_:
 			ripple_scale = 1.0 + sin(main._presence_time * 1.25) * 0.025
 			glow_scale = 1.0 + sin(main._presence_time * 1.1) * 0.035
 			reflection_scale = 1.0 + sin(main._presence_time * 1.0) * 0.018
+
+	if not ["casting", "uncasted", "final_catch", "landed"].has(state):
+		var wind_motion: Dictionary = _get_wind_visual_motion()
+		var motion: float = float(wind_motion.get("motion", 0.0))
+		var gust_motion: float = float(wind_motion.get("gust_motion", 0.0))
+		ripple_scale += motion * 0.08 + gust_motion * 0.05
+		reflection_scale += motion * 0.04
+		marker_sink += sin(main._presence_time * 3.1) * motion * 0.9 + gust_motion * 0.9
+		marker_tilt += sin(main._presence_time * 2.7) * motion * 4.2 + sin(main._presence_time * 7.4) * gust_motion * 4.0
+		ripple_alpha = clamp(ripple_alpha + motion * 0.12 + gust_motion * 0.10, 0.0, 1.2)
+
+	var glow_profile: Dictionary = _get_current_float_glow_profile()
+	if bool(glow_profile.get("active", false)):
+		var glow_pulse: float = 0.92 + sin(main._presence_time * 2.2) * 0.08
+		glow_scale += float(glow_profile.get("scale_bonus", 0.0)) * glow_pulse
+		glow_alpha += float(glow_profile.get("power", 1.0)) * 0.36
 
 	var perspective_scale := _get_bobber_perspective_scale(center, state)
 	ripple_scale *= perspective_scale
@@ -1313,7 +1636,9 @@ func _set_float_presence(center: Vector2, state: String, intensity: float) -> vo
 	var glow_size = Vector2(26.0, 26.0) * glow_scale
 	main.float_glow.size = glow_size
 	main.float_glow.position = Vector2(bobber_center.x - glow_size.x * 0.5, bobber_contact.y - glow_size.y * 0.5 - 2.0)
-	main.float_glow.modulate = Color(1.0, 1.0, 1.0, glow_alpha * 0.92)
+	_update_float_glow_material(glow_profile)
+	var glow_alpha_multiplier: float = 1.08 if bool(glow_profile.get("active", false)) else 0.92
+	main.float_glow.modulate = Color(1.0, 1.0, 1.0, glow_alpha * glow_alpha_multiplier)
 	main.float_glow.visible = true
 
 	main.float_marker.size = Vector2(marker_width, marker_height)
@@ -1335,7 +1660,7 @@ func _set_float_presence(center: Vector2, state: String, intensity: float) -> vo
 		_ripple_sprite.modulate = Color(0.90, 0.96, 0.98, clamp(ripple_alpha * 0.38, 0.16, 0.52))
 
 	if _regular_splash_sprite != null:
-		var regular_active: bool = (state != "idle" and state != "casting") or (state == "casting" and _cast_landed)
+		var regular_active: bool = state != "final_catch" and state != "landed" and ((state != "idle" and state != "casting") or (state == "casting" and _cast_landed))
 		var regular_phase: float = sin(main._presence_time * 1.55)
 		var regular_display_size: Vector2 = Vector2(126.0, 58.0) * (ripple_scale + regular_phase * 0.03)
 		_regular_splash_sprite.position = bobber_contact + Vector2(0.0, 1.5)
@@ -1348,16 +1673,19 @@ func _set_float_presence(center: Vector2, state: String, intensity: float) -> vo
 		_regular_splash_sprite.modulate = Color(0.54, 0.66, 0.70, clamp(ripple_alpha * 0.30, 0.18, 0.38) if regular_active else 0.0)
 
 	if _float_sprite != null:
-		var float_display_size := Vector2(marker_width * 1.78, marker_height * 1.50)
+		var float_display_size := Vector2(marker_width * 2.05, marker_height * 1.72)
+		if _float_texture_uses_custom:
+			float_display_size = Vector2(marker_width * 5.60, marker_height * 3.25)
+		var float_texture_size: Vector2 = _get_float_sprite_texture_size()
 		_float_sprite.position = Vector2(bobber_center.x, surface_y + marker_sink + bobber_center.y - center.y)
 		_float_sprite.scale = Vector2(
-			float_display_size.x / FLOAT_TEXTURE_REGION.size.x,
-			float_display_size.y / FLOAT_TEXTURE_REGION.size.y
+			float_display_size.x / max(float_texture_size.x, 1.0),
+			float_display_size.y / max(float_texture_size.y, 1.0)
 		)
-		_float_sprite.offset = Vector2(0.0, -FLOAT_TEXTURE_REGION.size.y * 0.080)
+		_float_sprite.offset = Vector2.ZERO if _float_texture_uses_custom else Vector2(0.0, -FLOAT_TEXTURE_REGION.size.y * 0.080)
 		_float_sprite.rotation = deg_to_rad(marker_tilt)
 		_float_sprite.visible = true
-		_float_sprite.modulate = Color(1.0, 1.0, 1.0, 0.98)
+		_float_sprite.modulate = Color(1.08, 1.12, 0.82, 0.98) if bool(glow_profile.get("active", false)) else Color(1.0, 1.0, 1.0, 0.98)
 
 	_update_bobber_ripple_node(center, surface_y, state, ripple_scale, ripple_alpha, marker_sink)
 	_update_bobber_contact_waterline(bobber_contact, state, ripple_scale, ripple_alpha)
@@ -1369,7 +1697,7 @@ func _update_bobber_ripple_node(center: Vector2, surface_y: float, state: String
 	if _bobber_ripple == null:
 		return
 
-	var active: bool = ripple_alpha > 0.01 and (state != "casting" or _cast_landed)
+	var active: bool = state != "final_catch" and state != "landed" and ripple_alpha > 0.01 and (state != "casting" or _cast_landed)
 	_bobber_ripple.visible = active
 	if not active:
 		return
@@ -1386,7 +1714,7 @@ func _update_bobber_contact_waterline(contact_point: Vector2, state: String, rip
 	if _bobber_contact_waterline == null:
 		return
 
-	var active: bool = ripple_alpha > 0.01 and (state != "casting" or _cast_landed)
+	var active: bool = state != "final_catch" and state != "landed" and ripple_alpha > 0.01 and (state != "casting" or _cast_landed)
 	_bobber_contact_waterline.visible = active
 	if not active:
 		return
@@ -1418,6 +1746,34 @@ func _update_splash_sprites(center: Vector2, surface_y: float, visual_scale: flo
 	_drop_splash_sprite.modulate = Color(0.62, 0.76, 0.80, (1.0 - eased) * 0.58)
 
 
+func _update_wind_drift(delta: float, state: String, screen_size: Vector2, has_cast_landing_surface: bool) -> void:
+	if not ["waiting", "bite", "laid_down"].has(state):
+		_wind_drift_offset = _wind_drift_offset.lerp(Vector2.ZERO, clamp(delta * 2.2, 0.0, 1.0))
+		return
+
+	var wind_state: Dictionary = _get_effective_wind_state()
+	var direction: Vector2 = Vector2.ZERO
+	var raw_direction = wind_state.get("direction_vector", Vector2.ZERO)
+	if raw_direction is Vector2:
+		direction = (raw_direction as Vector2).normalized()
+	if direction == Vector2.ZERO:
+		return
+
+	var float_data: Dictionary = _get_current_float_data()
+	var wind_speed: float = max(float(wind_state.get("speed_mps", 0.0)), 0.0)
+	var drift_resistance: float = clamp(float(float_data.get("drift_resistance", 0.65)), 0.0, 1.0)
+	var drift_speed: float = wind_speed * 0.9 * (1.0 - drift_resistance * 0.65)
+	if bool(wind_state.get("gust_active", false)):
+		drift_speed *= 1.4 + max(float(wind_state.get("gust_strength", 0.0)), 0.0) * 0.15
+	if wind_speed <= 0.5:
+		drift_speed *= 0.35
+
+	var scene_scale: float = clamp(screen_size.y / 540.0, 0.86, 1.26)
+	_wind_drift_offset += direction * drift_speed * FLOAT_DRIFT_PIXELS_PER_MPS * scene_scale * delta
+	var max_drift: float = (FLOAT_DRIFT_MAX_CAST if has_cast_landing_surface else FLOAT_DRIFT_MAX_IDLE) * scene_scale
+	_wind_drift_offset = _wind_drift_offset.limit_length(max_drift)
+
+
 func _update_fishing_presence(delta: float) -> void:
 	if not main._presence_has_layout:
 		return
@@ -1427,6 +1783,15 @@ func _update_fishing_presence(delta: float) -> void:
 	main._presence_caught_timer = max(main._presence_caught_timer - delta, 0.0)
 	_float_nudge_timer = max(_float_nudge_timer - delta, 0.0)
 	_float_lay_down_timer = max(_float_lay_down_timer - delta, 0.0)
+	_bite_pull_timer = max(_bite_pull_timer - delta, 0.0)
+	if _final_catch_active:
+		_final_catch_timer = max(_final_catch_timer - delta, 0.0)
+		if _final_catch_timer <= 0.0 and not _final_catch_signal_sent:
+			_final_catch_signal_sent = true
+			_final_catch_active = false
+			_landed_hold_active = true
+			rod_visual_state = RodVisualState.LANDED
+			final_catch_visual_finished.emit()
 	if _cast_timer > 0.0:
 		var was_casting := _cast_timer > 0.0
 		_cast_timer = max(_cast_timer - delta, 0.0)
@@ -1447,6 +1812,10 @@ func _update_fishing_presence(delta: float) -> void:
 		intensity = max(intensity, 0.9)
 	elif state == "caught":
 		intensity = max(intensity, 0.35 + main._presence_caught_timer * 0.15)
+	elif state == "final_catch":
+		intensity = max(intensity, 0.42)
+	elif state == "landed":
+		intensity = max(intensity * 0.10, 0.18)
 	elif state == "idle":
 		intensity *= 0.2
 	elif state == "uncasted":
@@ -1472,9 +1841,25 @@ func _update_fishing_presence(delta: float) -> void:
 	if has_cast_landing_surface:
 		base_float_center = _last_cast_float_center
 
+	_update_wind_drift(delta, state, screen_size, has_cast_landing_surface)
+	if state == "reeling" and has_cast_landing_surface:
+		var pull_progress: float = _smooth_unit(_get_reeling_progress_ratio())
+		var shore_target := _get_reeling_pull_target(screen_size, scene_scale)
+		base_float_center = base_float_center.lerp(shore_target, clamp(pull_progress * 0.84 + intensity * 0.08, 0.0, 0.92))
+
 	match state:
 		"bite":
-			float_offset += Vector2(sin(main._presence_time * 22.0) * 7.0, 14.0 + abs(sin(main._presence_time * 18.0)) * 9.0)
+			var bite_t := 1.0
+			if _bite_pull_duration > 0.0:
+				bite_t = clamp(1.0 - _bite_pull_timer / _bite_pull_duration, 0.0, 1.0)
+			var shore_direction: Vector2 = (main._rod_anchor_pos - base_float_center).normalized()
+			if shore_direction == Vector2.ZERO:
+				shore_direction = Vector2(0.54, 0.84).normalized()
+			var bite_normal: Vector2 = _get_line_normal(base_float_center, main._rod_anchor_pos)
+			var pull_amount: float = (18.0 + _bite_pull_strength * 22.0) * _ease_out_sine(bite_t) * scene_scale
+			float_offset += shore_direction * pull_amount
+			float_offset += bite_normal * sin(main._presence_time * 20.0) * (2.5 + _bite_pull_strength * 3.5) * scene_scale
+			float_offset += Vector2(sin(main._presence_time * 22.0) * 4.0, 6.0 + abs(sin(main._presence_time * 18.0)) * 5.0)
 		"reeling":
 			float_offset += Vector2(sin(main._presence_time * 7.7) * (2.0 + intensity * 3.5), sin(main._presence_time * 6.3) * (2.0 + intensity * 3.0))
 		"caught":
@@ -1488,10 +1873,10 @@ func _update_fishing_presence(delta: float) -> void:
 			(5.0 + _float_nudge_strength * 8.0) * nudge_pulse
 		)
 
-	var target_float_center = base_float_center + float_offset + scene_breath * 0.35
+	var target_float_center = base_float_center + float_offset + _wind_drift_offset + scene_breath * 0.35
 	if has_cast_landing_surface:
 		target_float_center.x = clamp(target_float_center.x, screen_size.x * 0.20, screen_size.x * 0.80)
-		target_float_center.y = clamp(target_float_center.y, screen_size.y * 0.18, screen_size.y * 0.78)
+		target_float_center.y = clamp(target_float_center.y, main._water_zone_top, main._water_zone_bottom)
 	else:
 		target_float_center.x = clamp(target_float_center.x, screen_size.x * 0.26, screen_size.x * 0.74)
 		target_float_center.y = clamp(target_float_center.y, main._water_zone_top, main._water_zone_bottom)
@@ -1500,6 +1885,17 @@ func _update_fishing_presence(delta: float) -> void:
 	if state == "casting":
 		target_float_center = _get_cast_float_center(main._float_base_center + scene_breath * 0.35, scene_scale)
 		float_follow = 1.0
+	elif state == "final_catch":
+		var float_lift_t: float = _ease_in_out_sine(_get_final_catch_progress())
+		var airborne_target := _get_final_catch_float_center(screen_size, scene_scale)
+		var sway_power: float = clamp(float_lift_t * 1.4, 0.0, 1.0)
+		target_float_center = _final_catch_start_center.lerp(airborne_target, float_lift_t)
+		target_float_center += Vector2(sin(main._presence_time * 5.0) * 4.6, sin(main._presence_time * 4.2 + 0.4) * 2.4) * scene_scale * sway_power
+		float_follow = 10.5
+	elif state == "landed":
+		target_float_center = _get_landed_float_center(screen_size, scene_scale)
+		target_float_center += Vector2(sin(main._presence_time * 2.8) * 2.4, sin(main._presence_time * 2.1 + 0.6) * 1.4) * scene_scale
+		float_follow = 7.5
 	elif state == "bite":
 		float_follow = 13.0
 	elif state == "reeling":
@@ -1529,14 +1925,26 @@ func _update_fishing_presence(delta: float) -> void:
 	match state:
 		"casting":
 			rod_tip_target = _get_cast_rod_tip_target(rod_tip_rest, scene_scale)
+		"final_catch":
+			var rod_lift_t: float = _ease_in_out_sine(_get_final_catch_progress())
+			var final_vertical_tip: Vector2 = _get_final_catch_rod_tip(screen_size, scene_scale)
+			var sway: Vector2 = Vector2(sin(main._presence_time * 3.6) * 3.0, sin(main._presence_time * 3.0 + 0.8) * 2.0) * scene_scale * clamp(rod_lift_t * 1.25, 0.0, 1.0)
+			rod_tip_target = rod_tip_rest.lerp(final_vertical_tip, rod_lift_t) + sway
+		"landed":
+			var landed_vertical_tip: Vector2 = _get_final_catch_rod_tip(screen_size, scene_scale)
+			var landed_sway: Vector2 = Vector2(sin(main._presence_time * 2.4) * 1.7, sin(main._presence_time * 1.9 + 0.8) * 1.2) * scene_scale
+			rod_tip_target = landed_vertical_tip + landed_sway
 		"bite":
 			var bite_pull: float = 12.0 + abs(sin(main._presence_time * 12.0)) * 7.0
 			var bite_shake: Vector2 = _get_line_normal(rod_tip_rest, main._float_visual_center) * sin(main._presence_time * 18.0) * 1.8
 			rod_tip_target += tip_pull_direction * bite_pull + bite_shake
 		"reeling":
+			var lift_t: float = _ease_in_out_sine(clamp(_get_reeling_progress_ratio() * 1.12, 0.0, 1.0))
+			var reeling_vertical_tip: Vector2 = _get_final_catch_rod_tip(screen_size, scene_scale)
+			var lifted_tip: Vector2 = rod_tip_rest.lerp(reeling_vertical_tip, lift_t * 0.78)
 			var fight_pull: float = 8.0 + intensity * 26.0
 			var fight_pulse: Vector2 = tip_pull_direction * sin(main._presence_time * 4.2) * (0.7 + intensity * 1.5)
-			rod_tip_target += tip_pull_direction * fight_pull + fight_pulse
+			rod_tip_target = lifted_tip + tip_pull_direction * fight_pull * lerp(1.0, 0.46, lift_t) + fight_pulse
 		"caught":
 			rod_tip_target += tip_pull_direction * 4.0 + Vector2(-3.0, -3.0 + sin(main._presence_time * 1.8) * 1.1)
 		_:
@@ -1546,6 +1954,10 @@ func _update_fishing_presence(delta: float) -> void:
 
 	if state == "casting":
 		rod_tip_follow = 10.0
+	elif state == "final_catch":
+		rod_tip_follow = 8.5
+	elif state == "landed":
+		rod_tip_follow = 6.0
 	elif state == "bite":
 		rod_tip_follow = 7.5
 	elif state == "reeling":
@@ -1576,6 +1988,10 @@ func _update_fishing_presence(delta: float) -> void:
 
 	if state == "bite":
 		bend_direction_follow = 6.0
+	elif state == "final_catch":
+		bend_direction_follow = 5.2
+	elif state == "landed":
+		bend_direction_follow = 4.6
 	elif state == "reeling":
 		bend_direction_follow = 4.6
 
@@ -1592,6 +2008,10 @@ func _update_fishing_presence(delta: float) -> void:
 	match state:
 		"casting":
 			target_bend_amount = 8.0 + sin(_get_cast_progress() * PI) * 3.4
+		"final_catch":
+			target_bend_amount = 2.4 + sin(main._presence_time * 3.1) * 0.35
+		"landed":
+			target_bend_amount = 2.2 + sin(main._presence_time * 2.2) * 0.22
 		"bite":
 			target_bend_amount = 5.0 + abs(sin(main._presence_time * 8.0)) * 1.6
 		"reeling":
@@ -1608,6 +2028,10 @@ func _update_fishing_presence(delta: float) -> void:
 
 	if state == "casting":
 		bend_amount_follow = 7.0
+	elif state == "final_catch":
+		bend_amount_follow = 5.4
+	elif state == "landed":
+		bend_amount_follow = 4.5
 	elif state == "bite":
 		bend_amount_follow = 5.0
 	elif state == "reeling":
@@ -1677,6 +2101,10 @@ func _update_fishing_presence(delta: float) -> void:
 		sag = 7.0
 	elif state == "caught":
 		sag = 22.0
+	elif state == "final_catch":
+		sag = 10.0 + sin(main._presence_time * 3.4) * 2.0
+	elif state == "landed":
+		sag = 14.0 + sin(main._presence_time * 2.4) * 1.6
 
 	var line_start: Vector2 = main._rod_tip_visual
 	var line_sway: float = sin(main._presence_time * 2.0) * (1.0 + intensity * 0.8)
@@ -1727,6 +2155,14 @@ func _update_fishing_presence(delta: float) -> void:
 	elif state == "caught":
 		line_alpha = 0.34
 		glow_alpha = 0.014
+		line_width = 0.32
+	elif state == "final_catch":
+		line_alpha = 0.40
+		glow_alpha = 0.020
+		line_width = 0.34
+	elif state == "landed":
+		line_alpha = 0.38
+		glow_alpha = 0.016
 		line_width = 0.32
 
 	main.fishing_line.width = line_width

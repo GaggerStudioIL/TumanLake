@@ -18,6 +18,7 @@ func refresh() -> void:
 	update_money()
 	update_time()
 	update_weather()
+	update_wind()
 	update_location()
 	update_level()
 
@@ -50,6 +51,43 @@ func update_weather() -> void:
 	main.weather_label.tooltip_text = str(weather_state.get("description", ""))
 	if main.weather_effects_controller != null and main.weather_effects_controller.has_method("update_weather_state"):
 		main.weather_effects_controller.update_weather_state(weather_state)
+	update_wind()
+
+
+func update_wind() -> void:
+	if main == null or main.wind_label == null:
+		return
+	var wind_manager := get_wind_manager()
+	if wind_manager == null:
+		main.wind_label.visible = false
+		if main.wind_hud_icon != null:
+			main.wind_hud_icon.visible = false
+		return
+
+	var wind_state := {}
+	if wind_manager.has_method("get_effective_wind_state"):
+		wind_state = wind_manager.call("get_effective_wind_state", str(PlayerData.current_spot))
+	elif wind_manager.has_method("get_wind_state"):
+		wind_state = wind_manager.call("get_wind_state")
+	if not (wind_state is Dictionary):
+		main.wind_label.visible = false
+		if main.wind_hud_icon != null:
+			main.wind_hud_icon.visible = false
+		return
+
+	var speed: float = float((wind_state as Dictionary).get("speed_mps", 0.0))
+	var degrees: float = float((wind_state as Dictionary).get("direction_degrees", 0.0))
+	var gust_active: bool = bool((wind_state as Dictionary).get("gust_active", false))
+	var description: String = str((wind_state as Dictionary).get("description", ""))
+	var arrow: String = _get_wind_direction_arrow(degrees)
+	var speed_text: String = "Штиль" if speed <= 0.5 and not gust_active else "%.1f м/с" % speed
+	main.wind_label.text = "%s %s%s" % [arrow, speed_text, " ↑" if gust_active else ""]
+	main.wind_label.visible = true
+	main.wind_label.tooltip_text = "%s, %.1f м/с, %.0f°" % [description, speed, degrees]
+	main.wind_label.modulate = Color(1.0, 0.92, 0.66, 1.0) if gust_active else Color.WHITE
+	if main.wind_hud_icon != null:
+		main.wind_hud_icon.visible = true
+		main.wind_hud_icon.modulate = Color(1.0, 0.92, 0.66, 0.96) if gust_active else Color(1.0, 1.0, 1.0, 0.94)
 
 
 func update_location() -> void:
@@ -77,6 +115,31 @@ func get_time_manager() -> Node:
 	if root == null:
 		return null
 	return root.get_node_or_null("/root/TimeManager")
+
+
+func get_wind_manager() -> Node:
+	if root == null:
+		return null
+	return root.get_node_or_null("/root/WindManager")
+
+
+func _get_wind_direction_arrow(degrees: float) -> String:
+	var normalized := fposmod(degrees, 360.0)
+	if normalized >= 337.5 or normalized < 22.5:
+		return "→"
+	if normalized < 67.5:
+		return "↘"
+	if normalized < 112.5:
+		return "↓"
+	if normalized < 157.5:
+		return "↙"
+	if normalized < 202.5:
+		return "←"
+	if normalized < 247.5:
+		return "↖"
+	if normalized < 292.5:
+		return "↑"
+	return "↗"
 
 
 func get_clock_text() -> String:

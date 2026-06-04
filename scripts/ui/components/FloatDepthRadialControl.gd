@@ -11,6 +11,7 @@ signal depth_change_committed(value: float)
 
 var depth_value := 1.2
 var hook_texture: Texture2D
+var draw_depth_text := true
 
 var _dragging := false
 var _arc_top_angle := deg_to_rad(228.0)
@@ -25,6 +26,11 @@ func _ready() -> void:
 
 func set_hook_texture(texture: Texture2D) -> void:
 	hook_texture = texture
+	queue_redraw()
+
+
+func set_draw_depth_text(enabled: bool) -> void:
+	draw_depth_text = enabled
 	queue_redraw()
 
 
@@ -141,7 +147,8 @@ func _draw() -> void:
 	draw_circle(knob_pos, maxf(edge * 0.030, 3.5), Color(0.18, 0.28, 0.28, 0.92))
 
 	_draw_wave_icon(center + Vector2(0.0, -edge * 0.145), edge)
-	_draw_depth_text(center, edge)
+	if draw_depth_text:
+		_draw_depth_text(center, edge)
 
 
 func _update_depth_from_point(point: Vector2) -> void:

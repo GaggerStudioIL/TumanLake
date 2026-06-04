@@ -151,7 +151,7 @@ func _ensure_profile_ui_nodes() -> void:
 	scroll.name = "ProfileScroll"
 	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	scroll.offset_left = 28.0
-	scroll.offset_top = 128.0
+	scroll.offset_top = 144.0
 	scroll.offset_right = -28.0
 	scroll.offset_bottom = -24.0
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -169,7 +169,7 @@ func _ensure_profile_ui_nodes() -> void:
 func _refresh_tabs() -> void:
 	_clear_children(tabs)
 	var data := [
-		[TAB_INFO, "Основная информация"],
+		[TAB_INFO, "Общее"],
 		[TAB_SKILLS, "Навыки"],
 		[TAB_HELP, "Помощь"],
 		[TAB_RECORDS, "Рекорды"]
@@ -193,11 +193,13 @@ func _set_active_tab(tab_id: String) -> void:
 func _add_info_section() -> void:
 	var top := HBoxContainer.new()
 	top.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top.add_theme_constant_override("separation", 14)
+	top.add_theme_constant_override("separation", 18)
 	content.add_child(top)
 
 	var avatar := Panel.new()
-	avatar.custom_minimum_size = Vector2(126.0, 126.0)
+	avatar.custom_minimum_size = Vector2(124.0, 124.0)
+	avatar.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	avatar.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	theme.apply_card_style(avatar)
 	top.add_child(avatar)
 
@@ -219,7 +221,7 @@ func _add_info_section() -> void:
 	_add_stat_card(grid, "Деньги", UIFormatters.format_money(PlayerData.money))
 	_add_stat_card(grid, "Водоём", _get_current_waterbody_name())
 	_add_stat_card(grid, "Поймано рыб", "%d" % PlayerData.total_fish_caught)
-	_add_stat_card(grid, "Общий вес", UIFormatters.format_weight_kg(float(PlayerData.get("total_fish_weight"))))
+	_add_stat_card(grid, "Рекорд за сутки", _format_daily_weight_record())
 	_add_stat_card(grid, "Самый дорогой улов", _format_short_record(_get_most_expensive_catch(), true))
 	_add_stat_card(grid, "Самая крупная рыба", _format_short_record(PlayerData.biggest_fish))
 	_add_stat_card(grid, "Трофеи", "%d" % PlayerData.total_trophies_caught)
@@ -227,32 +229,31 @@ func _add_info_section() -> void:
 
 func _add_skills_section() -> void:
 	var intro := Panel.new()
-	intro.custom_minimum_size = Vector2(0.0, 82.0)
+	intro.custom_minimum_size = Vector2(0.0, 68.0)
 	intro.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	theme.apply_card_style(intro)
 	content.add_child(intro)
 
-	var row := HBoxContainer.new()
-	row.set_anchors_preset(Control.PRESET_FULL_RECT)
-	row.offset_left = 16.0
-	row.offset_top = 12.0
-	row.offset_right = -16.0
-	row.offset_bottom = -12.0
-	row.add_theme_constant_override("separation", 14)
-	intro.add_child(row)
-
-	var text_box := VBoxContainer.new()
-	text_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(text_box)
-	text_box.add_child(_make_label("Очки навыков: %d" % PlayerData.skill_points, 16, Color(0.94, 1.0, 0.92, 1.0)))
-	text_box.add_child(_make_label("Навыки показывают, как развивается рыбак: ловля, вываживание, снасти и торговля.", 12, Color(0.72, 0.84, 0.78, 0.94)))
+	var points := _make_label("Очки навыков: %d" % PlayerData.skill_points, 16, Color(0.94, 1.0, 0.92, 1.0))
+	points.set_anchors_preset(Control.PRESET_LEFT_WIDE)
+	points.offset_left = 16.0
+	points.offset_top = 0.0
+	points.offset_right = -330.0
+	points.offset_bottom = 0.0
+	points.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	intro.add_child(points)
 
 	var skill_button := Button.new()
-	skill_button.text = "Дерево навыков"
-	skill_button.custom_minimum_size = Vector2(160.0, 44.0)
+	skill_button.text = "Ветка Навыков"
+	skill_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	skill_button.offset_left = -292.0
+	skill_button.offset_top = 16.0
+	skill_button.offset_right = -26.0
+	skill_button.offset_bottom = 52.0
+	skill_button.custom_minimum_size = Vector2(0.0, 0.0)
 	main._apply_button_style(skill_button, main.STYLE_PRIMARY_BUTTON)
 	skill_button.pressed.connect(open_skill_tree)
-	row.add_child(skill_button)
+	intro.add_child(skill_button)
 
 	var skill_database := _get_skill_database()
 	if skill_database == null:
@@ -264,59 +265,69 @@ func _add_skills_section() -> void:
 		_add_empty_label(content, "Навыки пока не настроены.")
 		return
 
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	content.add_child(grid)
+
 	for branch_id in branch_ids:
-		_add_skill_branch_card(str(branch_id), skill_database)
+		_add_skill_branch_card(grid, str(branch_id), skill_database)
 
 
-func _add_skill_branch_card(branch_id: String, skill_database: Node) -> void:
+func _add_skill_branch_card(parent: Control, branch_id: String, skill_database: Node) -> void:
 	var skills: Array = skill_database.call("get_branch_skills", branch_id) if skill_database.has_method("get_branch_skills") else []
-	var learned := 0
-	var names: Array = []
+	var learned: int = 0
 	for skill in skills:
 		if typeof(skill) != TYPE_DICTIONARY:
 			continue
 		var skill_id := str(skill.get("id", ""))
 		if PlayerData.has_skill(skill_id):
 			learned += 1
-			names.append("%s: изучено" % str(skill.get("name", skill_id)))
-		else:
-			names.append("%s: далее" % str(skill.get("name", skill_id)))
 
 	var total: int = maxi(skills.size(), 1)
-	var card := Panel.new()
-	card.custom_minimum_size = Vector2(0.0, 112.0)
+	var card := Button.new()
+	card.text = ""
+	card.custom_minimum_size = Vector2(172.0, 92.0)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	theme.apply_card_style(card)
-	content.add_child(card)
+	card.focus_mode = Control.FOCUS_NONE
+	main._apply_button_style(card, main.STYLE_SECONDARY_BUTTON)
+	card.pressed.connect(_open_skill_branch.bind(branch_id))
+	parent.add_child(card)
 
-	var title := _make_label(str(skill_database.call("get_branch_title", branch_id)), 16, Color(0.94, 1.0, 0.92, 1.0))
-	title.position = Vector2(14.0, 10.0)
-	title.size = Vector2(300.0, 22.0)
-	card.add_child(title)
+	var box := VBoxContainer.new()
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.set_anchors_preset(Control.PRESET_FULL_RECT)
+	box.offset_left = 10.0
+	box.offset_top = 9.0
+	box.offset_right = -10.0
+	box.offset_bottom = -8.0
+	box.add_theme_constant_override("separation", 4)
+	card.add_child(box)
 
-	var progress := ProgressBar.new()
-	progress.position = Vector2(14.0, 40.0)
-	progress.size = Vector2(320.0, 14.0)
-	progress.max_value = total
-	progress.value = learned
-	progress.show_percentage = false
-	card.add_child(progress)
+	var title := _make_label(str(skill_database.call("get_branch_title", branch_id)), 15, Color(0.94, 1.0, 0.92, 1.0))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_child(title)
 
-	var level := _make_label("Уровень: %d / %d" % [learned, total], 12, Color(0.74, 0.88, 0.80, 0.95))
-	level.position = Vector2(350.0, 34.0)
-	level.size = Vector2(160.0, 24.0)
-	card.add_child(level)
+	var learned_label := _make_label("Изучено %d/%d" % [learned, total], 12, Color(0.74, 0.88, 0.80, 0.95))
+	learned_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	learned_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_child(learned_label)
 
-	var preview_lines := ""
-	for i in mini(names.size(), 3):
-		if preview_lines != "":
-			preview_lines += "\n"
-		preview_lines += str(names[i])
-	var effects := _make_label(preview_lines, 12, Color(0.72, 0.82, 0.78, 0.94))
-	effects.position = Vector2(14.0, 64.0)
-	effects.size = Vector2(660.0, 42.0)
-	effects.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	card.add_child(effects)
+
+func _open_skill_branch(branch_id: String) -> void:
+	if skill_tree_ui == null:
+		skill_tree_ui = SkillTreeUIScript.new()
+		skill_tree_ui.setup(main, self)
+	if skill_tree_ui.has_method("open_tree"):
+		skill_tree_ui.open_tree(branch_id)
+	else:
+		skill_tree_ui.open()
 
 
 func open_skill_tree() -> void:
@@ -327,46 +338,97 @@ func open_skill_tree() -> void:
 
 
 func _add_help_section() -> void:
-	var topics := [
-		["Как ловить рыбу", "Выберите точку, выставьте глубину, нажмите заброс и следите за поплавком. При поклёвке вовремя подсекайте и держите натяжение в безопасной зоне."],
-		["Что такое садок", "Садок хранит пойманную рыбу. Это единственное хранилище улова перед продажей или отпусканием."],
-		["Как продавать улов", "Откройте Рыбную гавань, выберите рыбу из садка, сравните покупателей и продайте выбранное или всё по лучшим предложениям."],
-		["Что такое Рыбная гавань", "Это торговый хаб для продажи улова, просмотра покупателей, контрактов, рыночного спроса и репутации."],
-		["Поставщики и покупатели", "У каждого покупателя свои условия: качество, редкость, вес, репутация и тип рыбы."],
-		["Контракты", "Контракты требуют конкретную рыбу, вес или количество. Прогресс засчитывается при подходящей продаже."],
-		["Зачётная рыба", "Зачётная рыба достигла минимального полезного веса и продаётся заметно дороже мелочи."],
-		["Трофейная рыба", "Трофейная рыба сильно превышает норму вида, выделяется в интерфейсе и получает большой ценовой множитель."],
-		["Рынок", "Спрос меняется по игровым дням. Высокий множитель рынка делает вид выгоднее сегодня."],
-		["Как улучшать снасти", "Покупайте предметы в магазине, экипируйте их в инвентаре и следите за прочностью снасти."]
+	var sections := [
+		["Основы ловли", [
+			["Как ловить рыбу", "Выберите водоём и точку, соберите снасть, выставьте глубину и нажмите заброс. Следите за поплавком: при уверенной поклёвке подсекайте и держите натяжение в безопасной зоне."],
+			["Глубина и точка", "Разная рыба держится на разной глубине и в разных местах. Если поклёвок мало, смените глубину, наживку или точку ловли."],
+			["Вываживание", "Во время вываживания удерживайте натяжение в рабочей зоне. Слишком слабое натяжение повышает шанс схода, слишком сильное увеличивает риск обрыва."],
+			["Сход и обрыв", "Если рыба резко дёргает снасть, слабый элемент может не выдержать. Обычно рвётся самый слабый участок: поводок, леска или повреждённая часть оснастки."]
+		]],
+		["Снасти и сборка", [
+			["Полная снасть", "Для маховой ловли нужны: удочка, основная леска, поводок, крючок, поплавок и наживка. Если обязательный элемент не установлен, игра покажет предупреждение."],
+			["Поводки", "Поводок ставится между основной леской и крючком. Тонкий поводок лучше для осторожной рыбы, мощный поводок надёжнее на крупной рыбе, но может снижать шанс поклёвки мелочи."],
+			["Обрыв поводка", "При обрыве поводка обычно теряются поводок, крючок и наживка. Удочка, основная леска и поплавок остаются. При обрыве основной лески потери могут быть больше."],
+			["Наживка и бутерброд", "Навык «Ловля на бутерброд» открывает второй слот наживки для маховой снасти. Если установлены две наживки, система поклёвки учитывает обе, а при поклёвке расходуется по одной единице каждой активной наживки."],
+			["Износ снасти", "Снасти изнашиваются при ловле и сильном вываживании. Следите за прочностью: повреждённые элементы чаще ломаются и хуже держат рывки."]
+		]],
+		["Улов и продажа", [
+			["Садок", "Садок хранит пойманную рыбу до продажи или отпускания. Рыба попадает в садок после успешного вылова."],
+			["Рыбная гавань", "Рыбная гавань нужна для продажи улова, сравнения покупателей, просмотра контрактов, спроса рынка и репутации."],
+			["Покупатели", "У покупателей разные условия: одни ценят вес, другие редкость, качество, конкретные виды или вашу репутацию."],
+			["Рынок", "Спрос меняется по игровым дням. Если у вида высокий рыночный множитель, продавать его сегодня выгоднее."],
+			["Контракты", "Контракты требуют конкретную рыбу, вес, качество или количество. Прогресс засчитывается при подходящей продаже."],
+			["Зачётная и трофейная рыба", "Зачётная рыба достигла минимального полезного веса и стоит дороже мелочи. Трофейная рыба сильно превышает норму вида и получает большой ценовой бонус."]
+		]],
+		["Развитие", [
+			["Навыки", "За повышение уровня игрок получает очки навыков. Ветки развивают разные стили ловли, ремесло, кулинарию и выживание. Финальные навыки требуют вложений в ветку и ключевых умений."],
+			["Очки навыков", "Чем выше уровень, тем больше очков даётся за следующий уровень. Обычные навыки имеют ранги, и каждый следующий ранг стоит дороже."],
+			["Ремесло", "Ремесленные навыки готовят добычу наживки, создание поводков, прикормки и ремонт снастей. Часть возможностей может открываться позже по мере развития механик."],
+			["Кулинария и выживание", "Кулинария готовит еду и будущие бонусы. Выживание снижает влияние холода, жары, ночной рыбалки и расход энергии на сложных водоёмах."]
+		]]
 	]
 
-	for topic in topics:
-		_add_help_card(str(topic[0]), str(topic[1]))
+	for section in sections:
+		_add_help_section_title(str(section[0]))
+		for topic in section[1]:
+			_add_help_card(str(topic[0]), str(topic[1]))
 	_add_rescue_kit_card()
+
+
+func _add_help_section_title(text: String) -> void:
+	var label := _make_label(text, 16, Color(0.92, 1.0, 0.86, 1.0))
+	label.custom_minimum_size = Vector2(0.0, 26.0)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	content.add_child(label)
 
 
 func _add_help_card(title_text: String, body_text: String) -> void:
 	var card := Panel.new()
-	card.custom_minimum_size = Vector2(0.0, 86.0)
+	var card_height: float = _estimate_help_card_height(title_text, body_text)
+	card.custom_minimum_size = Vector2(0.0, card_height)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	theme.apply_card_style(card)
 	content.add_child(card)
 
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.offset_left = 14.0
+	margin.offset_top = 9.0
+	margin.offset_right = -14.0
+	margin.offset_bottom = -10.0
+	card.add_child(margin)
+
+	var box := VBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 7)
+	margin.add_child(box)
+
 	var title := _make_label(title_text, 15, Color(0.94, 1.0, 0.92, 1.0))
-	title.position = Vector2(14.0, 9.0)
-	title.size = Vector2(620.0, 22.0)
-	card.add_child(title)
+	title.custom_minimum_size = Vector2(0.0, 24.0)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.clip_text = false
+	box.add_child(title)
 
 	var body := _make_label(body_text, 12, Color(0.74, 0.84, 0.80, 0.94))
-	body.position = Vector2(14.0, 36.0)
-	body.size = Vector2(700.0, 42.0)
-	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	card.add_child(body)
+	body.custom_minimum_size = Vector2(0.0, card_height - 54.0)
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD
+	body.clip_text = false
+	box.add_child(body)
+
+
+func _estimate_help_card_height(title_text: String, body_text: String) -> float:
+	var body_lines: int = ceili(float(body_text.length()) / 72.0)
+	body_lines += body_text.count("\n")
+	var title_lines: int = ceili(float(title_text.length()) / 54.0)
+	return maxf(86.0, 34.0 + float(maxi(title_lines, 1)) * 20.0 + float(maxi(body_lines, 1)) * 18.0)
 
 
 func _add_rescue_kit_card() -> void:
 	var card := Panel.new()
-	card.custom_minimum_size = Vector2(0.0, 104.0)
+	card.custom_minimum_size = Vector2(0.0, 118.0)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	theme.apply_card_style(card)
 	content.add_child(card)
@@ -379,15 +441,16 @@ func _add_rescue_kit_card() -> void:
 	var check: Dictionary = PlayerData.can_claim_rescue_kit()
 	var body := _make_label(str(check.get("reason", "")), 12, Color(0.74, 0.84, 0.80, 0.94))
 	body.position = Vector2(14.0, 36.0)
-	body.size = Vector2(470.0, 54.0)
+	body.size = Vector2(500.0, 72.0)
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.clip_text = false
 	card.add_child(body)
 
 	var button := Button.new()
 	button.text = "Получить"
 	button.disabled = not bool(check.get("allowed", false))
-	button.position = Vector2(520.0, 52.0)
-	button.size = Vector2(138.0, 40.0)
+	button.position = Vector2(560.0, 58.0)
+	button.size = Vector2(126.0, 40.0)
 	main._apply_button_style(button, main.STYLE_PRIMARY_BUTTON if bool(check.get("allowed", false)) else main.STYLE_SECONDARY_BUTTON)
 	button.pressed.connect(_on_rescue_kit_button_pressed.bind(body, button))
 	card.add_child(button)
@@ -482,28 +545,28 @@ func _add_section_title(text: String) -> void:
 func _make_grid(columns: int) -> GridContainer:
 	var grid := GridContainer.new()
 	grid.columns = columns
-	grid.add_theme_constant_override("h_separation", 10)
-	grid.add_theme_constant_override("v_separation", 10)
+	grid.add_theme_constant_override("h_separation", 14)
+	grid.add_theme_constant_override("v_separation", 12)
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return grid
 
 
 func _add_stat_card(parent: Control, label_text: String, value_text: String) -> void:
 	var card := Panel.new()
-	card.custom_minimum_size = Vector2(190.0, 70.0)
+	card.custom_minimum_size = Vector2(178.0, 66.0)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	theme.apply_card_style(card)
 	parent.add_child(card)
 
 	var label := _make_label(label_text, 12, Color(0.68, 0.78, 0.72, 0.92))
 	label.position = Vector2(14.0, 8.0)
-	label.size = Vector2(168.0, 20.0)
+	label.size = Vector2(150.0, 20.0)
 	label.clip_text = true
 	card.add_child(label)
 
 	var value := _make_label(value_text, 15, Color(0.94, 1.0, 0.92, 1.0))
 	value.position = Vector2(14.0, 31.0)
-	value.size = Vector2(168.0, 30.0)
+	value.size = Vector2(150.0, 28.0)
 	value.clip_text = true
 	card.add_child(value)
 
@@ -556,6 +619,13 @@ func _format_short_record(record: Dictionary, include_price: bool = false) -> St
 	if include_price:
 		text += " | %s" % UIFormatters.format_money(float(record.get("price", 0)))
 	return text
+
+
+func _format_daily_weight_record() -> String:
+	var weight: float = maxf(float(PlayerData.best_daily_fish_weight), float(PlayerData.daily_fish_weight))
+	if weight <= 0.0:
+		return "пока нет данных"
+	return UIFormatters.format_weight_kg(weight)
 
 
 func _get_most_expensive_catch() -> Dictionary:

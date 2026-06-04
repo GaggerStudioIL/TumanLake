@@ -617,8 +617,10 @@ func _play_catch_reward_sound(tier: String) -> void:
 
 	match tier:
 		"trophy":
-			main._play_audio_hook(main.catch_trophy_audio)
-		"rarity", "rare":
+			main._call_audio_manager("play_trophy_catch")
+		"rarity":
+			main._call_audio_manager("play_rare_trophy_catch")
+		"rare":
 			main._play_audio_hook(main.catch_rare_audio)
 		_:
 			main._play_audio_hook(main.catch_reward_audio)

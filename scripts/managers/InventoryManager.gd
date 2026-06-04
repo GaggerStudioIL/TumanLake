@@ -53,13 +53,13 @@ func purge_zero_value_fish() -> int:
 			continue
 
 		var catch_data: Dictionary = _prepare_sale_catch_data(item)
-		if is_zero_value_fish(catch_data):
+		if _is_invalid_fish_record(catch_data):
 			inventory.remove_at(index)
 			removed_count += 1
 
 	last_zero_value_cleanup_count = removed_count
 	if removed_count > 0:
-		print("Removed zero-value fish from keepnet: %d" % removed_count)
+		print("Removed invalid fish records from keepnet: %d" % removed_count)
 	return removed_count
 
 
@@ -72,6 +72,21 @@ func is_zero_value_fish(catch_data: Dictionary) -> bool:
 		return true
 
 	return _get_best_positive_cleanup_price(catch_data) <= 0
+
+
+func _is_invalid_fish_record(catch_data: Dictionary) -> bool:
+	if catch_data.is_empty():
+		return true
+
+	var fish_id := str(catch_data.get("id", catch_data.get("fish_id", ""))).strip_edges()
+	if fish_id.is_empty():
+		return true
+	if FishDatabase.get_fish(fish_id).is_empty():
+		return true
+	if float(catch_data.get("weight", 0.0)) <= 0.0:
+		return true
+
+	return false
 
 
 func _get_best_positive_cleanup_price(catch_data: Dictionary) -> int:

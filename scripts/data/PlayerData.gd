@@ -1,6 +1,26 @@
 extends Node
 
 const PHYSICAL_SHORE_MIN_DEPTH := 0.16
+const BASIC_FLOAT_ID := "float_drop_basic"
+const BASIC_LEADER_ID := "nylon_leader_20cm_1kg"
+const LEGACY_TACKLE_ITEM_ALIASES := {
+	"light_float": "float_feather_basic",
+	"medium_float": "float_drop_basic",
+	"night_float": "float_glow_feather",
+	"basic_mono_leader_1kg": BASIC_LEADER_ID,
+	"soft_fluoro_leader_2kg": "fluoro_leader_25cm_2kg",
+	"strong_braid_leader_4kg": "braided_leader_25cm_5kg"
+}
+const WORM_BAIT_PRICE_OVERRIDES := {
+	"worm": 1.2,
+	"cherv_moskovskiy": 2.4,
+	"cherv_surskiy": 2.8,
+	"cherv_navozni": 1.6,
+	"cherv_astrahanskiy": 4.8,
+	"cherv_volhovskiy": 5.2,
+	"cherv_leningradskiy": 5.6,
+	"vipolzok": 5.8
+}
 
 const TACKLE_CATALOG := {
 	"simple_pole_rod_4m": {
@@ -896,55 +916,892 @@ const TACKLE_CATALOG := {
 			"wear_rate": 0.022
 		}
 	},
-	"basic_mono_leader_1kg": {
-		"id": "basic_mono_leader_1kg",
-		"name": "Basic Mono Leader 1 kg",
+	"nylon_leader_10cm_0_5kg": {
+		"id": "nylon_leader_10cm_0_5kg",
+		"name": "Нейлоновый поводок 10 см / 0.5 кг",
+		"type": "leader",
+		"category": "leader",
+		"rarity": "common",
+		"price": 12,
+		"level_required": 1,
+		"description": "Очень тонкий короткий поводок для уклейки, мелкой плотвы и быстрой поклёвки. Контроль выше, но осторожная рыба чаще замечает короткую подачу.",
+		"stats": {
+			"leader_type": "nylon",
+			"material": "nylon",
+			"length_cm": 10,
+			"max_load_kg": 0.5,
+			"max_load": 0.5,
+			"strength": 0.5,
+			"visibility": 0.025,
+			"bite_protection": 0.00,
+			"control_bonus": 0.05,
+			"cautious_bite_bonus": -0.05,
+			"small_fish_penalty": 0.00,
+			"break_resistance": 0.82,
+			"break_chance": 0.22,
+			"durability": 1.0,
+			"wear_rate": 0.023
+		}
+	},
+	"nylon_leader_15cm_1kg": {
+		"id": "nylon_leader_15cm_1kg",
+		"name": "Нейлоновый поводок 15 см / 1 кг",
+		"type": "leader",
+		"category": "leader",
+		"rarity": "common",
+		"price": 16,
+		"level_required": 1,
+		"description": "Короткий недорогой поводок для активной мелкой рыбы. Даёт хороший контроль при вываживании.",
+		"stats": {
+			"leader_type": "nylon",
+			"material": "nylon",
+			"length_cm": 15,
+			"max_load_kg": 1.0,
+			"max_load": 1.0,
+			"strength": 1.0,
+			"visibility": 0.035,
+			"bite_protection": 0.00,
+			"control_bonus": 0.05,
+			"cautious_bite_bonus": -0.05,
+			"small_fish_penalty": 0.01,
+			"break_resistance": 0.88,
+			"break_chance": 0.18,
+			"durability": 1.0,
+			"wear_rate": 0.022
+		}
+	},
+	"nylon_leader_20cm_1kg": {
+		"id": "nylon_leader_20cm_1kg",
+		"name": "Нейлоновый поводок 20 см / 1 кг",
 		"type": "leader",
 		"category": "leader",
 		"rarity": "common",
 		"price": 18,
-		"description": "Thin starter leader for cautious small fish.",
+		"image_path": "res://assets/ui/tackle/leaders/nylon_leader_20cm_1kg.png",
+		"level_required": 1,
+		"description": "Базовый стартовый поводок для плотвы, уклейки и мелкого карася. Дешёвый, универсальный, без ярких бонусов.",
 		"stats": {
-			"leader_type": "mono",
+			"leader_type": "nylon",
+			"material": "nylon",
+			"length_cm": 20,
+			"max_load_kg": 1.0,
+			"max_load": 1.0,
 			"strength": 1.0,
-			"visibility": 0.04,
+			"visibility": 0.040,
 			"bite_protection": 0.00,
+			"control_bonus": 0.00,
+			"cautious_bite_bonus": 0.00,
+			"small_fish_penalty": 0.00,
+			"break_resistance": 0.92,
+			"break_chance": 0.17,
 			"durability": 1.0,
 			"wear_rate": 0.020
 		}
 	},
-	"soft_fluoro_leader_2kg": {
-		"id": "soft_fluoro_leader_2kg",
-		"name": "Soft Fluoro Leader 2 kg",
+	"nylon_leader_25cm_2kg": {
+		"id": "nylon_leader_25cm_2kg",
+		"name": "Нейлоновый поводок 25 см / 2 кг",
 		"type": "leader",
 		"category": "leader",
-		"rarity": "uncommon",
-		"price": 48,
-		"description": "Low-visibility leader for clear water and delicate float rigs.",
+		"rarity": "common",
+		"price": 28,
+		"image_path": "res://assets/ui/tackle/leaders/nylon_leader_25cm_2kg.png",
+		"level_required": 1,
+		"description": "Универсальный нейлоновый поводок для карася, подлещика и спокойной озёрной рыбы.",
 		"stats": {
-			"leader_type": "fluoro",
+			"leader_type": "nylon",
+			"material": "nylon",
+			"length_cm": 25,
+			"max_load_kg": 2.0,
+			"max_load": 2.0,
 			"strength": 2.0,
-			"visibility": 0.025,
-			"bite_protection": 0.03,
+			"visibility": 0.055,
+			"bite_protection": 0.00,
+			"control_bonus": 0.00,
+			"cautious_bite_bonus": 0.00,
+			"small_fish_penalty": 0.02,
+			"break_resistance": 0.98,
+			"break_chance": 0.14,
+			"durability": 1.0,
+			"wear_rate": 0.019
+		}
+	},
+	"nylon_leader_30cm_3kg": {
+		"id": "nylon_leader_30cm_3kg",
+		"name": "Нейлоновый поводок 30 см / 3 кг",
+		"type": "leader",
+		"category": "leader",
+		"rarity": "common",
+		"price": 42,
+		"image_path": "res://assets/ui/tackle/leaders/nylon_leader_30cm_3kg.png",
+		"level_required": 1,
+		"description": "Простой прочный поводок для уверенной ловли карася, подлещика и некрупного леща.",
+		"stats": {
+			"leader_type": "nylon",
+			"material": "nylon",
+			"length_cm": 30,
+			"max_load_kg": 3.0,
+			"max_load": 3.0,
+			"strength": 3.0,
+			"visibility": 0.070,
+			"bite_protection": 0.00,
+			"control_bonus": 0.00,
+			"cautious_bite_bonus": 0.00,
+			"small_fish_penalty": 0.03,
+			"break_resistance": 1.02,
+			"break_chance": 0.12,
 			"durability": 1.0,
 			"wear_rate": 0.018
 		}
 	},
-	"strong_braid_leader_4kg": {
-		"id": "strong_braid_leader_4kg",
-		"name": "Strong Braid Leader 4 kg",
+	"fluoro_leader_25cm_2kg": {
+		"id": "fluoro_leader_25cm_2kg",
+		"name": "Флюорокарбоновый поводок 25 см / 2 кг",
+		"type": "leader",
+		"category": "leader",
+		"rarity": "uncommon",
+		"price": 56,
+		"image_path": "res://assets/ui/tackle/leaders/fluoro_leader_25cm_2kg.png",
+		"level_required": 2,
+		"description": "Малозаметный поводок для прозрачной воды и осторожной белой рыбы. Чуть менее гибкий, зато лучше провоцирует поклёвку.",
+		"stats": {
+			"leader_type": "fluorocarbon",
+			"material": "fluorocarbon",
+			"length_cm": 25,
+			"max_load_kg": 2.0,
+			"max_load": 2.0,
+			"strength": 2.0,
+			"visibility": 0.020,
+			"bite_protection": 0.02,
+			"control_bonus": -0.01,
+			"cautious_bite_bonus": 0.05,
+			"small_fish_penalty": 0.00,
+			"break_resistance": 0.96,
+			"break_chance": 0.13,
+			"durability": 1.0,
+			"wear_rate": 0.018
+		}
+	},
+	"fluoro_leader_30cm_3kg": {
+		"id": "fluoro_leader_30cm_3kg",
+		"name": "Флюорокарбоновый поводок 30 см / 3 кг",
+		"type": "leader",
+		"category": "leader",
+		"rarity": "uncommon",
+		"price": 74,
+		"image_path": "res://assets/ui/tackle/leaders/fluoro_leader_30cm_3kg.png",
+		"level_required": 3,
+		"description": "Универсальный флюорокарбон для карася, подлещика и осторожного леща.",
+		"stats": {
+			"leader_type": "fluorocarbon",
+			"material": "fluorocarbon",
+			"length_cm": 30,
+			"max_load_kg": 3.0,
+			"max_load": 3.0,
+			"strength": 3.0,
+			"visibility": 0.026,
+			"bite_protection": 0.03,
+			"control_bonus": -0.01,
+			"cautious_bite_bonus": 0.06,
+			"small_fish_penalty": 0.01,
+			"break_resistance": 0.99,
+			"break_chance": 0.12,
+			"durability": 1.0,
+			"wear_rate": 0.017
+		}
+	},
+	"fluoro_leader_40cm_5kg": {
+		"id": "fluoro_leader_40cm_5kg",
+		"name": "Флюорокарбоновый поводок 40 см / 5 кг",
 		"type": "leader",
 		"category": "leader",
 		"rarity": "rare",
-		"price": 92,
-		"description": "Stronger leader for bigger fish. More visible, but safer under pressure.",
+		"price": 128,
+		"image_path": "res://assets/ui/tackle/leaders/fluoro_leader_40cm_5kg.png",
+		"level_required": 5,
+		"description": "Длинный малозаметный поводок для осторожной крупной рыбы. Лучше даёт поклёвку, но немного снижает контроль.",
 		"stats": {
-			"leader_type": "braid",
-			"strength": 4.0,
-			"visibility": 0.08,
-			"bite_protection": 0.07,
+			"leader_type": "fluorocarbon",
+			"material": "fluorocarbon",
+			"length_cm": 40,
+			"max_load_kg": 5.0,
+			"max_load": 5.0,
+			"strength": 5.0,
+			"visibility": 0.032,
+			"bite_protection": 0.04,
+			"control_bonus": -0.05,
+			"cautious_bite_bonus": 0.12,
+			"small_fish_penalty": 0.04,
+			"break_resistance": 1.03,
+			"break_chance": 0.10,
 			"durability": 1.0,
 			"wear_rate": 0.016
+		}
+	},
+	"fluoro_leader_50cm_3kg": {
+		"id": "fluoro_leader_50cm_3kg",
+		"name": "Флюорокарбоновый поводок 50 см / 3 кг",
+		"type": "leader",
+		"category": "leader",
+		"rarity": "rare",
+		"price": 104,
+		"level_required": 4,
+		"description": "Длинный деликатный поводок для самой осторожной мирной рыбы. Хорошо маскирует снасть, но хуже контролируется на вываживании.",
+		"stats": {
+			"leader_type": "fluorocarbon",
+			"material": "fluorocarbon",
+			"length_cm": 50,
+			"max_load_kg": 3.0,
+			"max_load": 3.0,
+			"strength": 3.0,
+			"visibility": 0.024,
+			"bite_protection": 0.03,
+			"control_bonus": -0.05,
+			"cautious_bite_bonus": 0.13,
+			"small_fish_penalty": 0.02,
+			"break_resistance": 0.98,
+			"break_chance": 0.12,
+			"durability": 1.0,
+			"wear_rate": 0.017
+		}
+	},
+	"braided_leader_25cm_5kg": {
+		"id": "braided_leader_25cm_5kg",
+		"name": "Плетёный поводок 25 см / 5 кг",
+		"type": "leader",
+		"category": "leader",
+		"rarity": "uncommon",
+		"price": 92,
+		"image_path": "res://assets/ui/tackle/leaders/braided_leader_25cm_5kg.png",
+		"level_required": 3,
+		"description": "Прочный поводок с хорошим контролем для крупного леща, карпа и амура. Более заметен в воде.",
+		"stats": {
+			"leader_type": "braided",
+			"material": "braided",
+			"length_cm": 25,
+			"max_load_kg": 5.0,
+			"max_load": 5.0,
+			"strength": 5.0,
+			"visibility": 0.105,
+			"bite_protection": 0.06,
+			"control_bonus": 0.04,
+			"cautious_bite_bonus": -0.06,
+			"small_fish_penalty": 0.06,
+			"break_resistance": 1.15,
+			"break_chance": 0.08,
+			"durability": 1.0,
+			"wear_rate": 0.015
+		}
+	},
+	"braided_leader_30cm_8kg": {
+		"id": "braided_leader_30cm_8kg",
+		"name": "Плетёный поводок 30 см / 8 кг",
+		"type": "leader",
+		"category": "leader",
+		"rarity": "rare",
+		"price": 148,
+		"image_path": "res://assets/ui/tackle/leaders/braided_leader_30cm_8kg.png",
+		"level_required": 6,
+		"description": "Силовая плетёнка для крупной рыбы. Держит рывки и даёт контроль, но отпугивает осторожную мелочь.",
+		"stats": {
+			"leader_type": "braided",
+			"material": "braided",
+			"length_cm": 30,
+			"max_load_kg": 8.0,
+			"max_load": 8.0,
+			"strength": 8.0,
+			"visibility": 0.130,
+			"bite_protection": 0.08,
+			"control_bonus": 0.04,
+			"cautious_bite_bonus": -0.07,
+			"small_fish_penalty": 0.09,
+			"break_resistance": 1.22,
+			"break_chance": 0.07,
+			"durability": 1.0,
+			"wear_rate": 0.014
+		}
+	},
+	"reinforced_leader_30cm_5kg": {
+		"id": "reinforced_leader_30cm_5kg",
+		"name": "Усиленный поводок 30 см / 5 кг",
+		"type": "leader",
+		"category": "leader",
+		"rarity": "uncommon",
+		"price": 118,
+		"image_path": "res://assets/ui/tackle/leaders/reinforced_leader_30cm_5kg.png",
+		"level_required": 4,
+		"description": "Усиленный поводок для крупного леща и карповой рыбы. Надёжнее тонкого нейлона, но грубее для осторожной мелочи.",
+		"stats": {
+			"leader_type": "reinforced",
+			"material": "reinforced",
+			"length_cm": 30,
+			"max_load_kg": 5.0,
+			"max_load": 5.0,
+			"strength": 5.0,
+			"visibility": 0.120,
+			"bite_protection": 0.10,
+			"control_bonus": 0.01,
+			"cautious_bite_bonus": -0.09,
+			"small_fish_penalty": 0.08,
+			"break_resistance": 1.28,
+			"break_chance": 0.06,
+			"durability": 1.0,
+			"wear_rate": 0.013
+		}
+	},
+	"reinforced_leader_40cm_12kg": {
+		"id": "reinforced_leader_40cm_12kg",
+		"name": "Усиленный поводок 40 см / 12 кг",
+		"type": "leader",
+		"category": "leader",
+		"rarity": "rare",
+		"price": 230,
+		"image_path": "res://assets/ui/tackle/leaders/reinforced_leader_40cm_12kg.png",
+		"level_required": 8,
+		"description": "Мощный длинный поводок под крупного карпа, амура и тяжёлую рыбу. Сильно заметен для мелкой мирной рыбы.",
+		"stats": {
+			"leader_type": "reinforced",
+			"material": "reinforced",
+			"length_cm": 40,
+			"max_load_kg": 12.0,
+			"max_load": 12.0,
+			"strength": 12.0,
+			"visibility": 0.165,
+			"bite_protection": 0.14,
+			"control_bonus": -0.03,
+			"cautious_bite_bonus": -0.02,
+			"small_fish_penalty": 0.13,
+			"break_resistance": 1.40,
+			"break_chance": 0.05,
+			"durability": 1.0,
+			"wear_rate": 0.012
+		}
+	},
+	"steel_leader_30cm_12kg": {
+		"id": "steel_leader_30cm_12kg",
+		"name": "Стальной поводок 30 см / 12 кг",
+		"type": "leader",
+		"category": "leader",
+		"rarity": "rare",
+		"price": 260,
+		"image_path": "res://assets/ui/tackle/leaders/steel_leader_30cm_12kg.png",
+		"level_required": 9,
+		"description": "Стальной поводок для хищника. Защищает от перекуса, но заметен и плохо подходит для осторожной мирной рыбы.",
+		"stats": {
+			"leader_type": "steel",
+			"material": "steel",
+			"length_cm": 30,
+			"max_load_kg": 12.0,
+			"max_load": 12.0,
+			"strength": 12.0,
+			"visibility": 0.240,
+			"bite_protection": 0.26,
+			"control_bonus": -0.01,
+			"cautious_bite_bonus": -0.18,
+			"small_fish_penalty": 0.17,
+			"break_resistance": 1.48,
+			"break_chance": 0.04,
+			"durability": 1.0,
+			"wear_rate": 0.010
+		}
+	},
+	"steel_leader_40cm_20kg": {
+		"id": "steel_leader_40cm_20kg",
+		"name": "Стальной поводок 40 см / 20 кг",
+		"type": "leader",
+		"category": "leader",
+		"rarity": "trophy",
+		"price": 420,
+		"image_path": "res://assets/ui/tackle/leaders/steel_leader_40cm_20kg.png",
+		"level_required": 12,
+		"description": "Тяжёлый стальной поводок для будущей ловли щуки, сома и спиннинга. Максимальная защита, минимальная деликатность.",
+		"stats": {
+			"leader_type": "steel",
+			"material": "steel",
+			"length_cm": 40,
+			"max_load_kg": 20.0,
+			"max_load": 20.0,
+			"strength": 20.0,
+			"visibility": 0.280,
+			"bite_protection": 0.30,
+			"control_bonus": -0.05,
+			"cautious_bite_bonus": -0.16,
+			"small_fish_penalty": 0.20,
+			"break_resistance": 1.58,
+			"break_chance": 0.035,
+			"durability": 1.0,
+			"wear_rate": 0.009
+		}
+	},
+	"float_feather_basic": {
+		"id": "float_feather_basic",
+		"name": "Поплавок «Перо»",
+		"type": "float",
+		"category": "float",
+		"float_type": "feather",
+		"rarity": "common",
+		"price": 65,
+		"image_path": "res://assets/ui/tackle/floats/float_feather.png",
+		"description": "Очень чувствительный поплавок для мелкой осторожной рыбы в тихой воде.",
+		"stats": {
+			"float_type": "feather",
+			"buoyancy": 0.72,
+			"sensitivity": 0.97,
+			"stability": 0.52,
+			"wind_resistance": 0.35,
+			"drift_resistance": 0.32,
+			"cast_distance_bonus": -0.04,
+			"bite_visibility": 0.88,
+			"false_bite_resistance": 0.35,
+			"depth_min": 0.2,
+			"depth_max": 1.4,
+			"night_bonus": 0.0,
+			"vegetation_control": 0.55,
+			"heavy_bait_support": 0.30,
+			"recommended_spots": ["old_oak_pier", "green_duckweed", "quiet_water_pier"]
+		}
+	},
+	"float_drop_basic": {
+		"id": "float_drop_basic",
+		"name": "Поплавок «Капля»",
+		"type": "float",
+		"category": "float",
+		"float_type": "drop",
+		"rarity": "common",
+		"price": 120,
+		"image_path": "res://assets/ui/tackle/floats/float_drop.png",
+		"description": "Универсальный поплавок для спокойной воды и камышей.",
+		"stats": {
+			"float_type": "drop",
+			"buoyancy": 1.0,
+			"sensitivity": 0.90,
+			"stability": 0.85,
+			"wind_resistance": 0.70,
+			"drift_resistance": 0.70,
+			"cast_distance_bonus": 0.0,
+			"bite_visibility": 0.90,
+			"false_bite_resistance": 0.75,
+			"depth_min": 0.3,
+			"depth_max": 2.2,
+			"night_bonus": 0.0,
+			"vegetation_control": 0.65,
+			"heavy_bait_support": 0.65,
+			"recommended_spots": ["reeds_pier", "quiet_water_pier"]
+		}
+	},
+	"float_spindle_basic": {
+		"id": "float_spindle_basic",
+		"name": "Поплавок «Веретено»",
+		"type": "float",
+		"category": "float",
+		"float_type": "spindle",
+		"rarity": "uncommon",
+		"price": 155,
+		"image_path": "res://assets/ui/tackle/floats/float_spindle.png",
+		"description": "Точный поплавок для осторожной плотвы, карася и подлещика.",
+		"stats": {
+			"float_type": "spindle",
+			"buoyancy": 0.86,
+			"sensitivity": 0.94,
+			"stability": 0.70,
+			"wind_resistance": 0.55,
+			"drift_resistance": 0.55,
+			"cast_distance_bonus": 0.0,
+			"bite_visibility": 0.92,
+			"false_bite_resistance": 0.58,
+			"depth_min": 0.3,
+			"depth_max": 2.0,
+			"night_bonus": 0.0,
+			"vegetation_control": 0.60,
+			"heavy_bait_support": 0.45,
+			"recommended_spots": ["quiet_water_pier", "reeds_pier", "morning_pier"]
+		}
+	},
+	"float_barrel_basic": {
+		"id": "float_barrel_basic",
+		"name": "Поплавок «Бочонок»",
+		"type": "float",
+		"category": "float",
+		"float_type": "barrel",
+		"rarity": "uncommon",
+		"price": 180,
+		"image_path": "res://assets/ui/tackle/floats/float_barrel.png",
+		"description": "Устойчивый поплавок для камышей, волны и тяжёлой наживки.",
+		"stats": {
+			"float_type": "barrel",
+			"buoyancy": 1.35,
+			"sensitivity": 0.62,
+			"stability": 0.96,
+			"wind_resistance": 0.90,
+			"drift_resistance": 0.88,
+			"cast_distance_bonus": -0.01,
+			"bite_visibility": 0.70,
+			"false_bite_resistance": 0.92,
+			"depth_min": 0.5,
+			"depth_max": 2.8,
+			"night_bonus": 0.0,
+			"vegetation_control": 0.88,
+			"heavy_bait_support": 0.95,
+			"recommended_spots": ["reeds_pier", "frog_backwater", "old_boat_pier"]
+		}
+	},
+	"float_waggler_basic": {
+		"id": "float_waggler_basic",
+		"name": "Поплавок «Вагглер»",
+		"type": "float",
+		"category": "float",
+		"float_type": "waggler",
+		"rarity": "rare",
+		"price": 260,
+		"image_path": "res://assets/ui/tackle/floats/float_waggler.png",
+		"description": "Дальний заброс для открытой воды, где важны дистанция и стабильность.",
+		"stats": {
+			"float_type": "waggler",
+			"buoyancy": 1.10,
+			"sensitivity": 0.72,
+			"stability": 0.82,
+			"wind_resistance": 0.78,
+			"drift_resistance": 0.82,
+			"cast_distance_bonus": 0.18,
+			"bite_visibility": 0.76,
+			"false_bite_resistance": 0.78,
+			"depth_min": 0.8,
+			"depth_max": 3.5,
+			"night_bonus": 0.0,
+			"vegetation_control": 0.42,
+			"heavy_bait_support": 0.72,
+			"recommended_spots": ["morning_pier", "deep_pier", "cold_water", "quiet_water_pier"]
+		}
+	},
+	"float_sliding_basic": {
+		"id": "float_sliding_basic",
+		"name": "Поплавок «Скользящий»",
+		"type": "float",
+		"category": "float",
+		"float_type": "sliding",
+		"rarity": "rare",
+		"price": 310,
+		"image_path": "res://assets/ui/tackle/floats/float_sliding.png",
+		"description": "Поплавок для глубины и ям, когда обычная оснастка уже некомфортна.",
+		"stats": {
+			"float_type": "sliding",
+			"buoyancy": 1.20,
+			"sensitivity": 0.76,
+			"stability": 0.74,
+			"wind_resistance": 0.64,
+			"drift_resistance": 0.66,
+			"cast_distance_bonus": 0.06,
+			"bite_visibility": 0.78,
+			"false_bite_resistance": 0.70,
+			"depth_min": 1.5,
+			"depth_max": 6.5,
+			"night_bonus": 0.0,
+			"vegetation_control": 0.55,
+			"heavy_bait_support": 0.80,
+			"recommended_spots": ["dark_hole", "deep_pier", "cold_water", "mist_pier"]
+		}
+	},
+	"float_glow_feather": {
+		"id": "float_glow_feather",
+		"name": "Светящееся перо",
+		"type": "float",
+		"category": "float",
+		"float_type": "glow_feather",
+		"rarity": "rare",
+		"price": 240,
+		"image_path": "res://assets/ui/tackle/floats/float_glow_feather.png",
+		"description": "Ночная версия пера: высокая видимость поклёвки в темноте при слабой защите от ветра.",
+		"stats": {
+			"float_type": "glow_feather",
+			"buoyancy": 0.74,
+			"sensitivity": 0.95,
+			"stability": 0.50,
+			"wind_resistance": 0.32,
+			"drift_resistance": 0.30,
+			"cast_distance_bonus": -0.04,
+			"bite_visibility": 0.86,
+			"false_bite_resistance": 0.36,
+			"depth_min": 0.2,
+			"depth_max": 1.5,
+			"night_bonus": 0.35,
+			"vegetation_control": 0.55,
+			"heavy_bait_support": 0.28,
+			"recommended_spots": ["old_oak_pier", "mist_pier", "frog_backwater"]
+		}
+	},
+	"float_goose_feather": {
+		"id": "float_goose_feather",
+		"name": "Goose Feather Float",
+		"display_name_ru": "Гусиное перо",
+		"type": "float",
+		"category": "float",
+		"float_type": "feather",
+		"base_type": "feather",
+		"rarity": "uncommon",
+		"price": 180,
+		"image_path": "res://assets/ui/tackle/floats/float_goose_feather.png",
+		"bonus_tags": ["Very Sensitive", "Careful Bites", "Calm Water"],
+		"description": "Extremely sensitive feather float for careful bites in calm water.",
+		"description_ru": "Очень чувствительное гусиное перо для осторожных поклёвок в спокойной воде.",
+		"stats": {
+			"float_type": "feather",
+			"base_type": "feather",
+			"buoyancy": 0.70,
+			"sensitivity": 0.98,
+			"stability": 0.52,
+			"wind_resistance": 0.38,
+			"drift_resistance": 0.36,
+			"cast_distance_bonus": -0.03,
+			"bite_visibility": 0.95,
+			"false_bite_resistance": 0.45,
+			"depth_min": 0.2,
+			"depth_max": 1.5,
+			"night_bonus": 0.0,
+			"vegetation_control": 0.45,
+			"heavy_bait_support": 0.25,
+			"recommended_spots": ["quiet_water_pier", "old_oak_pier"],
+			"bonus_tags": ["Very Sensitive", "Careful Bites", "Calm Water"]
+		}
+	},
+	"float_lacquered_feather": {
+		"id": "float_lacquered_feather",
+		"name": "Lacquered Feather Float",
+		"display_name_ru": "Лакированное перо",
+		"type": "float",
+		"category": "float",
+		"float_type": "feather",
+		"base_type": "feather",
+		"rarity": "rare",
+		"price": 320,
+		"image_path": "res://assets/ui/tackle/floats/float_lacquered_feather.png",
+		"bonus_tags": ["Sensitive", "Stable Feather", "Clean Bite Feedback"],
+		"description": "A polished feather float with better stability and clean bite feedback.",
+		"description_ru": "Лакированное перо с улучшенной стабильностью и чистым отображением поклёвки.",
+		"stats": {
+			"float_type": "feather",
+			"base_type": "feather",
+			"buoyancy": 0.76,
+			"sensitivity": 0.94,
+			"stability": 0.68,
+			"wind_resistance": 0.48,
+			"drift_resistance": 0.44,
+			"cast_distance_bonus": 0.0,
+			"bite_visibility": 0.96,
+			"false_bite_resistance": 0.60,
+			"depth_min": 0.2,
+			"depth_max": 1.8,
+			"night_bonus": 0.0,
+			"vegetation_control": 0.48,
+			"heavy_bait_support": 0.30,
+			"recommended_spots": ["quiet_water_pier", "old_oak_pier", "morning_pier"],
+			"bonus_tags": ["Sensitive", "Stable Feather", "Clean Bite Feedback"]
+		}
+	},
+	"float_reed_drop": {
+		"id": "float_reed_drop",
+		"name": "Reed Drop Float",
+		"display_name_ru": "Камышовая капля",
+		"type": "float",
+		"category": "float",
+		"float_type": "drop",
+		"base_type": "drop",
+		"rarity": "uncommon",
+		"price": 260,
+		"image_path": "res://assets/ui/tackle/floats/float_reed_drop.png",
+		"bonus_tags": ["Reeds", "Vegetation Control", "Stable"],
+		"description": "A drop float tuned for reeds, grass and quiet backwaters.",
+		"description_ru": "Капля для камышей, травы и тихих заводей. Лучше контролирует снасть в заросших местах.",
+		"stats": {
+			"float_type": "drop",
+			"base_type": "drop",
+			"buoyancy": 1.05,
+			"sensitivity": 0.82,
+			"stability": 0.82,
+			"wind_resistance": 0.68,
+			"drift_resistance": 0.78,
+			"cast_distance_bonus": -0.02,
+			"bite_visibility": 0.86,
+			"false_bite_resistance": 0.78,
+			"depth_min": 0.3,
+			"depth_max": 2.4,
+			"night_bonus": 0.0,
+			"vegetation_control": 0.92,
+			"heavy_bait_support": 0.62,
+			"recommended_spots": ["reeds_pier", "frog_backwater"],
+			"bonus_tags": ["Reeds", "Vegetation Control", "Stable"]
+		}
+	},
+	"float_sport_drop": {
+		"id": "float_sport_drop",
+		"name": "Sport Drop Float",
+		"display_name_ru": "Спортивная капля",
+		"type": "float",
+		"category": "float",
+		"float_type": "drop",
+		"base_type": "drop",
+		"rarity": "rare",
+		"price": 420,
+		"image_path": "res://assets/ui/tackle/floats/float_sport_drop.png",
+		"bonus_tags": ["Sport", "Fast Bite Reading", "Accurate Hook Timing"],
+		"description": "A responsive sport float for fast bite reading and accurate hook timing.",
+		"description_ru": "Спортивная капля для быстрой реакции на поклёвку и точной подсечки.",
+		"stats": {
+			"float_type": "drop",
+			"base_type": "drop",
+			"buoyancy": 0.95,
+			"sensitivity": 0.92,
+			"stability": 0.76,
+			"wind_resistance": 0.62,
+			"drift_resistance": 0.64,
+			"cast_distance_bonus": 0.04,
+			"bite_visibility": 0.96,
+			"false_bite_resistance": 0.70,
+			"depth_min": 0.3,
+			"depth_max": 2.2,
+			"night_bonus": 0.0,
+			"vegetation_control": 0.58,
+			"heavy_bait_support": 0.48,
+			"hook_timing_bonus": 0.10,
+			"recommended_spots": ["quiet_water_pier", "morning_pier"],
+			"bonus_tags": ["Sport", "Fast Bite Reading", "Accurate Hook Timing"]
+		}
+	},
+	"float_night_barrel": {
+		"id": "float_night_barrel",
+		"name": "Night Barrel Float",
+		"display_name_ru": "Ночной бочонок",
+		"type": "float",
+		"category": "float",
+		"float_type": "barrel",
+		"base_type": "barrel",
+		"rarity": "rare",
+		"price": 520,
+		"image_path": "res://assets/ui/tackle/floats/float_night_barrel.png",
+		"bonus_tags": ["Night Fishing", "Heavy Bait", "Wind Stable"],
+		"description": "A stable glowing barrel float for night fishing and heavy bait.",
+		"description_ru": "Устойчивый светящийся бочонок для ночной ловли, ветра и тяжёлой наживки.",
+		"stats": {
+			"float_type": "barrel",
+			"base_type": "barrel",
+			"buoyancy": 1.35,
+			"sensitivity": 0.58,
+			"stability": 0.94,
+			"wind_resistance": 0.88,
+			"drift_resistance": 0.86,
+			"cast_distance_bonus": -0.03,
+			"bite_visibility": 0.78,
+			"false_bite_resistance": 0.88,
+			"depth_min": 0.5,
+			"depth_max": 3.0,
+			"night_bonus": 0.35,
+			"vegetation_control": 0.72,
+			"heavy_bait_support": 0.92,
+			"recommended_spots": ["reeds_pier", "frog_backwater", "dark_hole"],
+			"bonus_tags": ["Night Fishing", "Heavy Bait", "Wind Stable"]
+		}
+	},
+	"float_reinforced_barrel": {
+		"id": "float_reinforced_barrel",
+		"name": "Reinforced Barrel Float",
+		"display_name_ru": "Усиленный бочонок",
+		"type": "float",
+		"category": "float",
+		"float_type": "barrel",
+		"base_type": "barrel",
+		"rarity": "epic",
+		"price": 850,
+		"image_path": "res://assets/ui/tackle/floats/float_reinforced_barrel.png",
+		"bonus_tags": ["Reinforced", "Heavy Bait", "Wind Stable"],
+		"description": "A reinforced barrel float built for wind, waves and heavy bait.",
+		"description_ru": "Усиленный бочонок для ветра, волны и тяжёлой наживки. Плохо подходит для осторожной мелочи.",
+		"stats": {
+			"float_type": "barrel",
+			"base_type": "barrel",
+			"buoyancy": 1.55,
+			"sensitivity": 0.48,
+			"stability": 1.00,
+			"wind_resistance": 0.95,
+			"drift_resistance": 0.94,
+			"cast_distance_bonus": -0.05,
+			"bite_visibility": 0.76,
+			"false_bite_resistance": 0.95,
+			"depth_min": 0.6,
+			"depth_max": 3.2,
+			"night_bonus": 0.0,
+			"vegetation_control": 0.78,
+			"heavy_bait_support": 1.00,
+			"recommended_spots": ["reeds_pier", "frog_backwater", "dark_hole"],
+			"bonus_tags": ["Reinforced", "Heavy Bait", "Wind Stable"]
+		}
+	},
+	"float_long_cast_waggler": {
+		"id": "float_long_cast_waggler",
+		"name": "Long Cast Waggler",
+		"display_name_ru": "Дальнобойный вагглер",
+		"type": "float",
+		"category": "float",
+		"float_type": "waggler",
+		"base_type": "waggler",
+		"rarity": "rare",
+		"price": 640,
+		"image_path": "res://assets/ui/tackle/floats/float_long_cast_waggler.png",
+		"bonus_tags": ["Long Cast", "Open Water", "Distance"],
+		"description": "A long-range waggler for open water and distant casts.",
+		"description_ru": "Дальнобойный вагглер для открытой воды и дальнего заброса.",
+		"stats": {
+			"float_type": "waggler",
+			"base_type": "waggler",
+			"buoyancy": 1.15,
+			"sensitivity": 0.68,
+			"stability": 0.82,
+			"wind_resistance": 0.82,
+			"drift_resistance": 0.76,
+			"cast_distance_bonus": 0.25,
+			"bite_visibility": 0.82,
+			"false_bite_resistance": 0.78,
+			"depth_min": 0.8,
+			"depth_max": 3.8,
+			"night_bonus": 0.0,
+			"vegetation_control": 0.42,
+			"heavy_bait_support": 0.65,
+			"long_range_accuracy_bonus": 0.12,
+			"recommended_spots": ["morning_pier", "quiet_water_pier"],
+			"bonus_tags": ["Long Cast", "Open Water", "Distance"]
+		}
+	},
+	"float_self_cocking_waggler": {
+		"id": "float_self_cocking_waggler",
+		"name": "Self-Cocking Waggler",
+		"display_name_ru": "Самоогружаемый вагглер",
+		"type": "float",
+		"category": "float",
+		"float_type": "waggler",
+		"base_type": "waggler",
+		"rarity": "epic",
+		"price": 980,
+		"image_path": "res://assets/ui/tackle/floats/float_self_cocking_waggler.png",
+		"bonus_tags": ["Easy Setup", "Stable", "Long Cast"],
+		"description": "A self-cocking waggler that is easy to set up and stable at distance.",
+		"description_ru": "Самоогружаемый вагглер: легко настраивается, стабилен и хорошо работает на дистанции.",
+		"stats": {
+			"float_type": "waggler",
+			"base_type": "waggler",
+			"buoyancy": 1.20,
+			"sensitivity": 0.72,
+			"stability": 0.94,
+			"wind_resistance": 0.84,
+			"drift_resistance": 0.82,
+			"cast_distance_bonus": 0.18,
+			"bite_visibility": 0.88,
+			"false_bite_resistance": 0.90,
+			"depth_min": 0.8,
+			"depth_max": 4.0,
+			"night_bonus": 0.0,
+			"vegetation_control": 0.48,
+			"heavy_bait_support": 0.74,
+			"setup_comfort": 0.15,
+			"recommended_spots": ["morning_pier", "quiet_water_pier", "cold_water"],
+			"bonus_tags": ["Easy Setup", "Stable", "Long Cast"]
 		}
 	},
 	"light_float": {
@@ -996,6 +1853,7 @@ const TACKLE_CATALOG := {
 		"category": "hook",
 		"rarity": "common",
 		"price": 0.3,
+		"image_path": "res://assets/ui/shop/hooks/riverstart_basic_hook_24.png",
 		"description": "Стартовый бюджетный крючок для самой мелкой осторожной рыбы.",
 		"stats": {
 			"hook_size": 24,
@@ -1015,6 +1873,7 @@ const TACKLE_CATALOG := {
 		"category": "hook",
 		"rarity": "common",
 		"price": 0.4,
+		"image_path": "res://assets/ui/shop/hooks/riverstart_basic_hook_22.png",
 		"description": "Дешёвый тонкий крючок для мелкой рыбы.",
 		"stats": {
 			"hook_size": 22,
@@ -1034,6 +1893,7 @@ const TACKLE_CATALOG := {
 		"category": "hook",
 		"rarity": "common",
 		"price": 0.6,
+		"image_path": "res://assets/ui/shop/hooks/riverstart_basic_hook_20.png",
 		"description": "Бюджетный крючок для уклейки и другой небольшой рыбы.",
 		"stats": {
 			"hook_size": 20,
@@ -1053,6 +1913,7 @@ const TACKLE_CATALOG := {
 		"category": "hook",
 		"rarity": "common",
 		"price": 0.8,
+		"image_path": "res://assets/ui/shop/hooks/riverstart_basic_hook_18.png",
 		"description": "Стартовый крючок для лёгкой поплавочной оснастки.",
 		"stats": {
 			"hook_size": 18,
@@ -1072,6 +1933,7 @@ const TACKLE_CATALOG := {
 		"category": "hook",
 		"rarity": "common",
 		"price": 1.0,
+		"image_path": "res://assets/ui/shop/hooks/riverstart_basic_hook_16.png",
 		"description": "Недорогой крючок для мелкой и некрупной белой рыбы.",
 		"stats": {
 			"hook_size": 16,
@@ -1091,6 +1953,7 @@ const TACKLE_CATALOG := {
 		"category": "hook",
 		"rarity": "common",
 		"price": 1.3,
+		"image_path": "res://assets/ui/shop/hooks/riverstart_basic_hook_14.png",
 		"description": "Бюджетный универсальный крючок для ранней ловли.",
 		"stats": {
 			"hook_size": 14,
@@ -1110,6 +1973,7 @@ const TACKLE_CATALOG := {
 		"category": "hook",
 		"rarity": "common",
 		"price": 1.7,
+		"image_path": "res://assets/ui/shop/hooks/riverstart_basic_hook_12.png",
 		"description": "Дешёвый крючок ходового размера. Уступает фирменным крючкам по прочности.",
 		"stats": {
 			"hook_size": 12,
@@ -1129,6 +1993,7 @@ const TACKLE_CATALOG := {
 		"category": "hook",
 		"rarity": "common",
 		"price": 2.2,
+		"image_path": "res://assets/ui/shop/hooks/riverstart_basic_hook_10.png",
 		"description": "Бюджетный крючок для плотвы, карася и окуня.",
 		"stats": {
 			"hook_size": 10,
@@ -1148,6 +2013,7 @@ const TACKLE_CATALOG := {
 		"category": "hook",
 		"rarity": "common",
 		"price": 3.0,
+		"image_path": "res://assets/ui/shop/hooks/riverstart_basic_hook_8.png",
 		"description": "Бюджетный крючок среднего размера для универсальной ловли.",
 		"stats": {
 			"hook_size": 8,
@@ -1167,6 +2033,7 @@ const TACKLE_CATALOG := {
 		"category": "hook",
 		"rarity": "common",
 		"price": 4.2,
+		"image_path": "res://assets/ui/shop/hooks/riverstart_basic_hook_6.png",
 		"description": "Недорогой средний крючок для рыбы покрупнее.",
 		"stats": {
 			"hook_size": 6,
@@ -1186,6 +2053,7 @@ const TACKLE_CATALOG := {
 		"category": "hook",
 		"rarity": "common",
 		"price": 5.8,
+		"image_path": "res://assets/ui/shop/hooks/riverstart_basic_hook_4.png",
 		"description": "Крупный бюджетный крючок. Подходит для сильной рыбы, но грубоват.",
 		"stats": {
 			"hook_size": 4,
@@ -1205,6 +2073,7 @@ const TACKLE_CATALOG := {
 		"category": "hook",
 		"rarity": "common",
 		"price": 7.5,
+		"image_path": "res://assets/ui/shop/hooks/riverstart_basic_hook_2.png",
 		"description": "Крупный бюджетный крючок для силовой ловли.",
 		"stats": {
 			"hook_size": 2,
@@ -1224,6 +2093,7 @@ const TACKLE_CATALOG := {
 		"category": "hook",
 		"rarity": "common",
 		"price": 9.5,
+		"image_path": "res://assets/ui/shop/hooks/riverstart_basic_hook_1.png",
 		"description": "Большой бюджетный крючок для крупной рыбы.",
 		"stats": {
 			"hook_size": 1,
@@ -1243,6 +2113,7 @@ const TACKLE_CATALOG := {
 		"category": "hook",
 		"rarity": "common",
 		"price": 12,
+		"image_path": "res://assets/ui/shop/hooks/riverstart_basic_hook_1_0.png",
 		"description": "Бюджетный крючок 1/0 для крупной рыбы и грубой оснастки.",
 		"stats": {
 			"hook_size": 0,
@@ -1262,6 +2133,7 @@ const TACKLE_CATALOG := {
 		"category": "hook",
 		"rarity": "common",
 		"price": 15,
+		"image_path": "res://assets/ui/shop/hooks/riverstart_basic_hook_2_0.png",
 		"description": "Бюджетный крючок 2/0 для самой крупной рыбы.",
 		"stats": {
 			"hook_size": -1,
@@ -1281,6 +2153,7 @@ const TACKLE_CATALOG := {
 		"category": "hook",
 		"rarity": "common",
 		"price": 19,
+		"image_path": "res://assets/ui/shop/hooks/riverstart_basic_hook_3_0.png",
 		"description": "Крупный бюджетный крючок 3/0. Требует подходящей рыбы и снасти.",
 		"stats": {
 			"hook_size": -2,
@@ -1300,6 +2173,7 @@ const TACKLE_CATALOG := {
 		"category": "hook",
 		"rarity": "common",
 		"price": 24,
+		"image_path": "res://assets/ui/shop/hooks/riverstart_basic_hook_4_0.png",
 		"description": "Самый крупный крючок RiverStart Basic Hook. Дешёвый, прочный и грубый.",
 		"stats": {
 			"hook_size": -3,
@@ -1337,6 +2211,7 @@ const TACKLE_CATALOG := {
 		"category": "hook",
 		"rarity": "uncommon",
 		"price": 70,
+		"image_path": "res://assets/ui/shop/hooks/medium_hook_8.png",
 		"description": "Универсальный крючок для средней рыбы.",
 		"stats": {
 			"hook_size": 8,
@@ -1355,6 +2230,7 @@ const TACKLE_CATALOG := {
 		"category": "hook",
 		"rarity": "rare",
 		"price": 155,
+		"image_path": "res://assets/ui/shop/hooks/large_hook_4.png",
 		"description": "Крупный крючок для сильной рыбы. Мелочь клюёт хуже.",
 		"stats": {
 			"hook_size": 4,
@@ -1479,7 +2355,7 @@ const TACKLE_CATALOG := {
 		"type": "bait",
 		"category": "bait",
 		"rarity": "uncommon",
-		"price": 28,
+		"price": 2.8,
 		"image_path": "res://assets/ui/shop/baits/cherv_surskiy.png",
 		"description": "Мясистый речной червь с хорошей заметностью на дне.",
 		"stats": {
@@ -1569,7 +2445,7 @@ const TACKLE_CATALOG := {
 		"type": "bait",
 		"category": "bait",
 		"rarity": "common",
-		"price": 16,
+		"price": 1.6,
 		"image_path": "res://assets/ui/shop/baits/cherv_navozni.png",
 		"description": "Пахучий червь для донной и прибрежной рыбы.",
 		"stats": {
@@ -1629,7 +2505,7 @@ const TACKLE_CATALOG := {
 		"type": "bait",
 		"category": "bait",
 		"rarity": "rare",
-		"price": 48,
+		"price": 4.8,
 		"image_path": "res://assets/ui/shop/baits/cherv_astrahanskiy.png",
 		"description": "Крупный червь для уверенной донной подачи.",
 		"stats": {
@@ -1824,7 +2700,7 @@ const TACKLE_CATALOG := {
 		"type": "bait",
 		"category": "bait",
 		"rarity": "rare",
-		"price": 52,
+		"price": 5.2,
 		"image_path": "res://assets/ui/shop/baits/cherv_volhovskiy.png",
 		"description": "Крупная речная наживка для глубины и донной рыбы.",
 		"stats": {
@@ -2049,7 +2925,7 @@ const TACKLE_CATALOG := {
 		"type": "bait",
 		"category": "bait",
 		"rarity": "rare",
-		"price": 56,
+		"price": 5.6,
 		"image_path": "res://assets/ui/shop/baits/cherv_leningradskiy.png",
 		"description": "Крупный тёмный червь для прохладной воды и глубины.",
 		"stats": {
@@ -2199,7 +3075,7 @@ const TACKLE_CATALOG := {
 		"type": "bait",
 		"category": "bait",
 		"rarity": "rare",
-		"price": 58,
+		"price": 5.8,
 		"image_path": "res://assets/ui/shop/baits/vipolzok.png",
 		"description": "Крупный червь для глубокой и уверенной подачи.",
 		"stats": {
@@ -2360,7 +3236,8 @@ const BAIT_TARGET_PROFILES := {
 	"boilie_simple": {"bait_tags": ["plant", "boilie", "carp", "bottom"], "target_fish_ids": ["young_mirror_carp", "mist_carp", "bream", "tench"], "secondary_fish_ids": ["crucian", "silver_crucian", "young_grass_carp"], "fish_attraction": 0.05, "target_bonus": 0.29, "secondary_bonus": 0.15}
 }
 const TACKLE_SLOTS := ["rod", "line", "leader", "hook", "float", "bait", "bait_2"]
-const REQUIRED_TACKLE_SLOTS := ["rod", "line", "hook", "float", "bait"]
+const REQUIRED_TACKLE_SLOTS := ["rod", "line", "leader", "hook", "float", "bait"]
+const QUICK_TACKLE_CATEGORIES := ["line", "leader", "float", "hook", "bait"]
 const TACKLE_SLOT_ITEM_CATEGORIES := {
 	"rod": "rod",
 	"line": "line",
@@ -2384,6 +3261,7 @@ var level: int = 1
 var current_xp: int = 0
 var xp_to_next_level: int = 175
 var skill_points: int = 0
+var total_skill_points_earned: int = 0
 var learned_skills: Dictionary = {}
 var player_name: String = "Рыбак"
 var current_waterbody: String = "agamin_lake"
@@ -2394,8 +3272,12 @@ var upgrades: Array = []
 var fishing_depth: float = 1.2
 var owned_items: Array = get_default_owned_items()
 var current_tackle: Dictionary = get_default_tackle()
+var recent_tackle_items: Dictionary = get_default_recent_tackle_items()
 var total_fish_caught := 0
 var total_fish_weight: float = 0.0
+var daily_catch_day: int = 1
+var daily_fish_weight: float = 0.0
+var best_daily_fish_weight: float = 0.0
 var total_trophies_caught := 0
 var total_rarity_caught := 0
 var biggest_fish := {}
@@ -2428,9 +3310,21 @@ func format_hook_size(size: int) -> String:
 func get_xp_to_next_level(for_level: int) -> int:
 	return 100 + 50 * for_level + 25 * for_level * for_level
 
+func get_skill_points_for_level(for_level: int) -> int:
+	if for_level >= 100:
+		return 11
+	return clampi(int(floor(float(max(for_level, 1)) / 10.0)) + 1, 1, 11)
+
+func calculate_total_skill_points_for_level(for_level: int) -> int:
+	var total := 0
+	for reached_level in range(2, max(for_level, 1) + 1):
+		total += get_skill_points_for_level(reached_level)
+	return total
+
 func add_xp(amount: int) -> Dictionary:
 	var gained_xp: int = max(amount, 0)
 	var levels_gained: int = 0
+	var skill_points_gained := 0
 
 	current_xp += gained_xp
 
@@ -2438,15 +3332,19 @@ func add_xp(amount: int) -> Dictionary:
 		current_xp -= xp_to_next_level
 		level += 1
 		levels_gained += 1
+		var points_for_level := get_skill_points_for_level(level)
+		skill_points += points_for_level
+		total_skill_points_earned += points_for_level
+		skill_points_gained += points_for_level
 		xp_to_next_level = get_xp_to_next_level(level)
 
 	if levels_gained > 0:
-		skill_points += levels_gained
 		refresh_waterbody_unlocks()
 
 	return {
 		"gained_xp": gained_xp,
 		"levels_gained": levels_gained,
+		"skill_points_gained": skill_points_gained,
 		"leveled_up": levels_gained > 0,
 		"level": level,
 		"current_xp": current_xp,
@@ -2477,6 +3375,7 @@ func register_catch_stats(catch_data: Dictionary) -> void:
 
 	total_fish_caught += 1
 	total_fish_weight = snappedf(total_fish_weight + weight, 0.01)
+	_update_daily_catch_weight(weight)
 
 	var record_entry := _build_catch_record_entry(catch_data)
 	if catch_rank == "trophy":
@@ -2503,7 +3402,7 @@ func prepare_record_info(catch_data: Dictionary) -> Dictionary:
 	var fish_id := str(result.get("id", ""))
 	var current_weight := float(result.get("weight", 0.0))
 
-	var previous_record := {}
+	var previous_record: Dictionary = {}
 	if personal_records.has(fish_id):
 		previous_record = personal_records[fish_id].duplicate(true)
 
@@ -2522,6 +3421,9 @@ func get_catch_stats_save_data() -> Dictionary:
 		"player_name": player_name,
 		"total_fish_caught": total_fish_caught,
 		"total_fish_weight": total_fish_weight,
+		"daily_catch_day": daily_catch_day,
+		"daily_fish_weight": daily_fish_weight,
+		"best_daily_fish_weight": best_daily_fish_weight,
 		"total_trophies_caught": total_trophies_caught,
 		"total_rarity_caught": total_rarity_caught,
 		"biggest_fish": biggest_fish.duplicate(true),
@@ -2534,12 +3436,23 @@ func set_catch_stats_from_save(save_data: Dictionary) -> void:
 	player_name = str(save_data.get("player_name", player_name))
 	total_fish_caught = max(int(save_data.get("total_fish_caught", 0)), 0)
 	total_fish_weight = max(float(save_data.get("total_fish_weight", 0.0)), 0.0)
+	daily_catch_day = maxi(int(save_data.get("daily_catch_day", _get_current_game_day())), 1)
+	daily_fish_weight = maxf(float(save_data.get("daily_fish_weight", 0.0)), 0.0)
+	best_daily_fish_weight = maxf(float(save_data.get("best_daily_fish_weight", daily_fish_weight)), 0.0)
 	total_trophies_caught = max(int(save_data.get("total_trophies_caught", 0)), 0)
 	total_rarity_caught = max(int(save_data.get("total_rarity_caught", 0)), 0)
 	biggest_fish = _safe_saved_dictionary(save_data.get("biggest_fish", {}))
 	biggest_fish_by_species = _safe_saved_dictionary(save_data.get("biggest_fish_by_species", {}))
 	trophy_catches = _safe_saved_array(save_data.get("trophy_catches", []))
 	personal_records = _safe_saved_dictionary(save_data.get("personal_records", {}))
+
+func _update_daily_catch_weight(weight: float) -> void:
+	var current_day: int = _get_current_game_day()
+	if daily_catch_day != current_day:
+		daily_catch_day = current_day
+		daily_fish_weight = 0.0
+	daily_fish_weight = snappedf(daily_fish_weight + maxf(weight, 0.0), 0.01)
+	best_daily_fish_weight = maxf(best_daily_fish_weight, daily_fish_weight)
 
 func has_caught_species(fish_id: String) -> bool:
 	return personal_records.has(fish_id) or biggest_fish_by_species.has(fish_id)
@@ -2642,9 +3555,54 @@ func set_progression(saved_level: int, saved_xp: int) -> void:
 	refresh_waterbody_unlocks()
 
 func has_skill(skill_id: String) -> bool:
-	return bool(learned_skills.get(skill_id, false))
+	return get_skill_rank(skill_id) > 0
+
+func get_skill_rank(skill_id: String) -> int:
+	return max(int(learned_skills.get(_normalize_skill_id(skill_id), 0)), 0)
+
+func can_upgrade_skill(skill_id: String) -> Dictionary:
+	var skill_database := _get_skill_database()
+	if skill_database == null or not skill_database.has_method("can_upgrade_skill"):
+		return {"success": false, "can_upgrade": false, "can_learn": false, "reason": "База навыков недоступна."}
+	var result: Dictionary = skill_database.call("can_upgrade_skill", _normalize_skill_id(skill_id))
+	result["can_learn"] = bool(result.get("can_upgrade", false))
+	return result
+
+func upgrade_skill(skill_id: String) -> Dictionary:
+	var normalized_id := _normalize_skill_id(skill_id)
+	var skill_database := _get_skill_database()
+	if skill_database == null or not skill_database.has_method("can_upgrade_skill"):
+		return {"success": false, "can_upgrade": false, "can_learn": false, "reason": "База навыков недоступна."}
+
+	var check: Dictionary = skill_database.call("can_upgrade_skill", normalized_id)
+	if not bool(check.get("can_upgrade", false)):
+		check["success"] = false
+		check["can_learn"] = false
+		return check
+
+	var cost := int(check.get("cost", 0))
+	if skill_points < cost:
+		return {"success": false, "can_upgrade": false, "can_learn": false, "reason": "Недостаточно очков навыков."}
+
+	var current_rank := get_skill_rank(normalized_id)
+	learned_skills[normalized_id] = current_rank + 1
+	skill_points = max(skill_points - cost, 0)
+
+	return {
+		"success": true,
+		"can_upgrade": true,
+		"can_learn": true,
+		"reason": "Навык улучшен.",
+		"skill_id": normalized_id,
+		"new_rank": current_rank + 1,
+		"spent": cost
+	}
 
 func can_learn_skill(skill_id: String) -> Dictionary:
+	var result := can_upgrade_skill(skill_id)
+	result["can_learn"] = bool(result.get("can_upgrade", false))
+	return result
+
 	var skill_database := _get_skill_database()
 	if skill_database == null or not skill_database.has_method("get_skill"):
 		return {
@@ -2691,6 +3649,8 @@ func can_learn_skill(skill_id: String) -> Dictionary:
 	}
 
 func learn_skill(skill_id: String) -> Dictionary:
+	return upgrade_skill(skill_id)
+
 	var check := can_learn_skill(skill_id)
 	if not bool(check.get("can_learn", false)):
 		return check
@@ -2708,8 +3668,18 @@ func learn_skill(skill_id: String) -> Dictionary:
 	}
 
 func get_skill_effects() -> Dictionary:
-	var result := {}
+	var result: Dictionary = {}
 	var skill_database := _get_skill_database()
+	if skill_database != null and skill_database.has_method("get_skill_effects_for_rank"):
+		for skill_id in learned_skills.keys():
+			var rank: int = max(int(learned_skills.get(skill_id, 0)), 0)
+			if rank <= 0:
+				continue
+			var effects: Dictionary = skill_database.call("get_skill_effects_for_rank", str(skill_id), rank)
+			for effect_id in effects.keys():
+				result[effect_id] = float(result.get(effect_id, 0.0)) + float(effects[effect_id])
+		return result
+
 	if skill_database == null or not skill_database.has_method("get_skill"):
 		return result
 
@@ -2736,7 +3706,30 @@ func get_sell_price_multiplier() -> float:
 func get_skill_adjusted_sell_price(base_price: int) -> int:
 	return max(roundi(float(max(base_price, 0)) * get_sell_price_multiplier()), 0)
 
-func set_skill_state(saved_skill_points: int, saved_learned_skills) -> void:
+func set_skill_state(saved_skill_points: int, saved_learned_skills, saved_total_skill_points: int = -1, _saved_tree_points = {}) -> void:
+	learned_skills = {}
+	var skill_db := _get_skill_database()
+	var saved_ranks := _normalize_saved_skill_ranks(saved_learned_skills)
+
+	for skill_id in saved_ranks.keys():
+		if str(skill_id).is_empty():
+			continue
+		if skill_db != null and skill_db.has_method("has_skill") and not bool(skill_db.call("has_skill", str(skill_id))):
+			continue
+		var max_rank := int(skill_db.call("get_max_rank", str(skill_id))) if skill_db != null and skill_db.has_method("get_max_rank") else 5
+		var rank: int = clampi(int(saved_ranks[skill_id]), 0, max_rank)
+		if rank > 0:
+			learned_skills[str(skill_id)] = rank
+
+	var spent := get_total_spent_skill_points()
+	if saved_total_skill_points >= 0:
+		total_skill_points_earned = max(saved_total_skill_points, spent + max(saved_skill_points, 0))
+		skill_points = max(saved_skill_points, 0)
+	else:
+		total_skill_points_earned = max(calculate_total_skill_points_for_level(level), spent)
+		skill_points = max(total_skill_points_earned - spent, 0)
+	return
+
 	skill_points = max(saved_skill_points, 0)
 	learned_skills = {}
 
@@ -2758,15 +3751,116 @@ func set_skill_state(saved_skill_points: int, saved_learned_skills) -> void:
 			continue
 		learned_skills[skill_id] = true
 
+func get_skill_ranks_save_data() -> Dictionary:
+	return learned_skills.duplicate(true)
+
+func get_skill_tree_points_save_data() -> Dictionary:
+	var result: Dictionary = {}
+	var skill_database := _get_skill_database()
+	if skill_database == null or not skill_database.has_method("get_tree_ids") or not skill_database.has_method("get_tree_progress"):
+		return result
+	for tree_id in skill_database.call("get_tree_ids"):
+		result[str(tree_id)] = int(skill_database.call("get_tree_progress", str(tree_id)).get("spent_points", 0))
+	return result
+
+func get_total_spent_skill_points() -> int:
+	var spent := 0
+	var skill_database := _get_skill_database()
+	if skill_database == null or not skill_database.has_method("get_spent_points_for_rank"):
+		return 0
+	for skill_id in learned_skills.keys():
+		spent += int(skill_database.call("get_spent_points_for_rank", str(skill_id), int(learned_skills[skill_id])))
+	return spent
+
+func _normalize_saved_skill_ranks(saved_learned_skills) -> Dictionary:
+	var result: Dictionary = {}
+	if typeof(saved_learned_skills) == TYPE_DICTIONARY:
+		for raw_id in (saved_learned_skills as Dictionary).keys():
+			var raw_value = (saved_learned_skills as Dictionary)[raw_id]
+			var rank := 0
+			if raw_value is bool:
+				rank = 1 if bool(raw_value) else 0
+			elif raw_value is Dictionary:
+				rank = int((raw_value as Dictionary).get("current_rank", (raw_value as Dictionary).get("rank", 0)))
+			else:
+				rank = int(raw_value)
+			_merge_migrated_skill_rank(result, str(raw_id), rank)
+	elif typeof(saved_learned_skills) == TYPE_ARRAY:
+		for raw_id in saved_learned_skills:
+			_merge_migrated_skill_rank(result, str(raw_id), 1)
+	return result
+
+func _merge_migrated_skill_rank(result: Dictionary, raw_skill_id: String, raw_rank: int) -> void:
+	if raw_rank <= 0:
+		return
+	var mapped := _map_legacy_skill_id(raw_skill_id)
+	for skill_id in mapped.keys():
+		var rank := int(mapped[skill_id]) * raw_rank
+		result[skill_id] = max(int(result.get(skill_id, 0)), rank)
+
+func _map_legacy_skill_id(skill_id: String) -> Dictionary:
+	match skill_id:
+		"float_sense_1":
+			return {"float_bobber_control": 1}
+		"float_sense_2":
+			return {"float_bobber_control": 2}
+		"depth_reader":
+			return {"float_soft_hookset": 1}
+		"quiet_water":
+			return {"float_confident_reeling": 1}
+		"soft_hand_1":
+			return {"float_confident_reeling": 1}
+		"soft_hand_2":
+			return {"float_confident_reeling": 2}
+		"jerk_control":
+			return {"float_bobber_control": 1}
+		"steady_pressure":
+			return {"float_confident_reeling": 1}
+		"basic_knot_1":
+			return {"float_thin_tackle": 1}
+		"basic_knot_2":
+			return {"float_thin_tackle": 2}
+		"careful_hookset":
+			return {"float_soft_hookset": 1}
+		"bait_sandwich":
+			return {"float_double_bait": 1}
+		"line_reserve":
+			return {"bottom_reliable_rig": 1}
+		"experienced_eye":
+			return {"float_fishing_xp": 1}
+		"trophy_habit":
+			return {"float_fishing_xp": 2}
+		_:
+			return {_normalize_skill_id(skill_id): 1}
+
+func _normalize_skill_id(skill_id: String) -> String:
+	if skill_id == "bait_sandwich":
+		return "float_double_bait"
+	return skill_id
+
 func refresh_waterbody_unlocks() -> void:
+	var waterbody_db := _get_waterbody_database()
+	var normalized_unlocked: Array = []
+	for waterbody_id in unlocked_waterbodies:
+		var normalized_id := _normalize_waterbody_id(str(waterbody_id))
+		if normalized_id != "" and _get_waterbody(normalized_id).is_empty() == false and not normalized_unlocked.has(normalized_id):
+			normalized_unlocked.append(normalized_id)
+	unlocked_waterbodies = normalized_unlocked
+
 	for waterbody in _get_all_waterbodies():
 		var waterbody_id := str(waterbody.get("id", ""))
-		if level >= int(waterbody.get("required_level", 1)) and not unlocked_waterbodies.has(waterbody_id):
+		var can_unlock := false
+		if waterbody_db != null and waterbody_db.has_method("is_unlocked"):
+			can_unlock = bool(waterbody_db.call("is_unlocked", waterbody_id, level))
+		else:
+			can_unlock = waterbody_id == "agamin_lake"
+		if can_unlock and not unlocked_waterbodies.has(waterbody_id):
 			unlocked_waterbodies.append(waterbody_id)
 
 	if not unlocked_waterbodies.has("agamin_lake"):
 		unlocked_waterbodies.append("agamin_lake")
 
+	current_waterbody = _normalize_waterbody_id(current_waterbody)
 	if not unlocked_waterbodies.has(current_waterbody):
 		current_waterbody = "agamin_lake"
 
@@ -2774,7 +3868,7 @@ func set_unlocked_waterbodies(saved_waterbodies: Array) -> void:
 	unlocked_waterbodies = []
 
 	for waterbody_id in saved_waterbodies:
-		var id := str(waterbody_id)
+		var id := _normalize_waterbody_id(str(waterbody_id))
 		if id != "" and _get_waterbody(id).is_empty() == false and not unlocked_waterbodies.has(id):
 			unlocked_waterbodies.append(id)
 
@@ -2782,16 +3876,32 @@ func set_unlocked_waterbodies(saved_waterbodies: Array) -> void:
 
 func can_use_waterbody(waterbody_id: String) -> bool:
 	var waterbody_db := _get_waterbody_database()
+	var normalized_id := _normalize_waterbody_id(waterbody_id)
 	if waterbody_db == null:
-		return waterbody_id == "agamin_lake"
+		return normalized_id == "agamin_lake"
 
-	return unlocked_waterbodies.has(waterbody_id) and bool(waterbody_db.call("is_unlocked", waterbody_id, level))
+	return unlocked_waterbodies.has(normalized_id) and bool(waterbody_db.call("is_unlocked", normalized_id, level))
 
-func set_current_waterbody(waterbody_id: String) -> bool:
-	if not can_use_waterbody(waterbody_id):
+func can_use_spot(spot_id: String) -> bool:
+	var spot := SpotDatabase.get_spot(spot_id)
+	if spot.is_empty():
 		return false
 
-	current_waterbody = waterbody_id
+	var required_level := int(spot.get("required_level", spot.get("unlock_level", 1)))
+	if level < required_level:
+		return false
+
+	if bool(spot.get("is_unlocked", true)):
+		return true
+
+	return unlocked_spots.has(spot_id)
+
+func set_current_waterbody(waterbody_id: String) -> bool:
+	var normalized_id := _normalize_waterbody_id(waterbody_id)
+	if not can_use_waterbody(normalized_id):
+		return false
+
+	current_waterbody = normalized_id
 	var spot := SpotDatabase.get_spot(current_spot)
 	if spot.is_empty() or str(spot.get("waterbody_id", "")) != current_waterbody:
 		current_spot = _get_primary_waterbody_spot(current_waterbody)
@@ -2803,6 +3913,8 @@ func set_current_spot(spot_id: String) -> bool:
 	var spot := SpotDatabase.get_spot(spot_id)
 
 	if spot.is_empty():
+		return false
+	if not can_use_spot(spot_id):
 		return false
 	if str(spot.get("waterbody_id", current_waterbody)) != current_waterbody:
 		return false
@@ -2840,6 +3952,14 @@ func _get_waterbody(waterbody_id: String) -> Dictionary:
 
 	return {}
 
+func _normalize_waterbody_id(waterbody_id: String) -> String:
+	var waterbody_db := _get_waterbody_database()
+	if waterbody_db != null and waterbody_db.has_method("normalize_waterbody_id"):
+		return str(waterbody_db.call("normalize_waterbody_id", waterbody_id))
+	if waterbody_id == "":
+		return "agamin_lake"
+	return waterbody_id
+
 func _get_primary_waterbody_spot(waterbody_id: String) -> String:
 	var waterbody_db := _get_waterbody_database()
 
@@ -2873,11 +3993,17 @@ func get_current_spot_depth_range() -> Dictionary:
 	}
 
 func _get_raw_tackle_catalog_item(item_id: String) -> Dictionary:
+	item_id = _resolve_tackle_item_id(item_id)
 	if TACKLE_CATALOG.has(item_id):
 		return TACKLE_CATALOG[item_id]
 	if ADDITIONAL_BAIT_CATALOG.has(item_id):
 		return ADDITIONAL_BAIT_CATALOG[item_id]
 	return {}
+
+func _resolve_tackle_item_id(item_id: String) -> String:
+	if LEGACY_TACKLE_ITEM_ALIASES.has(item_id):
+		return str(LEGACY_TACKLE_ITEM_ALIASES[item_id])
+	return item_id
 
 func _normalize_catalog_item(item: Dictionary) -> Dictionary:
 	if item.is_empty():
@@ -2886,9 +4012,17 @@ func _normalize_catalog_item(item: Dictionary) -> Dictionary:
 	var normalized := item.duplicate(true)
 	var item_id := str(normalized.get("id", ""))
 	var category := str(normalized.get("category", normalized.get("type", "misc")))
+	if WORM_BAIT_PRICE_OVERRIDES.has(item_id):
+		normalized["price"] = float(WORM_BAIT_PRICE_OVERRIDES[item_id])
 	if category == "bait":
 		var stats: Dictionary = normalized.get("stats", {}).duplicate(true) if typeof(normalized.get("stats", {})) == TYPE_DICTIONARY else {}
 		normalized["stats"] = _normalize_equipment_stats(stats, "bait", item_id)
+	elif category == "float":
+		var stats: Dictionary = normalized.get("stats", {}).duplicate(true) if typeof(normalized.get("stats", {})) == TYPE_DICTIONARY else {}
+		normalized["stats"] = _normalize_equipment_stats(stats, "float", item_id)
+	elif TACKLE_SLOT_ITEM_CATEGORIES.values().has(category):
+		var stats: Dictionary = normalized.get("stats", {}).duplicate(true) if typeof(normalized.get("stats", {})) == TYPE_DICTIONARY else {}
+		normalized["stats"] = _normalize_equipment_stats(stats, category, item_id)
 
 	return normalized
 
@@ -2929,8 +4063,10 @@ func get_tackle_shop_items() -> Array:
 	var starter_ids := {
 		"simple_pole_rod_4m": true,
 		"mono_1_2kg": true,
-		"basic_mono_leader_1kg": true,
+		BASIC_FLOAT_ID: true,
 		"light_float": true,
+		"medium_float": true,
+		"night_float": true,
 		"small_hook_12": true
 	}
 
@@ -2965,6 +4101,9 @@ func _make_tackle_component(item_id: String) -> Dictionary:
 	component["price"] = float(item.get("price", 0.0))
 	component["image_path"] = str(item.get("image_path", ""))
 	component["description"] = str(item.get("description", ""))
+	component["display_name_ru"] = str(item.get("display_name_ru", item.get("name", "")))
+	component["description_ru"] = str(item.get("description_ru", item.get("description", "")))
+	component["bonus_tags"] = _to_string_array(item.get("bonus_tags", component.get("bonus_tags", [])))
 	return component
 
 func _make_owned_catalog_item(item_id: String, quantity: int = 1) -> Dictionary:
@@ -3045,20 +4184,49 @@ func _normalize_equipment_stats(stats: Dictionary, category: String, item_id: St
 			normalized["durability"] = clamp(float(normalized["durability"]), 0.0, 1.0)
 		"leader":
 			if not normalized.has("leader_type"):
-				normalized["leader_type"] = "mono"
-			if not normalized.has("strength"):
-				normalized["strength"] = 1.0
+				normalized["leader_type"] = str(normalized.get("material", "nylon"))
+			if not normalized.has("material"):
+				normalized["material"] = str(normalized.get("leader_type", "nylon"))
+			var leader_load: float = float(normalized.get("max_load_kg", normalized.get("max_load", normalized.get("strength", 1.0))))
+			normalized["max_load_kg"] = leader_load
+			normalized["max_load"] = leader_load
+			normalized["strength"] = leader_load
+			if not normalized.has("length_cm"):
+				normalized["length_cm"] = 20
 			if not normalized.has("visibility"):
 				normalized["visibility"] = 0.05
 			if not normalized.has("bite_protection"):
 				normalized["bite_protection"] = 0.0
+			if not normalized.has("control_bonus"):
+				normalized["control_bonus"] = 0.0
+			if not normalized.has("cautious_bite_bonus"):
+				normalized["cautious_bite_bonus"] = 0.0
+			if not normalized.has("small_fish_penalty"):
+				normalized["small_fish_penalty"] = 0.0
+			if not normalized.has("break_resistance"):
+				normalized["break_resistance"] = 1.0
+			if not normalized.has("break_chance"):
+				normalized["break_chance"] = 0.14
+			if not normalized.has("level_required"):
+				normalized["level_required"] = 1
 			if not normalized.has("durability"):
 				normalized["durability"] = 1.0
 			if not normalized.has("wear_rate"):
 				normalized["wear_rate"] = 0.020
-			normalized["strength"] = max(float(normalized["strength"]), 0.05)
+			normalized["leader_type"] = str(normalized["leader_type"])
+			normalized["material"] = str(normalized["material"])
+			normalized["length_cm"] = clampi(int(normalized["length_cm"]), 5, 80)
+			normalized["max_load_kg"] = max(float(normalized["max_load_kg"]), 0.05)
+			normalized["max_load"] = float(normalized["max_load_kg"])
+			normalized["strength"] = float(normalized["max_load_kg"])
 			normalized["visibility"] = clamp(float(normalized["visibility"]), 0.0, 0.45)
 			normalized["bite_protection"] = clamp(float(normalized["bite_protection"]), 0.0, 0.30)
+			normalized["control_bonus"] = clamp(float(normalized["control_bonus"]), -0.12, 0.12)
+			normalized["cautious_bite_bonus"] = clamp(float(normalized["cautious_bite_bonus"]), -0.30, 0.20)
+			normalized["small_fish_penalty"] = clamp(float(normalized["small_fish_penalty"]), 0.0, 0.30)
+			normalized["break_resistance"] = clamp(float(normalized["break_resistance"]), 0.45, 1.80)
+			normalized["break_chance"] = clamp(float(normalized["break_chance"]), 0.02, 0.32)
+			normalized["level_required"] = max(int(normalized["level_required"]), 1)
 			normalized["durability"] = clamp(float(normalized["durability"]), 0.0, 1.0)
 		"hook":
 			if not normalized.has("hook_chance") and normalized.has("hook_success_bonus"):
@@ -3082,6 +4250,67 @@ func _normalize_equipment_stats(stats: Dictionary, category: String, item_id: St
 			if not normalized.has("durability"):
 				normalized["durability"] = 1.0
 			normalized["durability"] = clamp(float(normalized["durability"]), 0.0, 1.0)
+		"float":
+			if not normalized.has("float_type"):
+				normalized["float_type"] = "drop"
+			if not normalized.has("base_type"):
+				normalized["base_type"] = str(normalized.get("float_type", "drop"))
+			if not normalized.has("buoyancy"):
+				normalized["buoyancy"] = 1.0
+			if not normalized.has("sensitivity"):
+				normalized["sensitivity"] = float(normalized.get("bite_detection_bonus", 0.85))
+			if not normalized.has("stability"):
+				normalized["stability"] = 0.75
+			if not normalized.has("wind_resistance"):
+				normalized["wind_resistance"] = 0.65
+			if not normalized.has("drift_resistance"):
+				normalized["drift_resistance"] = 0.65
+			if not normalized.has("cast_distance_bonus"):
+				normalized["cast_distance_bonus"] = 0.0
+			if not normalized.has("bite_visibility"):
+				normalized["bite_visibility"] = 0.85
+			if not normalized.has("false_bite_resistance"):
+				normalized["false_bite_resistance"] = 0.65
+			if not normalized.has("depth_min"):
+				normalized["depth_min"] = 0.2
+			if not normalized.has("depth_max"):
+				normalized["depth_max"] = 2.5
+			if not normalized.has("night_bonus"):
+				normalized["night_bonus"] = 0.0
+			if not normalized.has("vegetation_control"):
+				normalized["vegetation_control"] = 0.55
+			if not normalized.has("heavy_bait_support"):
+				normalized["heavy_bait_support"] = 0.55
+			if not normalized.has("hook_timing_bonus"):
+				normalized["hook_timing_bonus"] = 0.0
+			if not normalized.has("long_range_accuracy_bonus"):
+				normalized["long_range_accuracy_bonus"] = 0.0
+			if not normalized.has("setup_comfort"):
+				normalized["setup_comfort"] = 0.0
+			if not normalized.has("recommended_spots") or typeof(normalized.get("recommended_spots", [])) != TYPE_ARRAY:
+				normalized["recommended_spots"] = []
+			if not normalized.has("bonus_tags") or typeof(normalized.get("bonus_tags", [])) != TYPE_ARRAY:
+				normalized["bonus_tags"] = []
+
+			normalized["base_type"] = str(normalized["base_type"])
+			normalized["buoyancy"] = clamp(float(normalized["buoyancy"]), 0.1, 2.0)
+			normalized["sensitivity"] = clamp(_normalize_float_rating(float(normalized["sensitivity"]), 0.85), 0.0, 1.0)
+			normalized["stability"] = clamp(_normalize_float_rating(float(normalized["stability"]), 0.75), 0.0, 1.0)
+			normalized["wind_resistance"] = clamp(_normalize_float_rating(float(normalized["wind_resistance"]), 0.65), 0.0, 1.0)
+			normalized["drift_resistance"] = clamp(_normalize_float_rating(float(normalized["drift_resistance"]), 0.65), 0.0, 1.0)
+			normalized["cast_distance_bonus"] = clamp(float(normalized["cast_distance_bonus"]), -0.20, 0.25)
+			normalized["bite_visibility"] = clamp(_normalize_float_rating(float(normalized["bite_visibility"]), 0.85), 0.0, 1.0)
+			normalized["false_bite_resistance"] = clamp(_normalize_float_rating(float(normalized["false_bite_resistance"]), 0.65), 0.0, 1.0)
+			normalized["depth_min"] = max(float(normalized["depth_min"]), PHYSICAL_SHORE_MIN_DEPTH)
+			normalized["depth_max"] = max(float(normalized["depth_max"]), float(normalized["depth_min"]) + 0.1)
+			normalized["night_bonus"] = clamp(float(normalized["night_bonus"]), 0.0, 0.60)
+			normalized["vegetation_control"] = clamp(_normalize_float_rating(float(normalized["vegetation_control"]), 0.55), 0.0, 1.0)
+			normalized["heavy_bait_support"] = clamp(_normalize_float_rating(float(normalized["heavy_bait_support"]), 0.55), 0.0, 1.0)
+			normalized["hook_timing_bonus"] = clamp(float(normalized["hook_timing_bonus"]), 0.0, 0.20)
+			normalized["long_range_accuracy_bonus"] = clamp(float(normalized["long_range_accuracy_bonus"]), 0.0, 0.20)
+			normalized["setup_comfort"] = clamp(float(normalized["setup_comfort"]), 0.0, 0.20)
+			normalized["recommended_spots"] = _to_string_array(normalized["recommended_spots"])
+			normalized["bonus_tags"] = _to_string_array(normalized["bonus_tags"])
 		"bait":
 			var bait_id := item_id
 			if bait_id == "":
@@ -3089,6 +4318,13 @@ func _normalize_equipment_stats(stats: Dictionary, category: String, item_id: St
 			normalized = _apply_bait_target_profile(normalized, bait_id)
 
 	return normalized
+
+func _normalize_float_rating(value: float, fallback: float) -> float:
+	if value <= 0.0:
+		return fallback
+	if value <= 0.35:
+		return clamp(value / 0.25, 0.35, 1.0)
+	return clamp(value, 0.0, 1.0)
 
 func _apply_bait_target_profile(stats: Dictionary, bait_id: String) -> Dictionary:
 	var normalized := stats.duplicate(true)
@@ -3196,7 +4432,8 @@ func _get_default_rod_handling_bonus(length_m: float, rod_class: String) -> floa
 	return clamp(class_bonus - max(length_m - 5.2, 0.0) * 0.018, -0.06, 0.06)
 
 func _normalize_owned_item(item: Dictionary) -> Dictionary:
-	var item_id := str(item.get("id", ""))
+	var original_item_id := str(item.get("id", ""))
+	var item_id := _resolve_tackle_item_id(original_item_id)
 	var catalog_item := get_tackle_catalog_item(item_id)
 	var item_type := str(item.get("type", item.get("category", catalog_item.get("type", catalog_item.get("category", "misc")))))
 	var category := str(item.get("category", catalog_item.get("category", item_type)))
@@ -3209,17 +4446,21 @@ func _normalize_owned_item(item: Dictionary) -> Dictionary:
 	if typeof(raw_stats) == TYPE_DICTIONARY:
 		stats.merge(raw_stats, true)
 	stats = _normalize_equipment_stats(stats, category, item_id)
+	var use_catalog_identity := original_item_id != item_id and not catalog_item.is_empty()
 
 	return {
 		"id": item_id,
-		"name": str(item.get("name", catalog_item.get("name", "-"))),
-		"type": item_type,
-		"category": category,
-		"rarity": str(item.get("rarity", catalog_item.get("rarity", "common"))),
-		"price": float(item.get("price", catalog_item.get("price", 0.0))),
+		"name": str(catalog_item.get("name", "-") if use_catalog_identity else item.get("name", catalog_item.get("name", "-"))),
+		"type": str(catalog_item.get("type", item_type) if use_catalog_identity else item_type),
+		"category": str(catalog_item.get("category", category) if use_catalog_identity else category),
+		"rarity": str(catalog_item.get("rarity", "common") if use_catalog_identity else item.get("rarity", catalog_item.get("rarity", "common"))),
+		"price": float(catalog_item.get("price", 0.0) if use_catalog_identity else item.get("price", catalog_item.get("price", 0.0))),
 		"quantity": max(int(item.get("quantity", 1)), 0),
-		"image_path": str(item.get("image_path", catalog_item.get("image_path", ""))),
-		"description": str(item.get("description", catalog_item.get("description", ""))),
+		"image_path": str(catalog_item.get("image_path", "") if use_catalog_identity else item.get("image_path", catalog_item.get("image_path", ""))),
+		"description": str(catalog_item.get("description", "") if use_catalog_identity else item.get("description", catalog_item.get("description", ""))),
+		"display_name_ru": str(catalog_item.get("display_name_ru", catalog_item.get("name", "-")) if use_catalog_identity else item.get("display_name_ru", catalog_item.get("display_name_ru", item.get("name", catalog_item.get("name", "-"))))),
+		"description_ru": str(catalog_item.get("description_ru", catalog_item.get("description", "")) if use_catalog_identity else item.get("description_ru", catalog_item.get("description_ru", item.get("description", catalog_item.get("description", ""))))),
+		"bonus_tags": _to_string_array(catalog_item.get("bonus_tags", []) if use_catalog_identity else item.get("bonus_tags", catalog_item.get("bonus_tags", stats.get("bonus_tags", [])))),
 		"stats": stats
 	}
 
@@ -3227,19 +4468,155 @@ func get_default_tackle() -> Dictionary:
 	return {
 		"rod": _make_tackle_component("simple_pole_rod_4m"),
 		"line": _make_tackle_component("mono_1_2kg"),
-		"leader": {},
+		"leader": _make_tackle_component(BASIC_LEADER_ID),
 		"hook": _make_tackle_component("small_hook_12"),
-		"float": _make_tackle_component("light_float"),
+		"float": _make_tackle_component(BASIC_FLOAT_ID),
 		"bait": _make_tackle_component("worm"),
 		"bait_2": {}
 	}
+
+func get_default_recent_tackle_items() -> Dictionary:
+	var defaults: Dictionary = {}
+	for category in QUICK_TACKLE_CATEGORIES:
+		defaults[category] = []
+	return defaults
+
+func set_recent_tackle_items(saved_recent) -> void:
+	recent_tackle_items = get_default_recent_tackle_items()
+	if typeof(saved_recent) != TYPE_DICTIONARY:
+		return
+
+	for category in QUICK_TACKLE_CATEGORIES:
+		var saved_ids = saved_recent.get(category, [])
+		if typeof(saved_ids) != TYPE_ARRAY:
+			continue
+
+		var normalized_ids: Array = []
+		for raw_id in saved_ids:
+			var item_id := str(raw_id)
+			if item_id != "" and normalized_ids.has(item_id):
+				continue
+			normalized_ids.append(item_id)
+			if normalized_ids.size() >= 3:
+				break
+		recent_tackle_items[category] = normalized_ids
+
+func get_recent_tackle_items_save_data() -> Dictionary:
+	var data := get_default_recent_tackle_items()
+	for category in QUICK_TACKLE_CATEGORIES:
+		data[category] = get_recent_tackle_item_ids(category)
+	return data
+
+func get_recent_tackle_item_ids(category: String) -> Array:
+	if not QUICK_TACKLE_CATEGORIES.has(category):
+		return []
+	var ids = recent_tackle_items.get(category, [])
+	if typeof(ids) != TYPE_ARRAY:
+		return []
+	return (ids as Array).duplicate()
+
+func remember_recent_tackle_item(category: String, item_id: String) -> void:
+	if not QUICK_TACKLE_CATEGORIES.has(category) or item_id == "":
+		return
+
+	var ids := _get_recent_tackle_slot_ids(category)
+	var existing_index := ids.find(item_id)
+	if existing_index >= 0:
+		recent_tackle_items[category] = ids
+		return
+
+	var empty_index := ids.find("")
+	if empty_index >= 0:
+		ids[empty_index] = item_id
+	else:
+		ids.push_front(item_id)
+		while ids.size() > 3:
+			ids.pop_back()
+	recent_tackle_items[category] = ids
+
+func forget_recent_tackle_item(category: String, item_id: String) -> void:
+	if not QUICK_TACKLE_CATEGORIES.has(category) or item_id == "":
+		return
+	if not recent_tackle_items.has(category) or typeof(recent_tackle_items.get(category)) != TYPE_ARRAY:
+		return
+
+	var ids: Array = recent_tackle_items[category]
+	ids.erase(item_id)
+	recent_tackle_items[category] = ids
+
+func set_recent_tackle_item_slot(category: String, slot_index: int, item_id: String) -> void:
+	if not QUICK_TACKLE_CATEGORIES.has(category) or slot_index < 0 or slot_index >= 3:
+		return
+
+	var ids := _get_recent_tackle_slot_ids(category)
+	if item_id != "":
+		for i in ids.size():
+			if i != slot_index and str(ids[i]) == item_id:
+				ids[i] = ""
+	ids[slot_index] = item_id
+	recent_tackle_items[category] = ids
+
+func clear_recent_tackle_item_slot(category: String, slot_index: int) -> void:
+	set_recent_tackle_item_slot(category, slot_index, "")
+
+func _get_recent_tackle_slot_ids(category: String) -> Array:
+	var ids: Array = []
+	if recent_tackle_items.has(category) and typeof(recent_tackle_items.get(category)) == TYPE_ARRAY:
+		for raw_id in recent_tackle_items[category]:
+			ids.append(str(raw_id))
+			if ids.size() >= 3:
+				break
+	while ids.size() < 3:
+		ids.append("")
+	return ids
+
+func get_quick_tackle_items(category: String, limit: int = 3) -> Array:
+	if not QUICK_TACKLE_CATEGORIES.has(category):
+		return []
+
+	var result: Array = []
+	var used_ids: Dictionary = {}
+	for item_id in get_recent_tackle_item_ids(category):
+		var item := get_owned_item(str(item_id))
+		if _is_quick_tackle_item_available(item, category):
+			result.append(item)
+			used_ids[str(item.get("id", ""))] = true
+		if result.size() >= limit:
+			return result
+
+	for item in get_owned_items_for_category(category):
+		if typeof(item) != TYPE_DICTIONARY:
+			continue
+		var owned_item: Dictionary = item
+		var owned_id := str(owned_item.get("id", ""))
+		if used_ids.has(owned_id):
+			continue
+		if not _is_quick_tackle_item_available(owned_item, category):
+			continue
+		result.append(owned_item)
+		used_ids[owned_id] = true
+		if result.size() >= limit:
+			break
+
+	return result
+
+func _is_quick_tackle_item_available(item: Dictionary, category: String) -> bool:
+	if item.is_empty():
+		return false
+	if str(item.get("category", item.get("type", ""))) != category:
+		return false
+	if int(item.get("quantity", 0)) <= 0:
+		return false
+	if category == "bait" and int(item.get("quantity", 0)) <= 0:
+		return false
+	return true
 
 func get_default_owned_items() -> Array:
 	return [
 		_make_owned_catalog_item("simple_pole_rod_4m", 1),
 		_make_owned_catalog_item("mono_1_2kg", 1),
-		_make_owned_catalog_item("basic_mono_leader_1kg", 1),
-		_make_owned_catalog_item("light_float", 1),
+		_make_owned_catalog_item(BASIC_LEADER_ID, 1),
+		_make_owned_catalog_item(BASIC_FLOAT_ID, 1),
 		_make_owned_catalog_item("small_hook_12", 1),
 		_make_owned_catalog_item("worm", 30)
 	]
@@ -3262,6 +4639,11 @@ func set_current_tackle(saved_tackle: Dictionary) -> void:
 		if str(merged_component.get("id", "")) == "":
 			current_tackle[slot] = {}
 			continue
+		var resolved_component_id := _resolve_tackle_item_id(str(merged_component.get("id", "")))
+		if resolved_component_id != str(merged_component.get("id", "")):
+			var catalog_component := _make_tackle_component(resolved_component_id)
+			if not catalog_component.is_empty():
+				merged_component = catalog_component
 		merged_component["slot"] = slot
 		merged_component["type"] = slot_category
 		merged_component["category"] = slot_category
@@ -3288,7 +4670,22 @@ func set_current_tackle(saved_tackle: Dictionary) -> void:
 				merged_component["target_fish_size"] = "small"
 
 		merged_component = _normalize_equipment_stats(merged_component, slot_category, str(merged_component.get("id", "")))
+		var slot_catalog_item := get_tackle_catalog_item(str(merged_component.get("id", "")))
+		if not slot_catalog_item.is_empty():
+			merged_component["name"] = str(slot_catalog_item.get("name", merged_component.get("name", "-")))
+			merged_component["rarity"] = str(slot_catalog_item.get("rarity", merged_component.get("rarity", "common")))
+			merged_component["price"] = float(slot_catalog_item.get("price", merged_component.get("price", 0.0)))
+			merged_component["image_path"] = str(slot_catalog_item.get("image_path", merged_component.get("image_path", "")))
+			merged_component["description"] = str(slot_catalog_item.get("description", merged_component.get("description", "")))
+			merged_component["display_name_ru"] = str(slot_catalog_item.get("display_name_ru", merged_component.get("display_name_ru", slot_catalog_item.get("name", "-"))))
+			merged_component["description_ru"] = str(slot_catalog_item.get("description_ru", merged_component.get("description_ru", slot_catalog_item.get("description", ""))))
+			merged_component["bonus_tags"] = _to_string_array(slot_catalog_item.get("bonus_tags", merged_component.get("bonus_tags", [])))
 		current_tackle[slot] = merged_component
+
+	if current_tackle.get("float", {}).is_empty():
+		current_tackle["float"] = _make_tackle_component(BASIC_FLOAT_ID)
+	if current_tackle.get("leader", {}).is_empty():
+		current_tackle["leader"] = _make_tackle_component(BASIC_LEADER_ID)
 
 func set_owned_items(saved_items: Array) -> void:
 	if saved_items.is_empty():
@@ -3310,6 +4707,29 @@ func set_owned_items(saved_items: Array) -> void:
 
 	if owned_items.is_empty():
 		owned_items = get_default_owned_items()
+	else:
+		_ensure_default_float_owned()
+		_ensure_default_leader_owned()
+
+func _ensure_default_float_owned() -> void:
+	if _has_owned_category("float"):
+		return
+	var fallback_float := _make_owned_catalog_item(BASIC_FLOAT_ID, 1)
+	if not fallback_float.is_empty():
+		owned_items.append(fallback_float)
+
+func _ensure_default_leader_owned() -> void:
+	if _has_owned_category("leader"):
+		return
+	var fallback_leader := _make_owned_catalog_item(BASIC_LEADER_ID, 1)
+	if not fallback_leader.is_empty():
+		owned_items.append(fallback_leader)
+
+func _has_owned_category(category: String) -> bool:
+	for item in owned_items:
+		if typeof(item) == TYPE_DICTIONARY and str(item.get("category", item.get("type", ""))) == category and int(item.get("quantity", 0)) > 0:
+			return true
+	return false
 
 func get_owned_items_for_category(category_filter: String) -> Array:
 	if category_filter == "all":
@@ -3330,7 +4750,7 @@ func is_tackle_slot_supported(slot_id: String) -> bool:
 	return TACKLE_SLOTS.has(slot_id)
 
 func can_use_second_bait() -> bool:
-	return get_skill_effect_value("second_bait_slot") > 0.0 or has_skill("bait_sandwich")
+	return get_skill_effect_value("unlock_double_bait") > 0.0 or get_skill_effect_value("second_bait_slot") > 0.0 or has_skill("float_double_bait") or has_skill("bait_sandwich")
 
 func get_current_tackle_slot(slot_id: String) -> Dictionary:
 	if not current_tackle.has(slot_id):
@@ -3355,21 +4775,31 @@ func set_current_tackle_slot(slot_id: String, item: Dictionary) -> bool:
 	if item_category != slot_category:
 		return false
 
-	var component: Dictionary = _normalize_equipment_stats(item.get("stats", {}).duplicate(true), slot_category, str(item.get("id", "")))
-	component["id"] = str(item.get("id", ""))
-	component["name"] = str(item.get("name", "-"))
-	component["type"] = str(item.get("type", slot_category))
-	component["category"] = item_category
+	var original_item_id := str(item.get("id", ""))
+	var resolved_item_id := _resolve_tackle_item_id(original_item_id)
+	var catalog_item := get_tackle_catalog_item(resolved_item_id)
+	var use_catalog_identity := resolved_item_id != original_item_id and not catalog_item.is_empty()
+	var source_stats: Dictionary = catalog_item.get("stats", {}).duplicate(true) if use_catalog_identity and typeof(catalog_item.get("stats", {})) == TYPE_DICTIONARY else item.get("stats", {}).duplicate(true)
+	var component: Dictionary = _normalize_equipment_stats(source_stats, slot_category, resolved_item_id)
+	component["id"] = resolved_item_id
+	component["name"] = str(catalog_item.get("name", "-") if use_catalog_identity else item.get("name", "-"))
+	component["type"] = str(catalog_item.get("type", slot_category) if use_catalog_identity else item.get("type", slot_category))
+	component["category"] = str(catalog_item.get("category", item_category) if use_catalog_identity else item_category)
 	component["slot"] = slot_id
-	component["rarity"] = str(item.get("rarity", "common"))
-	component["price"] = float(item.get("price", 0.0))
-	component["image_path"] = str(item.get("image_path", ""))
-	component["description"] = str(item.get("description", ""))
+	component["rarity"] = str(catalog_item.get("rarity", "common") if use_catalog_identity else item.get("rarity", "common"))
+	component["price"] = float(catalog_item.get("price", 0.0) if use_catalog_identity else item.get("price", 0.0))
+	component["image_path"] = str(catalog_item.get("image_path", "") if use_catalog_identity else item.get("image_path", ""))
+	component["description"] = str(catalog_item.get("description", "") if use_catalog_identity else item.get("description", ""))
+	component["display_name_ru"] = str(catalog_item.get("display_name_ru", catalog_item.get("name", "-")) if use_catalog_identity else item.get("display_name_ru", catalog_item.get("display_name_ru", item.get("name", "-"))))
+	component["description_ru"] = str(catalog_item.get("description_ru", catalog_item.get("description", "")) if use_catalog_identity else item.get("description_ru", catalog_item.get("description_ru", item.get("description", ""))))
+	component["bonus_tags"] = _to_string_array(catalog_item.get("bonus_tags", []) if use_catalog_identity else item.get("bonus_tags", catalog_item.get("bonus_tags", component.get("bonus_tags", []))))
 
 	if slot_category == "bait":
 		component["quantity"] = int(item.get("quantity", 0))
 
 	current_tackle[slot_id] = component
+	if QUICK_TACKLE_CATEGORIES.has(slot_id):
+		remember_recent_tackle_item(slot_id, resolved_item_id)
 	return true
 
 func clear_current_tackle_slot(slot_id: String) -> void:
@@ -3387,7 +4817,7 @@ func get_equip_block_reason(item: Dictionary, slot_type: String = "") -> String:
 	var category := str(item.get("category", ""))
 	if slot_type != "":
 		if slot_type == "bait_2" and not can_use_second_bait():
-			return "Нужен навык «Бутерброд»."
+			return "Нужен навык «Ловля на бутерброд»."
 		var expected_category := _get_tackle_slot_item_category(slot_type)
 		if category != expected_category:
 			return "Не подходит к этой снасти."
@@ -3548,7 +4978,8 @@ func claim_rescue_kit() -> Dictionary:
 
 	_grant_rescue_item("simple_pole_rod_4m", 1)
 	_grant_rescue_item(RESCUE_KIT_LINE_ID, 1)
-	_grant_rescue_item("light_float", 1)
+	_grant_rescue_item(BASIC_LEADER_ID, 1)
+	_grant_rescue_item(BASIC_FLOAT_ID, 1)
 	_grant_rescue_item(hook_id, hook_quantity)
 	_grant_rescue_item("worm", 5)
 	_equip_rescue_items_if_needed(hook_id)
@@ -3560,14 +4991,10 @@ func claim_rescue_kit() -> Dictionary:
 	return {
 		"allowed": true,
 		"success": true,
-		"message": "Базовый набор выдан: удочка, леска, поплавок, крючки и наживка."
+		"message": "Базовый набор выдан: удочка, леска, поводок, поплавок, крючки и наживка."
 	}
 
 func _is_current_tackle_slot_usable(slot: String) -> bool:
-	if slot == "leader":
-		var leader_component = current_tackle.get(slot, {})
-		if typeof(leader_component) == TYPE_DICTIONARY and str(leader_component.get("id", "")) == "":
-			return true
 	if slot == "bait_2":
 		if not can_use_second_bait():
 			return true
@@ -3627,8 +5054,8 @@ func _equip_rescue_items_if_needed(hook_id: String) -> void:
 	var rescue_slots: Dictionary = {
 		"rod": "simple_pole_rod_4m",
 		"line": RESCUE_KIT_LINE_ID,
-		"leader": "basic_mono_leader_1kg",
-		"float": "light_float",
+		"leader": BASIC_LEADER_ID,
+		"float": BASIC_FLOAT_ID,
 		"hook": hook_id,
 		"bait": "worm"
 	}
@@ -3692,6 +5119,9 @@ func add_owned_item(item: Dictionary, amount: int = 1) -> void:
 		owned_item["price"] = float(normalized_item.get("price", owned_item.get("price", 0.0)))
 		owned_item["image_path"] = str(normalized_item.get("image_path", owned_item.get("image_path", "")))
 		owned_item["description"] = str(normalized_item.get("description", owned_item.get("description", "")))
+		owned_item["display_name_ru"] = str(normalized_item.get("display_name_ru", owned_item.get("display_name_ru", owned_item.get("name", "-"))))
+		owned_item["description_ru"] = str(normalized_item.get("description_ru", owned_item.get("description_ru", owned_item.get("description", ""))))
+		owned_item["bonus_tags"] = _to_string_array(normalized_item.get("bonus_tags", owned_item.get("bonus_tags", [])))
 
 		if ["rod", "line", "leader", "hook"].has(item_category):
 			var refreshed_stats: Dictionary = normalized_item.get("stats", {}).duplicate(true)
@@ -3728,6 +5158,9 @@ func _refresh_current_tackle_from_owned_item(owned_item: Dictionary) -> void:
 			current_tackle[slot][key] = stats[key]
 
 		current_tackle[slot]["image_path"] = str(owned_item.get("image_path", current_tackle[slot].get("image_path", "")))
+		current_tackle[slot]["display_name_ru"] = str(owned_item.get("display_name_ru", current_tackle[slot].get("display_name_ru", current_tackle[slot].get("name", "-"))))
+		current_tackle[slot]["description_ru"] = str(owned_item.get("description_ru", current_tackle[slot].get("description_ru", current_tackle[slot].get("description", ""))))
+		current_tackle[slot]["bonus_tags"] = _to_string_array(owned_item.get("bonus_tags", current_tackle[slot].get("bonus_tags", [])))
 		current_tackle[slot]["quantity"] = int(owned_item.get("quantity", 0))
 
 func _change_owned_item_quantity(item_id: String, delta: int) -> int:
@@ -3777,7 +5210,7 @@ func get_tackle_setup_issues() -> Array:
 		if issue != "":
 			issues.append(issue)
 
-	for slot in ["leader", "bait_2"]:
+	for slot in ["bait_2"]:
 		var optional_issue := _get_tackle_slot_issue(slot)
 		if optional_issue != "":
 			issues.append(optional_issue)
@@ -3793,7 +5226,7 @@ func get_tackle_setup_status_text() -> String:
 
 func _get_tackle_slot_issue(slot: String) -> String:
 	var title := _get_tackle_slot_title(slot)
-	var slot_is_optional := ["leader", "bait_2"].has(slot)
+	var slot_is_optional := ["bait_2"].has(slot)
 
 	if slot == "bait_2" and not can_use_second_bait():
 		return ""
@@ -3803,16 +5236,22 @@ func _get_tackle_slot_issue(slot: String) -> String:
 			return ""
 
 	if not current_tackle.has(slot):
+		if slot == "leader":
+			return "Установите поводок."
 		return "%s не выбрана." % title
 
 	var raw_component: Variant = current_tackle.get(slot, {})
 	if typeof(raw_component) != TYPE_DICTIONARY:
+		if slot == "leader":
+			return "Установите поводок."
 		return "%s не выбрана." % title
 
 	var component: Dictionary = raw_component
 	var item_id := str(component.get("id", ""))
 	var item_name := str(component.get("name", title))
 	if item_id == "":
+		if slot == "leader":
+			return "Установите поводок."
 		return "%s не выбрана." % title
 
 	if slot == "bait":
@@ -3866,17 +5305,23 @@ func apply_tackle_wear(wear: Dictionary) -> Dictionary:
 	var result := {
 		"rod_broken": bool(wear.get("rod_broken", false)),
 		"line_broken": bool(wear.get("line_broken", false)),
+		"leader_broken": bool(wear.get("leader_broken", false)),
+		"leader_lost": bool(wear.get("leader_lost", false)),
+		"float_lost": bool(wear.get("float_lost", false)),
 		"hook_lost": bool(wear.get("hook_lost", false)),
 		"rod_old": get_tackle_condition("rod"),
 		"line_old": get_tackle_condition("line"),
+		"leader_old": get_tackle_condition("leader"),
 		"hook_old": get_tackle_condition("hook")
 	}
 
-	for slot in ["rod", "line", "hook"]:
+	for slot in ["rod", "line", "leader", "hook"]:
 		if not current_tackle.has(slot):
 			continue
 
 		var item_id := str(current_tackle[slot].get("id", ""))
+		if item_id == "":
+			continue
 		var old_condition: float = get_tackle_condition(slot)
 		var new_condition: float = clamp(old_condition - max(float(wear.get(slot, 0.0)), 0.0), 0.0, 1.0)
 
@@ -3885,6 +5330,9 @@ func apply_tackle_wear(wear: Dictionary) -> Dictionary:
 		elif slot == "line" and bool(wear.get("line_broken", false)):
 			var remaining_lines := _change_owned_item_quantity(item_id, -1)
 			new_condition = 1.0 if remaining_lines > 0 else 0.0
+		elif slot == "leader" and (bool(wear.get("leader_broken", false)) or bool(wear.get("leader_lost", false))):
+			var remaining_leaders := _change_owned_item_quantity(item_id, -1)
+			new_condition = 1.0 if remaining_leaders > 0 else 0.0
 		elif slot == "hook" and bool(wear.get("hook_lost", false)):
 			var remaining_hooks := _change_owned_item_quantity(item_id, -1)
 			new_condition = 1.0 if remaining_hooks > 0 else 0.0
@@ -3892,6 +5340,12 @@ func apply_tackle_wear(wear: Dictionary) -> Dictionary:
 		current_tackle[slot]["durability"] = new_condition
 		_set_owned_item_durability(item_id, new_condition)
 		result["%s_new" % slot] = new_condition
+
+	if bool(wear.get("float_lost", false)):
+		var float_id := str(current_tackle.get("float", {}).get("id", ""))
+		if float_id != "":
+			var remaining_floats := _change_owned_item_quantity(float_id, -1)
+			result["float_new_quantity"] = remaining_floats
 
 	return result
 
@@ -3970,15 +5424,103 @@ func consume_primary_bait(amount: int = 1) -> bool:
 
 	return false
 
+func get_current_float_data() -> Dictionary:
+	var raw_component = current_tackle.get("float", {})
+	if typeof(raw_component) != TYPE_DICTIONARY or str(raw_component.get("id", "")) == "":
+		return _make_tackle_component(BASIC_FLOAT_ID)
+
+	var component: Dictionary = (raw_component as Dictionary).duplicate(true)
+	var original_id := str(component.get("id", ""))
+	var resolved_id := _resolve_tackle_item_id(original_id)
+	var catalog_item := get_tackle_catalog_item(resolved_id)
+	var normalized: Dictionary = {}
+
+	if not catalog_item.is_empty():
+		var catalog_stats: Dictionary = catalog_item.get("stats", {}).duplicate(true) if typeof(catalog_item.get("stats", {})) == TYPE_DICTIONARY else {}
+		catalog_stats.merge(component, true)
+		normalized = _normalize_equipment_stats(catalog_stats, "float", resolved_id)
+		normalized["id"] = resolved_id
+		normalized["name"] = str(catalog_item.get("name", component.get("name", "-")))
+		normalized["type"] = "float"
+		normalized["category"] = "float"
+		normalized["rarity"] = str(catalog_item.get("rarity", component.get("rarity", "common")))
+		normalized["price"] = float(catalog_item.get("price", component.get("price", 0.0)))
+		normalized["image_path"] = str(catalog_item.get("image_path", component.get("image_path", "")))
+		normalized["description"] = str(catalog_item.get("description", component.get("description", "")))
+		normalized["display_name_ru"] = str(catalog_item.get("display_name_ru", component.get("display_name_ru", catalog_item.get("name", ""))))
+		normalized["description_ru"] = str(catalog_item.get("description_ru", component.get("description_ru", catalog_item.get("description", ""))))
+		normalized["bonus_tags"] = _to_string_array(catalog_item.get("bonus_tags", component.get("bonus_tags", normalized.get("bonus_tags", []))))
+	else:
+		normalized = _normalize_equipment_stats(component, "float", resolved_id)
+		normalized["id"] = resolved_id if resolved_id != "" else BASIC_FLOAT_ID
+		normalized["type"] = "float"
+		normalized["category"] = "float"
+		normalized["display_name_ru"] = str(component.get("display_name_ru", component.get("name", "")))
+		normalized["description_ru"] = str(component.get("description_ru", component.get("description", "")))
+		normalized["bonus_tags"] = _to_string_array(component.get("bonus_tags", normalized.get("bonus_tags", [])))
+
+	if original_id != str(normalized.get("id", "")):
+		current_tackle["float"] = normalized.duplicate(true)
+
+	return normalized.duplicate(true)
+
+func _get_current_float_depth_match(float_part: Dictionary) -> float:
+	var depth: float = float(fishing_depth)
+	var min_depth: float = float(float_part.get("depth_min", PHYSICAL_SHORE_MIN_DEPTH))
+	var max_depth: float = float(float_part.get("depth_max", 2.5))
+
+	if depth >= min_depth and depth <= max_depth:
+		return 1.0
+
+	var distance: float = min(abs(depth - min_depth), abs(depth - max_depth))
+	return clamp(1.0 - distance * 0.28, 0.58, 1.0)
+
+func _is_current_time_night() -> bool:
+	var time_manager := get_node_or_null("/root/TimeManager")
+	if time_manager != null and time_manager.has_method("get_time_state"):
+		var state = time_manager.call("get_time_state")
+		if state is Dictionary:
+			return str((state as Dictionary).get("time_of_day", "")) == "night"
+	if time_manager != null:
+		return str(time_manager.get("time_of_day")) == "night"
+	return false
+
+func _get_bait_float_load(bait_part: Dictionary) -> float:
+	if bait_part.is_empty():
+		return 0.0
+
+	var tags: Array = _to_string_array(bait_part.get("bait_tags", []))
+	var bait_id: String = str(bait_part.get("id", bait_part.get("bait_id", "")))
+	var bait_type: String = str(bait_part.get("bait_type", ""))
+	var load := 0.0
+
+	if tags.has("large") or tags.has("live_bait"):
+		load += 0.34
+	if tags.has("predator") or tags.has("crustacean") or tags.has("shellfish"):
+		load += 0.16
+	if tags.has("bottom") and (bait_type == "worm" or bait_type == "maggot"):
+		load += 0.06
+	if ["fish_piece", "small_live_bait", "frog_bait", "rakovaia_sheika", "krabovoe_myaso", "vipolzok", "medvedka"].has(bait_id):
+		load += 0.18
+
+	load += clamp(float(bait_part.get("fish_attraction", 0.0)) - 0.14, 0.0, 0.12) * 0.55
+	return clamp(load, 0.0, 0.45)
+
 func get_tackle_stats() -> Dictionary:
 	var rod: Dictionary = _normalize_equipment_stats(current_tackle.get("rod", {}).duplicate(true), "rod")
 	var line: Dictionary = _normalize_equipment_stats(current_tackle.get("line", {}).duplicate(true), "line")
 	var leader: Dictionary = _normalize_equipment_stats(current_tackle.get("leader", {}).duplicate(true), "leader")
-	var float_part: Dictionary = current_tackle.get("float", {})
+	var float_part: Dictionary = get_current_float_data()
 	var hook: Dictionary = _normalize_equipment_stats(current_tackle.get("hook", {}).duplicate(true), "hook")
 	var bait: Dictionary = _normalize_equipment_stats(current_tackle.get("bait", {}).duplicate(true), "bait", str(current_tackle.get("bait", {}).get("id", "")))
 	var second_bait: Dictionary = _normalize_equipment_stats(current_tackle.get("bait_2", {}).duplicate(true), "bait", str(current_tackle.get("bait_2", {}).get("id", ""))) if _has_active_second_bait() else {}
 	var skill_effects := get_skill_effects()
+	var hook_skill_bonus: float = max(float(skill_effects.get("hook_success_chance", 0.0)), 0.0)
+	var float_stability_skill_bonus: float = max(float(skill_effects.get("float_reeling_stability", 0.0)), 0.0)
+	var escape_skill_reduction: float = clamp(float(skill_effects.get("fish_escape_chance_reduction", 0.0)), 0.0, 0.85)
+	var line_break_skill_reduction: float = clamp(float(skill_effects.get("line_break_chance_reduction", 0.0)) + float(skill_effects.get("thin_tackle_break_reduction", 0.0)), 0.0, 0.85)
+	var double_bait_skill_bonus: float = clamp(float(skill_effects.get("double_bait_bite_bonus", 0.0)), 0.0, 0.20)
+	var cautious_fish_bite_bonus: float = clamp(float(skill_effects.get("cautious_fish_bite_chance", 0.0)), 0.0, 0.20)
 	var rod_durability: float = clamp(float(rod.get("durability", 1.0)), 0.0, 1.0)
 	var line_durability: float = clamp(float(line.get("durability", 1.0)), 0.0, 1.0)
 	var leader_durability: float = clamp(float(leader.get("durability", 1.0)), 0.0, 1.0)
@@ -3994,25 +5536,48 @@ func get_tackle_stats() -> Dictionary:
 	var raw_rod_stiffness: float = float(rod.get("stiffness", rod.get("strength", 1.0)))
 	var rod_strength: float = raw_rod_stiffness * lerp(0.55, 1.0, rod_durability)
 	var raw_line_strength: float = float(line.get("max_load", line.get("max_load_kg", line.get("strength", 1.0))))
-	var line_strength_bonus: float = max(float(skill_effects.get("line_strength_bonus", 0.0)), -0.95)
+	var line_strength_bonus: float = max(float(skill_effects.get("line_strength_bonus", 0.0)) + line_break_skill_reduction * 0.30, -0.95)
 	var line_strength: float = raw_line_strength * line_condition * (1.0 + line_strength_bonus)
 	var line_visibility: float = float(line.get("visibility", line.get("visibility_penalty", 0.0)))
 	var has_leader := str(current_tackle.get("leader", {}).get("id", "")) != ""
 	var leader_strength: float = float(leader.get("strength", line_strength)) * leader_condition
 	var leader_visibility: float = float(leader.get("visibility", 0.0)) if has_leader else 0.0
 	var leader_bite_protection: float = float(leader.get("bite_protection", 0.0)) * leader_condition if has_leader else 0.0
+	var leader_control_bonus: float = float(leader.get("control_bonus", 0.0)) * leader_condition if has_leader else 0.0
+	var leader_cautious_bite_bonus: float = float(leader.get("cautious_bite_bonus", 0.0)) if has_leader else 0.0
+	var leader_small_fish_penalty: float = float(leader.get("small_fish_penalty", 0.0)) if has_leader else 0.0
+	var leader_break_resistance: float = float(leader.get("break_resistance", 1.0)) * leader_condition if has_leader else 1.0
+	var leader_break_chance: float = float(leader.get("break_chance", 0.14)) / max(leader_condition, 0.1) if has_leader else 0.0
+	var leader_wear_rate: float = float(leader.get("wear_rate", 0.020)) if has_leader else 0.0
+	var leader_length_cm: int = int(leader.get("length_cm", 0)) if has_leader else 0
+	var leader_material: String = str(leader.get("material", leader.get("leader_type", ""))) if has_leader else ""
+	var effective_break_resistance: float = float(line.get("break_resistance", 1.0)) * lerp(0.35, 1.0, line_durability)
+	var effective_break_chance: float = float(line.get("break_chance", 0.15)) * (1.0 - line_break_skill_reduction) / max(lerp(0.45, 1.0, line_durability), 0.1)
 	if has_leader:
 		line_strength = min(line_strength, max(leader_strength * 1.08, 0.05))
 		line_visibility = clamp(line_visibility + leader_visibility * 0.55 - leader_bite_protection * 0.25, 0.0, 0.65)
-	var float_sensitivity: float = float(float_part.get("sensitivity", float_part.get("bite_detection_bonus", 0.0)))
-	var float_stability: float = float(float_part.get("stability", 0.0))
-	var float_bite_visibility: float = float(float_part.get("bite_visibility", 0.0))
-	var hook_chance: float = float(hook.get("hook_chance", hook.get("hook_success_bonus", 0.0))) * hook_condition
+		effective_break_resistance = min(effective_break_resistance, leader_break_resistance) * (1.0 + leader_bite_protection * 0.45)
+		effective_break_chance = max(effective_break_chance, leader_break_chance) / max(1.0 + leader_bite_protection * 0.65, 0.1)
+	var float_night_bonus_rating: float = clamp(float(float_part.get("night_bonus", 0.0)), 0.0, 0.60) if _is_current_time_night() else 0.0
+	var float_setup_comfort_rating: float = clamp(float(float_part.get("setup_comfort", 0.0)), 0.0, 0.20)
+	var float_sensitivity_rating: float = clamp(float(float_part.get("sensitivity", 0.85)), 0.0, 1.0)
+	var float_stability_rating: float = clamp(float(float_part.get("stability", 0.75)) + float_setup_comfort_rating * 0.08 + float_stability_skill_bonus, 0.0, 1.0)
+	var float_bite_visibility_rating: float = clamp(float(float_part.get("bite_visibility", 0.85)) + float_night_bonus_rating * 0.30, 0.0, 1.0)
+	var float_false_bite_resistance_rating: float = clamp(float(float_part.get("false_bite_resistance", 0.65)) + float_setup_comfort_rating * 0.10 + (0.05 if float_night_bonus_rating > 0.0 else 0.0), 0.0, 1.0)
+	var float_hook_timing_bonus: float = clamp(float(float_part.get("hook_timing_bonus", 0.0)), 0.0, 0.20)
+	var float_long_range_accuracy_bonus: float = clamp(float(float_part.get("long_range_accuracy_bonus", 0.0)), 0.0, 0.20)
+	var float_heavy_bait_support_rating: float = clamp(float(float_part.get("heavy_bait_support", 0.55)), 0.0, 1.0)
+	var float_depth_match: float = _get_current_float_depth_match(float_part)
+	var float_sensitivity: float = clamp((float_sensitivity_rating - 0.45) * 0.30, 0.0, 0.18)
+	var float_stability: float = clamp(float_stability_rating * 0.22, 0.0, 0.24)
+	var float_bite_visibility: float = clamp((float_bite_visibility_rating - 0.45) * 0.22 + float_night_bonus_rating * 0.10, 0.0, 0.24)
+	var hook_chance: float = float(hook.get("hook_chance", hook.get("hook_success_bonus", 0.0))) * hook_condition + hook_skill_bonus
 	var hook_strength: float = float(hook.get("hook_strength", 1.0)) * hook_condition
-	var raw_escape_modifier: float = float(hook.get("fish_escape_modifier", 1.0))
+	var raw_escape_modifier: float = float(hook.get("fish_escape_modifier", 1.0)) * (1.0 - escape_skill_reduction)
 	var line_wear_reduction: float = clamp(float(skill_effects.get("line_wear_reduction", 0.0)), 0.0, 0.85)
 	var line_wear_rate: float = max(float(line.get("wear_rate", 0.022)) * (1.0 - line_wear_reduction), 0.001)
-	var bite_detection_bonus: float = float_sensitivity + float_bite_visibility * 0.50 + float(skill_effects.get("bite_detection_bonus", 0.0))
+	var leader_bite_setup_bonus: float = clamp(leader_cautious_bite_bonus * 0.45 - leader_small_fish_penalty * 0.25 - max(leader_visibility - 0.10, 0.0) * 0.18, -0.08, 0.07) if has_leader else 0.0
+	var bite_detection_bonus: float = float_sensitivity + float_bite_visibility * 0.50 + float(skill_effects.get("bite_detection_bonus", 0.0)) + leader_bite_setup_bonus
 	var bait_id := str(bait.get("id", bait.get("bait_id", "")))
 	var secondary_bait_id := ""
 	var bait_types: Array = [str(bait.get("bait_type", "worm"))]
@@ -4020,7 +5585,7 @@ func get_tackle_stats() -> Dictionary:
 	var bait_tags: Array = _to_string_array(bait.get("bait_tags", []))
 	var target_fish_ids: Array = _to_string_array(bait.get("target_fish_ids", []))
 	var secondary_fish_ids: Array = _to_string_array(bait.get("secondary_fish_ids", []))
-	var fish_attraction: float = clamp(float(bait.get("fish_attraction", 0.0)), 0.0, 0.08)
+	var fish_attraction: float = clamp(float(bait.get("fish_attraction", 0.0)) + cautious_fish_bite_bonus * 0.35, 0.0, 0.14)
 	var fish_attraction_by_id: Dictionary = bait.get("fish_attraction_by_id", {}).duplicate(true) if typeof(bait.get("fish_attraction_by_id", {})) == TYPE_DICTIONARY else {}
 	var allowed_rarities: Array = bait.get("allowed_rarities", []).duplicate(true) if typeof(bait.get("allowed_rarities", [])) == TYPE_ARRAY else []
 	if not second_bait.is_empty():
@@ -4034,7 +5599,7 @@ func get_tackle_stats() -> Dictionary:
 		for fish_id in target_fish_ids:
 			secondary_fish_ids.erase(str(fish_id))
 		var second_base_attraction: float = clamp(float(second_bait.get("fish_attraction", 0.0)), 0.0, 0.08)
-		fish_attraction = clamp(max(fish_attraction, second_base_attraction) + min(fish_attraction, second_base_attraction) * 0.35 + 0.01, 0.0, 0.12)
+		fish_attraction = clamp(max(fish_attraction, second_base_attraction) + min(fish_attraction, second_base_attraction) * 0.35 + 0.01 + double_bait_skill_bonus * 0.35, 0.0, 0.20)
 		var second_attraction_by_id = second_bait.get("fish_attraction_by_id", {})
 		if typeof(second_attraction_by_id) == TYPE_DICTIONARY:
 			for fish_id in second_attraction_by_id.keys():
@@ -4042,7 +5607,7 @@ func get_tackle_stats() -> Dictionary:
 				var current_attraction := float(fish_attraction_by_id.get(merged_fish_id, 0.0))
 				var second_attraction := float(second_attraction_by_id[fish_id])
 				if current_attraction > 0.0 and second_attraction > 0.0:
-					fish_attraction_by_id[merged_fish_id] = clamp(max(current_attraction, second_attraction) + min(current_attraction, second_attraction) * 0.35 + 0.03, 0.0, 0.42)
+					fish_attraction_by_id[merged_fish_id] = clamp(max(current_attraction, second_attraction) + min(current_attraction, second_attraction) * 0.35 + 0.03 + double_bait_skill_bonus, 0.0, 0.48)
 				else:
 					fish_attraction_by_id[merged_fish_id] = max(current_attraction, second_attraction)
 		var second_allowed = second_bait.get("allowed_rarities", [])
@@ -4051,9 +5616,15 @@ func get_tackle_stats() -> Dictionary:
 				if not allowed_rarities.has(rarity):
 					allowed_rarities.append(rarity)
 
+	var heavy_bait_load: float = _get_bait_float_load(bait)
+	if not second_bait.is_empty():
+		heavy_bait_load = max(heavy_bait_load, _get_bait_float_load(second_bait) * 0.85)
+	var heavy_bait_penalty: float = clamp(heavy_bait_load * (1.0 - float_heavy_bait_support_rating * 0.60), 0.0, 0.22)
+	bite_detection_bonus = max(bite_detection_bonus - heavy_bait_penalty * 0.35, -0.15)
+
 	return {
-		"control_bonus": rod_tension_bonus,
-		"tension_bonus": rod_tension_bonus,
+		"control_bonus": rod_tension_bonus + leader_control_bonus,
+		"tension_bonus": rod_tension_bonus + leader_control_bonus,
 		"base_control_bonus": raw_rod_control * rod_condition,
 		"handling_bonus": rod_handling_bonus * rod_condition,
 		"reach_bonus": rod_reach_bonus,
@@ -4073,20 +5644,53 @@ func get_tackle_stats() -> Dictionary:
 		"max_load_kg": line_strength,
 		"max_load": line_strength,
 		"raw_line_strength": raw_line_strength,
-		"break_resistance": float(line.get("break_resistance", 1.0)) * lerp(0.35, 1.0, line_durability) * (1.0 + leader_bite_protection),
-		"break_chance": float(line.get("break_chance", 0.15)) / max(lerp(0.45, 1.0, line_durability) * (1.0 + leader_bite_protection), 0.1),
+		"break_resistance": effective_break_resistance,
+		"break_chance": effective_break_chance,
 		"line_wear_rate": line_wear_rate,
 		"wear_rate": line_wear_rate,
 		"visibility": line_visibility,
 		"visibility_penalty": line_visibility,
 		"leader_strength": leader_strength if has_leader else 0.0,
+		"leader_test_kg": leader_strength if has_leader else 0.0,
+		"leader_length_cm": leader_length_cm,
+		"leader_material": leader_material,
 		"leader_visibility": leader_visibility,
 		"leader_bite_protection": leader_bite_protection,
+		"leader_control_bonus": leader_control_bonus,
+		"leader_cautious_bite_bonus": leader_cautious_bite_bonus,
+		"leader_small_fish_penalty": leader_small_fish_penalty,
+		"leader_break_resistance": leader_break_resistance,
+		"leader_break_chance": leader_break_chance,
+		"leader_wear_rate": leader_wear_rate,
+		"leader_bite_setup_bonus": leader_bite_setup_bonus,
 		"sensitivity": float_sensitivity,
 		"bite_visibility": float_bite_visibility,
 		"bite_detection_bonus": bite_detection_bonus,
 		"green_zone_bonus": float(skill_effects.get("green_zone_bonus", 0.0)),
 		"stability": float_stability,
+		"float_id": str(float_part.get("id", BASIC_FLOAT_ID)),
+		"float_type": str(float_part.get("float_type", "drop")),
+		"float_name": str(float_part.get("name", "")),
+		"float_buoyancy": float(float_part.get("buoyancy", 1.0)),
+		"float_sensitivity_rating": float_sensitivity_rating,
+		"float_stability_rating": float_stability_rating,
+		"float_bite_visibility_rating": float_bite_visibility_rating,
+		"wind_resistance": clamp(float(float_part.get("wind_resistance", 0.65)), 0.0, 1.0),
+		"drift_resistance": clamp(float(float_part.get("drift_resistance", 0.65)), 0.0, 1.0),
+		"cast_distance_bonus": clamp(float(float_part.get("cast_distance_bonus", 0.0)), -0.20, 0.25),
+		"false_bite_resistance": float_false_bite_resistance_rating,
+		"depth_min": float(float_part.get("depth_min", PHYSICAL_SHORE_MIN_DEPTH)),
+		"depth_max": float(float_part.get("depth_max", 2.5)),
+		"float_depth_match": float_depth_match,
+		"night_bonus": float_night_bonus_rating,
+		"vegetation_control": clamp(float(float_part.get("vegetation_control", 0.55)), 0.0, 1.0),
+		"heavy_bait_support": float_heavy_bait_support_rating,
+		"heavy_bait_load": heavy_bait_load,
+		"heavy_bait_penalty": heavy_bait_penalty,
+		"hook_timing_bonus": float_hook_timing_bonus,
+		"long_range_accuracy_bonus": float_long_range_accuracy_bonus,
+		"setup_comfort": float_setup_comfort_rating,
+		"recommended_spots": _to_string_array(float_part.get("recommended_spots", [])),
 		"hook_size": int(hook.get("hook_size", 12)),
 		"hook_chance": hook_chance,
 		"hook_success_bonus": hook_chance,
@@ -4105,7 +5709,12 @@ func get_tackle_stats() -> Dictionary:
 		"fishing_depth": fishing_depth,
 		"fish_attraction": fish_attraction,
 		"fish_attraction_by_id": fish_attraction_by_id,
-		"allowed_rarities": allowed_rarities
+		"allowed_rarities": allowed_rarities,
+		"double_bait_bite_bonus": double_bait_skill_bonus,
+		"cautious_fish_bite_bonus": cautious_fish_bite_bonus,
+		"hook_skill_bonus": hook_skill_bonus,
+		"escape_skill_reduction": escape_skill_reduction,
+		"line_break_skill_reduction": line_break_skill_reduction
 	}
 
 func get_bait_target_fish_names(bait_id: String, limit: int = 4) -> String:
@@ -4194,9 +5803,10 @@ func _get_bait_fish_names(bait_id: String, field: String, limit: int) -> Array:
 	return names
 
 func get_tackle_text() -> String:
-	return "Текущая снасть:\nУдочка: %s\nЛеска: %s\nПоплавок: %s\nКрючок: %s\nНаживка: %s x%d\nГлубина: %.1f м\nПрочность: уд. %d%% | леска %d%% | крючок %d%%" % [
+	return "Текущая снасть:\nУдочка: %s\nЛеска: %s\nПоводок: %s\nПоплавок: %s\nКрючок: %s\nНаживка: %s x%d\nГлубина: %.1f м\nПрочность: уд. %d%% | леска %d%% | поводок %d%% | крючок %d%%" % [
 		current_tackle.get("rod", {}).get("name", "-"),
 		current_tackle.get("line", {}).get("name", "-"),
+		current_tackle.get("leader", {}).get("name", "-"),
 		current_tackle.get("float", {}).get("name", "-"),
 		current_tackle.get("hook", {}).get("name", "-"),
 		current_tackle.get("bait", {}).get("name", "-"),
@@ -4204,5 +5814,6 @@ func get_tackle_text() -> String:
 		fishing_depth,
 		roundi(get_tackle_condition("rod") * 100.0),
 		roundi(get_tackle_condition("line") * 100.0),
+		roundi(get_tackle_condition("leader") * 100.0),
 		roundi(get_tackle_condition("hook") * 100.0)
 	]

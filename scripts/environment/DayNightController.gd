@@ -112,6 +112,10 @@ const DEEP_PIER_VISUAL_PROFILE := {
 	"show_light_overlay": false,
 	"show_foreground": true,
 	"foreground_z": 5,
+	"celestial_z": 1,
+	"sun_horizon_y_ratio": 0.37,
+	"sun_arc_height": 0.22,
+	"sun_size": 54.0,
 	"mist_enabled": false
 }
 const COLD_WATER_VISUAL_PROFILE := {

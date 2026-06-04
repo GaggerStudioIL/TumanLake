@@ -4,6 +4,8 @@ const WATER_AMBIENT_PATH := "res://assets/audio/ambient/water_ambient_loop_01.og
 const SFX_CAST := "cast"
 const SFX_BITE := "bite"
 const SFX_CATCH_SUCCESS := "catch_success"
+const SFX_TROPHY_CATCH := "trophy_catch"
+const SFX_RARE_TROPHY_CATCH := "rare_trophy_catch"
 const SFX_LINE_BREAK := "line_break"
 const MUSIC_SILENCE_DB := -80.0
 
@@ -11,6 +13,8 @@ const SFX_PATHS := {
 	"cast": "res://assets/audio/sfx/bite_soft_01.ogg",
 	"bite": "res://assets/audio/sfx/cast_start_01.ogg",
 	"catch_success": "res://assets/audio/sfx/catch_success_01.mp3",
+	"trophy_catch": "res://assets/audio/sfx/trophy_catch.ogg",
+	"rare_trophy_catch": "res://assets/audio/sfx/rare_trophy.ogg",
 	"line_break": "res://assets/audio/sfx/line_break_01.ogg"
 }
 
@@ -18,6 +22,8 @@ const SFX_PLAYER_NAMES := {
 	"cast": "SfxPlayerCast",
 	"bite": "SfxPlayerBite",
 	"catch_success": "SfxPlayerCatch",
+	"trophy_catch": "SfxPlayerTrophyCatch",
+	"rare_trophy_catch": "SfxPlayerRareTrophyCatch",
 	"line_break": "SfxPlayerLineBreak"
 }
 
@@ -210,6 +216,12 @@ func play_catch() -> void:
 
 func play_catch_success() -> void:
 	play_sfx(SFX_CATCH_SUCCESS)
+
+func play_trophy_catch() -> void:
+	play_sfx(SFX_TROPHY_CATCH)
+
+func play_rare_trophy_catch() -> void:
+	play_sfx(SFX_RARE_TROPHY_CATCH)
 
 func play_line_break() -> void:
 	play_sfx(SFX_LINE_BREAK)
@@ -522,6 +534,10 @@ func _normalize_sfx_name(sfx_name: String) -> String:
 			return SFX_CAST
 		"catch":
 			return SFX_CATCH_SUCCESS
+		"trophy":
+			return SFX_TROPHY_CATCH
+		"rarity", "rare_trophy":
+			return SFX_RARE_TROPHY_CATCH
 		_:
 			return sfx_name
 

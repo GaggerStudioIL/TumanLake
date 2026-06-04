@@ -20,9 +20,15 @@ func save_game() -> void:
 		"xp": PlayerData.current_xp,
 		"xp_to_next_level": PlayerData.xp_to_next_level,
 		"skill_points": PlayerData.skill_points,
-		"learned_skills": PlayerData.learned_skills,
+		"total_skill_points_earned": PlayerData.total_skill_points_earned,
+		"learned_skills": PlayerData.get_skill_ranks_save_data() if PlayerData.has_method("get_skill_ranks_save_data") else PlayerData.learned_skills,
+		"skill_tree_points": PlayerData.get_skill_tree_points_save_data() if PlayerData.has_method("get_skill_tree_points_save_data") else {},
 		"player_name": PlayerData.player_name,
 		"total_fish_caught": PlayerData.total_fish_caught,
+		"total_fish_weight": PlayerData.total_fish_weight,
+		"daily_catch_day": PlayerData.daily_catch_day,
+		"daily_fish_weight": PlayerData.daily_fish_weight,
+		"best_daily_fish_weight": PlayerData.best_daily_fish_weight,
 		"total_trophies_caught": PlayerData.total_trophies_caught,
 		"total_rarity_caught": PlayerData.total_rarity_caught,
 		"biggest_fish": PlayerData.biggest_fish,
@@ -39,6 +45,7 @@ func save_game() -> void:
 		"fishing_depth": PlayerData.fishing_depth,
 		"owned_items": PlayerData.owned_items,
 		"current_tackle": PlayerData.current_tackle,
+		"recent_tackle_items": PlayerData.get_recent_tackle_items_save_data(),
 		"inventory": InventoryManager.inventory,
 		"max_items": InventoryManager.max_items,
 		"economy": _get_economy_save_data(),
@@ -102,23 +109,29 @@ func load_game() -> void:
 	)
 	PlayerData.set_skill_state(
 		int(save_data.get("skill_points", 0)),
-		save_data.get("learned_skills", {})
+		save_data.get("learned_skills", {}),
+		int(save_data.get("total_skill_points_earned", -1)),
+		save_data.get("skill_tree_points", {})
 	)
 	PlayerData.set_catch_stats_from_save(save_data)
 	PlayerData.rescue_kit_claims_total = max(int(save_data.get("rescue_kit_claims_total", 0)), 0)
 	PlayerData.rescue_kit_last_claim_day = int(save_data.get("rescue_kit_last_claim_day", -1))
 	PlayerData.set_unlocked_waterbodies(save_data.get("unlocked_waterbodies", ["agamin_lake"]))
-	PlayerData.current_waterbody = str(save_data.get("current_waterbody", "agamin_lake"))
+	PlayerData.current_waterbody = _normalize_saved_waterbody_id(str(save_data.get("current_waterbody", "agamin_lake")))
 	if not PlayerData.can_use_waterbody(PlayerData.current_waterbody):
 		PlayerData.current_waterbody = "agamin_lake"
 	PlayerData.current_spot = str(save_data.get("current_spot", "old_oak_pier"))
-	if SpotDatabase.get_spot(PlayerData.current_spot).is_empty():
-		PlayerData.current_spot = "old_oak_pier"
+	var current_spot := SpotDatabase.get_spot(PlayerData.current_spot)
+	if current_spot.is_empty() or str(current_spot.get("waterbody_id", "agamin_lake")) != PlayerData.current_waterbody:
+		PlayerData.current_spot = WaterbodyDatabase.get_primary_spot(PlayerData.current_waterbody)
+		if PlayerData.current_spot == "":
+			PlayerData.current_spot = "old_oak_pier"
 	PlayerData.unlocked_spots = save_data.get("unlocked_spots", ["old_oak_pier"])
 	PlayerData.upgrades = save_data.get("upgrades", [])
 	PlayerData.set_fishing_depth(float(save_data.get("fishing_depth", PlayerData.fishing_depth)))
 	PlayerData.set_owned_items(save_data.get("owned_items", []))
 	PlayerData.set_current_tackle(save_data.get("current_tackle", {}))
+	PlayerData.set_recent_tackle_items(save_data.get("recent_tackle_items", {}))
 
 	InventoryManager.inventory = save_data.get("inventory", [])
 	InventoryManager.max_items = maxi(int(save_data.get("max_items", 30)), 30)
@@ -128,6 +141,8 @@ func load_game() -> void:
 	_load_gameplay_save_data(save_data.get("gameplay", {}))
 	var time_manager := _get_time_manager()
 	var should_save_after_time_load := false
+	var missing_recent_tackle_items := not (save_data as Dictionary).has("recent_tackle_items")
+	var missing_ranked_skill_state := not (save_data as Dictionary).has("total_skill_points_earned") or not (save_data as Dictionary).has("skill_tree_points")
 	if time_manager != null and time_manager.has_method("load_time_from_save"):
 		time_manager.call("load_time_from_save", save_data)
 		should_save_after_time_load = true
@@ -147,7 +162,7 @@ func load_game() -> void:
 		removed_zero_value_fish = InventoryManager.purge_zero_value_fish() > 0
 
 	print("Game loaded")
-	if should_save_after_time_load or migrated_freshness or migrated_save or removed_zero_value_fish:
+	if should_save_after_time_load or migrated_freshness or migrated_save or removed_zero_value_fish or missing_recent_tackle_items or missing_ranked_skill_state:
 		save_game()
 
 func delete_save() -> void:
@@ -318,6 +333,14 @@ func _get_time_value(property_name: String, fallback: float) -> float:
 		return fallback
 
 	return float(time_manager.get(property_name))
+
+func _normalize_saved_waterbody_id(waterbody_id: String) -> String:
+	var waterbody_db := get_node_or_null("/root/WaterbodyDatabase")
+	if waterbody_db != null and waterbody_db.has_method("normalize_waterbody_id"):
+		return str(waterbody_db.call("normalize_waterbody_id", waterbody_id))
+	if waterbody_id == "":
+		return "agamin_lake"
+	return waterbody_id
 
 
 func _migrate_save_data(save_data: Dictionary) -> Dictionary:

@@ -66,9 +66,12 @@ var _weight_difficulty: float = 1.0
 var _line_pressure: float = 1.0
 var _effective_load_kg: float = 0.0
 var _line_load_ratio: float = 0.0
+var _main_line_load_ratio: float = 0.0
+var _leader_load_ratio: float = 0.0
 var _rod_load_ratio: float = 0.0
 var _rod_overload_time: float = 0.0
 var _line_overload_time: float = 0.0
+var _leader_overload_time: float = 0.0
 var _wear_pressure: float = 0.0
 var _last_fail_kind: String = ""
 var _weight_ratio: float = 0.0
@@ -131,6 +134,7 @@ const FAILURE_BAD_BAIT := "BAD_BAIT"
 const FAILURE_BAD_HOOK := "BAD_HOOK"
 const FAILURE_WEAK_TACKLE := "WEAK_TACKLE"
 const FAILURE_LINE_BROKE := "LINE_BROKE"
+const FAILURE_LEADER_BROKE := "LEADER_BROKE"
 const FAILURE_ROD_OVERLOAD := "ROD_OVERLOAD"
 const FAILURE_FISH_ESCAPED_LOW_TENSION := "FISH_ESCAPED_LOW_TENSION"
 const FAILURE_FISH_ESCAPED_HIGH_TENSION := "FISH_ESCAPED_HIGH_TENSION"
@@ -224,6 +228,8 @@ func start_fishing(spot_id: String) -> void:
 	var weather_type := _get_current_weather_type()
 	var weather_modifiers := _get_weather_bite_modifiers(weather_type)
 	var weather_bite_multiplier: float = float(weather_modifiers.get("bite_chance", 1.0))
+	var wind_effects := _get_wind_effects(spot)
+	weather_bite_multiplier *= float(wind_effects.get("bite_chance_multiplier", 1.0))
 
 	if use_new_bite_system:
 		_start_waiting_for_active_bite(spot, spot_id, available_fish, spot_depth_modifier)
@@ -265,7 +271,8 @@ func start_fishing(spot_id: String) -> void:
 				"bait_bonus": bait_bonus,
 				"time_activity_modifier": time_activity_modifier,
 				"weather_type": weather_type,
-				"weather_bite_multiplier": weather_bite_multiplier
+				"weather_bite_multiplier": weather_bite_multiplier,
+				"wind_effects": wind_effects
 			}
 		)
 		return
@@ -419,17 +426,20 @@ func _update_false_nudge(delta: float) -> void:
 		return
 
 	_false_nudge_timer = randf_range(FALSE_NUDGE_MIN_DELAY, FALSE_NUDGE_MAX_DELAY)
-	if randf() > FALSE_NUDGE_CHANCE:
+	var wind_effects: Dictionary = _get_wind_effects(_active_spot)
+	var false_nudge_chance: float = clamp(FALSE_NUDGE_CHANCE + float(wind_effects.get("false_bite_chance", 0.0)), 0.06, 0.72)
+	if randf() > false_nudge_chance:
 		return
 
-	float_nudge.emit(_build_false_nudge_data())
+	float_nudge.emit(_build_false_nudge_data(wind_effects))
 
 
-func _build_false_nudge_data() -> Dictionary:
-	var roll := randf()
-	var kind := "small"
-	var strength := randf_range(0.18, 0.32)
-	var duration := randf_range(0.26, 0.42)
+func _build_false_nudge_data(wind_effects: Dictionary = {}) -> Dictionary:
+	var roll: float = randf()
+	var kind: String = "small"
+	var strength: float = randf_range(0.18, 0.32)
+	var duration: float = randf_range(0.26, 0.42)
+	var wind_false_bonus: float = clamp(float(wind_effects.get("false_bite_chance", 0.0)), 0.0, 0.45)
 
 	if roll > 0.82:
 		kind = "suspicious"
@@ -440,10 +450,17 @@ func _build_false_nudge_data() -> Dictionary:
 		strength = randf_range(0.30, 0.46)
 		duration = randf_range(0.34, 0.52)
 
+	if bool(wind_effects.get("gust_active", false)) and roll > 0.58:
+		kind = "suspicious"
+		strength += 0.10
+		duration += 0.08
+
 	return {
 		"kind": kind,
-		"strength": strength,
-		"duration": duration
+		"strength": clamp(strength + wind_false_bonus * 0.35, 0.12, 0.82),
+		"duration": clamp(duration + wind_false_bonus * 0.18, 0.18, 0.78),
+		"wind_speed_mps": float(wind_effects.get("wind_speed_mps", 0.0)),
+		"gust_active": bool(wind_effects.get("gust_active", false))
 	}
 
 
@@ -506,6 +523,7 @@ func _get_active_bite_balance_data() -> Dictionary:
 	var weather_type := _get_current_weather_type()
 	var weather_modifiers := _get_weather_bite_modifiers(weather_type)
 	var weather_bite_multiplier: float = float(weather_modifiers.get("bite_chance", 1.0))
+	var wind_effects := _get_wind_effects(_active_spot)
 	var bite_chance: float = clamp(
 		(
 			0.085
@@ -514,7 +532,7 @@ func _get_active_bite_balance_data() -> Dictionary:
 			+ bait_bonus * 0.09
 			+ float(_tackle_stats.get("hook_success_bonus", 0.0)) * 0.06
 			- float(_tackle_stats.get("visibility_penalty", 0.0)) * 0.08
-		) * spot_bite_modifier * clamp(time_activity_modifier, 0.42, 1.38) * weather_bite_multiplier,
+		) * spot_bite_modifier * clamp(time_activity_modifier, 0.42, 1.38) * weather_bite_multiplier * float(wind_effects.get("bite_chance_multiplier", 1.0)),
 		0.04,
 		0.22
 	)
@@ -535,7 +553,8 @@ func _get_active_bite_balance_data() -> Dictionary:
 		"spot_bite_modifier": spot_bite_modifier,
 		"weather_type": weather_type,
 		"weather_bite_multiplier": weather_bite_multiplier,
-		"weather_modifiers": weather_modifiers
+		"weather_modifiers": weather_modifiers,
+		"wind_effects": wind_effects
 	}
 
 
@@ -609,10 +628,23 @@ func _build_bite_window_data(fish_id: String, catch_data: Dictionary, balance_da
 	elif behavior == "aggressive":
 		window += 0.08
 
+	var wind_effects: Dictionary = balance_data.get("wind_effects", {})
+	var effective_wind_penalty: float = clamp(float(wind_effects.get("effective_wind_penalty", 0.0)), 0.0, 0.60)
+	var sensitivity_rating: float = clamp(float(_tackle_stats.get("float_sensitivity_rating", 0.85)), 0.0, 1.0)
+	var visibility_rating: float = clamp(float(_tackle_stats.get("float_bite_visibility_rating", 0.85)), 0.0, 1.0)
+	var hook_timing_bonus: float = clamp(float(_tackle_stats.get("hook_timing_bonus", 0.0)), 0.0, 0.20)
+	var bite_visibility_multiplier: float = clamp(float(wind_effects.get("bite_visibility_multiplier", 1.0)), 0.70, 1.06)
+	window += (sensitivity_rating - 0.70) * 0.14
+	window += (visibility_rating - 0.75) * 0.08
+	window *= 1.0 + hook_timing_bonus
+	window -= effective_wind_penalty * 0.12
 	window = clamp(window - size_ratio * 0.12, 1.15, 1.8)
-	var perfect_start := window * 0.25
-	var perfect_end := window * 0.75
-	var strength: float = clamp(0.42 + size_ratio * 0.38 + float(balance_data.get("bite_chance", 0.08)) * 0.90, 0.35, 1.0)
+	var perfect_start: float = window * 0.25
+	var perfect_end: float = window * 0.75
+	var timing_padding: float = clamp((sensitivity_rating - 0.55) * 0.08 + hook_timing_bonus * 0.10 - effective_wind_penalty * 0.03, -0.04, 0.10)
+	perfect_start = clamp(perfect_start - timing_padding, window * 0.12, window * 0.44)
+	perfect_end = clamp(perfect_end + timing_padding, perfect_start + 0.35, window * 0.92)
+	var strength: float = clamp((0.42 + size_ratio * 0.38 + float(balance_data.get("bite_chance", 0.08)) * 0.90) * bite_visibility_multiplier, 0.30, 1.0)
 
 	return {
 		"fish_id": fish_id,
@@ -623,7 +655,8 @@ func _build_bite_window_data(fish_id: String, catch_data: Dictionary, balance_da
 		"fish_name": str(catch_data.get("name", fish.get("name", "-"))),
 		"rarity": rarity,
 		"behavior": behavior,
-		"weight": weight
+		"weight": weight,
+		"wind_effects": wind_effects
 	}
 
 
@@ -898,7 +931,8 @@ func _get_random_tackle_fish_id(available_fish: Array, rare_chance_modifier: flo
 		var time_multiplier: float = _get_time_activity_modifier(fish)
 		var peak_multiplier: float = 1.0 + _get_time_peak_modifier(fish) * 0.45
 		var weather_weight_multiplier: float = _get_weather_fish_weight_multiplier(fish, weather_modifiers)
-		var final_weight: int = max(roundi(float(weight) * depth_multiplier * bait_multiplier * hook_multiplier * line_multiplier * time_multiplier * peak_multiplier * weather_weight_multiplier), 1)
+		var float_depth_multiplier: float = clamp(float(_tackle_stats.get("float_depth_match", 1.0)), 0.58, 1.05)
+		var final_weight: int = max(roundi(float(weight) * depth_multiplier * bait_multiplier * hook_multiplier * line_multiplier * time_multiplier * peak_multiplier * weather_weight_multiplier * float_depth_multiplier), 1)
 
 		for i in final_weight:
 			weighted_list.append(fish_id)
@@ -937,6 +971,7 @@ func _get_depth_match_multiplier(fish: Dictionary) -> float:
 
 func _get_spot_depth_match_multiplier(spot: Dictionary) -> float:
 	var depth: float = float(_tackle_stats.get("fishing_depth", PlayerData.fishing_depth))
+	var float_depth_match: float = clamp(float(_tackle_stats.get("float_depth_match", 1.0)), 0.58, 1.0)
 	# spot.min_depth / effective_min_depth = рабочая глубина рыбы, not physical shore depth.
 	var min_depth: float = float(spot.get("min_depth", 0.2))
 	var max_depth: float = float(spot.get("max_depth", 6.0))
@@ -945,15 +980,98 @@ func _get_spot_depth_match_multiplier(spot: Dictionary) -> float:
 	var reach_margin: float = depth_range * max(reach_bonus, 0.0)
 
 	if depth < min_depth - reach_margin or depth > max_depth + reach_margin:
-		return 0.34
+		return clamp(0.34 * float_depth_match, 0.28, 0.34)
 	if depth < min_depth or depth > max_depth:
-		return clamp(0.34 + reach_bonus * 0.85, 0.34, 0.52)
+		return clamp((0.34 + reach_bonus * 0.85) * float_depth_match, 0.30, 0.52)
 
 	var preferred_depth: float = clamp(float(spot.get("preferred_depth", spot.get("depth", (min_depth + max_depth) * 0.5))), min_depth, max_depth)
 	var half_range: float = max(depth_range * 0.5 * (1.0 + max(reach_bonus, 0.0) * 1.10), 0.1)
 	var distance: float = abs(depth - preferred_depth) / half_range
 	var falloff: float = max(0.26 - max(reach_bonus, 0.0) * 0.08, 0.18)
-	return clamp(1.10 - distance * falloff, 0.82, 1.12)
+	return clamp((1.10 - distance * falloff) * float_depth_match, 0.58, 1.12)
+
+func _get_wind_effects(spot: Dictionary) -> Dictionary:
+	var wind_state: Dictionary = _get_current_wind_state(spot)
+	var wind_speed: float = max(float(wind_state.get("speed_mps", 0.0)), 0.0)
+	var gust_strength: float = max(float(wind_state.get("gust_strength", 0.0)), 0.0)
+	var gust_active: bool = bool(wind_state.get("gust_active", false))
+	var wind_resistance: float = clamp(float(_tackle_stats.get("wind_resistance", 0.65)), 0.0, 1.0)
+	var drift_resistance: float = clamp(float(_tackle_stats.get("drift_resistance", 0.65)), 0.0, 1.0)
+	var false_bite_resistance: float = clamp(float(_tackle_stats.get("false_bite_resistance", 0.65)), 0.0, 1.0)
+	var vegetation_control: float = clamp(float(_tackle_stats.get("vegetation_control", 0.55)), 0.0, 1.0)
+	var cast_distance_bonus: float = clamp(float(_tackle_stats.get("cast_distance_bonus", 0.0)), -0.20, 0.25)
+	var long_range_accuracy_bonus: float = clamp(float(_tackle_stats.get("long_range_accuracy_bonus", 0.0)), 0.0, 0.20)
+	var setup_comfort: float = clamp(float(_tackle_stats.get("setup_comfort", 0.0)), 0.0, 0.20)
+	var heavy_bait_penalty: float = clamp(float(_tackle_stats.get("heavy_bait_penalty", 0.0)), 0.0, 0.22)
+	var float_depth_match: float = clamp(float(_tackle_stats.get("float_depth_match", 1.0)), 0.58, 1.0)
+	var wind_penalty: float = max(wind_speed - 2.0, 0.0) / 8.0
+	var effective_wind_penalty: float = wind_penalty * (1.0 - wind_resistance * 0.65)
+	if gust_active:
+		effective_wind_penalty += gust_strength * 0.025 * (1.0 - wind_resistance * 0.45)
+	effective_wind_penalty = clamp(effective_wind_penalty, 0.0, 0.60)
+
+	var vegetation_penalty: float = max(wind_speed - 3.0, 0.0) * 0.035 * _get_spot_vegetation_factor(spot) * (1.0 - vegetation_control * 0.70)
+	var light_wind_bonus: float = min(wind_speed, 2.0) * 0.012
+	var bite_visibility_multiplier: float = clamp(1.0 - effective_wind_penalty * 0.35 - heavy_bait_penalty * 0.10, 0.72, 1.05)
+	var bite_chance_multiplier: float = clamp(1.0 + light_wind_bonus - effective_wind_penalty * 0.18 - vegetation_penalty - heavy_bait_penalty * 0.14, 0.78, 1.05) * float_depth_match
+	var false_bite_chance: float = effective_wind_penalty * (1.0 - false_bite_resistance) * 0.25
+	if gust_active:
+		false_bite_chance += clamp(gust_strength / 10.0, 0.0, 0.18) * (1.0 - false_bite_resistance * 0.60)
+	false_bite_chance *= 1.0 - setup_comfort * 0.40
+	var cast_accuracy: float = clamp(1.0 - effective_wind_penalty * 0.20 + cast_distance_bonus * 0.10 + long_range_accuracy_bonus * 0.18 + setup_comfort * 0.08, 0.72, 1.14)
+	var drift_speed: float = wind_speed * 0.9 * (1.0 - drift_resistance * 0.65)
+	if gust_active:
+		drift_speed *= 1.4 + gust_strength * 0.15
+
+	return {
+		"wind_state": wind_state,
+		"wind_speed_mps": wind_speed,
+		"gust_strength": gust_strength,
+		"gust_active": gust_active,
+		"wind_penalty": wind_penalty,
+		"effective_wind_penalty": effective_wind_penalty,
+		"bite_visibility_multiplier": bite_visibility_multiplier,
+		"bite_chance_multiplier": clamp(bite_chance_multiplier, 0.58, 1.05),
+		"false_bite_chance": clamp(false_bite_chance, 0.0, 0.45),
+		"cast_accuracy": cast_accuracy,
+		"drift_speed": max(drift_speed, 0.0),
+		"vegetation_penalty": vegetation_penalty,
+		"heavy_bait_penalty": heavy_bait_penalty
+	}
+
+func _get_current_wind_state(spot: Dictionary) -> Dictionary:
+	var wind_manager := get_node_or_null("/root/WindManager")
+	var spot_id := str(spot.get("id", _active_spot_id))
+	if wind_manager != null:
+		if wind_manager.has_method("get_effective_wind_state"):
+			var effective_state = wind_manager.call("get_effective_wind_state", spot_id)
+			if effective_state is Dictionary:
+				return (effective_state as Dictionary).duplicate(true)
+		if wind_manager.has_method("get_wind_state"):
+			var base_state = wind_manager.call("get_wind_state")
+			if base_state is Dictionary:
+				return (base_state as Dictionary).duplicate(true)
+
+	return {
+		"speed_mps": 0.0,
+		"direction_degrees": 0.0,
+		"direction_vector": Vector2.RIGHT,
+		"gust_strength": 0.0,
+		"gust_active": false,
+		"description": "Штиль",
+		"icon_key": "wind_calm"
+	}
+
+func _get_spot_vegetation_factor(spot: Dictionary) -> float:
+	var spot_type := str(spot.get("type", "")).to_lower()
+	var visual_tag := str(spot.get("visual_tag", "")).to_lower()
+	if spot_type.find("reeds") >= 0 or visual_tag.find("reeds") >= 0:
+		return 1.0
+	if spot_type.find("duckweed") >= 0 or visual_tag.find("duckweed") >= 0 or visual_tag.find("frog") >= 0:
+		return 0.95
+	if spot_type.find("snag") >= 0 or visual_tag.find("snag") >= 0:
+		return 0.55
+	return 0.0
 
 func _get_bait_match_multiplier(fish: Dictionary, fish_id: String) -> float:
 	if fish.is_empty():
@@ -1007,7 +1125,59 @@ func _get_line_visibility_multiplier(fish: Dictionary) -> float:
 	elif behavior == "calm":
 		caution = 1.05
 
-	return clamp(1.0 - visibility * caution, 0.55, 1.0)
+	return clamp((1.0 - visibility * caution) * _get_leader_fish_bite_multiplier(fish), 0.38, 1.12)
+
+func _get_leader_fish_bite_multiplier(fish: Dictionary) -> float:
+	var leader_strength: float = float(_tackle_stats.get("leader_strength", 0.0))
+	if leader_strength <= 0.0:
+		return 1.0
+
+	var fish_id := str(fish.get("id", ""))
+	var behavior := str(fish.get("behavior_type", fish.get("behavior", "calm"))).to_lower()
+	var max_weight: float = max(float(fish.get("max_weight", 1.0)), 0.05)
+	var average_weight: float = max((float(fish.get("min_weight", 0.0)) + max_weight) * 0.5, 0.03)
+	var material := str(_tackle_stats.get("leader_material", "")).to_lower()
+	var length_cm: int = int(_tackle_stats.get("leader_length_cm", 20))
+	var is_predator := str(fish.get("habitat", "")).to_lower() == "predator" or ["rotan", "perch", "young_pike", "small_catfish", "pike", "catfish", "eel", "zander", "moon_catfish"].has(fish_id)
+	var cautious := max_weight <= 0.8 or behavior == "calm" or behavior == "cautious" or behavior == "shy"
+	var active := behavior == "aggressive" or behavior == "erratic"
+	var multiplier := 1.0 + float(_tackle_stats.get("leader_cautious_bite_bonus", 0.0)) * (1.0 if cautious else 0.30)
+
+	if length_cm <= 15:
+		if active:
+			multiplier += 0.05
+		if cautious:
+			multiplier -= 0.05
+	elif length_cm >= 40:
+		if cautious:
+			multiplier += 0.10
+		multiplier -= 0.05
+
+	var overpower_ratio: float = leader_strength / max(average_weight, 0.05)
+	if cautious and overpower_ratio > 3.0:
+		multiplier -= clamp((overpower_ratio - 3.0) * 0.018, 0.02, float(_tackle_stats.get("leader_small_fish_penalty", 0.12)))
+	if max_weight <= 0.35 and leader_strength >= 5.0:
+		multiplier -= 0.06
+
+	match material:
+		"fluoro", "fluorocarbon":
+			if cautious:
+				multiplier += 0.05
+		"braid", "braided":
+			if cautious:
+				multiplier -= 0.05
+			if active:
+				multiplier += 0.02
+		"reinforced":
+			if cautious:
+				multiplier -= 0.07
+		"steel":
+			if is_predator:
+				multiplier += 0.04
+			else:
+				multiplier -= 0.16 if cautious else 0.08
+
+	return clamp(multiplier, 0.45, 1.14)
 
 func _get_average_time_activity_modifier(fish_ids: Array) -> float:
 	if fish_ids.is_empty():
@@ -1464,12 +1634,18 @@ func _start_reeling(catch_data: Dictionary) -> void:
 		catch_weight * 0.35
 	)
 	var rod_capacity_ratio: float = _effective_load_kg / max(float(_tackle_stats.get("max_fish_weight", 1.0)), 0.1)
-	var line_capacity_ratio: float = _effective_load_kg / max(float(_tackle_stats.get("line_strength", 1.0)), 0.1)
+	var main_line_capacity_ratio: float = _effective_load_kg / max(float(_tackle_stats.get("raw_line_strength", _tackle_stats.get("line_strength", 1.0))), 0.1)
+	var leader_capacity_ratio: float = 0.0
+	if float(_tackle_stats.get("leader_strength", 0.0)) > 0.0:
+		leader_capacity_ratio = _effective_load_kg / max(float(_tackle_stats.get("leader_strength", 0.0)), 0.1)
+	var line_capacity_ratio: float = max(main_line_capacity_ratio, leader_capacity_ratio)
 	rod_overload = max(rod_capacity_ratio - 1.0, 0.0) / rod_strength
 	line_overload = max(line_capacity_ratio - 1.0, 0.0) / line_break_resistance
 	overload_penalty = max(rod_overload, line_overload * 0.74)
 	_line_pressure = line_capacity_ratio
 	_line_load_ratio = line_capacity_ratio
+	_main_line_load_ratio = main_line_capacity_ratio
+	_leader_load_ratio = leader_capacity_ratio
 	_rod_load_ratio = rod_capacity_ratio
 	_fight_power = clamp(
 		base_fight_power
@@ -1516,6 +1692,7 @@ func _start_reeling(catch_data: Dictionary) -> void:
 	_critical_break_risk = 0.0
 	_rod_overload_time = 0.0
 	_line_overload_time = 0.0
+	_leader_overload_time = 0.0
 	_wear_pressure = max(_line_load_ratio, _rod_load_ratio)
 	_last_fail_kind = ""
 	_tension_velocity = 0.0
@@ -1710,23 +1887,43 @@ func _get_current_load_info() -> Dictionary:
 	var tension_load: float = lerp(0.55, 1.55, _tension)
 	var struggle_load: float = clamp(_struggle_power * 0.38, 0.0, 0.65)
 	var load_kg: float = base_load * tension_load * (1.0 + struggle_load)
-	var line_capacity: float = max(float(_tackle_stats.get("line_strength", 1.0)), 0.1)
+	var main_line_capacity: float = max(float(_tackle_stats.get("raw_line_strength", _tackle_stats.get("line_strength", 1.0))), 0.1)
+	var leader_capacity: float = max(float(_tackle_stats.get("leader_strength", 0.0)), 0.0)
+	var main_line_ratio: float = load_kg / main_line_capacity
+	var leader_ratio: float = load_kg / leader_capacity if leader_capacity > 0.0 else 0.0
 	var rod_capacity: float = max(float(_tackle_stats.get("max_fish_weight", 1.0)), 0.1)
 
 	return {
 		"load_kg": load_kg,
-		"line_ratio": load_kg / line_capacity,
+		"line_ratio": max(main_line_ratio, leader_ratio),
+		"main_line_ratio": main_line_ratio,
+		"leader_ratio": leader_ratio,
 		"rod_ratio": load_kg / rod_capacity
 	}
+
+func _get_weakest_line_break_kind() -> String:
+	if _leader_load_ratio <= 0.0:
+		return "line_break"
+	if _leader_load_ratio >= _main_line_load_ratio * 0.96:
+		return "leader_break"
+	return "line_break"
+
+func _get_line_break_message(break_kind: String) -> String:
+	if break_kind == "leader_break":
+		return "Поводок не выдержал натяжения. Рыба ушла."
+	return "Обрыв лески! Рыба ушла."
 
 func _update_load_and_overload(delta: float) -> void:
 	var load_info := _get_current_load_info()
 	_line_load_ratio = float(load_info.get("line_ratio", 0.0))
+	_main_line_load_ratio = float(load_info.get("main_line_ratio", _line_load_ratio))
+	_leader_load_ratio = float(load_info.get("leader_ratio", 0.0))
 	_rod_load_ratio = float(load_info.get("rod_ratio", 0.0))
 	_line_pressure = max(_line_load_ratio, _line_pressure)
 	_wear_pressure = max(_wear_pressure, max(_line_load_ratio, _rod_load_ratio))
 
 	var line_overload: float = max(_line_load_ratio - 1.0, 0.0)
+	var leader_overload: float = max(_leader_load_ratio - 1.0, 0.0)
 	var rod_overload: float = max(_rod_load_ratio - 1.0, 0.0)
 
 	if line_overload > 0.0:
@@ -1734,20 +1931,34 @@ func _update_load_and_overload(delta: float) -> void:
 	else:
 		_line_overload_time = max(_line_overload_time - delta * 0.78, 0.0)
 
+	if leader_overload > 0.0:
+		_leader_overload_time += delta * (0.80 + leader_overload * 2.10) * (0.70 + _tension * 0.92)
+	else:
+		_leader_overload_time = max(_leader_overload_time - delta * 0.88, 0.0)
+
 	if rod_overload > 0.0:
 		_rod_overload_time += delta * (0.55 + rod_overload * 1.45) * (0.72 + _tension * 0.70)
 	else:
 		_rod_overload_time = max(_rod_overload_time - delta * 0.52, 0.0)
 
-	if line_overload > 0.08:
+	if leader_overload > 0.08 and _leader_load_ratio >= _main_line_load_ratio:
+		_feedback_message = "О НЕТ, поводок перегружен!"
+	elif line_overload > 0.08:
 		_feedback_message = "О НЕТ, леска перегружена!"
 	elif rod_overload > 0.10:
 		_feedback_message = "Удочка трещит!"
 
 	var line_break_chance: float = float(_tackle_stats.get("break_chance", 0.15))
+	var leader_break_chance: float = float(_tackle_stats.get("leader_break_chance", 0.0))
+	var leader_limit: float = clamp((1.82 - leader_break_chance * 1.30) / max(leader_overload, 0.08), 0.34, 2.10)
+	if leader_overload > 0.0 and _leader_overload_time >= leader_limit and _leader_load_ratio >= _main_line_load_ratio * 0.96:
+		_finish_reeling_failed(_get_line_break_message("leader_break"), "leader_break", FAILURE_LEADER_BROKE)
+		return
+
 	var line_limit: float = clamp((2.05 - line_break_chance * 1.45) / max(line_overload, 0.08), 0.42, 2.50)
 	if line_overload > 0.0 and _line_overload_time >= line_limit:
-		_finish_reeling_failed("Обрыв лески! Рыба ушла.", "line_break", FAILURE_LINE_BROKE)
+		var break_kind := _get_weakest_line_break_kind()
+		_finish_reeling_failed(_get_line_break_message(break_kind), break_kind, _get_failure_reason_for_fail_kind(break_kind))
 		return
 
 	var rod_limit: float = clamp(2.30 / max(rod_overload, 0.08), 0.65, 3.20)
@@ -1814,7 +2025,8 @@ func _update_progress_and_danger(delta: float) -> void:
 		return
 
 	if _high_danger_time >= _high_fail_limit:
-		_finish_reeling_failed("Леска не выдержала натяжения. Рыба сорвалась.", "line_break", FAILURE_LINE_BROKE)
+		var break_kind := _get_weakest_line_break_kind()
+		_finish_reeling_failed(_get_line_break_message(break_kind), break_kind, _get_failure_reason_for_fail_kind(break_kind))
 	elif _low_danger_time >= _low_fail_limit:
 		_finish_reeling_failed("Натяжение упало. Рыба сошла с крючка.", "escape", FAILURE_FISH_ESCAPED_LOW_TENSION)
 
@@ -1839,7 +2051,8 @@ func _update_critical_break(delta: float) -> void:
 	_feedback_message = "Осторожно, обрыв!"
 
 	if randf() < _critical_break_risk * 0.32 * delta:
-		_finish_reeling_failed("Критическое натяжение. Леска лопнула.", "line_break", FAILURE_LINE_BROKE)
+		var break_kind := _get_weakest_line_break_kind()
+		_finish_reeling_failed("Критическое натяжение. %s" % ("Поводок лопнул." if break_kind == "leader_break" else "Леска лопнула."), break_kind, _get_failure_reason_for_fail_kind(break_kind))
 
 func _apply_reeling_wear(outcome: String) -> Dictionary:
 	if _current_catch.is_empty():
@@ -1857,14 +2070,23 @@ func _apply_reeling_wear(outcome: String) -> Dictionary:
 	var wear := {
 		"rod": base_wear * float(_tackle_stats.get("durability_loss", 0.012)) / 0.012,
 		"line": base_wear * 1.45 * float(_tackle_stats.get("line_wear_rate", 0.022)) / 0.022,
+		"leader": base_wear * 1.35 * float(_tackle_stats.get("leader_wear_rate", 0.020)) / 0.020,
 		"hook": base_wear * 1.10 * float(_tackle_stats.get("hook_wear_rate", 0.026)) / 0.026,
 		"line_broken": outcome == "line_break",
+		"leader_broken": outcome == "leader_break",
+		"leader_lost": false,
+		"float_lost": false,
 		"rod_broken": outcome == "rod_break",
 		"hook_lost": false
 	}
 
 	if outcome == "line_break":
-		wear["hook_lost"] = randf() < 0.36
+		wear["leader_lost"] = randf() < 0.82
+		wear["hook_lost"] = randf() < 0.82
+		wear["float_lost"] = randf() < 0.55
+	elif outcome == "leader_break":
+		wear["leader_lost"] = true
+		wear["hook_lost"] = true
 	elif outcome == "escape":
 		wear["hook_lost"] = randf() < clamp(_escape_risk * 0.10, 0.02, 0.12)
 
@@ -1912,10 +2134,14 @@ func _finish_reeling_failed(message: String, fail_kind: String = "escape", reaso
 
 	if bool(wear_result.get("line_broken", false)) and final_message.find("Обрыв") == -1:
 		final_message += "\nОбрыв лески!"
+	if (bool(wear_result.get("leader_broken", false)) or bool(wear_result.get("leader_lost", false))) and final_message.find("Поводок") == -1:
+		final_message += "\nПоводок потерян."
 	if bool(wear_result.get("rod_broken", false)) and final_message.find("Удочка") == -1:
 		final_message += "\nУдочка повреждена!"
 	if bool(wear_result.get("hook_lost", false)):
 		final_message += "\nКрючок потерян."
+	if bool(wear_result.get("float_lost", false)):
+		final_message += "\nПоплавок потерян."
 
 	var failure_reason: String = reason if reason != "" else _get_failure_reason_for_fail_kind(fail_kind)
 	if fail_kind == "escape" and bool(wear_result.get("hook_lost", false)):
@@ -1989,13 +2215,16 @@ func _get_failure_context(extra_data: Dictionary = {}) -> Dictionary:
 		"fish_name": fish_name,
 		"fish_weight": fish_weight,
 		"line_strength": float(_tackle_stats.get("line_strength", _tackle_stats.get("max_load", 0.0))),
+		"leader_strength": float(_tackle_stats.get("leader_strength", 0.0)),
 		"rod_strength": float(_tackle_stats.get("max_fish_weight", 0.0)),
 		"line_load_ratio": _line_load_ratio,
+		"leader_load_ratio": _leader_load_ratio,
 		"rod_load_ratio": _rod_load_ratio,
 		"tension": _tension,
 		"fishing_depth": float(_tackle_stats.get("fishing_depth", PlayerData.fishing_depth)),
 		"bait": str(PlayerData.current_tackle.get("bait", {}).get("name", "")),
-		"hook": str(PlayerData.current_tackle.get("hook", {}).get("name", ""))
+		"hook": str(PlayerData.current_tackle.get("hook", {}).get("name", "")),
+		"leader": str(PlayerData.current_tackle.get("leader", {}).get("name", ""))
 	}
 
 	if catch_data.has("id"):
@@ -2051,6 +2280,13 @@ func _get_failure_template(reason: String) -> Dictionary:
 				"hint": "Поставьте более прочную леску или отпускайте натяжение вовремя.",
 				"severity": "medium"
 			}
+		FAILURE_LEADER_BROKE:
+			return {
+				"title": "Поводок порвался",
+				"message": "Самым слабым звеном оказался поводок, рыба ушла.",
+				"hint": "Поставьте поводок с большим тестом или держите натяжение в зелёной зоне.",
+				"severity": "medium"
+			}
 		FAILURE_ROD_OVERLOAD:
 			return {
 				"title": "Удочка не выдержала",
@@ -2096,6 +2332,8 @@ func _get_failure_template(reason: String) -> Dictionary:
 
 func _get_failure_reason_for_fail_kind(fail_kind: String) -> String:
 	match fail_kind:
+		"leader_break":
+			return FAILURE_LEADER_BROKE
 		"line_break":
 			return FAILURE_LINE_BROKE
 		"rod_break":
@@ -2188,6 +2426,7 @@ func _award_catch_xp(catch_data: Dictionary) -> Dictionary:
 
 	var skill_effects := PlayerData.get_skill_effects()
 	var xp_multiplier: float = 1.0 + float(skill_effects.get("xp_bonus", 0.0))
+	xp_multiplier += float(skill_effects.get("float_fishing_xp_bonus", 0.0))
 	var catch_rank := str(catch_data.get("catch_rank", "normal"))
 	var rarity := str(catch_data.get("rarity", "common"))
 	if catch_rank == "trophy" or catch_rank == "rarity" or rarity == "rare" or rarity == "very_rare" or rarity == "legendary":
@@ -2287,6 +2526,7 @@ func _get_reeling_state() -> Dictionary:
 	var load_info := _get_current_load_info()
 	var load_kg: float = float(load_info.get("load_kg", 0.0))
 	var line_load_ratio: float = float(load_info.get("line_ratio", _line_load_ratio))
+	var leader_load_ratio: float = float(load_info.get("leader_ratio", _leader_load_ratio))
 	var rod_load_ratio: float = float(load_info.get("rod_ratio", _rod_load_ratio))
 	var break_risk: float = clamp(max(_critical_break_risk, max(line_load_ratio - 1.0, 0.0) * 0.62 + max(_high_danger_time / max(_high_fail_limit, 0.1), 0.0) * 0.28), 0.0, 1.0)
 
@@ -2316,11 +2556,14 @@ func _get_reeling_state() -> Dictionary:
 		"fish_aggression": _fish_aggression,
 		"load_kg": load_kg,
 		"line_load_ratio": line_load_ratio,
+		"leader_load_ratio": leader_load_ratio,
 		"rod_load_ratio": rod_load_ratio,
 		"rod_durability": float(_tackle_stats.get("rod_durability", _tackle_stats.get("durability", 1.0))),
 		"line_durability": float(_tackle_stats.get("line_durability", 1.0)),
+		"leader_durability": float(_tackle_stats.get("leader_durability", 1.0)),
 		"hook_durability": float(_tackle_stats.get("hook_durability", 1.0)),
 		"line_strength": float(_tackle_stats.get("line_strength", 0.0)),
+		"leader_strength": float(_tackle_stats.get("leader_strength", 0.0)),
 		"critical_break_risk": _critical_break_risk,
 		"break_risk": break_risk,
 		"escape_risk": _escape_risk,

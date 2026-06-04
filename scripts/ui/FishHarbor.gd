@@ -1443,7 +1443,7 @@ func _build_contracts_section() -> void:
 
 
 func _create_contract_card(contract: Dictionary, completed: bool) -> Panel:
-	var card := _make_content_card(152.0)
+	var card := _make_content_card(176.0)
 	var box := VBoxContainer.new()
 	box.set_anchors_preset(Control.PRESET_FULL_RECT)
 	box.offset_left = 14.0
@@ -1457,6 +1457,16 @@ func _create_contract_card(contract: Dictionary, completed: bool) -> Panel:
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title.custom_minimum_size = Vector2(0.0, 38.0)
 	box.add_child(title)
+
+	var difficulty_text := str(contract.get("difficulty_label", ""))
+	var requirement_text := str(contract.get("requirement_text", ""))
+	if difficulty_text != "" or requirement_text != "":
+		var meta_text := "Сложность: %s" % (difficulty_text if difficulty_text != "" else "-")
+		if requirement_text != "":
+			meta_text += " | %s" % requirement_text
+		var meta := _make_label(meta_text, 12, Color(0.82, 0.94, 0.78, 0.96))
+		meta.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(meta)
 
 	var progress_text := _format_contract_progress(contract)
 	var details := _make_label("Рыба: %s | Поставщик: %s\nПрогресс: %s\nНаграда: %s | Репутация +%d%s" % [
@@ -1852,6 +1862,10 @@ func _format_contract_progress(contract: Dictionary) -> String:
 
 
 func _format_contract_title(contract: Dictionary) -> String:
+	var saved_title := str(contract.get("title", ""))
+	if saved_title != "":
+		return saved_title
+
 	var contract_type := str(contract.get("type", "weight"))
 	var fish_name := str(contract.get("fish_name", "-"))
 	match contract_type:

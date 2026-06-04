@@ -1,8 +1,6 @@
 # Handles the shop window: categories, item cards, and buy requests.
 extends RefCounted
 
-const PriceLabelScript := preload("res://scripts/ui/components/PriceLabel.gd")
-
 var main
 var theme
 var _texture_cache: Dictionary = {}
@@ -15,6 +13,7 @@ var _details_stats_label: Label
 var _details_owned_label: Label
 var _details_buy_button: Button
 var _details_close_button: Button
+var _shop_money_row: HBoxContainer
 var _details_item_id := ""
 signal buy_requested(item_id: String)
 
@@ -22,6 +21,7 @@ const SHOP_ITEMS_PER_PAGE := 8
 const SHOP_ROD_ITEMS_PER_PAGE := 4
 const SHOP_BAIT_ITEMS_PER_PAGE := 4
 const SHOP_LINE_ITEMS_PER_PAGE := 6
+const SHOP_LEADER_ITEMS_PER_PAGE := 6
 const SHOP_LINE_IMAGE_SIZE := Vector2(75.0, 75.0)
 const SHOP_CATEGORY_BAIT := "bait"
 const SHOP_CATEGORY_CONSUMABLE := "consumable"
@@ -161,6 +161,96 @@ const ROD_CARD_BADGE_NUMBERS := {
 	"titan_hook_ultra_match": 19
 }
 
+func _format_shop_money_amount(value: float) -> String:
+	return UIFormatters.format_money_amount(value)
+
+
+func _add_shop_price_row(
+	parent: Control,
+	value: float,
+	rect: Rect2,
+	font_size: int = 11,
+	icon_size: Vector2 = Vector2(15.0, 15.0),
+	align_end: bool = true,
+	text_color: Color = Color(0.94, 1.0, 0.91, 1.0),
+	row_name: String = "ShopPriceRow"
+) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.name = row_name
+	row.position = rect.position
+	row.size = rect.size
+	row.custom_minimum_size = rect.size
+	row.clip_contents = true
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 4)
+	parent.add_child(row)
+	_set_shop_price_row(row, value, rect.size, font_size, icon_size, align_end, text_color)
+	return row
+
+
+func _set_shop_price_row(
+	row: HBoxContainer,
+	value: float,
+	row_size: Vector2,
+	font_size: int,
+	icon_size: Vector2,
+	align_end: bool,
+	text_color: Color
+) -> void:
+	if row == null:
+		return
+
+	row.size = row_size
+	row.custom_minimum_size = row_size
+	row.clip_contents = true
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.alignment = BoxContainer.ALIGNMENT_END if align_end else BoxContainer.ALIGNMENT_BEGIN
+	row.add_theme_constant_override("separation", 4)
+
+	var label := row.get_node_or_null("PriceLabel") as Label
+	if label == null:
+		label = Label.new()
+		label.name = "PriceLabel"
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(label)
+	label.text = _format_shop_money_amount(value)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT if align_end else HORIZONTAL_ALIGNMENT_LEFT
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.clip_text = true
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.custom_minimum_size = Vector2(maxf(row_size.x - icon_size.x - 5.0, 18.0), row_size.y)
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", text_color)
+
+	var icon_slot := row.get_node_or_null("MoneyIconSlot") as Control
+	if icon_slot == null:
+		icon_slot = Control.new()
+		icon_slot.name = "MoneyIconSlot"
+		icon_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon_slot.clip_contents = true
+		icon_slot.size_flags_horizontal = Control.SIZE_SHRINK_END
+		row.add_child(icon_slot)
+	icon_slot.custom_minimum_size = icon_size
+	icon_slot.size = icon_size
+
+	var icon := icon_slot.get_node_or_null("MoneyIcon") as TextureRect
+	if icon == null:
+		icon = TextureRect.new()
+		icon.name = "MoneyIcon"
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		icon_slot.add_child(icon)
+	icon.texture = theme.get_icon("money")
+	icon.set_anchors_preset(Control.PRESET_FULL_RECT)
+	icon.offset_left = 0.0
+	icon.offset_top = 0.0
+	icon.offset_right = 0.0
+	icon.offset_bottom = 0.0
+	icon.custom_minimum_size = icon_size
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.modulate = Color(0.78, 0.84, 0.80, 0.95)
+
 func setup(main_ref) -> void:
 	main = main_ref
 	theme = main.ui_theme
@@ -224,6 +314,8 @@ func _get_shop_items_per_page(category: String) -> int:
 		return SHOP_BAIT_ITEMS_PER_PAGE
 	if category == SHOP_CATEGORY_LINE:
 		return SHOP_LINE_ITEMS_PER_PAGE
+	if category == SHOP_CATEGORY_LEADER:
+		return SHOP_LEADER_ITEMS_PER_PAGE
 
 	return SHOP_ITEMS_PER_PAGE
 
@@ -570,11 +662,11 @@ func _show_shop_details(item_id: String) -> void:
 
 	_ensure_shop_details_nodes()
 	_details_item_id = item_id
-	_details_title_label.text = str(item.get("name", "-"))
+	_details_title_label.text = _get_item_display_name(item)
 	var details_texture := _get_shop_card_texture(item)
 	_details_image.texture = details_texture
 	_details_image.visible = details_texture != null
-	_details_description_label.text = str(item.get("description", ""))
+	_details_description_label.text = _get_item_description(item)
 	_details_stats_label.text = _get_shop_details_stats_text(item)
 	_details_owned_label.text = "Есть: %d" % _get_owned_shop_item_quantity(item_id)
 	_layout_shop_details_nodes()
@@ -606,6 +698,12 @@ func _update_shop_pager(page_count: int, total_count: int, page_size: int) -> vo
 	if main.shop_prev_page_button == null or main.shop_next_page_button == null or main.shop_page_label == null:
 		return
 
+	if str(main._shop_category) == SHOP_CATEGORY_BAIT:
+		main.shop_prev_page_button.visible = false
+		main.shop_next_page_button.visible = false
+		main.shop_page_label.visible = false
+		return
+
 	var has_pages := total_count > page_size
 	main.shop_prev_page_button.visible = has_pages
 	main.shop_next_page_button.visible = has_pages
@@ -619,7 +717,7 @@ func _update_shop_ui() -> void:
 	if main.shop_panel == null:
 		return
 
-	main.shop_money_label.text = UIFormatters.format_money(PlayerData.money)
+	_update_shop_money_display()
 	theme.apply_tab_button_style(main.shop_bait_category_button, main._shop_category == SHOP_CATEGORY_BAIT)
 	theme.apply_tab_button_style(main.shop_consumable_category_button, main._shop_category == SHOP_CATEGORY_CONSUMABLE)
 	theme.apply_tab_button_style(main.shop_tackle_category_button, main._shop_category == SHOP_CATEGORY_ROD)
@@ -631,6 +729,41 @@ func _update_shop_ui() -> void:
 	_layout_shop_details_nodes()
 
 
+func _update_shop_money_display() -> void:
+	if main.shop_money_label == null:
+		return
+
+	main.shop_money_label.visible = false
+	var row_rect := Rect2(
+		Vector2(main.shop_panel.size.x - 32.0 - 156.0, main.shop_money_label.position.y),
+		Vector2(156.0, main.shop_money_label.size.y)
+	)
+	if _shop_money_row == null or not is_instance_valid(_shop_money_row):
+		_shop_money_row = _add_shop_price_row(
+			main.shop_panel,
+			PlayerData.money,
+			row_rect,
+			14,
+			Vector2(18.0, 18.0),
+			true,
+			Color(0.82, 0.94, 0.84, 0.92),
+			"ShopMoneyRow"
+		)
+		_shop_money_row.z_index = main.shop_money_label.z_index + 1
+	else:
+		_shop_money_row.position = row_rect.position
+		_set_shop_price_row(
+			_shop_money_row,
+			PlayerData.money,
+			row_rect.size,
+			14,
+			Vector2(18.0, 18.0),
+			true,
+			Color(0.82, 0.94, 0.84, 0.92)
+		)
+	_shop_money_row.visible = main.shop_panel.visible
+
+
 func _rebuild_shop_cards() -> void:
 	for child in main.shop_items_container.get_children():
 		child.queue_free()
@@ -638,27 +771,33 @@ func _rebuild_shop_cards() -> void:
 	main._shop_card_nodes.clear()
 	var all_items = _get_shop_items_for_category(main._shop_category)
 	var total_count: int = all_items.size()
+	var is_bait_category: bool = str(main._shop_category) == SHOP_CATEGORY_BAIT
 	var page_size := _get_shop_items_per_page(main._shop_category)
+	if is_bait_category:
+		page_size = max(total_count, 1)
 	var page_count: int = max(ceili(float(total_count) / float(page_size)), 1)
 	main._shop_page = clampi(main._shop_page, 0, page_count - 1)
 	var page_start: int = main._shop_page * page_size
 	var page_end: int = mini(page_start + page_size, total_count)
-	var items := all_items.slice(page_start, page_end)
+	var items: Array = all_items
+	if not is_bait_category:
+		items = all_items.slice(page_start, page_end)
 	var viewport_size: Vector2 = main.shop_items_scroll.size if main.shop_items_scroll != null else main.shop_items_container.size
 	var content_width: float = max(viewport_size.x - 12.0, 1.0)
 	main.shop_items_container.position = Vector2.ZERO
 	main.shop_items_container.size = Vector2(content_width, viewport_size.y)
-	var columns := 2
+	var columns := 5 if is_bait_category else 2
 	var gap := 12.0
 	var is_rod_category: bool = str(main._shop_category) == SHOP_CATEGORY_ROD
 	var is_line_category: bool = str(main._shop_category) == SHOP_CATEGORY_LINE
+	var is_leader_category: bool = str(main._shop_category) == SHOP_CATEGORY_LEADER
 	var is_image_category: bool = is_rod_category or str(main._shop_category) == SHOP_CATEGORY_BAIT
 
 	var card_width: float = (content_width - gap * float(columns - 1)) / float(columns)
 	var rows: int = max(ceil(float(items.size()) / float(columns)), 1)
-	var card_min_height := 148.0 if is_image_category else 60.0
-	var card_max_height := 160.0 if is_image_category else 68.0
-	if is_line_category:
+	var card_min_height := 178.0 if is_bait_category else (148.0 if is_image_category else 60.0)
+	var card_max_height := 178.0 if is_bait_category else (160.0 if is_image_category else 68.0)
+	if is_line_category or is_leader_category:
 		card_min_height = 100.0
 		card_max_height = 104.0
 
@@ -698,8 +837,12 @@ func _create_shop_card(item: Dictionary, card_size: Vector2) -> Panel:
 		_populate_line_shop_card(card, item, card_size, card_texture, rarity_color)
 		return card
 
+	if category == SHOP_CATEGORY_LEADER:
+		_populate_leader_shop_card(card, item, card_size, card_texture, rarity_color)
+		return card
+
 	if category == SHOP_CATEGORY_BAIT:
-		_populate_rod_image_card(card, item, card_size, card_texture, rarity_color)
+		_populate_bait_shop_card(card, item, card_size, card_texture, rarity_color)
 		return card
 
 	if card_texture != null and category == SHOP_CATEGORY_ROD:
@@ -742,7 +885,7 @@ func _create_shop_card(item: Dictionary, card_size: Vector2) -> Panel:
 			card.add_child(compact_icon_label)
 
 		var compact_name_label = Label.new()
-		compact_name_label.text = str(item.get("name", "-"))
+		compact_name_label.text = _get_item_display_name(item)
 		compact_name_label.position = Vector2(compact_content_x, compact_text_y)
 		compact_name_label.size = Vector2(compact_text_width, 19.0)
 		compact_name_label.clip_text = true
@@ -752,23 +895,32 @@ func _create_shop_card(item: Dictionary, card_size: Vector2) -> Panel:
 
 		var compact_quantity = int(item.get("quantity", 1))
 		var compact_owned = _get_owned_shop_item_quantity(item_id)
+		var compact_price_width := 54.0
+		var compact_price_x: float = compact_action_x - compact_price_width - 8.0
+		var compact_meta_width: float = maxf(compact_price_x - compact_content_x - 6.0, 70.0)
 		var compact_meta_label = Label.new()
-		compact_meta_label.text = "%s  |  %s" % [
-			_get_shop_compact_stat_text(item),
-			UIFormatters.format_money(float(item.get("price", 0.0)))
-		]
+		compact_meta_label.text = _get_shop_compact_stat_text(item)
 		if compact_quantity > 1:
-			compact_meta_label.text = "%s  |  x%d  |  %s" % [
+			compact_meta_label.text = "%s  |  x%d" % [
 				_get_shop_compact_stat_text(item),
-				compact_quantity,
-				UIFormatters.format_money(float(item.get("price", 0.0)))
+				compact_quantity
 			]
 		compact_meta_label.position = Vector2(compact_content_x, compact_text_y + 22.0)
-		compact_meta_label.size = Vector2(compact_text_width, 17.0)
+		compact_meta_label.size = Vector2(compact_meta_width, 17.0)
 		compact_meta_label.clip_text = true
 		compact_meta_label.add_theme_font_size_override("font_size", 10)
 		compact_meta_label.add_theme_color_override("font_color", Color(0.74, 0.88, 0.78, 0.92))
 		card.add_child(compact_meta_label)
+
+		_add_shop_price_row(
+			card,
+			float(item.get("price", 0.0)),
+			Rect2(Vector2(compact_price_x, compact_text_y + 22.0), Vector2(compact_price_width, 17.0)),
+			10,
+			Vector2(13.0, 13.0),
+			true,
+			Color(0.94, 1.0, 0.91, 0.96)
+		)
 
 		var compact_owned_label = Label.new()
 		compact_owned_label.text = "Есть %d" % compact_owned
@@ -830,7 +982,7 @@ func _populate_line_shop_card(card: Panel, item: Dictionary, card_size: Vector2,
 		card.add_child(fallback_icon_label)
 
 	var name_label := Label.new()
-	name_label.text = str(item.get("name", "-"))
+	name_label.text = _get_item_display_name(item)
 	name_label.position = Vector2(content_x, title_y)
 	name_label.size = Vector2(text_width, 20.0)
 	name_label.clip_text = true
@@ -863,14 +1015,107 @@ func _populate_line_shop_card(card: Panel, item: Dictionary, card_size: Vector2,
 	stat_line_b.add_theme_color_override("font_color", Color(0.70, 0.84, 0.76, 0.86))
 	card.add_child(stat_line_b)
 
-	var price_label := Label.new()
-	PriceLabelScript.set_price(price_label, float(item.get("price", 0.0)))
-	price_label.position = Vector2(content_x, title_y + 63.0)
-	price_label.size = Vector2(text_width, 17.0)
-	price_label.clip_text = true
-	price_label.add_theme_font_size_override("font_size", 10)
-	price_label.add_theme_color_override("font_color", Color(0.88, 0.96, 0.80, 0.90))
-	card.add_child(price_label)
+	_add_shop_price_row(
+		card,
+		float(item.get("price", 0.0)),
+		Rect2(Vector2(content_x, title_y + 63.0), Vector2(78.0, 17.0)),
+		10,
+		Vector2(14.0, 14.0),
+		false,
+		Color(0.88, 0.96, 0.80, 0.90)
+	)
+
+	var owned_label := Label.new()
+	owned_label.text = "Есть: %d" % _get_owned_shop_item_quantity(item_id)
+	owned_label.position = Vector2(buy_x - 68.0, title_y + 4.0)
+	owned_label.size = Vector2(58.0, 18.0)
+	owned_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	owned_label.clip_text = true
+	owned_label.add_theme_font_size_override("font_size", 9)
+	owned_label.add_theme_color_override("font_color", Color(0.62, 0.76, 0.68, 0.78))
+	card.add_child(owned_label)
+
+	var buy_button := Button.new()
+	buy_button.text = "Купить"
+	buy_button.position = Vector2(buy_x, (card_size.y - buy_height) * 0.5)
+	buy_button.size = Vector2(buy_width, buy_height)
+	_apply_shop_buy_button_style(buy_button)
+	buy_button.pressed.connect(_on_shop_buy_pressed.bind(item_id))
+	card.add_child(buy_button)
+
+func _populate_leader_shop_card(card: Panel, item: Dictionary, card_size: Vector2, texture: Texture2D, rarity_color: Color) -> void:
+	var item_id := str(item.get("id", ""))
+	var has_texture := texture != null
+	var icon_size := 72.0 if has_texture else 42.0
+	var icon_pos := Vector2(12.0, (card_size.y - icon_size) * 0.5)
+	var content_x := icon_pos.x + icon_size + 12.0
+	var buy_width := 66.0
+	var buy_height := 32.0
+	var right_padding := 12.0
+	var buy_x := card_size.x - right_padding - buy_width
+	var text_width: float = maxf(buy_x - content_x - 16.0, 118.0)
+	var title_y := 9.0
+
+	if has_texture:
+		_add_compact_shop_texture(card, texture, Rect2(icon_pos, Vector2(icon_size, icon_size)))
+	else:
+		var icon_label := Label.new()
+		icon_label.text = str(item.get("icon", "L"))
+		icon_label.position = icon_pos
+		icon_label.size = Vector2(icon_size, icon_size)
+		icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		icon_label.add_theme_font_size_override("font_size", 17)
+		icon_label.add_theme_color_override("font_color", Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.98))
+		icon_label.add_theme_stylebox_override(
+			"normal",
+			main._make_panel_style(Color(0.10, 0.22, 0.17, 0.72), Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.32), 10, 3, Color(0.0, 0.0, 0.0, 0.10))
+		)
+		card.add_child(icon_label)
+
+	var name_label := Label.new()
+	name_label.text = _get_item_display_name(item)
+	name_label.position = Vector2(content_x, title_y)
+	name_label.size = Vector2(text_width, 19.0)
+	name_label.clip_text = true
+	name_label.add_theme_font_size_override("font_size", 12)
+	name_label.add_theme_color_override("font_color", Color(0.94, 1.0, 0.91, 1.0))
+	card.add_child(name_label)
+
+	var leader_values := _get_leader_display_values(item)
+	var stat_line_a := Label.new()
+	stat_line_a.text = "Материал: %s   Длина: %s" % [
+		str(leader_values.get("material", "нейлон")),
+		str(leader_values.get("length", "20 см"))
+	]
+	stat_line_a.position = Vector2(content_x, title_y + 22.0)
+	stat_line_a.size = Vector2(text_width, 18.0)
+	stat_line_a.clip_text = true
+	stat_line_a.add_theme_font_size_override("font_size", 10)
+	stat_line_a.add_theme_color_override("font_color", Color(0.76, 0.90, 0.80, 0.92))
+	card.add_child(stat_line_a)
+
+	var stat_line_b := Label.new()
+	stat_line_b.text = "Тест: %s   %s" % [
+		str(leader_values.get("test", "-")),
+		_get_leader_bonus_summary(item)
+	]
+	stat_line_b.position = Vector2(content_x, title_y + 41.0)
+	stat_line_b.size = Vector2(text_width, 18.0)
+	stat_line_b.clip_text = true
+	stat_line_b.add_theme_font_size_override("font_size", 10)
+	stat_line_b.add_theme_color_override("font_color", Color(0.70, 0.84, 0.76, 0.86))
+	card.add_child(stat_line_b)
+
+	_add_shop_price_row(
+		card,
+		float(item.get("price", 0.0)),
+		Rect2(Vector2(content_x, title_y + 61.0), Vector2(78.0, 17.0)),
+		10,
+		Vector2(14.0, 14.0),
+		false,
+		Color(0.88, 0.96, 0.80, 0.90)
+	)
 
 	var owned_label := Label.new()
 	owned_label.text = "Есть: %d" % _get_owned_shop_item_quantity(item_id)
@@ -911,6 +1156,119 @@ func _add_compact_shop_texture(parent: Control, texture: Texture2D, slot_rect: R
 	sprite.scale = Vector2.ONE * minf(slot_rect.size.x / texture_size.x, slot_rect.size.y / texture_size.y)
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	slot.add_child(sprite)
+
+
+func _populate_bait_shop_card(card: Panel, item: Dictionary, card_size: Vector2, texture: Texture2D, rarity_color: Color) -> void:
+	var item_id := str(item.get("id", ""))
+	var padding := 8.0
+	var image_area_height := 76.0
+	var info_y := padding + image_area_height + 6.0
+	var info_height: float = maxf(card_size.y - info_y - padding, 74.0)
+	var inner_width: float = maxf(card_size.x - padding * 2.0, 1.0)
+
+	var image_area := Panel.new()
+	image_area.name = "BaitCardImageArea"
+	image_area.position = Vector2(padding, padding)
+	image_area.size = Vector2(inner_width, image_area_height)
+	image_area.clip_contents = true
+	image_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	image_area.add_theme_stylebox_override(
+		"panel",
+		main._make_panel_style(Color(0.012, 0.032, 0.035, 0.72), Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.18), 7, 2, Color(0.0, 0.0, 0.0, 0.10))
+	)
+	card.add_child(image_area)
+
+	if texture != null:
+		var image := TextureRect.new()
+		image.name = "BaitCardImage"
+		image.texture = texture
+		image.position = Vector2.ZERO
+		image.size = image_area.size
+		image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		image.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		image_area.add_child(image)
+	else:
+		var icon_label := Label.new()
+		icon_label.text = str(item.get("icon", "?"))
+		icon_label.position = Vector2((image_area.size.x - 42.0) * 0.5, 17.0)
+		icon_label.size = Vector2(42.0, 42.0)
+		icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		icon_label.add_theme_font_size_override("font_size", 18)
+		icon_label.add_theme_color_override("font_color", Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.98))
+		image_area.add_child(icon_label)
+
+	var info_area := Panel.new()
+	info_area.name = "BaitCardInfoArea"
+	info_area.position = Vector2(padding, info_y)
+	info_area.size = Vector2(inner_width, info_height)
+	info_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	info_area.add_theme_stylebox_override(
+		"panel",
+		main._make_panel_style(Color(0.012, 0.040, 0.034, 0.78), Color(0.58, 0.76, 0.66, 0.16), 7, 1, Color(0.0, 0.0, 0.0, 0.08))
+	)
+	card.add_child(info_area)
+
+	var info_padding := 8.0
+	var price_width := 70.0
+	var name_width: float = maxf(info_area.size.x - info_padding * 2.0 - price_width - 8.0, 70.0)
+	var name_label := Label.new()
+	name_label.name = "BaitCardNameLabel"
+	name_label.text = _get_item_display_name(item)
+	name_label.position = Vector2(info_padding, 6.0)
+	name_label.size = Vector2(name_width, 20.0)
+	name_label.clip_text = true
+	name_label.add_theme_font_size_override("font_size", 12)
+	name_label.add_theme_color_override("font_color", Color(0.94, 1.0, 0.91, 1.0))
+	info_area.add_child(name_label)
+
+	_add_shop_price_row(
+		info_area,
+		float(item.get("price", 0.0)),
+		Rect2(Vector2(info_area.size.x - info_padding - price_width, 6.0), Vector2(price_width, 20.0)),
+		11,
+		Vector2(15.0, 15.0),
+		true,
+		Color(0.92, 1.0, 0.90, 0.96),
+		"BaitCardPriceRow"
+	)
+
+	var owned_label := Label.new()
+	owned_label.name = "BaitCardOwnedLabel"
+	owned_label.text = "Есть: %d" % _get_owned_shop_item_quantity(item_id)
+	owned_label.position = Vector2(info_padding, 28.0)
+	owned_label.size = Vector2(info_area.size.x - info_padding * 2.0, 18.0)
+	owned_label.clip_text = true
+	owned_label.add_theme_font_size_override("font_size", 10)
+	owned_label.add_theme_color_override("font_color", Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.92))
+	info_area.add_child(owned_label)
+
+	var action_gap := 8.0
+	var action_height := 28.0
+	var action_y: float = info_area.size.y - action_height - 6.0
+	var action_width: float = maxf((info_area.size.x - info_padding * 2.0 - action_gap) * 0.5, 54.0)
+	var details_button := Button.new()
+	details_button.name = "BaitCardDetailsButton"
+	details_button.text = "Подробнее"
+	details_button.position = Vector2(info_padding, action_y)
+	details_button.size = Vector2(action_width, action_height)
+	_apply_shop_details_button_style(details_button)
+	details_button.add_theme_font_size_override("font_size", 10)
+	details_button.pressed.connect(_show_shop_details.bind(item_id))
+	info_area.add_child(details_button)
+
+	var buy_button := Button.new()
+	buy_button.name = "BaitCardBuyButton"
+	buy_button.text = "Купить"
+	buy_button.position = Vector2(info_area.size.x - info_padding - action_width, action_y)
+	buy_button.size = Vector2(action_width, action_height)
+	_apply_shop_buy_button_style(buy_button)
+	buy_button.add_theme_font_size_override("font_size", 10)
+	buy_button.pressed.connect(_on_shop_buy_pressed.bind(item_id))
+	info_area.add_child(buy_button)
+
 
 func _populate_rod_image_card(card: Panel, item: Dictionary, card_size: Vector2, texture: Texture2D, rarity_color: Color) -> void:
 	var item_id := str(item.get("id", ""))
@@ -983,21 +1341,20 @@ func _populate_rod_image_card(card: Panel, item: Dictionary, card_size: Vector2,
 	var actions_width := details_width + action_gap + buy_width
 	var left_width := maxf(details_x - info_padding - 14.0, 120.0)
 
-	var price_label := Label.new()
-	price_label.name = "RodCardPriceLabel"
-	PriceLabelScript.set_price(price_label, float(item.get("price", 0.0)))
-	price_label.position = Vector2(details_x, 3.0)
-	price_label.size = Vector2(actions_width, 16.0)
-	price_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	price_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	price_label.clip_text = true
-	price_label.add_theme_font_size_override("font_size", 12)
-	price_label.add_theme_color_override("font_color", Color(0.92, 1.0, 0.90, 0.96))
-	info_area.add_child(price_label)
+	_add_shop_price_row(
+		info_area,
+		float(item.get("price", 0.0)),
+		Rect2(Vector2(details_x, 3.0), Vector2(actions_width, 16.0)),
+		12,
+		Vector2(15.0, 15.0),
+		true,
+		Color(0.92, 1.0, 0.90, 0.96),
+		"RodCardPriceRow"
+	)
 
 	var name_label := Label.new()
 	name_label.name = "RodCardNameLabel"
-	name_label.text = str(item.get("name", "-"))
+	name_label.text = _get_item_display_name(item)
 	name_label.position = Vector2(info_padding, 6.0)
 	name_label.size = Vector2(left_width, 19.0)
 	name_label.clip_text = true
@@ -1140,8 +1497,72 @@ func _get_line_details_stats_text(item: Dictionary) -> String:
 		str(line_values.get("diameter", "-")),
 		str(line_values.get("strength", "-")),
 		str(line_values.get("material", "нейлон")),
-		UIFormatters.format_money(float(item.get("price", 0.0)))
+		_format_shop_money_amount(float(item.get("price", 0.0)))
 	]
+
+func _get_leader_display_values(item: Dictionary) -> Dictionary:
+	var stats: Dictionary = item.get("stats", {})
+	var length_cm := int(stats.get("length_cm", 20))
+	var test_kg := float(stats.get("max_load_kg", stats.get("max_load", stats.get("strength", 1.0))))
+	return {
+		"material": _get_leader_material_name(item),
+		"length": "%d см" % length_cm,
+		"test": "%.1f кг" % test_kg
+	}
+
+func _get_leader_material_name(item: Dictionary) -> String:
+	var stats: Dictionary = item.get("stats", {})
+	var leader_type := str(stats.get("material", stats.get("leader_type", "nylon"))).to_lower()
+	match leader_type:
+		"nylon", "mono", "monofilament":
+			return "нейлон"
+		"fluoro", "fluorocarbon":
+			return "флюорокарбон"
+		"braid", "braided":
+			return "плетёный"
+		"reinforced":
+			return "усиленный"
+		"steel":
+			return "стальной"
+		_:
+			return leader_type if leader_type != "" else "нейлон"
+
+func _get_leader_bonus_summary(item: Dictionary) -> String:
+	var stats: Dictionary = item.get("stats", {})
+	var parts := PackedStringArray()
+	var control_bonus := float(stats.get("control_bonus", 0.0))
+	var cautious_bonus := float(stats.get("cautious_bite_bonus", 0.0))
+	var small_penalty := float(stats.get("small_fish_penalty", 0.0))
+	var bite_protection := float(stats.get("bite_protection", 0.0))
+	if abs(control_bonus) >= 0.005:
+		parts.append("контр. %s" % _format_signed_percent(control_bonus))
+	if abs(cautious_bonus) >= 0.005:
+		parts.append("остор. %s" % _format_signed_percent(cautious_bonus))
+	if small_penalty >= 0.005:
+		parts.append("мелочь -%d%%" % roundi(small_penalty * 100.0))
+	if bite_protection >= 0.005:
+		parts.append("срез +%d%%" % roundi(bite_protection * 100.0))
+	if parts.is_empty():
+		return "универсальный"
+	return " / ".join(parts)
+
+func _get_leader_details_stats_text(item: Dictionary) -> String:
+	var stats: Dictionary = item.get("stats", {})
+	var leader_values := _get_leader_display_values(item)
+	var lines: Array = [
+		"Материал: %s" % str(leader_values.get("material", "нейлон")),
+		"Длина: %s" % str(leader_values.get("length", "20 см")),
+		"Тест: %s" % str(leader_values.get("test", "-")),
+		"Цена: %s" % _format_shop_money_amount(float(item.get("price", 0.0))),
+		"Контроль: %s" % _format_signed_percent(float(stats.get("control_bonus", 0.0))),
+		"Осторожная рыба: %s" % _format_signed_percent(float(stats.get("cautious_bite_bonus", 0.0))),
+		"Штраф мелкой рыбе: %s" % _format_signed_percent(-float(stats.get("small_fish_penalty", 0.0))),
+		"Защита от обрыва: %d%%" % roundi(float(stats.get("break_resistance", 1.0)) * 100.0),
+		"Риск обрыва: %d%%" % roundi(float(stats.get("break_chance", 0.0)) * 100.0)
+	]
+	if float(stats.get("bite_protection", 0.0)) > 0.0:
+		lines.append("Защита от среза: +%d%%" % roundi(float(stats.get("bite_protection", 0.0)) * 100.0))
+	return "\n".join(lines)
 
 func _get_shop_compact_stat_text(item: Dictionary) -> String:
 	var stats: Dictionary = item.get("stats", {})
@@ -1161,10 +1582,19 @@ func _get_shop_compact_stat_text(item: Dictionary) -> String:
 				str(line_values.get("diameter", "-")),
 				str(line_values.get("strength", "-"))
 			]
+		"leader":
+			var leader_values := _get_leader_display_values(item)
+			return "%s / %s / %s" % [
+				str(leader_values.get("material", "нейлон")),
+				str(leader_values.get("length", "20 см")),
+				str(leader_values.get("test", "-"))
+			]
 		"float":
-			return "Клёв +%d%% / стабильн. +%d%%" % [
-				roundi((float(stats.get("sensitivity", stats.get("bite_detection_bonus", 0.0))) + float(stats.get("bite_visibility", 0.0)) * 0.5) * 100.0),
-				roundi(float(stats.get("stability", 0.0)) * 100.0)
+			return "Чувств. %d%% / ветер %d%% / %.1f-%.1f м" % [
+				roundi(float(stats.get("sensitivity", 0.0)) * 100.0),
+				roundi(float(stats.get("wind_resistance", 0.0)) * 100.0),
+				float(stats.get("depth_min", 0.2)),
+				float(stats.get("depth_max", 2.5))
 			]
 		"hook":
 			return "№%s / %s / +%d%%" % [
@@ -1187,7 +1617,7 @@ func _get_rod_details_stats_text(item: Dictionary) -> String:
 		main._format_tackle_stat_value("length_m", stats.get("length_m", 0.0)),
 		main._format_tackle_stat_value("rod_class", stats.get("rod_class", "medium")),
 		main._format_tackle_stat_value("max_fish_weight", stats.get("max_fish_weight", 0.0)),
-		UIFormatters.format_money(float(item.get("price", 0.0))),
+		_format_shop_money_amount(float(item.get("price", 0.0))),
 		_format_signed_percent(float(stats.get("control_bonus", stats.get("tension_bonus", 0.0)))),
 		_format_signed_percent(float(stats.get("handling_bonus", 0.0))),
 		_format_signed_percent(float(stats.get("reach_bonus", 0.0))),
@@ -1212,7 +1642,7 @@ func _get_shop_details_stats_text(item: Dictionary) -> String:
 					roundi(float(stats.get("fish_attraction", 0.0)) * 100.0),
 					int(item.get("quantity", 1))
 				],
-				"Цена: %s" % UIFormatters.format_money(float(item.get("price", 0.0)))
+				"Цена: %s" % _format_shop_money_amount(float(item.get("price", 0.0)))
 			]
 			if target_text != "":
 				lines.append(target_text)
@@ -1221,10 +1651,14 @@ func _get_shop_details_stats_text(item: Dictionary) -> String:
 			return "\n".join(lines)
 		"line":
 			return _get_line_details_stats_text(item)
+		"leader":
+			return _get_leader_details_stats_text(item)
+		"float":
+			return _get_float_details_stats_text(item)
 		_:
 			return "%s\nЦена: %s" % [
 				_get_shop_key_stat_text(item),
-				UIFormatters.format_money(float(item.get("price", 0.0)))
+				_format_shop_money_amount(float(item.get("price", 0.0)))
 			]
 
 func _format_bait_type_name(bait_type: String) -> String:
@@ -1243,6 +1677,41 @@ func _format_signed_percent(value: float) -> String:
 	if percent > 0:
 		return "+%d%%" % percent
 	return "%d%%" % percent
+
+func _get_item_display_name(item: Dictionary) -> String:
+	return str(item.get("display_name_ru", item.get("name", "-")))
+
+func _get_item_description(item: Dictionary) -> String:
+	return str(item.get("description_ru", item.get("description", "")))
+
+
+func _get_float_details_stats_text(item: Dictionary) -> String:
+	var stats: Dictionary = item.get("stats", {})
+	var lines: Array = [
+		"Чувствительность: %d%%" % roundi(float(stats.get("sensitivity", 0.0)) * 100.0),
+		"Устойчивость: %d%%" % roundi(float(stats.get("stability", 0.0)) * 100.0),
+		"Ветер: %d%%" % roundi(float(stats.get("wind_resistance", 0.0)) * 100.0),
+		"Дальность: %s" % _format_signed_percent(float(stats.get("cast_distance_bonus", 0.0))),
+		"Камыши/трава: %d%%" % roundi(float(stats.get("vegetation_control", 0.0)) * 100.0),
+		"Тяжёлая наживка: %d%%" % roundi(float(stats.get("heavy_bait_support", 0.0)) * 100.0),
+		"Рабочая глубина: %.1f-%.1f м" % [float(stats.get("depth_min", 0.2)), float(stats.get("depth_max", 2.5))],
+		"Цена: %s" % _format_shop_money_amount(float(item.get("price", 0.0)))
+	]
+	if float(stats.get("night_bonus", 0.0)) > 0.0:
+		lines.append("Ночной бонус: +%d%% к видимости поклёвки" % roundi(float(stats.get("night_bonus", 0.0)) * 100.0))
+	if float(stats.get("hook_timing_bonus", 0.0)) > 0.0:
+		lines.append("Окно подсечки: +%d%%" % roundi(float(stats.get("hook_timing_bonus", 0.0)) * 100.0))
+	if float(stats.get("long_range_accuracy_bonus", 0.0)) > 0.0:
+		lines.append("Дальняя точность: +%d%%" % roundi(float(stats.get("long_range_accuracy_bonus", 0.0)) * 100.0))
+	if float(stats.get("setup_comfort", 0.0)) > 0.0:
+		lines.append("Удобство настройки: +%d%%" % roundi(float(stats.get("setup_comfort", 0.0)) * 100.0))
+	var tags: Array = stats.get("bonus_tags", item.get("bonus_tags", []))
+	if not tags.is_empty():
+		var tag_strings := PackedStringArray()
+		for tag in tags:
+			tag_strings.append(str(tag))
+		lines.append("Лучше всего: %s" % ", ".join(tag_strings))
+	return "\n".join(lines)
 
 
 func _get_owned_shop_item_quantity(item_id: String) -> int:
@@ -1314,10 +1783,21 @@ func _get_shop_key_stat_text(item: Dictionary) -> String:
 				str(line_values.get("strength", "-")),
 				str(line_values.get("material", "нейлон"))
 			]
+		"leader":
+			var leader_values := _get_leader_display_values(item)
+			return "Материал: %s  |  Длина: %s  |  Тест: %s  |  %s" % [
+				str(leader_values.get("material", "нейлон")),
+				str(leader_values.get("length", "20 см")),
+				str(leader_values.get("test", "-")),
+				_get_leader_bonus_summary(item)
+			]
 		"float":
-			return "Клёв +%d%%  |  стабильн. +%d%%" % [
-				roundi((float(stats.get("sensitivity", stats.get("bite_detection_bonus", 0.0))) + float(stats.get("bite_visibility", 0.0)) * 0.5) * 100.0),
-				roundi(float(stats.get("stability", 0.0)) * 100.0)
+			return "Чувств. %d%%  |  Устойчивость %d%%  |  Ветер %d%%  |  %.1f-%.1f м" % [
+				roundi(float(stats.get("sensitivity", 0.0)) * 100.0),
+				roundi(float(stats.get("stability", 0.0)) * 100.0),
+				roundi(float(stats.get("wind_resistance", 0.0)) * 100.0),
+				float(stats.get("depth_min", 0.2)),
+				float(stats.get("depth_max", 2.5))
 			]
 		"hook":
 			return "№%s  |  %s  |  подсечка +%d%%" % [
