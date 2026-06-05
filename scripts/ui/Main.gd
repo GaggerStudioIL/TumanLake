@@ -32,7 +32,6 @@ const TUMAN_LAKE_THEME := preload("res://themes/TumanLakeUI.tres")
 const DEPTH_HOOK_ICON := preload("res://assets/ui/icons/icon_depth_hook.png")
 const WIND_HUD_ICON_PATH := "res://assets/ui/icons/wind.png"
 
-const SHOW_DEBUG_PANEL := false
 const STYLE_HUD_PANEL := "HUDPanel"
 const STYLE_INFO_CARD := "InfoCard"
 const STYLE_PRIMARY_BUTTON := "PrimaryButton"
@@ -2131,7 +2130,7 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	timer_label.visible = false
 	tackle_label.visible = false
 	result_label.visible = false
-	debug_panel.visible = SHOW_DEBUG_PANEL
+	debug_panel.visible = BuildConfig.ENABLE_DEBUG_PANEL
 
 	var hud_rect := _scale_rect(Rect2(20.0, 16.0, 910.0, HUD_HEIGHT), screen_size)
 	hud_rect.size.x = max(260.0 * sx, screen_size.x - hud_rect.position.x - 128.0 * sx)
@@ -4076,7 +4075,7 @@ func _setup_layout() -> void:
 	debug_panel.position = Vector2(screen_size.x - margin - 360.0, content_top + 246.0)
 	debug_panel.size = Vector2(350.0, 148.0)
 	debug_panel.z_index = 8
-	debug_panel.visible = SHOW_DEBUG_PANEL
+	debug_panel.visible = BuildConfig.ENABLE_DEBUG_PANEL
 	debug_label.position = Vector2(10.0, 8.0)
 	debug_label.size = Vector2(debug_panel.size.x - 20.0, debug_panel.size.y - 16.0)
 	debug_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

@@ -65,7 +65,7 @@ func _update_ui() -> void:
 		main.system_menu_ui.set_disabled(main.inventory_button.disabled)
 	main.bait_button.disabled = main.inventory_button.disabled
 	main.reeling_panel.visible = main._fishing_ui_state == FishingUiState.FIGHTING
-	main.debug_panel.visible = main.SHOW_DEBUG_PANEL
+	main.debug_panel.visible = BuildConfig.ENABLE_DEBUG_PANEL
 
 	if main._is_catch_reward_open():
 		main._close_secondary_popups_for_reward()
