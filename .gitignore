@@ -9,6 +9,21 @@ export_presets.cfg
 tmp_*.gd
 tmp_*.uid
 
+# Logs and local debug output
+*.log
+logs/
+debug_logs/
+local_logs/
+
+# Temporary shell/editor artifacts
+*.swp
+*.swo
+*.orig
+*.rej
+*~
+lesshst
+.lesshst
+
 # Mono
 .mono/
 data_*/
