@@ -165,7 +165,15 @@ func _apply_supplier_freshness_defaults(supplier_id: String, supplier: Dictionar
 
 
 func get_supplier_ids() -> Array:
-	return SUPPLIERS.keys()
+	var result: Array = []
+
+	for supplier_id in SUPPLIERS.keys():
+		var supplier: Dictionary = SUPPLIERS.get(supplier_id, {})
+		if bool(supplier.get("legacy", false)):
+			continue
+		result.append(str(supplier_id))
+
+	return result
 
 
 func get_primary_supplier_ids() -> Array:
