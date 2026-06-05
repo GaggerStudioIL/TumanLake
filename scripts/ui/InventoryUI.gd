@@ -6,6 +6,16 @@ var theme
 const INVENTORY_ITEMS_PER_PAGE := 24
 const INVENTORY_DETAILS_COMPACT_HEIGHT := 360.0
 const INVENTORY_DETAILS_TINY_HEIGHT := 300.0
+const INVENTORY_FALLBACK_ICON_PATHS := {
+	"rod": "res://assets/ui/sprites/icons/rod.png",
+	"line": "res://assets/ui/sprites/icons/line.png",
+	"leader": "res://assets/ui/icons/quick_tackle/leashes_button.png",
+	"float": "res://assets/ui/icons/quick_tackle/floats_button.png",
+	"hook": "res://assets/ui/sprites/icons/hook.png",
+	"bait": "res://assets/ui/sprites/icons/bait.png",
+	"fish": "res://assets/ui/sprites/icons/fish.png",
+	"misc": "res://assets/ui/sprites/icons/inventory.png"
+}
 var _texture_cache: Dictionary = {}
 var _placeholder_texture_cache: Dictionary = {}
 var _details_close_button: Button
@@ -22,6 +32,8 @@ var _details_margin: MarginContainer
 var _details_root: VBoxContainer
 var _details_header_row: HBoxContainer
 var _details_empty_label: RichTextLabel
+var _details_content_scroll: ScrollContainer
+var _details_content_box: VBoxContainer
 var _details_meta_margin: MarginContainer
 var _details_preview_row: HBoxContainer
 var _details_meta_column: VBoxContainer
@@ -348,7 +360,26 @@ func _ensure_inventory_details_container_nodes() -> void:
 		_details_empty_label.add_theme_color_override("default_color", Color(0.82, 0.93, 0.86, 0.92))
 		_details_root.add_child(_details_empty_label)
 
-	_move_control_to_parent(_details_meta_panel, _details_root)
+	if _details_content_scroll == null or not is_instance_valid(_details_content_scroll):
+		_details_content_scroll = ScrollContainer.new()
+		_details_content_scroll.name = "DetailsContentScroll"
+		_details_content_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+		_details_content_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		_details_content_scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+		_details_content_scroll.clip_contents = true
+		_details_content_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_details_content_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		_details_root.add_child(_details_content_scroll)
+
+	if _details_content_box == null or not is_instance_valid(_details_content_box):
+		_details_content_box = VBoxContainer.new()
+		_details_content_box.name = "DetailsContentBox"
+		_details_content_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_details_content_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_details_content_box.add_theme_constant_override("separation", 10)
+		_details_content_scroll.add_child(_details_content_box)
+
+	_move_control_to_parent(_details_meta_panel, _details_content_box)
 	_details_meta_panel.custom_minimum_size = Vector2(0.0, 116.0)
 	_details_meta_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_details_meta_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
@@ -394,10 +425,10 @@ func _ensure_inventory_details_container_nodes() -> void:
 	_details_category_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_details_status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
-	_move_control_to_parent(_details_body_panel, _details_root)
+	_move_control_to_parent(_details_body_panel, _details_content_box)
 	_details_body_panel.custom_minimum_size = Vector2(0.0, 128.0)
 	_details_body_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_details_body_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_details_body_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	if _details_body_margin == null or not is_instance_valid(_details_body_margin):
 		_details_body_margin = MarginContainer.new()
 		_details_body_margin.name = "DetailsBodyMargin"
@@ -418,7 +449,7 @@ func _ensure_inventory_details_container_nodes() -> void:
 		_details_description_panel = Panel.new()
 		_details_description_panel.name = "DetailsDescriptionPanel"
 		_details_description_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-		_details_root.add_child(_details_description_panel)
+		_details_content_box.add_child(_details_description_panel)
 	_apply_inventory_details_section_style(
 		_details_description_panel,
 		Color(0.010, 0.030, 0.028, 0.98),
@@ -481,15 +512,23 @@ func _ensure_inventory_details_container_nodes() -> void:
 	var ordered_nodes: Array = [
 		_details_header_row,
 		_details_empty_label,
-		_details_meta_panel,
-		_details_body_panel,
-		_details_description_panel,
+		_details_content_scroll,
 		_details_action_panel
 	]
 	for i in ordered_nodes.size():
 		var node = ordered_nodes[i]
 		if node != null and is_instance_valid(node) and node.get_parent() == _details_root:
 			_details_root.move_child(node, i)
+
+	var ordered_content_nodes: Array = [
+		_details_meta_panel,
+		_details_body_panel,
+		_details_description_panel
+	]
+	for i in ordered_content_nodes.size():
+		var node = ordered_content_nodes[i]
+		if node != null and is_instance_valid(node) and node.get_parent() == _details_content_box:
+			_details_content_box.move_child(node, i)
 
 
 func _apply_inventory_details_panel_style() -> void:
@@ -846,6 +885,8 @@ func _show_inventory_details_empty_state() -> void:
 	_details_title_label.text = "Подробности"
 	_details_empty_label.visible = true
 	_details_empty_label.text = "[center][font_size=22][b]Выберите предмет[/b][/font_size]\n\n[color=#b8d7c5]Здесь появится информация о выбранном предмете.[/color][/center]"
+	if _details_content_scroll != null:
+		_details_content_scroll.visible = false
 	_details_meta_panel.visible = false
 	_details_body_panel.visible = false
 	_details_description_panel.visible = false
@@ -862,6 +903,8 @@ func _update_inventory_details_content(item: Dictionary) -> void:
 	var category := str(item.get("category", "misc"))
 	var status_text := _get_inventory_item_status_summary(item)
 	_details_empty_label.visible = false
+	if _details_content_scroll != null:
+		_details_content_scroll.visible = true
 	_details_meta_panel.visible = true
 	_details_body_panel.visible = true
 	_details_description_panel.visible = true
@@ -976,7 +1019,7 @@ func _position_inventory_details_popup(has_actions: bool) -> void:
 	if has_actions:
 		fixed_height += action_height
 	fixed_height += float(visible_gap_count * root_separation)
-	var body_height := 128.0
+	var body_height := clampf(panel_size.y * 0.24, 128.0, 210.0)
 	if compact:
 		body_height = clampf(panel_size.y - fixed_height, 56.0, 98.0)
 	var icon_size := 58.0 if tiny else (64.0 if compact else 92.0)
@@ -1007,6 +1050,15 @@ func _position_inventory_details_popup(has_actions: bool) -> void:
 		_details_root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_details_root.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		_details_root.add_theme_constant_override("separation", root_separation)
+	if _details_content_scroll != null:
+		_details_content_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_details_content_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		_details_content_scroll.clip_contents = true
+		_details_content_scroll.custom_minimum_size = Vector2(0.0, 1.0)
+	if _details_content_box != null:
+		_details_content_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_details_content_box.custom_minimum_size = Vector2(content_width, 0.0)
+		_details_content_box.add_theme_constant_override("separation", root_separation)
 	if _details_header_row != null:
 		_details_header_row.custom_minimum_size = Vector2(0.0, header_height)
 		_details_header_row.add_theme_constant_override("separation", root_separation)
@@ -1042,6 +1094,7 @@ func _position_inventory_details_popup(has_actions: bool) -> void:
 	_details_body_panel.z_index = main.inventory_panel.z_index + 31
 	_details_body_panel.custom_minimum_size = Vector2(0.0, body_height)
 	_details_body_panel.clip_contents = true
+	_details_body_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	_set_detail_margin(_details_body_margin, section_padding, section_padding, section_padding, section_padding)
 	if _details_body_scroll != null:
 		_details_body_scroll.clip_contents = true
@@ -1054,6 +1107,7 @@ func _position_inventory_details_popup(has_actions: bool) -> void:
 		_details_description_panel.z_index = main.inventory_panel.z_index + 31
 		_details_description_panel.custom_minimum_size = Vector2(0.0, description_height)
 		_details_description_panel.clip_contents = true
+		_details_description_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		_set_detail_margin(_details_description_margin, section_padding, section_padding, section_padding, section_padding)
 	if _details_description_scroll != null:
 		_details_description_scroll.clip_contents = true
@@ -1377,6 +1431,8 @@ func _get_inventory_item_details_text(item: Dictionary) -> String:
 func _get_item_texture(item: Dictionary) -> Texture2D:
 	var path := str(item.get("image_path", ""))
 	if path == "":
+		path = _get_default_item_image_path(item)
+	if path == "":
 		return _get_placeholder_texture(str(item.get("category", "misc")))
 	if _texture_cache.has(path):
 		var cached_texture = _texture_cache[path]
@@ -1391,12 +1447,78 @@ func _get_item_texture(item: Dictionary) -> Texture2D:
 	return _get_placeholder_texture(str(item.get("category", "misc")))
 
 
+func _get_default_item_image_path(item: Dictionary) -> String:
+	var category := str(item.get("category", item.get("type", "misc")))
+	var item_id := str(item.get("id", ""))
+
+	if category == "fish":
+		var stats: Dictionary = item.get("stats", {}) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
+		var fish_id := str(item.get("fish_id", stats.get("fish_id", item_id)))
+		var fish_path := "res://assets/fish/species/%s.png" % fish_id
+		if ResourceLoader.exists(fish_path):
+			return fish_path
+
+	if item_id != "":
+		var candidates: Array[String] = []
+		match category:
+			"rod":
+				candidates.append("res://assets/ui/shop/rods/%s.png" % item_id)
+			"line":
+				candidates.append("res://assets/ui/shop/lines/%s.png" % item_id)
+			"leader":
+				candidates.append("res://assets/ui/tackle/leaders/%s.png" % item_id)
+			"float":
+				candidates.append("res://assets/ui/tackle/floats/%s.png" % item_id)
+			"hook":
+				candidates.append("res://assets/ui/shop/hooks/%s.png" % item_id)
+			"bait":
+				candidates.append("res://assets/ui/shop/baits/%s.png" % item_id)
+
+		for candidate in candidates:
+			if ResourceLoader.exists(candidate):
+				return candidate
+
+	return _get_fallback_icon_path(category)
+
+
+func _get_fallback_icon_path(category: String) -> String:
+	var normalized_category := _get_fallback_icon_category(category)
+	return str(INVENTORY_FALLBACK_ICON_PATHS.get(normalized_category, INVENTORY_FALLBACK_ICON_PATHS["misc"]))
+
+
+func _get_fallback_icon_category(category: String) -> String:
+	match category:
+		"rod":
+			return "rod"
+		"line":
+			return "line"
+		"leader":
+			return "leader"
+		"float":
+			return "float"
+		"hook":
+			return "hook"
+		"bait", "bait_2":
+			return "bait"
+		"fish":
+			return "fish"
+		_:
+			return "misc"
+
+
 func _get_placeholder_texture(category: String) -> Texture2D:
-	if _placeholder_texture_cache.has(category):
-		return _placeholder_texture_cache[category]
+	var normalized_category := _get_fallback_icon_category(category)
+	if _placeholder_texture_cache.has(normalized_category):
+		return _placeholder_texture_cache[normalized_category]
+
+	var fallback_path := _get_fallback_icon_path(normalized_category)
+	var fallback_texture := _load_texture_resource(fallback_path)
+	if fallback_texture != null:
+		_placeholder_texture_cache[normalized_category] = fallback_texture
+		return fallback_texture
 
 	var color := Color(0.12, 0.19, 0.17, 0.96)
-	match category:
+	match normalized_category:
 		"rod":
 			color = Color(0.20, 0.16, 0.10, 0.96)
 		"line", "leader":
@@ -1413,7 +1535,7 @@ func _get_placeholder_texture(category: String) -> Texture2D:
 	var image := Image.create(96, 96, false, Image.FORMAT_RGBA8)
 	image.fill(color)
 	var texture := ImageTexture.create_from_image(image)
-	_placeholder_texture_cache[category] = texture
+	_placeholder_texture_cache[normalized_category] = texture
 	return texture
 
 
