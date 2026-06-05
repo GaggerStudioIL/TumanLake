@@ -36,7 +36,19 @@ enum TackleSlot {
 	FLOAT,
 	HOOK,
 	BAIT,
-	BAIT_2
+	BAIT_2,
+	REEL,
+	LURE,
+	FEEDER_RIG,
+	HOOK_OR_LURE,
+	SINKER_OR_RIG
+}
+
+enum TackleType {
+	FLOAT,
+	SPINNING,
+	FEEDER,
+	SEA
 }
 
 enum MarketTrend {

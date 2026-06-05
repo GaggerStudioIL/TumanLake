@@ -3235,7 +3235,59 @@ const BAIT_TARGET_PROFILES := {
 	"snail": {"bait_tags": ["animal", "shellfish", "bottom"], "target_fish_ids": ["tench", "bream", "skimmer_bream", "crucian", "water_turtle"], "secondary_fish_ids": ["silver_crucian", "golden_crucian", "crayfish"], "fish_attraction": 0.04, "target_bonus": 0.26, "secondary_bonus": 0.13},
 	"boilie_simple": {"bait_tags": ["plant", "boilie", "carp", "bottom"], "target_fish_ids": ["young_mirror_carp", "mist_carp", "bream", "tench"], "secondary_fish_ids": ["crucian", "silver_crucian", "young_grass_carp"], "fish_attraction": 0.05, "target_bonus": 0.29, "secondary_bonus": 0.15}
 }
-const TACKLE_SLOTS := ["rod", "line", "leader", "hook", "float", "bait", "bait_2"]
+const DEFAULT_TACKLE_TYPE := "float"
+const TACKLE_TYPE_ALIASES := {
+	"": DEFAULT_TACKLE_TYPE,
+	"float": DEFAULT_TACKLE_TYPE,
+	"pole": DEFAULT_TACKLE_TYPE,
+	"spinning": "spinning",
+	"feeder": "feeder",
+	"sea": "sea"
+}
+const TACKLE_TYPE_TITLES := {
+	"float": "Поплавочная",
+	"spinning": "Спиннинг",
+	"feeder": "Фидер",
+	"sea": "Морская"
+}
+const TACKLE_SLOT_SCHEMAS := {
+	"float": [
+		{"id": "rod", "title": "Удилище", "item_categories": ["rod"], "required": true},
+		{"id": "line", "title": "Леска", "item_categories": ["line"], "required": true},
+		{"id": "leader", "title": "Поводок", "item_categories": ["leader"], "required": true},
+		{"id": "float", "title": "Поплавок", "item_categories": ["float"], "required": true},
+		{"id": "hook", "title": "Крючок", "item_categories": ["hook"], "required": true},
+		{"id": "bait", "title": "Наживка", "item_categories": ["bait"], "required": true},
+		{"id": "bait_2", "title": "Наживка 2", "item_categories": ["bait"], "required": false, "skill": "second_bait", "locked_text": "Требуется навык «Бутерброд»"}
+	],
+	"spinning": [
+		{"id": "rod", "title": "Удилище", "item_categories": ["rod"], "required": true},
+		{"id": "reel", "title": "Катушка", "item_categories": ["reel"], "required": true},
+		{"id": "line", "title": "Леска/шнур", "item_categories": ["line"], "required": true},
+		{"id": "leader", "title": "Поводок", "item_categories": ["leader"], "required": false},
+		{"id": "lure", "title": "Приманка", "item_categories": ["lure"], "required": true}
+	],
+	"feeder": [
+		{"id": "rod", "title": "Удилище", "item_categories": ["rod"], "required": true},
+		{"id": "reel", "title": "Катушка", "item_categories": ["reel"], "required": true},
+		{"id": "line", "title": "Леска", "item_categories": ["line"], "required": true},
+		{"id": "feeder_rig", "title": "Оснастка/кормушка", "item_categories": ["feeder_rig"], "required": true},
+		{"id": "leader", "title": "Поводок", "item_categories": ["leader"], "required": true},
+		{"id": "hook", "title": "Крючок", "item_categories": ["hook"], "required": true},
+		{"id": "bait", "title": "Наживка", "item_categories": ["bait"], "required": true},
+		{"id": "bait_2", "title": "Наживка 2", "item_categories": ["bait"], "required": false, "skill": "second_bait", "locked_text": "Требуется навык «Бутерброд»"}
+	],
+	"sea": [
+		{"id": "rod", "title": "Удилище", "item_categories": ["rod"], "required": true},
+		{"id": "reel", "title": "Катушка", "item_categories": ["reel"], "required": true},
+		{"id": "line", "title": "Леска/шнур", "item_categories": ["line"], "required": true},
+		{"id": "leader", "title": "Поводок", "item_categories": ["leader"], "required": true},
+		{"id": "hook_or_lure", "title": "Крючок или приманка", "item_categories": ["hook", "lure"], "required": true},
+		{"id": "sinker_or_rig", "title": "Груз/оснастка", "item_categories": ["sinker", "sea_rig"], "required": false},
+		{"id": "bait", "title": "Наживка", "item_categories": ["bait"], "required": false}
+	]
+}
+const TACKLE_SLOTS := ["rod", "line", "leader", "hook", "float", "bait", "bait_2", "reel", "lure", "feeder_rig", "hook_or_lure", "sinker_or_rig"]
 const REQUIRED_TACKLE_SLOTS := ["rod", "line", "leader", "hook", "float", "bait"]
 const QUICK_TACKLE_CATEGORIES := ["line", "leader", "float", "hook", "bait"]
 const TACKLE_SLOT_ITEM_CATEGORIES := {
@@ -3245,7 +3297,12 @@ const TACKLE_SLOT_ITEM_CATEGORIES := {
 	"hook": "hook",
 	"float": "float",
 	"bait": "bait",
-	"bait_2": "bait"
+	"bait_2": "bait",
+	"reel": "reel",
+	"lure": "lure",
+	"feeder_rig": "feeder_rig",
+	"hook_or_lure": "hook",
+	"sinker_or_rig": "sinker"
 }
 const RESCUE_KIT_MONEY_LIMIT := 10.0
 const RESCUE_KIT_LINE_ID := "lakeline_nylon_basic_1_5kg"
@@ -4020,7 +4077,7 @@ func _normalize_catalog_item(item: Dictionary) -> Dictionary:
 	elif category == "float":
 		var stats: Dictionary = normalized.get("stats", {}).duplicate(true) if typeof(normalized.get("stats", {})) == TYPE_DICTIONARY else {}
 		normalized["stats"] = _normalize_equipment_stats(stats, "float", item_id)
-	elif TACKLE_SLOT_ITEM_CATEGORIES.values().has(category):
+	elif _is_tackle_item_category_supported(category):
 		var stats: Dictionary = normalized.get("stats", {}).duplicate(true) if typeof(normalized.get("stats", {})) == TYPE_DICTIONARY else {}
 		normalized["stats"] = _normalize_equipment_stats(stats, category, item_id)
 
@@ -4104,6 +4161,9 @@ func _make_tackle_component(item_id: String) -> Dictionary:
 	component["display_name_ru"] = str(item.get("display_name_ru", item.get("name", "")))
 	component["description_ru"] = str(item.get("description_ru", item.get("description", "")))
 	component["bonus_tags"] = _to_string_array(item.get("bonus_tags", component.get("bonus_tags", [])))
+	for key in ["tackle_type", "fishing_type", "assembly_type", "rod_type"]:
+		if item.has(key):
+			component[key] = str(item.get(key, ""))
 	return component
 
 func _make_owned_catalog_item(item_id: String, quantity: int = 1) -> Dictionary:
@@ -4472,7 +4532,12 @@ func get_default_tackle() -> Dictionary:
 		"hook": _make_tackle_component("small_hook_12"),
 		"float": _make_tackle_component(BASIC_FLOAT_ID),
 		"bait": _make_tackle_component("worm"),
-		"bait_2": {}
+		"bait_2": {},
+		"reel": {},
+		"lure": {},
+		"feeder_rig": {},
+		"hook_or_lure": {},
+		"sinker_or_rig": {}
 	}
 
 func get_default_recent_tackle_items() -> Dictionary:
@@ -4634,7 +4699,7 @@ func set_current_tackle(saved_tackle: Dictionary) -> void:
 			continue
 
 		var slot_category := _get_tackle_slot_item_category(slot)
-		var merged_component: Dictionary = current_tackle[slot].duplicate(true)
+		var merged_component: Dictionary = current_tackle.get(slot, {}).duplicate(true)
 		merged_component.merge(saved_component, true)
 		if str(merged_component.get("id", "")) == "":
 			current_tackle[slot] = {}
@@ -4680,6 +4745,9 @@ func set_current_tackle(saved_tackle: Dictionary) -> void:
 			merged_component["display_name_ru"] = str(slot_catalog_item.get("display_name_ru", merged_component.get("display_name_ru", slot_catalog_item.get("name", "-"))))
 			merged_component["description_ru"] = str(slot_catalog_item.get("description_ru", merged_component.get("description_ru", slot_catalog_item.get("description", ""))))
 			merged_component["bonus_tags"] = _to_string_array(slot_catalog_item.get("bonus_tags", merged_component.get("bonus_tags", [])))
+			for key in ["tackle_type", "fishing_type", "assembly_type", "rod_type"]:
+				if slot_catalog_item.has(key) and not merged_component.has(key):
+					merged_component[key] = str(slot_catalog_item.get(key, ""))
 		current_tackle[slot] = merged_component
 
 	if current_tackle.get("float", {}).is_empty():
@@ -4743,11 +4811,117 @@ func get_owned_items_for_category(category_filter: String) -> Array:
 
 	return items
 
+func normalize_tackle_type(raw_type: String) -> String:
+	var type_key := raw_type.strip_edges().to_lower()
+	return str(TACKLE_TYPE_ALIASES.get(type_key, DEFAULT_TACKLE_TYPE))
+
+func get_current_tackle_type() -> String:
+	var rod := get_current_tackle_slot("rod")
+	return normalize_tackle_type(_get_tackle_type_from_item(rod))
+
+func get_current_tackle_type_title() -> String:
+	return str(TACKLE_TYPE_TITLES.get(get_current_tackle_type(), TACKLE_TYPE_TITLES[DEFAULT_TACKLE_TYPE]))
+
+func _get_tackle_type_from_item(item: Dictionary) -> String:
+	if item.is_empty():
+		return DEFAULT_TACKLE_TYPE
+	for key in ["tackle_type", "fishing_type", "assembly_type", "rod_type"]:
+		var value := str(item.get(key, ""))
+		if value != "":
+			return value
+	var stats = item.get("stats", {})
+	if typeof(stats) == TYPE_DICTIONARY:
+		var stat_values: Dictionary = stats
+		for key in ["tackle_type", "fishing_type", "assembly_type", "rod_type"]:
+			var value := str(stat_values.get(key, ""))
+			if value != "":
+				return value
+	return DEFAULT_TACKLE_TYPE
+
+func get_tackle_slot_schema(slot_id: String, tackle_type: String = "") -> Dictionary:
+	for slot_schema in get_tackle_schema_slots(tackle_type):
+		if str(slot_schema.get("id", "")) == slot_id:
+			return (slot_schema as Dictionary).duplicate(true)
+	return {}
+
+func get_tackle_schema_slots(tackle_type: String = "") -> Array:
+	var normalized_type := normalize_tackle_type(tackle_type if tackle_type != "" else get_current_tackle_type())
+	var raw_slots: Array = TACKLE_SLOT_SCHEMAS.get(normalized_type, TACKLE_SLOT_SCHEMAS[DEFAULT_TACKLE_TYPE])
+	var result: Array = []
+	for slot_schema in raw_slots:
+		if typeof(slot_schema) == TYPE_DICTIONARY:
+			result.append((slot_schema as Dictionary).duplicate(true))
+	return result
+
+func get_tackle_schema_slot_ids(tackle_type: String = "") -> Array:
+	var slot_ids: Array = []
+	for slot_schema in get_tackle_schema_slots(tackle_type):
+		slot_ids.append(str(slot_schema.get("id", "")))
+	return slot_ids
+
+func get_required_tackle_slots(tackle_type: String = "") -> Array:
+	var required_slots: Array = []
+	for slot_schema in get_tackle_schema_slots(tackle_type):
+		if bool(slot_schema.get("required", false)) and not is_tackle_slot_locked(str(slot_schema.get("id", ""))):
+			required_slots.append(str(slot_schema.get("id", "")))
+	return required_slots
+
+func get_tackle_slot_title(slot_id: String, tackle_type: String = "") -> String:
+	var slot_schema := get_tackle_slot_schema(slot_id, tackle_type)
+	if not slot_schema.is_empty():
+		return str(slot_schema.get("title", _get_tackle_slot_title(slot_id)))
+	return _get_tackle_slot_title(slot_id)
+
 func _get_tackle_slot_item_category(slot_id: String) -> String:
-	return str(TACKLE_SLOT_ITEM_CATEGORIES.get(slot_id, slot_id))
+	var categories := get_tackle_slot_item_categories(slot_id)
+	if categories.is_empty():
+		return str(TACKLE_SLOT_ITEM_CATEGORIES.get(slot_id, slot_id))
+	return str(categories[0])
+
+func get_tackle_slot_item_categories(slot_id: String, tackle_type: String = "") -> Array:
+	var slot_schema := get_tackle_slot_schema(slot_id, tackle_type)
+	if not slot_schema.is_empty():
+		var configured_categories = slot_schema.get("item_categories", [])
+		if typeof(configured_categories) == TYPE_ARRAY:
+			var categories: Array = []
+			for category in configured_categories:
+				var category_key := str(category)
+				if category_key != "":
+					categories.append(category_key)
+			if not categories.is_empty():
+				return categories
+	var fallback_category := str(TACKLE_SLOT_ITEM_CATEGORIES.get(slot_id, slot_id))
+	return [fallback_category] if fallback_category != "" else []
 
 func is_tackle_slot_supported(slot_id: String) -> bool:
-	return TACKLE_SLOTS.has(slot_id)
+	return TACKLE_SLOTS.has(slot_id) or not get_tackle_slot_schema(slot_id).is_empty()
+
+func is_tackle_slot_required(slot_id: String, tackle_type: String = "") -> bool:
+	var slot_schema := get_tackle_slot_schema(slot_id, tackle_type)
+	return bool(slot_schema.get("required", false)) if not slot_schema.is_empty() else REQUIRED_TACKLE_SLOTS.has(slot_id)
+
+func is_tackle_slot_locked(slot_id: String, tackle_type: String = "") -> bool:
+	var slot_schema := get_tackle_slot_schema(slot_id, tackle_type)
+	var skill_key := str(slot_schema.get("skill", ""))
+	if skill_key == "second_bait":
+		return not can_use_second_bait()
+	return false
+
+func get_tackle_slot_lock_reason(slot_id: String, tackle_type: String = "") -> String:
+	if not is_tackle_slot_locked(slot_id, tackle_type):
+		return ""
+	var slot_schema := get_tackle_slot_schema(slot_id, tackle_type)
+	return str(slot_schema.get("locked_text", "Слот заблокирован навыком."))
+
+func _is_tackle_item_category_supported(category: String) -> bool:
+	if TACKLE_SLOT_ITEM_CATEGORIES.values().has(category):
+		return true
+	for schema_type in TACKLE_SLOT_SCHEMAS.keys():
+		for slot_schema in get_tackle_schema_slots(str(schema_type)):
+			var categories: Array = get_tackle_slot_item_categories(str(slot_schema.get("id", "")), str(schema_type))
+			if categories.has(category):
+				return true
+	return false
 
 func can_use_second_bait() -> bool:
 	return get_skill_effect_value("unlock_double_bait") > 0.0 or get_skill_effect_value("second_bait_slot") > 0.0 or has_skill("float_double_bait") or has_skill("bait_sandwich")
@@ -4765,15 +4939,17 @@ func get_current_tackle_slot(slot_id: String) -> Dictionary:
 func set_current_tackle_slot(slot_id: String, item: Dictionary) -> bool:
 	if not is_tackle_slot_supported(slot_id):
 		return false
-	if slot_id == "bait_2" and not can_use_second_bait():
+	if is_tackle_slot_locked(slot_id):
 		return false
 	if item.is_empty() or not can_equip_item(item):
 		return false
 
 	var slot_category := _get_tackle_slot_item_category(slot_id)
 	var item_category := str(item.get("category", item.get("type", "")))
-	if item_category != slot_category:
+	var allowed_categories := get_tackle_slot_item_categories(slot_id)
+	if not allowed_categories.has(item_category):
 		return false
+	slot_category = item_category
 
 	var original_item_id := str(item.get("id", ""))
 	var resolved_item_id := _resolve_tackle_item_id(original_item_id)
@@ -4793,6 +4969,9 @@ func set_current_tackle_slot(slot_id: String, item: Dictionary) -> bool:
 	component["display_name_ru"] = str(catalog_item.get("display_name_ru", catalog_item.get("name", "-")) if use_catalog_identity else item.get("display_name_ru", catalog_item.get("display_name_ru", item.get("name", "-"))))
 	component["description_ru"] = str(catalog_item.get("description_ru", catalog_item.get("description", "")) if use_catalog_identity else item.get("description_ru", catalog_item.get("description_ru", item.get("description", ""))))
 	component["bonus_tags"] = _to_string_array(catalog_item.get("bonus_tags", []) if use_catalog_identity else item.get("bonus_tags", catalog_item.get("bonus_tags", component.get("bonus_tags", []))))
+	for key in ["tackle_type", "fishing_type", "assembly_type", "rod_type"]:
+		if catalog_item.has(key) or item.has(key):
+			component[key] = str(catalog_item.get(key, item.get(key, "")) if use_catalog_identity else item.get(key, catalog_item.get(key, "")))
 
 	if slot_category == "bait":
 		component["quantity"] = int(item.get("quantity", 0))
@@ -4816,13 +4995,13 @@ func get_equip_block_reason(item: Dictionary, slot_type: String = "") -> String:
 
 	var category := str(item.get("category", ""))
 	if slot_type != "":
-		if slot_type == "bait_2" and not can_use_second_bait():
-			return "Нужен навык «Ловля на бутерброд»."
-		var expected_category := _get_tackle_slot_item_category(slot_type)
-		if category != expected_category:
+		if is_tackle_slot_locked(slot_type):
+			return get_tackle_slot_lock_reason(slot_type)
+		var expected_categories := get_tackle_slot_item_categories(slot_type)
+		if not expected_categories.has(category):
 			return "Не подходит к этой снасти."
 
-	if not TACKLE_SLOT_ITEM_CATEGORIES.values().has(category):
+	if not _is_tackle_item_category_supported(category):
 		return "Не подходит к этой снасти."
 
 	if _is_durable_tackle_category(category):
@@ -4933,7 +5112,7 @@ func _is_durable_tackle_category(category: String) -> bool:
 	return ["rod", "line", "leader", "hook"].has(category)
 
 func has_usable_basic_tackle() -> bool:
-	for slot in REQUIRED_TACKLE_SLOTS:
+	for slot in get_required_tackle_slots():
 		if _is_current_tackle_slot_usable(slot):
 			continue
 		if not _has_usable_owned_tackle_item(slot):
@@ -5028,11 +5207,14 @@ func _is_current_tackle_slot_usable(slot: String) -> bool:
 	return true
 
 func _has_usable_owned_tackle_item(category: String) -> bool:
+	var allowed_categories := get_tackle_slot_item_categories(category)
+	if allowed_categories.is_empty():
+		allowed_categories = [category]
 	for item in owned_items:
 		if typeof(item) != TYPE_DICTIONARY:
 			continue
 		var owned_item: Dictionary = item
-		if str(owned_item.get("category", "")) != category:
+		if not allowed_categories.has(str(owned_item.get("category", ""))):
 			continue
 		if can_equip_item(owned_item):
 			return true
@@ -5205,30 +5387,27 @@ func get_tackle_block_reason() -> String:
 func get_tackle_setup_issues() -> Array:
 	var issues: Array = []
 
-	for slot in REQUIRED_TACKLE_SLOTS:
-		var issue := _get_tackle_slot_issue(slot)
+	for slot_schema in get_tackle_schema_slots():
+		var slot := str(slot_schema.get("id", ""))
+		if slot == "" or is_tackle_slot_locked(slot):
+			continue
+		var issue := _get_tackle_slot_issue(slot, slot_schema)
 		if issue != "":
 			issues.append(issue)
-
-	for slot in ["bait_2"]:
-		var optional_issue := _get_tackle_slot_issue(slot)
-		if optional_issue != "":
-			issues.append(optional_issue)
 
 	return issues
 
 func get_tackle_setup_status_text() -> String:
 	var issues := get_tackle_setup_issues()
 	if issues.is_empty():
-		return "Сборка готова к ловле."
+		return "Снасть готова к ловле."
+	return "Снасть не готова:\n- %s" % "\n- ".join(issues)
 
-	return "Не хватает/не работает:\n- %s" % "\n- ".join(issues)
+func _get_tackle_slot_issue(slot: String, slot_schema: Dictionary = {}) -> String:
+	var title := str(slot_schema.get("title", _get_tackle_slot_title(slot)))
+	var slot_is_optional := not bool(slot_schema.get("required", REQUIRED_TACKLE_SLOTS.has(slot)))
 
-func _get_tackle_slot_issue(slot: String) -> String:
-	var title := _get_tackle_slot_title(slot)
-	var slot_is_optional := ["bait_2"].has(slot)
-
-	if slot == "bait_2" and not can_use_second_bait():
+	if is_tackle_slot_locked(slot):
 		return ""
 	if slot_is_optional:
 		var optional_component = current_tackle.get(slot, {})
@@ -5623,6 +5802,8 @@ func get_tackle_stats() -> Dictionary:
 	bite_detection_bonus = max(bite_detection_bonus - heavy_bait_penalty * 0.35, -0.15)
 
 	return {
+		"tackle_type": get_current_tackle_type(),
+		"tackle_type_title": get_current_tackle_type_title(),
 		"control_bonus": rod_tension_bonus + leader_control_bonus,
 		"tension_bonus": rod_tension_bonus + leader_control_bonus,
 		"base_control_bonus": raw_rod_control * rod_condition,
