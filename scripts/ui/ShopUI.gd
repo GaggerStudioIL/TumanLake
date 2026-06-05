@@ -17,11 +17,7 @@ var _shop_money_row: HBoxContainer
 var _details_item_id := ""
 signal buy_requested(item_id: String)
 
-const SHOP_ITEMS_PER_PAGE := 8
-const SHOP_ROD_ITEMS_PER_PAGE := 4
-const SHOP_BAIT_ITEMS_PER_PAGE := 4
-const SHOP_LINE_ITEMS_PER_PAGE := 6
-const SHOP_LEADER_ITEMS_PER_PAGE := 6
+const SHOP_SCROLL_BOTTOM_PADDING := 28.0
 const SHOP_LINE_IMAGE_SIZE := Vector2(75.0, 75.0)
 const SHOP_CATEGORY_BAIT := "bait"
 const SHOP_CATEGORY_CONSUMABLE := "consumable"
@@ -255,7 +251,7 @@ func setup(main_ref) -> void:
 	main = main_ref
 	theme = main.ui_theme
 	_ensure_shop_ui_nodes()
-	_ensure_shop_pager_nodes()
+	_hide_shop_pager()
 	_ensure_shop_details_nodes()
 
 func open() -> void:
@@ -306,18 +302,6 @@ func _get_shop_items_for_category(category: String) -> Array:
 		if str(item.get("shop_category", "")) == category:
 			items.append(item.duplicate(true))
 	return items
-
-func _get_shop_items_per_page(category: String) -> int:
-	if category == SHOP_CATEGORY_ROD or category == SHOP_CATEGORY_TACKLE:
-		return SHOP_ROD_ITEMS_PER_PAGE
-	if category == SHOP_CATEGORY_BAIT:
-		return SHOP_BAIT_ITEMS_PER_PAGE
-	if category == SHOP_CATEGORY_LINE:
-		return SHOP_LINE_ITEMS_PER_PAGE
-	if category == SHOP_CATEGORY_LEADER:
-		return SHOP_LEADER_ITEMS_PER_PAGE
-
-	return SHOP_ITEMS_PER_PAGE
 
 func _get_tackle_shop_items_for_type(category: String) -> Array:
 	var items: Array = []
@@ -484,42 +468,6 @@ func _ensure_shop_ui_nodes() -> void:
 	main.shop_error_audio = AudioStreamPlayer.new()
 	main.shop_error_audio.name = "ShopErrorAudio"
 	main.add_child(main.shop_error_audio)
-
-
-func _ensure_shop_pager_nodes() -> void:
-	if main == null or main.shop_panel == null:
-		return
-
-	if main.shop_prev_page_button == null:
-		main.shop_prev_page_button = Button.new()
-		main.shop_prev_page_button.name = "ShopPrevPageButton"
-		main.shop_prev_page_button.text = "<"
-		main.shop_prev_page_button.focus_mode = Control.FOCUS_NONE
-		main.shop_prev_page_button.mouse_filter = Control.MOUSE_FILTER_STOP
-		main.shop_prev_page_button.z_index = 2
-		main.shop_prev_page_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
-		main.shop_panel.add_child(main.shop_prev_page_button)
-		main.shop_prev_page_button.pressed.connect(_on_shop_prev_page_pressed)
-
-	if main.shop_next_page_button == null:
-		main.shop_next_page_button = Button.new()
-		main.shop_next_page_button.name = "ShopNextPageButton"
-		main.shop_next_page_button.text = ">"
-		main.shop_next_page_button.focus_mode = Control.FOCUS_NONE
-		main.shop_next_page_button.mouse_filter = Control.MOUSE_FILTER_STOP
-		main.shop_next_page_button.z_index = 2
-		main.shop_next_page_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
-		main.shop_panel.add_child(main.shop_next_page_button)
-		main.shop_next_page_button.pressed.connect(_on_shop_next_page_pressed)
-
-	if main.shop_page_label == null:
-		main.shop_page_label = Label.new()
-		main.shop_page_label.name = "ShopPageLabel"
-		main.shop_page_label.text = ""
-		main.shop_page_label.z_index = 2
-		main.shop_page_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		main.shop_page_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
-		main.shop_panel.add_child(main.shop_page_label)
 
 
 func _ensure_shop_details_nodes() -> void:
@@ -693,24 +641,25 @@ func _on_shop_details_buy_pressed() -> void:
 	_on_shop_buy_pressed(item_id)
 
 
-func _update_shop_pager(page_count: int, total_count: int, page_size: int) -> void:
-	_ensure_shop_pager_nodes()
-	if main.shop_prev_page_button == null or main.shop_next_page_button == null or main.shop_page_label == null:
+func _hide_shop_pager() -> void:
+	if main == null:
 		return
-
-	if str(main._shop_category) == SHOP_CATEGORY_BAIT:
+	if main.shop_prev_page_button != null:
 		main.shop_prev_page_button.visible = false
+		main.shop_prev_page_button.disabled = true
+	if main.shop_next_page_button != null:
 		main.shop_next_page_button.visible = false
+		main.shop_next_page_button.disabled = true
+	if main.shop_page_label != null:
 		main.shop_page_label.visible = false
-		return
+		main.shop_page_label.text = ""
 
-	var has_pages := total_count > page_size
-	main.shop_prev_page_button.visible = has_pages
-	main.shop_next_page_button.visible = has_pages
-	main.shop_page_label.visible = has_pages
-	main.shop_prev_page_button.disabled = main._shop_page <= 0
-	main.shop_next_page_button.disabled = main._shop_page >= page_count - 1
-	main.shop_page_label.text = "%d / %d" % [main._shop_page + 1, page_count]
+
+func _reset_shop_scroll_to_top() -> void:
+	if main == null or main.shop_items_scroll == null:
+		return
+	main.shop_items_scroll.scroll_vertical = 0
+	main.shop_items_scroll.set_deferred("scroll_vertical", 0)
 
 
 func _update_shop_ui() -> void:
@@ -725,6 +674,7 @@ func _update_shop_ui() -> void:
 	theme.apply_tab_button_style(main.shop_leader_category_button, main._shop_category == SHOP_CATEGORY_LEADER)
 	theme.apply_tab_button_style(main.shop_hook_category_button, main._shop_category == SHOP_CATEGORY_HOOK)
 	theme.apply_tab_button_style(main.shop_float_category_button, main._shop_category == SHOP_CATEGORY_FLOAT)
+	_hide_shop_pager()
 	_rebuild_shop_cards()
 	_layout_shop_details_nodes()
 
@@ -770,18 +720,8 @@ func _rebuild_shop_cards() -> void:
 
 	main._shop_card_nodes.clear()
 	var all_items = _get_shop_items_for_category(main._shop_category)
-	var total_count: int = all_items.size()
 	var is_bait_category: bool = str(main._shop_category) == SHOP_CATEGORY_BAIT
-	var page_size := _get_shop_items_per_page(main._shop_category)
-	if is_bait_category:
-		page_size = max(total_count, 1)
-	var page_count: int = max(ceili(float(total_count) / float(page_size)), 1)
-	main._shop_page = clampi(main._shop_page, 0, page_count - 1)
-	var page_start: int = main._shop_page * page_size
-	var page_end: int = mini(page_start + page_size, total_count)
 	var items: Array = all_items
-	if not is_bait_category:
-		items = all_items.slice(page_start, page_end)
 	var viewport_size: Vector2 = main.shop_items_scroll.size if main.shop_items_scroll != null else main.shop_items_container.size
 	var content_width: float = max(viewport_size.x - 12.0, 1.0)
 	main.shop_items_container.position = Vector2.ZERO
@@ -802,10 +742,10 @@ func _rebuild_shop_cards() -> void:
 		card_max_height = 104.0
 
 	var card_height: float = min(max((main.shop_items_container.size.y - gap * float(rows - 1)) / float(rows), card_min_height), card_max_height)
-	var content_height: float = max(viewport_size.y, float(rows) * card_height + gap * float(max(rows - 1, 0)))
+	var content_height: float = max(viewport_size.y, float(rows) * card_height + gap * float(max(rows - 1, 0)) + SHOP_SCROLL_BOTTOM_PADDING)
 	main.shop_items_container.size = Vector2(content_width, content_height)
 	main.shop_items_container.custom_minimum_size = main.shop_items_container.size
-	_update_shop_pager(page_count, total_count, page_size)
+	_hide_shop_pager()
 
 	for i in items.size():
 		var item: Dictionary = items[i]
@@ -1824,27 +1764,7 @@ func _set_shop_category(category: String) -> void:
 	main._shop_page = 0
 	_show_shop_notice("", true)
 	_update_shop_ui()
-
-
-func _on_shop_prev_page_pressed() -> void:
-	if main._shop_page <= 0:
-		return
-
-	main._shop_page -= 1
-	_show_shop_notice("", true)
-	_update_shop_ui()
-
-
-func _on_shop_next_page_pressed() -> void:
-	var total_count: int = _get_shop_items_for_category(main._shop_category).size()
-	var page_size := _get_shop_items_per_page(main._shop_category)
-	var page_count: int = max(ceili(float(total_count) / float(page_size)), 1)
-	if main._shop_page >= page_count - 1:
-		return
-
-	main._shop_page += 1
-	_show_shop_notice("", true)
-	_update_shop_ui()
+	_reset_shop_scroll_to_top()
 
 
 func _show_shop_notice(message: String, success: bool) -> void:
