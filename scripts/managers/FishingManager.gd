@@ -123,6 +123,11 @@ const SMALL_SAFE_ZONE_WIDTH := 0.35
 const MEDIUM_SAFE_ZONE_WIDTH := 0.25
 const LARGE_SAFE_ZONE_WIDTH := 0.16
 const TROPHY_SAFE_ZONE_WIDTH := 0.10
+const GREEN_ZONE_OVERLOAD_RELIEF_THRESHOLD := 0.55
+const GREEN_ZONE_OVERLOAD_TIMER_MIN := 0.08
+const GREEN_ZONE_OVERLOAD_TIMER_MAX := 0.24
+const GREEN_ZONE_OVERLOAD_LIMIT_MIN := 1.75
+const GREEN_ZONE_OVERLOAD_LIMIT_MAX := 2.80
 const FIGHT_VIBRATION_MIN_INTERVAL := 0.15
 const FIGHT_VIBRATION_MAX_INTERVAL := 0.35
 const FIGHT_VIBRATION_MIN_MS := 20.0
@@ -1909,6 +1914,24 @@ func _get_weakest_line_break_kind() -> String:
 		return "leader_break"
 	return "line_break"
 
+func _get_green_zone_control_factor() -> float:
+	if _tension < _green_min or _tension > _green_max:
+		return 0.0
+
+	var green_center: float = (_green_min + _green_max) * 0.5
+	var green_half_width: float = max((_green_max - _green_min) * 0.5, 0.01)
+	return max(clamp(1.0 - abs(_tension - green_center) / green_half_width, 0.0, 1.0), 0.05)
+
+func _get_green_zone_overload_timer_multiplier(green_control: float) -> float:
+	if green_control <= 0.0:
+		return 1.0
+	return lerp(GREEN_ZONE_OVERLOAD_TIMER_MAX, GREEN_ZONE_OVERLOAD_TIMER_MIN, green_control)
+
+func _get_green_zone_overload_limit_multiplier(green_control: float) -> float:
+	if green_control <= 0.0:
+		return 1.0
+	return lerp(GREEN_ZONE_OVERLOAD_LIMIT_MIN, GREEN_ZONE_OVERLOAD_LIMIT_MAX, green_control)
+
 func _get_line_break_message(break_kind: String) -> String:
 	if break_kind == "leader_break":
 		return "Поводок не выдержал натяжения. Рыба ушла."
@@ -1926,19 +1949,33 @@ func _update_load_and_overload(delta: float) -> void:
 	var line_overload: float = max(_line_load_ratio - 1.0, 0.0)
 	var leader_overload: float = max(_leader_load_ratio - 1.0, 0.0)
 	var rod_overload: float = max(_rod_load_ratio - 1.0, 0.0)
+	var green_control: float = _get_green_zone_control_factor()
+	var in_green_zone: bool = green_control > 0.0
+	var overload_timer_multiplier: float = _get_green_zone_overload_timer_multiplier(green_control)
+	var overload_limit_multiplier: float = _get_green_zone_overload_limit_multiplier(green_control)
+	var overload_recovery_bonus: float = lerp(0.35, 0.85, green_control)
 
 	if line_overload > 0.0:
-		_line_overload_time += delta * (0.72 + line_overload * 1.85) * (0.65 + _tension * 0.90)
+		if in_green_zone and line_overload <= GREEN_ZONE_OVERLOAD_RELIEF_THRESHOLD:
+			_line_overload_time = max(_line_overload_time - delta * (0.78 + overload_recovery_bonus), 0.0)
+		else:
+			_line_overload_time += delta * (0.72 + line_overload * 1.85) * (0.65 + _tension * 0.90) * overload_timer_multiplier
 	else:
 		_line_overload_time = max(_line_overload_time - delta * 0.78, 0.0)
 
 	if leader_overload > 0.0:
-		_leader_overload_time += delta * (0.80 + leader_overload * 2.10) * (0.70 + _tension * 0.92)
+		if in_green_zone and leader_overload <= GREEN_ZONE_OVERLOAD_RELIEF_THRESHOLD:
+			_leader_overload_time = max(_leader_overload_time - delta * (0.88 + overload_recovery_bonus), 0.0)
+		else:
+			_leader_overload_time += delta * (0.80 + leader_overload * 2.10) * (0.70 + _tension * 0.92) * overload_timer_multiplier
 	else:
 		_leader_overload_time = max(_leader_overload_time - delta * 0.88, 0.0)
 
 	if rod_overload > 0.0:
-		_rod_overload_time += delta * (0.55 + rod_overload * 1.45) * (0.72 + _tension * 0.70)
+		if in_green_zone and rod_overload <= GREEN_ZONE_OVERLOAD_RELIEF_THRESHOLD:
+			_rod_overload_time = max(_rod_overload_time - delta * (0.52 + overload_recovery_bonus), 0.0)
+		else:
+			_rod_overload_time += delta * (0.55 + rod_overload * 1.45) * (0.72 + _tension * 0.70) * overload_timer_multiplier
 	else:
 		_rod_overload_time = max(_rod_overload_time - delta * 0.52, 0.0)
 
@@ -1951,18 +1988,18 @@ func _update_load_and_overload(delta: float) -> void:
 
 	var line_break_chance: float = float(_tackle_stats.get("break_chance", 0.15))
 	var leader_break_chance: float = float(_tackle_stats.get("leader_break_chance", 0.0))
-	var leader_limit: float = clamp((1.82 - leader_break_chance * 1.30) / max(leader_overload, 0.08), 0.34, 2.10)
+	var leader_limit: float = clamp((1.82 - leader_break_chance * 1.30) / max(leader_overload, 0.08), 0.34, 2.10) * overload_limit_multiplier
 	if leader_overload > 0.0 and _leader_overload_time >= leader_limit and _leader_load_ratio >= _main_line_load_ratio * 0.96:
 		_finish_reeling_failed(_get_line_break_message("leader_break"), "leader_break", FAILURE_LEADER_BROKE)
 		return
 
-	var line_limit: float = clamp((2.05 - line_break_chance * 1.45) / max(line_overload, 0.08), 0.42, 2.50)
+	var line_limit: float = clamp((2.05 - line_break_chance * 1.45) / max(line_overload, 0.08), 0.42, 2.50) * overload_limit_multiplier
 	if line_overload > 0.0 and _line_overload_time >= line_limit:
 		var break_kind := _get_weakest_line_break_kind()
 		_finish_reeling_failed(_get_line_break_message(break_kind), break_kind, _get_failure_reason_for_fail_kind(break_kind))
 		return
 
-	var rod_limit: float = clamp(2.30 / max(rod_overload, 0.08), 0.65, 3.20)
+	var rod_limit: float = clamp(2.30 / max(rod_overload, 0.08), 0.65, 3.20) * overload_limit_multiplier
 	if rod_overload > 0.0 and _rod_overload_time >= rod_limit:
 		var rod_break_chance: float = clamp((rod_overload * 0.22 + _tension * 0.08) * delta, 0.0, 0.32)
 		if rod_overload > 0.82 or randf() < rod_break_chance:

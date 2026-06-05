@@ -5955,6 +5955,10 @@ func _on_fish_button_pressed(cast_power: float = MIN_CAST_POWER, cast_hold_time:
 		return
 
 	if _fishing_ui_state == FishingUiState.FAILED:
+		if failure_popup_ui != null and failure_popup_ui.has_method("requires_acknowledgement") and failure_popup_ui.requires_acknowledgement():
+			if failure_popup_ui.has_method("bring_to_front"):
+				failure_popup_ui.bring_to_front()
+			return
 		_return_to_idle_after_result()
 		return
 
