@@ -26,7 +26,8 @@ const SIMULATED_REPUTATION_LEVELS := [0, 30, 120, 180, 250]
 
 
 func print_report() -> void:
-	print(build_report())
+	if BuildConfig.ENABLE_VERBOSE_LOGS:
+		print(build_report())
 
 
 func build_report() -> String:
