@@ -117,15 +117,7 @@ func load_game() -> void:
 	PlayerData.rescue_kit_claims_total = max(int(save_data.get("rescue_kit_claims_total", 0)), 0)
 	PlayerData.rescue_kit_last_claim_day = int(save_data.get("rescue_kit_last_claim_day", -1))
 	PlayerData.set_unlocked_waterbodies(save_data.get("unlocked_waterbodies", ["agamin_lake"]))
-	PlayerData.current_waterbody = _normalize_saved_waterbody_id(str(save_data.get("current_waterbody", "agamin_lake")))
-	if not PlayerData.can_use_waterbody(PlayerData.current_waterbody):
-		PlayerData.current_waterbody = "agamin_lake"
-	PlayerData.current_spot = str(save_data.get("current_spot", "old_oak_pier"))
-	var current_spot := SpotDatabase.get_spot(PlayerData.current_spot)
-	if current_spot.is_empty() or str(current_spot.get("waterbody_id", "agamin_lake")) != PlayerData.current_waterbody:
-		PlayerData.current_spot = WaterbodyDatabase.get_primary_spot(PlayerData.current_waterbody)
-		if PlayerData.current_spot == "":
-			PlayerData.current_spot = "old_oak_pier"
+	var repaired_location := _sanitize_loaded_location(save_data)
 	PlayerData.unlocked_spots = save_data.get("unlocked_spots", ["old_oak_pier"])
 	PlayerData.upgrades = save_data.get("upgrades", [])
 	PlayerData.set_fishing_depth(float(save_data.get("fishing_depth", PlayerData.fishing_depth)))
@@ -162,7 +154,7 @@ func load_game() -> void:
 		removed_zero_value_fish = InventoryManager.purge_zero_value_fish() > 0
 
 	print("Game loaded")
-	if should_save_after_time_load or migrated_freshness or migrated_save or removed_zero_value_fish or missing_recent_tackle_items or missing_ranked_skill_state:
+	if should_save_after_time_load or migrated_freshness or migrated_save or removed_zero_value_fish or missing_recent_tackle_items or missing_ranked_skill_state or repaired_location:
 		save_game()
 
 func delete_save() -> void:
@@ -341,6 +333,38 @@ func _normalize_saved_waterbody_id(waterbody_id: String) -> String:
 	if waterbody_id == "":
 		return "agamin_lake"
 	return waterbody_id
+
+
+func _sanitize_loaded_location(save_data: Dictionary) -> bool:
+	var repaired := false
+	var saved_waterbody := str(save_data.get("current_waterbody", "agamin_lake")).strip_edges()
+	var waterbody_id := _normalize_saved_waterbody_id(saved_waterbody)
+	if waterbody_id != saved_waterbody:
+		repaired = true
+	if not PlayerData.can_use_waterbody(waterbody_id):
+		waterbody_id = "agamin_lake"
+		repaired = true
+
+	PlayerData.current_waterbody = waterbody_id
+
+	var saved_spot_id := str(save_data.get("current_spot", "old_oak_pier")).strip_edges()
+	var spot_id := saved_spot_id
+	var current_spot: Dictionary = SpotDatabase.get_spot(spot_id) if spot_id != "" else {}
+	var spot_invalid := spot_id == ""
+	spot_invalid = spot_invalid or current_spot.is_empty()
+	spot_invalid = spot_invalid or bool(current_spot.get("legacy", false))
+	spot_invalid = spot_invalid or str(current_spot.get("waterbody_id", "agamin_lake")) != PlayerData.current_waterbody
+
+	if spot_invalid:
+		spot_id = WaterbodyDatabase.get_primary_spot(PlayerData.current_waterbody)
+		if spot_id == "":
+			spot_id = "old_oak_pier"
+
+	if spot_id != saved_spot_id:
+		repaired = true
+
+	PlayerData.current_spot = spot_id
+	return repaired
 
 
 func _migrate_save_data(save_data: Dictionary) -> Dictionary:
