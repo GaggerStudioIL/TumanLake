@@ -45,7 +45,6 @@ InventoryManager="*uid://41dqjqi3kwa5"
 SalesService="*res://scripts/services/SalesService.gd"
 FishingManager="*uid://4dgapc06dnc1"
 SaveManager="*uid://bjm2ww6ncy078"
-GameManager="*uid://c5r742uysrpqj"
 AudioManager="*res://scripts/managers/AudioManager.gd"
 RadioManager="*res://scripts/managers/RadioManager.gd"
 
