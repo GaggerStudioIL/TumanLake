@@ -4,6 +4,8 @@ extends RefCounted
 var main
 var theme
 const INVENTORY_ITEMS_PER_PAGE := 24
+const INVENTORY_DETAILS_COMPACT_HEIGHT := 360.0
+const INVENTORY_DETAILS_TINY_HEIGHT := 300.0
 var _texture_cache: Dictionary = {}
 var _placeholder_texture_cache: Dictionary = {}
 var _details_close_button: Button
@@ -494,17 +496,17 @@ func _apply_inventory_details_panel_style() -> void:
 	if _details_panel == null or not is_instance_valid(_details_panel):
 		return
 	var style: StyleBoxFlat = theme.make_style(
-		Color(0.004, 0.015, 0.017, 0.985),
-		Color(0.66, 1.0, 0.86, 0.72),
+		Color(0.002, 0.012, 0.014, 0.995),
+		Color(0.70, 1.0, 0.88, 0.82),
 		14,
-		16,
-		Color(0.0, 0.0, 0.0, 0.52)
+		18,
+		Color(0.0, 0.0, 0.0, 0.66)
 	)
 	style.set_border_width_all(2)
-	style.content_margin_left = 20.0
-	style.content_margin_top = 18.0
-	style.content_margin_right = 20.0
-	style.content_margin_bottom = 18.0
+	style.content_margin_left = 14.0
+	style.content_margin_top = 14.0
+	style.content_margin_right = 14.0
+	style.content_margin_bottom = 14.0
 	_details_panel.add_theme_stylebox_override("panel", style)
 
 
@@ -524,6 +526,15 @@ func _apply_inventory_details_section_style(panel: Panel, bg_color: Color, borde
 	style.content_margin_right = 12.0
 	style.content_margin_bottom = 10.0
 	panel.add_theme_stylebox_override("panel", style)
+
+
+func _set_detail_margin(margin: MarginContainer, left: int, top: int, right: int, bottom: int) -> void:
+	if margin == null or not is_instance_valid(margin):
+		return
+	margin.add_theme_constant_override("margin_left", left)
+	margin.add_theme_constant_override("margin_top", top)
+	margin.add_theme_constant_override("margin_right", right)
+	margin.add_theme_constant_override("margin_bottom", bottom)
 
 
 func _move_control_to_parent(control: Control, parent: Control) -> void:
@@ -554,13 +565,14 @@ func _update_inventory_ui() -> void:
 
 
 func _get_inventory_content_layout(panel_size: Vector2) -> Dictionary:
-	var inventory_padding := 28.0
-	var inventory_body_y := 116.0
+	var is_compact := panel_size.y <= 620.0
+	var inventory_padding := 20.0 if is_compact else 28.0
+	var inventory_body_y := 104.0 if is_compact else 116.0
 	var close_button_height := 48.0
 	var inventory_action_y: float = panel_size.y - inventory_padding - close_button_height
-	var gap := 18.0
+	var gap := 14.0 if is_compact else 18.0
 	var content_width: float = maxf(panel_size.x - inventory_padding * 2.0, 360.0)
-	var body_height: float = maxf(inventory_action_y - inventory_body_y - 16.0, 180.0)
+	var body_height: float = maxf(inventory_action_y - inventory_body_y - 16.0, 1.0)
 	var min_grid_width := 260.0
 	var available_details_width: float = maxf(content_width - min_grid_width - gap, 240.0)
 	var min_details_width: float = minf(300.0, available_details_width)
@@ -950,18 +962,43 @@ func _position_inventory_details_popup(has_actions: bool) -> void:
 	var layout: Dictionary = _get_inventory_content_layout(main.inventory_panel.size)
 	var panel_pos: Vector2 = layout.get("details_pos", Vector2.ZERO)
 	var panel_size: Vector2 = layout.get("details_size", Vector2(320.0, 260.0))
+	var compact := panel_size.y <= INVENTORY_DETAILS_COMPACT_HEIGHT
+	var tiny := panel_size.y <= INVENTORY_DETAILS_TINY_HEIGHT
+	var outer_padding := 10 if compact else 14
+	var section_padding := 8 if compact else 10
+	var root_separation := 6 if compact else 10
+	var header_height := 34.0 if compact else 40.0
+	var meta_height := 72.0 if compact else 116.0
+	var description_height := 48.0 if tiny else (56.0 if compact else 112.0)
+	var action_height := 48.0 if tiny else (52.0 if compact else 76.0)
+	var visible_gap_count := 4 if has_actions else 3
+	var fixed_height := float(outer_padding * 2) + header_height + meta_height + description_height
+	if has_actions:
+		fixed_height += action_height
+	fixed_height += float(visible_gap_count * root_separation)
+	var body_height := 128.0
+	if compact:
+		body_height = clampf(panel_size.y - fixed_height, 56.0, 98.0)
+	var icon_size := 58.0 if tiny else (64.0 if compact else 92.0)
+	var icon_inset := 5.0 if compact else 8.0
+	var title_font_size := 17 if compact else 20
+	var meta_font_size := 11 if compact else 13
+	var body_font_size := 12 if compact else 13
+	var body_bold_font_size := 13 if compact else 14
 
 	_details_panel.position = panel_pos
 	_details_panel.size = panel_size
 	_details_panel.z_index = main.inventory_panel.z_index + 30
 	_details_panel.visible = true
 	_details_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_details_panel.clip_contents = true
 	_apply_inventory_details_panel_style()
 
-	var content_width: float = maxf(panel_size.x - 36.0, 120.0)
-	var label_width: float = maxf(content_width - 24.0, 100.0)
+	var content_width: float = maxf(panel_size.x - float(outer_padding * 2), 120.0)
+	var label_width: float = maxf(content_width - 16.0, 100.0)
 	if _details_margin != null:
 		_details_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_set_detail_margin(_details_margin, outer_padding, outer_padding, outer_padding, outer_padding)
 		_details_margin.offset_left = 0.0
 		_details_margin.offset_top = 0.0
 		_details_margin.offset_right = 0.0
@@ -969,45 +1006,79 @@ func _position_inventory_details_popup(has_actions: bool) -> void:
 	if _details_root != null:
 		_details_root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_details_root.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		_details_root.add_theme_constant_override("separation", root_separation)
+	if _details_header_row != null:
+		_details_header_row.custom_minimum_size = Vector2(0.0, header_height)
+		_details_header_row.add_theme_constant_override("separation", root_separation)
 	_details_title_label.z_index = main.inventory_panel.z_index + 31
-	_details_title_label.custom_minimum_size = Vector2(maxf(label_width - 52.0, 80.0), 40.0)
+	_details_title_label.custom_minimum_size = Vector2(maxf(label_width - 52.0, 80.0), header_height)
+	_details_title_label.add_theme_font_size_override("font_size", title_font_size)
 
 	if _details_close_button != null:
 		_details_close_button.z_index = main.inventory_panel.z_index + 32
+		_details_close_button.custom_minimum_size = Vector2(36.0 if compact else 42.0, 30.0 if compact else 34.0)
 		theme.apply_close_button_style(_details_close_button)
 
 	_details_meta_panel.z_index = main.inventory_panel.z_index + 31
-	_details_meta_panel.custom_minimum_size = Vector2(0.0, 116.0)
+	_details_meta_panel.custom_minimum_size = Vector2(0.0, meta_height)
+	_details_meta_panel.clip_contents = true
+	_set_detail_margin(_details_meta_margin, section_padding, section_padding, section_padding, section_padding)
+	if _details_preview_row != null:
+		_details_preview_row.add_theme_constant_override("separation", 8 if compact else 12)
+	if _details_meta_column != null:
+		_details_meta_column.add_theme_constant_override("separation", 4 if compact else 8)
 	_details_icon_slot.z_index = main.inventory_panel.z_index + 32
-	_details_icon_slot.custom_minimum_size = Vector2(92.0, 92.0)
+	_details_icon_slot.custom_minimum_size = Vector2(icon_size, icon_size)
 	_details_icon.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_details_icon.offset_left = 8.0
-	_details_icon.offset_top = 8.0
-	_details_icon.offset_right = -8.0
-	_details_icon.offset_bottom = -8.0
-	_details_category_label.custom_minimum_size = Vector2(label_width, 32.0)
-	_details_status_label.custom_minimum_size = Vector2(label_width, 42.0)
+	_details_icon.offset_left = icon_inset
+	_details_icon.offset_top = icon_inset
+	_details_icon.offset_right = -icon_inset
+	_details_icon.offset_bottom = -icon_inset
+	_details_category_label.custom_minimum_size = Vector2(label_width, 24.0 if compact else 32.0)
+	_details_category_label.add_theme_font_size_override("font_size", meta_font_size)
+	_details_status_label.custom_minimum_size = Vector2(label_width, 28.0 if compact else 42.0)
+	_details_status_label.add_theme_font_size_override("font_size", meta_font_size)
 
 	_details_body_panel.z_index = main.inventory_panel.z_index + 31
-	_details_body_panel.custom_minimum_size = Vector2(0.0, 128.0)
+	_details_body_panel.custom_minimum_size = Vector2(0.0, body_height)
+	_details_body_panel.clip_contents = true
+	_set_detail_margin(_details_body_margin, section_padding, section_padding, section_padding, section_padding)
+	if _details_body_scroll != null:
+		_details_body_scroll.clip_contents = true
 	_details_body_label.custom_minimum_size = Vector2(label_width, 1.0)
 	_details_body_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_details_body_label.add_theme_font_size_override("normal_font_size", body_font_size)
+	_details_body_label.add_theme_font_size_override("bold_font_size", body_bold_font_size)
 
 	if _details_description_panel != null:
 		_details_description_panel.z_index = main.inventory_panel.z_index + 31
-		_details_description_panel.custom_minimum_size = Vector2(0.0, 112.0)
+		_details_description_panel.custom_minimum_size = Vector2(0.0, description_height)
+		_details_description_panel.clip_contents = true
+		_set_detail_margin(_details_description_margin, section_padding, section_padding, section_padding, section_padding)
+	if _details_description_scroll != null:
+		_details_description_scroll.clip_contents = true
 	if _details_description_label != null:
 		_details_description_label.custom_minimum_size = Vector2(label_width, 1.0)
 		_details_description_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_details_description_label.add_theme_font_size_override("normal_font_size", body_font_size)
 
 	_details_action_panel.z_index = main.inventory_panel.z_index + 31
 	_details_action_panel.visible = has_actions
+	_details_action_panel.custom_minimum_size = Vector2(0.0, action_height)
+	_details_action_panel.clip_contents = true
+	_set_detail_margin(_details_action_margin, section_padding, section_padding, section_padding, section_padding)
 	_details_action_row.z_index = main.inventory_panel.z_index + 32
+	_details_action_row.add_theme_constant_override("separation", 6 if compact else 10)
 
 
 func _layout_inventory_detail_actions(action_buttons: Array) -> void:
 	if _details_action_row == null or not is_instance_valid(_details_action_row):
 		return
+
+	var compact := _details_panel != null and is_instance_valid(_details_panel) and _details_panel.size.y <= INVENTORY_DETAILS_COMPACT_HEIGHT
+	var button_height := 40.0 if compact else 56.0
+	var button_width := 64.0 if compact else 92.0
+	var button_font_size := 13 if compact else 16
 
 	_details_action_row.visible = not action_buttons.is_empty()
 	for button in [main.inventory_repair_button, main.inventory_discard_button, main.inventory_equip_button]:
@@ -1015,7 +1086,8 @@ func _layout_inventory_detail_actions(action_buttons: Array) -> void:
 			_move_control_to_parent(button, _details_action_row)
 			button.visible = false
 			button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			button.custom_minimum_size = Vector2(92.0, 56.0)
+			button.custom_minimum_size = Vector2(button_width, button_height)
+			button.add_theme_font_size_override("font_size", button_font_size)
 
 	if action_buttons.is_empty():
 		return
