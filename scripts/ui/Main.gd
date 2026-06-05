@@ -57,6 +57,7 @@ const MIN_CAST_POWER := 0.05
 const MAX_CAST_POWER := 1.0
 const MIN_SHORE_DEPTH := 0.16
 const DEPTH_TOLERANCE := 0.05
+const ENABLE_ALPHA_TESTER_BONUS := false
 const ALPHA_TESTER_BONUS_MONEY := 5000.0
 const ALPHA_TESTER_BONUS_MESSAGE := "Привет альфа тестер, для удобного теста мы даем тебе 5000 монет."
 
@@ -5055,6 +5056,9 @@ func _update_ui() -> void:
 
 
 func _grant_alpha_tester_bonus_if_needed() -> void:
+	if not ENABLE_ALPHA_TESTER_BONUS:
+		return
+
 	if PlayerData.alpha_tester_bonus_claimed:
 		return
 
