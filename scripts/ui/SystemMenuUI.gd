@@ -15,6 +15,7 @@ var outside_close: ColorRect
 var menu_button: Button
 var dropdown_panel: Panel
 var menu_items_box: VBoxContainer
+var build_version_label: Label
 var profile_item: Button
 var atlas_item: Button
 var forecast_item: Button
@@ -78,7 +79,10 @@ func layout(screen_size: Vector2) -> void:
 	var item_gap: float = clampf(5.0 * ui_scale, 4.0, 7.0)
 	var item_count: int = menu_items_box.get_child_count() if menu_items_box != null else 4
 	var panel_padding: float = clampf(10.0 * ui_scale, 9.0, 13.0)
-	var panel_height: float = item_height * float(item_count) + panel_padding * 2.0 + item_gap * float(maxi(item_count - 1, 0))
+	var items_height: float = item_height * float(item_count) + item_gap * float(maxi(item_count - 1, 0))
+	var footer_gap: float = clampf(8.0 * ui_scale, 7.0, 10.0)
+	var footer_height: float = clampf(42.0 * ui_scale, 38.0, 48.0)
+	var panel_height: float = items_height + footer_gap + footer_height + panel_padding * 2.0
 	var button_x: float = screen_size.x - margin_x - button_size.x
 	var button_y: float = margin_y
 	var icon_size: int = int(clampf(ITEM_ICON_BASE_SIZE * ui_scale, 38.0, 52.0))
@@ -113,8 +117,14 @@ func layout(screen_size: Vector2) -> void:
 	dropdown_panel.pivot_offset = Vector2(dropdown_panel.size.x, 0.0)
 
 	menu_items_box.position = Vector2(panel_padding, panel_padding)
-	menu_items_box.size = Vector2(panel_width - panel_padding * 2.0, panel_height - panel_padding * 2.0)
+	menu_items_box.size = Vector2(panel_width - panel_padding * 2.0, items_height)
 	menu_items_box.add_theme_constant_override("separation", int(item_gap))
+
+	build_version_label.position = Vector2(panel_padding, panel_padding + items_height + footer_gap)
+	build_version_label.size = Vector2(panel_width - panel_padding * 2.0, footer_height)
+	build_version_label.text = GameVersion.get_version_label()
+	build_version_label.add_theme_font_size_override("font_size", int(clampf(10.0 * ui_scale, 10.0, 12.0)))
+	build_version_label.add_theme_color_override("font_color", Color(0.66, 0.76, 0.72, 0.82))
 
 	for item in [profile_item, atlas_item, forecast_item, settings_item]:
 		item.custom_minimum_size = Vector2(menu_items_box.size.x, item_height)
@@ -340,6 +350,14 @@ func _ensure_menu_nodes() -> void:
 	menu_items_box.name = "SystemMenuItems"
 	menu_items_box.mouse_filter = Control.MOUSE_FILTER_PASS
 	dropdown_panel.add_child(menu_items_box)
+
+	build_version_label = Label.new()
+	build_version_label.name = "BuildVersionLabel"
+	build_version_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	build_version_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	build_version_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	build_version_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dropdown_panel.add_child(build_version_label)
 
 	profile_item = _create_menu_item("Профиль", "profile")
 	atlas_item = _create_menu_item("Атлас рыб", "encyclopedia")
