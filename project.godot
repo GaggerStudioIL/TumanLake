@@ -20,6 +20,7 @@ config/icon="res://assets/app/tuman_lake_icon.png"
 [autoload]
 
 GameEnums="*res://scripts/core/GameEnums.gd"
+BuildConfig="*res://scripts/core/BuildConfig.gd"
 UIFormatters="*res://scripts/ui/helpers/UIFormatters.gd"
 FishDatabase="*uid://dop3pbr3l2rm3"
 WaterbodyDatabase="*res://scripts/data/WaterbodyDatabase.gd"
