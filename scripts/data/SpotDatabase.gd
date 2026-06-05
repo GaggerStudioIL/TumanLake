@@ -313,6 +313,7 @@ var spots := {
 		"id": "forest_old_pier",
 		"name": "Старый пирс",
 		"waterbody_id": "forest_lake",
+		"legacy": true,
 		"type": "wooden_pier",
 		"spot_type": "пирс",
 		"description": "Лесной пирс с первой серьезной хищной рыбой.",
@@ -334,6 +335,7 @@ var spots := {
 		"id": "river_deep_hole",
 		"name": "Речная яма",
 		"waterbody_id": "river_backwater",
+		"legacy": true,
 		"type": "deep_hole",
 		"spot_type": "глубокая зона",
 		"description": "Глубокая речная заводь с сильной рыбой.",
@@ -363,7 +365,10 @@ func get_all_spots() -> Array:
 	var all_spots: Array = []
 
 	for spot_id in spots.keys():
-		all_spots.append(get_spot(spot_id))
+		var spot := get_spot(spot_id)
+		if bool(spot.get("legacy", false)):
+			continue
+		all_spots.append(spot)
 
 	return all_spots
 
@@ -372,6 +377,8 @@ func get_spots_for_waterbody(waterbody_id: String) -> Array:
 
 	for spot_id in spots.keys():
 		var spot: Dictionary = spots[spot_id]
+		if bool(spot.get("legacy", false)):
+			continue
 		if str(spot.get("waterbody_id", "agamin_lake")) != waterbody_id:
 			continue
 
