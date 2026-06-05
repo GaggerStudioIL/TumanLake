@@ -20,6 +20,7 @@ var profile_item: Button
 var atlas_item: Button
 var forecast_item: Button
 var settings_item: Button
+var bug_report_item: Button
 var settings_backdrop: ColorRect
 var settings_panel: Panel
 var settings_title: Label
@@ -46,6 +47,12 @@ var forecast_title: Label
 var forecast_scroll: ScrollContainer
 var forecast_list: VBoxContainer
 var forecast_close_button: Button
+var bug_report_backdrop: ColorRect
+var bug_report_panel: Panel
+var bug_report_title: Label
+var bug_report_scroll: ScrollContainer
+var bug_report_body: Label
+var bug_report_close_button: Button
 var _is_disabled := false
 var _menu_tween: Tween
 var _menu_open_position := Vector2.ZERO
@@ -58,6 +65,7 @@ func setup(main_ref) -> void:
 	_ensure_menu_nodes()
 	_ensure_settings_nodes()
 	_ensure_forecast_nodes()
+	_ensure_bug_report_nodes()
 	layout(main.get_viewport_rect().size)
 
 
@@ -122,11 +130,11 @@ func layout(screen_size: Vector2) -> void:
 
 	build_version_label.position = Vector2(panel_padding, panel_padding + items_height + footer_gap)
 	build_version_label.size = Vector2(panel_width - panel_padding * 2.0, footer_height)
-	build_version_label.text = GameVersion.get_version_label()
+	build_version_label.text = _get_build_version_label()
 	build_version_label.add_theme_font_size_override("font_size", int(clampf(10.0 * ui_scale, 10.0, 12.0)))
 	build_version_label.add_theme_color_override("font_color", Color(0.66, 0.76, 0.72, 0.82))
 
-	for item in [profile_item, atlas_item, forecast_item, settings_item]:
+	for item in [profile_item, atlas_item, forecast_item, settings_item, bug_report_item]:
 		item.custom_minimum_size = Vector2(menu_items_box.size.x, item_height)
 		item.add_theme_font_size_override("font_size", int(clampf(16.0 * ui_scale, 15.0, 19.0)))
 		item.add_theme_constant_override("icon_max_width", icon_size)
@@ -227,6 +235,33 @@ func layout(screen_size: Vector2) -> void:
 		forecast_close_button.add_theme_font_size_override("font_size", int(15.0 * ui_scale))
 		_apply_menu_item_style(forecast_close_button)
 
+	if bug_report_panel != null:
+		var bug_size := Vector2(clampf(520.0 * ui_scale, 430.0, 560.0), clampf(462.0 * ui_scale, 404.0, 500.0))
+		var bug_padding: float = clampf(24.0 * ui_scale, 18.0, 28.0)
+		var close_size := Vector2(132.0 * ui_scale, 40.0 * ui_scale)
+		var close_y: float = bug_size.y - close_size.y - 18.0 * ui_scale
+		bug_report_backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+		bug_report_backdrop.position = Vector2.ZERO
+		bug_report_backdrop.size = screen_size
+		bug_report_panel.position = (screen_size - bug_size) * 0.5
+		bug_report_panel.size = bug_size
+		bug_report_panel.custom_minimum_size = bug_size
+		_apply_bug_report_panel_style(bug_report_panel)
+		bug_report_title.position = Vector2(bug_padding, 18.0 * ui_scale)
+		bug_report_title.size = Vector2(bug_size.x - bug_padding * 2.0, 36.0 * ui_scale)
+		bug_report_title.add_theme_font_size_override("font_size", int(clampf(22.0 * ui_scale, 20.0, 25.0)))
+		bug_report_scroll.position = Vector2(bug_padding, 66.0 * ui_scale)
+		bug_report_scroll.size = Vector2(bug_size.x - bug_padding * 2.0, close_y - bug_report_scroll.position.y - 18.0 * ui_scale)
+		bug_report_body.position = Vector2.ZERO
+		bug_report_body.size = bug_report_scroll.size
+		bug_report_body.custom_minimum_size = Vector2(bug_report_scroll.size.x, 0.0)
+		bug_report_body.add_theme_font_size_override("font_size", int(clampf(15.0 * ui_scale, 14.0, 17.0)))
+		bug_report_close_button.position = Vector2(bug_size.x - close_size.x - bug_padding, close_y)
+		bug_report_close_button.size = close_size
+		bug_report_close_button.custom_minimum_size = close_size
+		bug_report_close_button.add_theme_font_size_override("font_size", int(clampf(15.0 * ui_scale, 14.0, 17.0)))
+		_apply_menu_item_style(bug_report_close_button)
+
 
 func is_menu_open() -> bool:
 	return dropdown_panel != null and dropdown_panel.visible
@@ -238,6 +273,9 @@ func is_settings_open() -> bool:
 
 func is_forecast_open() -> bool:
 	return forecast_panel != null and forecast_panel.visible
+
+func is_bug_report_open() -> bool:
+	return bug_report_panel != null and bug_report_panel.visible
 
 
 func _layout_settings_slider_row(title_label: Label, slider: HSlider, value_label: Label, pos: Vector2, width: float, ui_scale: float) -> void:
@@ -309,6 +347,19 @@ func close_forecast(reset_nav: bool = true) -> void:
 			main._refresh_bottom_nav_styles()
 	_refresh_main_depth_controls()
 
+func close_bug_report(reset_nav: bool = true) -> void:
+	if bug_report_panel == null or bug_report_backdrop == null:
+		return
+
+	bug_report_panel.visible = false
+	bug_report_backdrop.visible = false
+	if main != null:
+		main.close_modal("bug_report")
+		if reset_nav:
+			main._active_nav_tab = "fish"
+			main._refresh_bottom_nav_styles()
+	_refresh_main_depth_controls()
+
 
 func set_disabled(disabled: bool) -> void:
 	_is_disabled = disabled
@@ -363,15 +414,18 @@ func _ensure_menu_nodes() -> void:
 	atlas_item = _create_menu_item("Атлас рыб", "encyclopedia")
 	forecast_item = _create_menu_item("Прогноз погоды", "weather")
 	settings_item = _create_menu_item("Настройки", "settings")
+	bug_report_item = _create_menu_item("Сообщить о баге", "bug_report")
 	menu_items_box.add_child(profile_item)
 	menu_items_box.add_child(atlas_item)
 	menu_items_box.add_child(forecast_item)
 	menu_items_box.add_child(settings_item)
+	menu_items_box.add_child(bug_report_item)
 
 	profile_item.pressed.connect(_on_profile_pressed)
 	atlas_item.pressed.connect(_on_atlas_pressed)
 	forecast_item.pressed.connect(_on_forecast_pressed)
 	settings_item.pressed.connect(_on_settings_pressed)
+	bug_report_item.pressed.connect(_on_bug_report_pressed)
 
 	menu_button = Button.new()
 	menu_button.name = "HamburgerMenuButton"
@@ -597,6 +651,55 @@ func _ensure_forecast_nodes() -> void:
 	forecast_panel.add_child(forecast_close_button)
 	forecast_close_button.pressed.connect(_on_forecast_close_pressed)
 
+func _ensure_bug_report_nodes() -> void:
+	if bug_report_panel != null:
+		return
+
+	var parent: Node = main.get_modal_content_root() if main.has_method("get_modal_content_root") else main
+
+	bug_report_backdrop = ColorRect.new()
+	bug_report_backdrop.name = "BugReportBackdrop"
+	bug_report_backdrop.color = Color(0.0, 0.0, 0.0, 0.62)
+	bug_report_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	bug_report_backdrop.visible = false
+	parent.add_child(bug_report_backdrop)
+
+	bug_report_panel = Panel.new()
+	bug_report_panel.name = "BugReportPanel"
+	bug_report_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	bug_report_panel.visible = false
+	parent.add_child(bug_report_panel)
+
+	bug_report_title = Label.new()
+	bug_report_title.name = "BugReportTitle"
+	bug_report_title.text = "Как сообщить о баге"
+	bug_report_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	bug_report_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	bug_report_title.add_theme_color_override("font_color", Color(0.92, 1.0, 0.96, 1.0))
+	bug_report_panel.add_child(bug_report_title)
+
+	bug_report_scroll = ScrollContainer.new()
+	bug_report_scroll.name = "BugReportScroll"
+	bug_report_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	bug_report_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	bug_report_scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+	bug_report_panel.add_child(bug_report_scroll)
+
+	bug_report_body = Label.new()
+	bug_report_body.name = "BugReportBody"
+	bug_report_body.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	bug_report_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	bug_report_body.add_theme_color_override("font_color", Color(0.78, 0.90, 0.86, 0.96))
+	bug_report_scroll.add_child(bug_report_body)
+
+	bug_report_close_button = Button.new()
+	bug_report_close_button.name = "BugReportCloseButton"
+	bug_report_close_button.text = "Закрыть"
+	bug_report_close_button.focus_mode = Control.FOCUS_NONE
+	bug_report_close_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	bug_report_panel.add_child(bug_report_close_button)
+	bug_report_close_button.pressed.connect(_on_bug_report_close_pressed)
+
 
 func _get_menu_item_icon(icon_name: String) -> Texture2D:
 	if main == null or main.ui_theme == null:
@@ -702,6 +805,20 @@ func _on_forecast_pressed() -> void:
 	main.open_modal("weather_forecast")
 	forecast_backdrop.visible = true
 	forecast_panel.visible = true
+	main._active_nav_tab = "fish"
+	main._refresh_modal_input_blocker()
+	main._refresh_bottom_nav_styles()
+
+func _on_bug_report_pressed() -> void:
+	close_menu()
+	if main == null:
+		return
+
+	_ensure_bug_report_nodes()
+	_refresh_bug_report_text()
+	main.open_modal("bug_report")
+	bug_report_backdrop.visible = true
+	bug_report_panel.visible = true
 	main._active_nav_tab = "fish"
 	main._refresh_modal_input_blocker()
 	main._refresh_bottom_nav_styles()
@@ -888,6 +1005,9 @@ func _on_settings_close_pressed() -> void:
 func _on_forecast_close_pressed() -> void:
 	close_forecast(true)
 
+func _on_bug_report_close_pressed() -> void:
+	close_bug_report(true)
+
 
 func _on_outside_close_gui_input(event: InputEvent) -> void:
 	var mouse_event := event as InputEventMouseButton
@@ -971,6 +1091,32 @@ func _get_time_manager() -> Node:
 		return null
 	return main.get_node_or_null("/root/TimeManager")
 
+func _refresh_bug_report_text() -> void:
+	if bug_report_body == null:
+		return
+	bug_report_body.text = _get_bug_report_text()
+
+
+func _get_bug_report_text() -> String:
+	return "Чтобы мы быстро нашли и исправили ошибку, пришлите:\n\n" \
+		+ "1. Что вы делали перед багом.\n" \
+		+ "2. Что должно было произойти.\n" \
+		+ "3. Что произошло на самом деле.\n" \
+		+ "4. Можно ли повторить баг.\n" \
+		+ "5. Скриншот или видео, если возможно.\n" \
+		+ "6. Версию билда.\n" \
+		+ "7. Устройство и разрешение экрана.\n\n" \
+		+ "Версия билда:\n%s" % _get_build_version_label()
+
+
+func _get_build_version_label() -> String:
+	var version_node: Node = null
+	if main != null:
+		version_node = main.get_node_or_null("/root/GameVersion")
+	if version_node != null and version_node.has_method("get_version_label"):
+		return str(version_node.call("get_version_label"))
+	return "v0.1.0-beta.1"
+
 
 func _clear_children(node: Node) -> void:
 	for child in node.get_children():
@@ -1027,6 +1173,12 @@ func _apply_panel_style(panel: Panel) -> void:
 	panel.add_theme_stylebox_override(
 		"panel",
 		_make_style(Color(0.018, 0.034, 0.034, 0.78), Color(0.74, 0.94, 0.78, 0.26), 16, 10, Color(0.0, 0.0, 0.0, 0.28))
+	)
+
+func _apply_bug_report_panel_style(panel: Panel) -> void:
+	panel.add_theme_stylebox_override(
+		"panel",
+		_make_style(Color(0.015, 0.030, 0.030, 0.94), Color(0.74, 0.94, 0.78, 0.34), 16, 12, Color(0.0, 0.0, 0.0, 0.34))
 	)
 
 

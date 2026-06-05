@@ -865,6 +865,9 @@ func close_current_modal() -> void:
 		"weather_forecast":
 			if system_menu_ui != null and system_menu_ui.has_method("close_forecast"):
 				system_menu_ui.close_forecast()
+		"bug_report":
+			if system_menu_ui != null and system_menu_ui.has_method("close_bug_report"):
+				system_menu_ui.close_bug_report()
 		"encyclopedia":
 			if encyclopedia_ui != null:
 				encyclopedia_ui.close()
@@ -882,6 +885,8 @@ func close_current_modal() -> void:
 				system_menu_ui.close_settings()
 				if system_menu_ui.has_method("close_forecast"):
 					system_menu_ui.close_forecast()
+				if system_menu_ui.has_method("close_bug_report"):
+					system_menu_ui.close_bug_report()
 			_refresh_modal_input_blocker()
 
 func _hide_modal_roots_except(modal_name: String) -> void:
@@ -927,6 +932,8 @@ func _hide_modal_roots_except(modal_name: String) -> void:
 		system_menu_ui.close_settings(false)
 	if modal_name != "weather_forecast" and system_menu_ui != null and system_menu_ui.has_method("close_forecast"):
 		system_menu_ui.close_forecast(false)
+	if modal_name != "bug_report" and system_menu_ui != null and system_menu_ui.has_method("close_bug_report"):
+		system_menu_ui.close_bug_report(false)
 
 func _refresh_modal_input_blocker() -> void:
 	_ensure_modal_layer()
@@ -957,6 +964,8 @@ func _is_any_modal_visible() -> bool:
 	if system_menu_ui != null and system_menu_ui.is_settings_open():
 		return true
 	if system_menu_ui != null and system_menu_ui.has_method("is_forecast_open") and system_menu_ui.is_forecast_open():
+		return true
+	if system_menu_ui != null and system_menu_ui.has_method("is_bug_report_open") and system_menu_ui.is_bug_report_open():
 		return true
 	return false
 
