@@ -1164,7 +1164,7 @@ func _sample_time_color(minutes: float, anchors: Array) -> Color:
 	return anchors[anchors.size() - 1][1]
 
 func _debug_print_layout() -> void:
-	if not SHOW_ENVIRONMENT_DEBUG:
+	if not SHOW_ENVIRONMENT_DEBUG or not BuildConfig.ENABLE_VERBOSE_LOGS:
 		return
 	if _last_debug_viewport.is_equal_approx(_viewport_size):
 		return
@@ -1178,7 +1178,7 @@ func _debug_print_visual_state(
 	sunset_strength: float,
 	light_alpha: float
 ) -> void:
-	if not SHOW_ENVIRONMENT_DEBUG:
+	if not SHOW_ENVIRONMENT_DEBUG or not BuildConfig.ENABLE_VERBOSE_LOGS:
 		return
 	var phase_key := "%s:%d" % [phase, int(minutes / 30.0)]
 	if phase_key == _last_debug_phase:

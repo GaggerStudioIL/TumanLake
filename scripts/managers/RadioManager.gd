@@ -174,7 +174,8 @@ func start_radio() -> void:
 	current_station = STATION_TUMAN_FM
 	_set_audio_manager_music_source("radio")
 	if not was_enabled:
-		print("[TumanFM] Вы слушаете Tuman FM - радио у воды.")
+		if BuildConfig.ENABLE_VERBOSE_LOGS:
+			print("[TumanFM] Вы слушаете Tuman FM - радио у воды.")
 		radio_state_changed.emit(true)
 	if music_player == null or not music_player.playing:
 		play_next_music_track()
@@ -336,7 +337,8 @@ func play_next_music_track() -> void:
 	_set_stream_loop(stream, false)
 	_apply_music_volume()
 	music_player.play()
-	print("[TumanFM] music: %s" % current_track)
+	if BuildConfig.ENABLE_VERBOSE_LOGS:
+		print("[TumanFM] music: %s" % current_track)
 
 
 func choose_music_pool_by_time_and_weather() -> Array:
@@ -962,7 +964,7 @@ func _build_night_morning_forecast_scenario(time_state: Dictionary) -> Dictionar
 	scenario["weather"] = morning_weather
 	scenario["text"] = "Прогноз на утро: температура около %d градусов." % int(scenario.get("temperature", morning_temperature))
 	scenario["fallback_text"] = "[TumanFM] Завтра утром температура будет около %d градусов." % int(scenario.get("temperature", morning_temperature))
-	if radio_debug_enabled:
+	if radio_debug_enabled and BuildConfig.ENABLE_VERBOSE_LOGS:
 		print("[TumanFM] Night forecast target: day=%d, weather=%s, temperature=%d" % [
 			tomorrow_day_index,
 			morning_weather,
@@ -991,7 +993,7 @@ func _make_scheduled_weather_forecast_key(slot: String, time_state: Dictionary) 
 
 
 func _debug_scheduled_weather_forecast(action: String, forecast: Dictionary) -> void:
-	if not radio_debug_enabled:
+	if not radio_debug_enabled or not BuildConfig.ENABLE_VERBOSE_LOGS:
 		return
 	var slot := str(forecast.get("slot", ""))
 	var key := str(forecast.get("key", ""))
@@ -1039,7 +1041,8 @@ func _play_context_message_sequence(message: Dictionary, generation: int) -> voi
 
 	var played_voice := play_voice_message(message_id, message_type)
 	if not played_voice:
-		print("[TumanFM] %s" % text)
+		if BuildConfig.ENABLE_VERBOSE_LOGS:
+			print("[TumanFM] %s" % text)
 		_restore_timer.start(FALLBACK_MESSAGE_SECONDS)
 
 
@@ -1206,7 +1209,7 @@ func _get_temperature_scenario_from_message(message: Dictionary) -> Dictionary:
 
 
 func _debug_temperature_scenario(forecast: Dictionary, scenario: Dictionary) -> void:
-	if not radio_debug_enabled:
+	if not radio_debug_enabled or not BuildConfig.ENABLE_VERBOSE_LOGS:
 		return
 	print("[TumanFM] Temperature forecast: morning=%d, day=%d, evening=%d, night=%d, current=%d" % [
 		int(forecast.get("morning_temperature", 21)),
@@ -1271,7 +1274,7 @@ func _context_has_temperature(context: Dictionary) -> bool:
 
 
 func _debug_radio_weather_context(context: Dictionary, weather_aliases: Array[String]) -> void:
-	if not radio_debug_enabled:
+	if not radio_debug_enabled or not BuildConfig.ENABLE_VERBOSE_LOGS:
 		return
 	print("[TumanFM] Context: weather=%s, previous_weather=%s, tomorrow_weather=%s, temperature=%d" % [
 		str(context.get("weather", "clear")),
@@ -1518,6 +1521,9 @@ func _set_broadcast_state(active: bool, status_text: String = "") -> void:
 
 
 func _print_radio_fallback(text: String) -> void:
+	if not BuildConfig.ENABLE_VERBOSE_LOGS:
+		return
+
 	if text.begins_with("[TumanFM]"):
 		print(text)
 	else:

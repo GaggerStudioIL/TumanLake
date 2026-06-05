@@ -58,7 +58,7 @@ func purge_zero_value_fish() -> int:
 			removed_count += 1
 
 	last_zero_value_cleanup_count = removed_count
-	if removed_count > 0:
+	if removed_count > 0 and BuildConfig.ENABLE_VERBOSE_LOGS:
 		print("Removed invalid fish records from keepnet: %d" % removed_count)
 	return removed_count
 

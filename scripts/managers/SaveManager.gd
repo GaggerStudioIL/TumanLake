@@ -67,11 +67,13 @@ func save_game() -> void:
 	file.store_string(JSON.stringify(save_data))
 	file.close()
 
-	print("Game saved")
+	if BuildConfig.ENABLE_VERBOSE_LOGS:
+		print("Game saved")
 
 func load_game() -> void:
 	if not FileAccess.file_exists(SAVE_PATH):
-		print("No save file yet")
+		if BuildConfig.ENABLE_VERBOSE_LOGS:
+			print("No save file yet")
 		var time_manager := _get_time_manager()
 		if time_manager != null and time_manager.has_method("initialize_new_game_time"):
 			time_manager.call("initialize_new_game_time", false)
@@ -153,14 +155,16 @@ func load_game() -> void:
 	if InventoryManager.has_method("purge_zero_value_fish"):
 		removed_zero_value_fish = InventoryManager.purge_zero_value_fish() > 0
 
-	print("Game loaded")
+	if BuildConfig.ENABLE_VERBOSE_LOGS:
+		print("Game loaded")
 	if should_save_after_time_load or migrated_freshness or migrated_save or removed_zero_value_fish or missing_recent_tackle_items or missing_ranked_skill_state or repaired_location:
 		save_game()
 
 func delete_save() -> void:
 	if FileAccess.file_exists(SAVE_PATH):
 		DirAccess.remove_absolute(SAVE_PATH)
-		print("Save deleted")
+		if BuildConfig.ENABLE_VERBOSE_LOGS:
+			print("Save deleted")
 	var time_manager := _get_time_manager()
 	if time_manager != null and time_manager.has_method("initialize_new_game_time"):
 		time_manager.call("initialize_new_game_time", false)

@@ -537,7 +537,7 @@ func _get_active_bite_balance_data() -> Dictionary:
 		0.22
 	)
 
-	if SHOW_WEATHER_BITE_DEBUG:
+	if SHOW_WEATHER_BITE_DEBUG and BuildConfig.ENABLE_VERBOSE_LOGS:
 		print("[WeatherBite] weather=%s bite_x=%.2f final=%.3f modifiers=%s" % [
 			weather_type,
 			weather_bite_multiplier,
@@ -941,7 +941,7 @@ func _get_random_tackle_fish_id(available_fish: Array, rare_chance_modifier: flo
 		return FishDatabase.get_random_fish_id(available_fish, rare_chance_modifier)
 
 	var selected_fish_id := str(weighted_list.pick_random())
-	if SHOW_WEATHER_BITE_DEBUG:
+	if SHOW_WEATHER_BITE_DEBUG and BuildConfig.ENABLE_VERBOSE_LOGS:
 		var selected_fish := FishDatabase.get_fish(selected_fish_id)
 		print("[WeatherBite] selected=%s categories=%s weight_x=%.2f" % [
 			selected_fish_id,
@@ -1562,7 +1562,7 @@ func stop_fight_vibration() -> void:
 	_last_vibration_label = "off"
 
 func _debug_tension_fight(delta: float) -> void:
-	if not TENSION_FIGHT_DEBUG:
+	if not TENSION_FIGHT_DEBUG or not BuildConfig.ENABLE_VERBOSE_LOGS:
 		return
 
 	_fight_vibration_debug_timer -= delta
@@ -1719,14 +1719,15 @@ func _start_reeling(catch_data: Dictionary) -> void:
 	_low_fail_limit = clamp((1.52 * escape_safety) / (_difficulty * float(tuning["danger"]) * (1.0 + _escape_risk)), 0.52, 1.85)
 	_target_progress_time = _get_target_fight_duration(catch_data, fish, tuning, rod_strength)
 
-	print("[TensionFight] fish=%s, weight=%.2fkg, strength=%.2f, safe_zone=%d%%-%d%%, target_duration=%.1fs" % [
-		str(catch_data.get("name", fish.get("name", "-"))),
-		catch_weight,
-		_safe_zone_strength_factor,
-		roundi(_green_min * 100.0),
-		roundi(_green_max * 100.0),
-		_target_progress_time
-	])
+	if BuildConfig.ENABLE_VERBOSE_LOGS:
+		print("[TensionFight] fish=%s, weight=%.2fkg, strength=%.2f, safe_zone=%d%%-%d%%, target_duration=%.1fs" % [
+			str(catch_data.get("name", fish.get("name", "-"))),
+			catch_weight,
+			_safe_zone_strength_factor,
+			roundi(_green_min * 100.0),
+			roundi(_green_max * 100.0),
+			_target_progress_time
+		])
 
 	reeling_started.emit(_current_catch, _get_reeling_state())
 	reeling_updated.emit(_get_reeling_state())

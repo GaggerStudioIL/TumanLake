@@ -452,7 +452,8 @@ var _last_reeling_state := {
 }
 
 func _ready() -> void:
-	print("Tuman Lake: Main scene loaded")
+	if BuildConfig.ENABLE_VERBOSE_LOGS:
+		print("Tuman Lake: Main scene loaded")
 	_play_main_ambient()
 
 	theme = TUMAN_LAKE_THEME
@@ -3066,6 +3067,9 @@ func _get_effective_wind_state_for_spot(spot_id: String) -> Dictionary:
 
 
 func _debug_log_cast_depth(context: Dictionary) -> void:
+	if not BuildConfig.ENABLE_VERBOSE_LOGS:
+		return
+
 	var valid := bool(context.get("valid", false))
 	print("[CastDepth] hold_time=%.2f, cast_power=%.2f, shore_depth=%.2f, spot_max_depth=%.1f, water_depth_at_cast=%.2f, float_depth=%.1f, valid=%s" % [
 		float(context.get("hold_time", 0.0)),
