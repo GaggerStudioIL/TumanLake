@@ -25,7 +25,7 @@ const CatchPopupControllerScript := preload("res://scripts/ui/controllers/CatchP
 const CatchResultHandlerScript := preload("res://scripts/gameplay/handlers/CatchResultHandler.gd")
 const WeatherEffectsControllerScript := preload("res://scripts/environment/WeatherEffectsController.gd")
 const AmbientVoicesControllerScript := preload("res://scripts/environment/AmbientVoicesController.gd")
-const WaterAnimationLayerScript := preload("res://scripts/environment/WaterAnimationLayer.gd")
+const WaterLiveLayerScript := preload("res://scripts/environment/WaterLiveLayer.gd")
 const WeatherUIHelperScript := preload("res://scripts/ui/helpers/WeatherUIHelper.gd")
 const NAVIGATION_CONTROLLER_PATH := "res://scripts/ui/controllers/NavigationController.gd"
 const SIDE_MENU_CONTROLLER_PATH := "res://scripts/ui/controllers/SideMenuController.gd"
@@ -640,13 +640,14 @@ func _ensure_water_animation_layer() -> void:
 	if water_animation_layer != null and is_instance_valid(water_animation_layer):
 		return
 
+	_disable_legacy_water_animation_layer()
 	var was_created := false
-	var existing_layer := get_node_or_null("WaterAnimationLayer") as Control
+	var existing_layer := get_node_or_null("WaterLiveLayer") as Control
 	if existing_layer != null:
 		water_animation_layer = existing_layer
 	else:
-		water_animation_layer = WaterAnimationLayerScript.new() as Control
-		water_animation_layer.name = "WaterAnimationLayer"
+		water_animation_layer = WaterLiveLayerScript.new() as Control
+		water_animation_layer.name = "WaterLiveLayer"
 		add_child(water_animation_layer)
 		was_created = true
 
@@ -655,8 +656,19 @@ func _ensure_water_animation_layer() -> void:
 	water_animation_layer.z_as_relative = false
 	_update_water_animation_layer_z()
 	water_animation_layer.set("debug_visible_water_effect", false)
+	_apply_water_debug_visuals()
 	if was_created and BuildConfig.ENABLE_VERBOSE_LOGS:
-		print("WaterAnimationLayer created z=%s parent=%s beta_debug=%s" % [water_animation_layer.z_index, water_animation_layer.get_parent().name, water_animation_layer.get("debug_visible_water_effect")])
+		print("WaterLiveLayer created z=%s parent=%s debug_visible=%s" % [water_animation_layer.z_index, water_animation_layer.get_parent().name, water_animation_layer.get("debug_visible_water_effect")])
+
+func _disable_legacy_water_animation_layer() -> void:
+	var legacy_layer := get_node_or_null("WaterAnimationLayer") as Control
+	if legacy_layer == null:
+		return
+
+	if legacy_layer.has_method("set_water_profile"):
+		legacy_layer.call("set_water_profile", "disabled")
+	legacy_layer.visible = false
+	legacy_layer.set_process(false)
 
 func _update_water_animation_layer_z() -> void:
 	if water_animation_layer == null:
@@ -665,9 +677,20 @@ func _update_water_animation_layer_z() -> void:
 	water_animation_layer.z_as_relative = false
 	water_animation_layer.z_index = WATER_ANIMATION_DAY_NIGHT_Z if day_night_controller != null else WATER_ANIMATION_LEGACY_Z
 
+func _apply_water_debug_visuals() -> void:
+	if water_animation_layer == null:
+		return
+
+	if water_animation_layer.has_method("set_debug_visuals"):
+		water_animation_layer.call("set_debug_visuals", BuildConfig.ENABLE_WATER_DEBUG_VISUALS)
+
 func _get_current_water_profile_id() -> String:
 	var spot := SpotDatabase.get_spot(PlayerData.current_spot)
 	return str(spot.get("water_profile", "calm_pier"))
+
+func _get_current_water_mask_id() -> String:
+	var spot := SpotDatabase.get_spot(PlayerData.current_spot)
+	return str(spot.get("water_mask", "default_lake"))
 
 func _apply_current_water_profile() -> void:
 	_ensure_water_animation_layer()
@@ -686,8 +709,11 @@ func _layout_water_animation_layer(screen_size: Vector2) -> void:
 		return
 
 	_update_water_animation_layer_z()
+	_apply_water_debug_visuals()
 	var rect := _get_safe_water_animation_rect(screen_size)
-	if water_animation_layer.has_method("set_water_rect"):
+	if water_animation_layer.has_method("set_water_area"):
+		water_animation_layer.call("set_water_area", _get_water_animation_area(rect))
+	elif water_animation_layer.has_method("set_water_rect"):
 		water_animation_layer.call("set_water_rect", rect)
 	else:
 		water_animation_layer.position = rect.position
@@ -717,6 +743,40 @@ func _get_safe_water_animation_rect(screen_size: Vector2) -> Rect2:
 		Vector2(maxf(screen_size.x - horizontal_padding * 2.0, 1.0), maxf(rect_bottom - rect_top, 1.0))
 	)
 
+func _get_water_animation_area(rect: Rect2) -> Dictionary:
+	var mask_id := _get_current_water_mask_id()
+	return {
+		"mask_id": mask_id,
+		"rect": rect,
+		"polygon": _get_water_mask_polygon(mask_id, rect.size)
+	}
+
+func _get_water_mask_polygon(mask_id: String, rect_size: Vector2) -> PackedVector2Array:
+	if rect_size.x <= 1.0 or rect_size.y <= 1.0:
+		return PackedVector2Array()
+
+	match mask_id:
+		"default_lake":
+			return PackedVector2Array([
+				Vector2(0.0, rect_size.y * 0.22),
+				Vector2(rect_size.x * 0.18, rect_size.y * 0.15),
+				Vector2(rect_size.x * 0.48, rect_size.y * 0.10),
+				Vector2(rect_size.x * 0.80, rect_size.y * 0.14),
+				Vector2(rect_size.x, rect_size.y * 0.24),
+				Vector2(rect_size.x, rect_size.y),
+				Vector2(0.0, rect_size.y)
+			])
+		_:
+			return PackedVector2Array([
+				Vector2(0.0, rect_size.y * 0.22),
+				Vector2(rect_size.x * 0.18, rect_size.y * 0.15),
+				Vector2(rect_size.x * 0.48, rect_size.y * 0.10),
+				Vector2(rect_size.x * 0.80, rect_size.y * 0.14),
+				Vector2(rect_size.x, rect_size.y * 0.24),
+				Vector2(rect_size.x, rect_size.y),
+				Vector2(0.0, rect_size.y)
+			])
+
 func _log_water_animation_state() -> void:
 	if not BuildConfig.ENABLE_VERBOSE_LOGS or water_animation_layer == null:
 		return
@@ -740,7 +800,7 @@ func _log_water_animation_state() -> void:
 		return
 
 	_last_water_animation_log_key = key
-	print("WaterAnimationLayer state profile_id=%s rect=%s size=%s visible=%s z=%s mouse_ignore=%s processing=%s debug_visible=%s" % [
+	print("WaterLiveLayer state profile_id=%s rect=%s size=%s visible=%s z=%s mouse_ignore=%s processing=%s debug_visible=%s" % [
 		profile_id,
 		rect,
 		water_animation_layer.size,
