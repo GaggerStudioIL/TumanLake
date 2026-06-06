@@ -17,7 +17,7 @@ var _shop_money_row: HBoxContainer
 var _details_item_id := ""
 signal buy_requested(item_id: String)
 
-const SHOP_SCROLL_BOTTOM_PADDING := 28.0
+const SHOP_SCROLL_BOTTOM_PADDING := 72.0
 const SHOP_LINE_IMAGE_SIZE := Vector2(75.0, 75.0)
 const SHOP_CATEGORY_BAIT := "bait"
 const SHOP_CATEGORY_CONSUMABLE := "consumable"
@@ -662,6 +662,29 @@ func _reset_shop_scroll_to_top() -> void:
 	main.shop_items_scroll.set_deferred("scroll_vertical", 0)
 
 
+func _clear_shop_item_cards(content_width: float) -> void:
+	for child in main.shop_items_container.get_children():
+		main.shop_items_container.remove_child(child)
+		child.queue_free()
+
+	main._shop_card_nodes.clear()
+	main.shop_items_container.position = Vector2.ZERO
+	main.shop_items_container.size = Vector2(content_width, 0.0)
+	main.shop_items_container.custom_minimum_size = Vector2(content_width, 0.0)
+	main.shop_items_container.update_minimum_size()
+	if main.shop_items_scroll != null:
+		main.shop_items_scroll.queue_sort()
+
+
+func _apply_shop_items_content_height(content_width: float, content_height: float) -> void:
+	var target_size := Vector2(content_width, maxf(content_height, 1.0))
+	main.shop_items_container.size = target_size
+	main.shop_items_container.custom_minimum_size = target_size
+	main.shop_items_container.update_minimum_size()
+	if main.shop_items_scroll != null:
+		main.shop_items_scroll.queue_sort()
+
+
 func _update_shop_ui() -> void:
 	if main.shop_panel == null:
 		return
@@ -715,17 +738,13 @@ func _update_shop_money_display() -> void:
 
 
 func _rebuild_shop_cards() -> void:
-	for child in main.shop_items_container.get_children():
-		child.queue_free()
-
-	main._shop_card_nodes.clear()
 	var all_items = _get_shop_items_for_category(main._shop_category)
 	var is_bait_category: bool = str(main._shop_category) == SHOP_CATEGORY_BAIT
 	var items: Array = all_items
 	var viewport_size: Vector2 = main.shop_items_scroll.size if main.shop_items_scroll != null else main.shop_items_container.size
 	var content_width: float = max(viewport_size.x - 12.0, 1.0)
-	main.shop_items_container.position = Vector2.ZERO
-	main.shop_items_container.size = Vector2(content_width, viewport_size.y)
+	_clear_shop_item_cards(content_width)
+
 	var columns := 5 if is_bait_category else 2
 	var gap := 12.0
 	var is_rod_category: bool = str(main._shop_category) == SHOP_CATEGORY_ROD
@@ -734,17 +753,20 @@ func _rebuild_shop_cards() -> void:
 	var is_image_category: bool = is_rod_category or str(main._shop_category) == SHOP_CATEGORY_BAIT
 
 	var card_width: float = (content_width - gap * float(columns - 1)) / float(columns)
-	var rows: int = max(ceil(float(items.size()) / float(columns)), 1)
+	var rows: int = int(ceil(float(items.size()) / float(columns))) if not items.is_empty() else 0
 	var card_min_height := 178.0 if is_bait_category else (148.0 if is_image_category else 60.0)
 	var card_max_height := 178.0 if is_bait_category else (160.0 if is_image_category else 68.0)
 	if is_line_category or is_leader_category:
 		card_min_height = 100.0
 		card_max_height = 104.0
 
-	var card_height: float = min(max((main.shop_items_container.size.y - gap * float(rows - 1)) / float(rows), card_min_height), card_max_height)
-	var content_height: float = max(viewport_size.y, float(rows) * card_height + gap * float(max(rows - 1, 0)) + SHOP_SCROLL_BOTTOM_PADDING)
-	main.shop_items_container.size = Vector2(content_width, content_height)
-	main.shop_items_container.custom_minimum_size = main.shop_items_container.size
+	var card_height: float = card_min_height
+	if rows > 0:
+		card_height = min(max((viewport_size.y - gap * float(rows - 1)) / float(rows), card_min_height), card_max_height)
+	var content_height: float = SHOP_SCROLL_BOTTOM_PADDING
+	if rows > 0:
+		content_height += float(rows) * card_height + gap * float(max(rows - 1, 0))
+	_apply_shop_items_content_height(content_width, content_height)
 	_hide_shop_pager()
 
 	for i in items.size():
@@ -1762,6 +1784,7 @@ func _get_shop_key_stat_text(item: Dictionary) -> String:
 func _set_shop_category(category: String) -> void:
 	main._shop_category = category
 	main._shop_page = 0
+	_reset_shop_scroll_to_top()
 	_show_shop_notice("", true)
 	_update_shop_ui()
 	_reset_shop_scroll_to_top()
