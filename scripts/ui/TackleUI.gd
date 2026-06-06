@@ -112,10 +112,10 @@ func refresh_slots() -> void:
 	main.tackle_rod_button.text = ""
 	main.tackle_rod_button.tooltip_text = "Выбрать удочку"
 	main.tackle_rod_button.icon = _get_rod_button_texture()
-	main.tackle_rod_button.expand_icon = main.tackle_rod_button.icon != null
+	main.tackle_rod_button.expand_icon = false
 	main.tackle_rod_button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	main.tackle_rod_button.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
-	main.tackle_rod_button.add_theme_constant_override("icon_max_width", 999 if main.tackle_rod_button.icon != null else 0)
+	main.tackle_rod_button.add_theme_constant_override("icon_max_width", 210 if main.tackle_rod_button.icon != null else 0)
 	main.tackle_rod_button.alignment = HORIZONTAL_ALIGNMENT_CENTER
 	main.tackle_rod_button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	main.tackle_rod_button.clip_text = true
@@ -125,6 +125,9 @@ func refresh_slots() -> void:
 	if main.tackle_rod_name_label != null:
 		main.tackle_rod_name_label.text = _get_rod_showcase_title_text()
 		main.tackle_rod_name_label.tooltip_text = _get_rod_showcase_name()
+	if main.tackle_rod_meta_label != null:
+		main.tackle_rod_meta_label.text = _get_rod_showcase_meta_text()
+		main.tackle_rod_meta_label.tooltip_text = main.tackle_rod_meta_label.text
 	if main.tackle_info_button != null:
 		main.tackle_info_button.visible = true
 		main.tackle_info_button.text = "×" if _picker_open else "i"
@@ -156,7 +159,7 @@ func _refresh_schema_slot_buttons() -> void:
 			button.focus_mode = Control.FOCUS_NONE
 			button.mouse_filter = Control.MOUSE_FILTER_STOP
 			button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			button.custom_minimum_size = Vector2(0.0, 70.0)
+			button.custom_minimum_size = Vector2(0.0, 86.0)
 			button.pressed.connect(_set_tackle_category.bind(slot_id))
 			main.tackle_slot_buttons[slot_id] = button
 
@@ -173,13 +176,13 @@ func _refresh_schema_slot_buttons() -> void:
 		button.expand_icon = false
 		button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
-		button.add_theme_constant_override("icon_max_width", 42 if button.icon != null else 0)
+		button.add_theme_constant_override("icon_max_width", 38 if button.icon != null else 0)
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		button.clip_text = true
 		button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		button.tooltip_text = _get_tackle_slot_tooltip(slot_id)
-		button.add_theme_font_size_override("font_size", 12)
+		button.add_theme_font_size_override("font_size", 11)
 		button.add_theme_constant_override("h_separation", 12)
 		theme.apply_tackle_slot_button_style(button, _get_tackle_slot_state(slot_id))
 
@@ -197,7 +200,7 @@ func _get_tackle_slot_card_text(slot_schema: Dictionary, order: int) -> String:
 	var equipped_name := _get_tackle_slot_equipped_name(slot_id)
 	var param_text := _get_tackle_slot_param_text(slot_id)
 	var marker := "обязательный" if bool(slot_schema.get("required", false)) else "опционально"
-	return "%d. %s  %s\n%s\n%s" % [order, title, status, equipped_name, param_text if param_text != "" else marker]
+	return "%d. %s\n[%s]\n%s\n%s" % [order, title, status, equipped_name, param_text if param_text != "" else marker]
 
 
 func _get_tackle_slot_tooltip(slot_id: String) -> String:
@@ -275,6 +278,7 @@ func refresh_validation_status() -> void:
 	main.tackle_hint_label.text = _get_validation_status_line(issues, tackle_valid)
 	main.tackle_hint_label.add_theme_color_override("font_color", TACKLE_COLOR_SUCCESS if tackle_valid else TACKLE_COLOR_WARNING)
 	main.tackle_compare_label.add_theme_color_override("font_color", TACKLE_COLOR_TEXT if tackle_valid else Color(0.96, 0.78, 0.54, 0.96))
+	_apply_tackle_status_panel_style(tackle_valid)
 
 	main.tackle_equip_button.visible = true
 	if _picker_open:
@@ -319,6 +323,22 @@ func refresh_validation_status() -> void:
 		main.tackle_discard_button.disabled = not can_discard
 		main.tackle_discard_button.text = "Выбросить"
 
+
+func _apply_tackle_status_panel_style(tackle_valid: bool) -> void:
+	if main.tackle_status_panel == null:
+		return
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.04, 0.18, 0.11, 0.82) if tackle_valid else Color(0.22, 0.12, 0.04, 0.82)
+	style.border_color = Color(0.34, 0.92, 0.50, 0.72) if tackle_valid else Color(1.0, 0.62, 0.28, 0.72)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(6)
+	style.content_margin_left = 10.0
+	style.content_margin_right = 10.0
+	style.content_margin_top = 3.0
+	style.content_margin_bottom = 3.0
+	main.tackle_status_panel.add_theme_stylebox_override("panel", style)
+	main.tackle_status_panel.visible = true
+
 func on_slot_pressed(slot_type: String) -> void:
 	_set_tackle_category(slot_type)
 
@@ -342,6 +362,8 @@ func _refresh_rod_surface_visibility() -> void:
 	main.tackle_rod_button.visible = show_showcase
 	if main.tackle_rod_name_label != null:
 		main.tackle_rod_name_label.visible = show_showcase
+	if main.tackle_rod_meta_label != null:
+		main.tackle_rod_meta_label.visible = show_showcase
 	main.tackle_rod_stats_panel.visible = show_info
 	main.tackle_rod_description_panel.visible = show_info
 	main.tackle_current_label.visible = show_info
@@ -499,6 +521,13 @@ func _ensure_tackle_ui_nodes() -> void:
 	main.tackle_rod_name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	main.tackle_panel.add_child(main.tackle_rod_name_label)
 
+	main.tackle_rod_meta_label = Label.new()
+	main.tackle_rod_meta_label.name = "TackleRodMetaLabel"
+	main.tackle_rod_meta_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	main.tackle_rod_meta_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	main.tackle_rod_meta_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	main.tackle_panel.add_child(main.tackle_rod_meta_label)
+
 	main.tackle_line_button = Button.new()
 	main.tackle_line_button.name = "TackleLineButton"
 	main.tackle_line_button.text = "Лески"
@@ -567,6 +596,10 @@ func _ensure_tackle_ui_nodes() -> void:
 	main.tackle_depth_plus_button.name = "TackleDepthPlusButton"
 	main.tackle_depth_plus_button.text = "+"
 	main.tackle_panel.add_child(main.tackle_depth_plus_button)
+
+	main.tackle_status_panel = Panel.new()
+	main.tackle_status_panel.name = "TackleStatusPanel"
+	main.tackle_panel.add_child(main.tackle_status_panel)
 
 	main.tackle_hint_label = Label.new()
 	main.tackle_hint_label.name = "TackleHintLabel"
@@ -792,7 +825,22 @@ func _get_rod_showcase_name() -> String:
 
 
 func _get_rod_showcase_title_text() -> String:
-	return "Удочка\n%s" % _short_tackle_slot_text(_get_rod_showcase_name(), 42)
+	return _short_tackle_slot_text(_get_rod_showcase_name(), 44)
+
+
+func _get_rod_showcase_meta_text() -> String:
+	var rod: Dictionary = PlayerData.current_tackle.get("rod", {})
+	var stats := PlayerData.get_tackle_stats()
+	var tackle_type := PlayerData.get_current_tackle_type_title()
+	var length := _format_tackle_stat_value("length_m", rod.get("length_m", stats.get("length_m", 0.0)))
+	var max_fish := _format_tackle_stat_value("max_fish_weight", rod.get("max_fish_weight", stats.get("max_fish_weight", 0.0)))
+	var durability := "%d%%" % roundi(PlayerData.get_tackle_condition("rod") * 100.0)
+	return "Тип: %s\nДлина: %s\nМакс. рыба: %s\nПрочность: %s" % [
+		tackle_type,
+		length,
+		max_fish,
+		durability
+	]
 
 
 func _get_selected_item_card_text(item: Dictionary) -> String:
@@ -835,7 +883,7 @@ func _get_current_tackle_validation() -> Dictionary:
 
 func _get_validation_status_line(issues: Array, tackle_valid: bool) -> String:
 	if tackle_valid:
-		return "Снасть готова к ловле."
+		return "Снасть готова к ловле"
 	if issues.is_empty():
 		return "Снасть не готова"
 	return "Снасть не готова: %s" % "; ".join(issues.slice(0, mini(issues.size(), 2)))
@@ -1071,11 +1119,11 @@ func _get_tackle_slot_equipped_name(category: String) -> String:
 	if category == "bait_2":
 		return _format_tackle_bait_slot_text(category, equipped_name)
 
-	return _short_tackle_slot_text(equipped_name, 20)
+	return _short_tackle_slot_text(equipped_name, 34)
 
 func _format_tackle_bait_slot_text(slot_id: String, equipped_name: String) -> String:
 	var quantity := PlayerData.get_current_bait_quantity(slot_id)
-	var short_name := _short_tackle_slot_text(equipped_name, 15)
+	var short_name := _short_tackle_slot_text(equipped_name, 28)
 	if quantity <= 0:
 		return "%s x0 — закончилась" % short_name
 	return "%s x%d" % [short_name, quantity]
