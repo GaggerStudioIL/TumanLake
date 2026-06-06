@@ -752,14 +752,23 @@ func _log_water_animation_state() -> void:
 	])
 
 func _apply_water_animation_weather() -> void:
-	if water_animation_layer == null or not water_animation_layer.has_method("set_weather_context"):
+	if water_animation_layer == null:
 		return
 
-	water_animation_layer.call("set_weather_context", _get_current_weather_type())
+	var weather_type := _get_current_weather_type()
+	var wind_speed := _get_current_water_wind_speed()
+	if water_animation_layer.has_method("set_environment_context"):
+		water_animation_layer.call("set_environment_context", weather_type, wind_speed)
+	elif water_animation_layer.has_method("set_weather_context"):
+		water_animation_layer.call("set_weather_context", weather_type)
 
 func _get_current_weather_type() -> String:
 	var weather_state := WeatherUIHelperScript.get_current_weather_state(_get_time_manager())
 	return str(weather_state.get("weather_type", "clear"))
+
+func _get_current_water_wind_speed() -> float:
+	var wind_state := _get_effective_wind_state_for_spot(str(PlayerData.current_spot))
+	return maxf(float(wind_state.get("speed_mps", 0.0)), 0.0)
 
 func _ensure_ui_canvas_layer() -> void:
 	if ui_canvas_layer == null:

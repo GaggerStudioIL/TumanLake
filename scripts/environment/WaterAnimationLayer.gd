@@ -2,125 +2,126 @@ extends Control
 
 const DEFAULT_PROFILE := "calm_pier"
 const DISABLED_PROFILE := "disabled"
-const SAFE_ALPHA_SCALE := 0.55
+const TEST_WATER_INTENSITY_MULT := 1.38
+const SAFE_ALPHA_SCALE := 0.62
 const DEBUG_ALPHA_SCALE := 2.0
-const MAX_WAVE_ALPHA := 0.014
-const MAX_RIPPLE_ALPHA := 0.013
-const MAX_HIGHLIGHT_ALPHA := 0.010
+const MAX_WAVE_ALPHA := 0.020
+const MAX_RIPPLE_ALPHA := 0.018
+const MAX_HIGHLIGHT_ALPHA := 0.014
 const DEBUG_MAX_WAVE_ALPHA := 0.045
 const DEBUG_MAX_RIPPLE_ALPHA := 0.040
 const DEBUG_MAX_HIGHLIGHT_ALPHA := 0.038
 
 const PROFILES := {
 	"calm_pier": {
-		"intensity": 0.20,
-		"wave_count": 2,
-		"wave_speed": 0.15,
-		"wave_alpha": 0.024,
-		"ripple_count": 2,
-		"ripple_alpha": 0.024,
-		"highlight_alpha": 0.006,
-		"color_tint": Color(0.70, 0.92, 0.86, 1.0),
-		"movement_scale": 0.54
-	},
-	"open_water": {
-		"intensity": 0.30,
-		"wave_count": 4,
-		"wave_speed": 0.26,
-		"wave_alpha": 0.036,
-		"ripple_count": 3,
-		"ripple_alpha": 0.030,
-		"highlight_alpha": 0.018,
-		"color_tint": Color(0.72, 0.94, 0.92, 1.0),
-		"movement_scale": 0.82
-	},
-	"reeds": {
-		"intensity": 0.24,
+		"intensity": 0.26,
 		"wave_count": 3,
 		"wave_speed": 0.18,
-		"wave_alpha": 0.028,
+		"wave_alpha": 0.032,
 		"ripple_count": 2,
-		"ripple_alpha": 0.026,
+		"ripple_alpha": 0.032,
 		"highlight_alpha": 0.010,
-		"color_tint": Color(0.72, 0.90, 0.76, 1.0),
-		"movement_scale": 0.52
-	},
-	"duckweed": {
-		"intensity": 0.14,
-		"wave_count": 0,
-		"wave_speed": 0.08,
-		"wave_alpha": 0.000,
-		"ripple_count": 2,
-		"ripple_alpha": 0.024,
-		"highlight_alpha": 0.000,
-		"color_tint": Color(0.64, 0.82, 0.58, 1.0),
-		"movement_scale": 0.34
-	},
-	"frog_backwater": {
-		"intensity": 0.16,
-		"wave_count": 1,
-		"wave_speed": 0.10,
-		"wave_alpha": 0.012,
-		"ripple_count": 3,
-		"ripple_alpha": 0.026,
-		"highlight_alpha": 0.000,
-		"color_tint": Color(0.68, 0.84, 0.62, 1.0),
-		"movement_scale": 0.38
-	},
-	"mist": {
-		"intensity": 0.18,
-		"wave_count": 2,
-		"wave_speed": 0.12,
-		"wave_alpha": 0.020,
-		"ripple_count": 2,
-		"ripple_alpha": 0.022,
-		"highlight_alpha": 0.006,
-		"color_tint": Color(0.84, 0.96, 0.92, 1.0),
-		"movement_scale": 0.48
-	},
-	"deep_water": {
-		"intensity": 0.24,
-		"wave_count": 3,
-		"wave_speed": 0.14,
-		"wave_alpha": 0.026,
-		"ripple_count": 2,
-		"ripple_alpha": 0.020,
-		"highlight_alpha": 0.008,
-		"color_tint": Color(0.58, 0.78, 0.82, 1.0),
+		"color_tint": Color(0.70, 0.92, 0.86, 1.0),
 		"movement_scale": 0.66
 	},
-	"deep_dark": {
+	"open_water": {
+		"intensity": 0.40,
+		"wave_count": 5,
+		"wave_speed": 0.30,
+		"wave_alpha": 0.048,
+		"ripple_count": 3,
+		"ripple_alpha": 0.040,
+		"highlight_alpha": 0.026,
+		"color_tint": Color(0.72, 0.94, 0.92, 1.0),
+		"movement_scale": 0.96
+	},
+	"reeds": {
+		"intensity": 0.32,
+		"wave_count": 3,
+		"wave_speed": 0.22,
+		"wave_alpha": 0.038,
+		"ripple_count": 2,
+		"ripple_alpha": 0.034,
+		"highlight_alpha": 0.014,
+		"color_tint": Color(0.72, 0.90, 0.76, 1.0),
+		"movement_scale": 0.66
+	},
+	"duckweed": {
 		"intensity": 0.18,
-		"wave_count": 2,
+		"wave_count": 1,
+		"wave_speed": 0.08,
+		"wave_alpha": 0.010,
+		"ripple_count": 2,
+		"ripple_alpha": 0.034,
+		"highlight_alpha": 0.004,
+		"color_tint": Color(0.64, 0.82, 0.58, 1.0),
+		"movement_scale": 0.42
+	},
+	"frog_backwater": {
+		"intensity": 0.22,
+		"wave_count": 1,
 		"wave_speed": 0.12,
 		"wave_alpha": 0.018,
-		"ripple_count": 1,
-		"ripple_alpha": 0.014,
+		"ripple_count": 3,
+		"ripple_alpha": 0.036,
 		"highlight_alpha": 0.004,
-		"color_tint": Color(0.36, 0.56, 0.60, 1.0),
-		"movement_scale": 0.48
+		"color_tint": Color(0.68, 0.84, 0.62, 1.0),
+		"movement_scale": 0.46
 	},
-	"cold_water": {
+	"mist": {
 		"intensity": 0.24,
 		"wave_count": 3,
-		"wave_speed": 0.20,
+		"wave_speed": 0.15,
 		"wave_alpha": 0.028,
 		"ripple_count": 2,
-		"ripple_alpha": 0.022,
-		"highlight_alpha": 0.014,
+		"ripple_alpha": 0.030,
+		"highlight_alpha": 0.010,
+		"color_tint": Color(0.84, 0.96, 0.92, 1.0),
+		"movement_scale": 0.58
+	},
+	"deep_water": {
+		"intensity": 0.32,
+		"wave_count": 4,
+		"wave_speed": 0.18,
+		"wave_alpha": 0.036,
+		"ripple_count": 2,
+		"ripple_alpha": 0.028,
+		"highlight_alpha": 0.012,
+		"color_tint": Color(0.58, 0.78, 0.82, 1.0),
+		"movement_scale": 0.78
+	},
+	"deep_dark": {
+		"intensity": 0.24,
+		"wave_count": 2,
+		"wave_speed": 0.14,
+		"wave_alpha": 0.026,
+		"ripple_count": 1,
+		"ripple_alpha": 0.020,
+		"highlight_alpha": 0.006,
+		"color_tint": Color(0.36, 0.56, 0.60, 1.0),
+		"movement_scale": 0.58
+	},
+	"cold_water": {
+		"intensity": 0.32,
+		"wave_count": 4,
+		"wave_speed": 0.24,
+		"wave_alpha": 0.038,
+		"ripple_count": 2,
+		"ripple_alpha": 0.030,
+		"highlight_alpha": 0.020,
 		"color_tint": Color(0.72, 0.92, 1.00, 1.0),
-		"movement_scale": 0.64
+		"movement_scale": 0.76
 	},
 	"snag_shadow": {
-		"intensity": 0.17,
+		"intensity": 0.23,
 		"wave_count": 2,
-		"wave_speed": 0.11,
-		"wave_alpha": 0.016,
+		"wave_speed": 0.14,
+		"wave_alpha": 0.024,
 		"ripple_count": 2,
-		"ripple_alpha": 0.018,
-		"highlight_alpha": 0.004,
+		"ripple_alpha": 0.026,
+		"highlight_alpha": 0.006,
 		"color_tint": Color(0.46, 0.64, 0.58, 1.0),
-		"movement_scale": 0.42
+		"movement_scale": 0.52
 	}
 }
 
@@ -130,6 +131,7 @@ var _time := 0.0
 var _effect_enabled := true
 var debug_visible_water_effect := false
 var _weather_type := "clear"
+var _wind_speed_mps := 0.0
 var _last_logged_rect := Rect2()
 var _has_logged_rect := false
 var _last_logged_profile := ""
@@ -167,12 +169,18 @@ func get_water_profile() -> String:
 
 
 func set_weather_context(weather_type: String) -> void:
+	set_environment_context(weather_type, _wind_speed_mps)
+
+
+func set_environment_context(weather_type: String, wind_speed_mps: float = 0.0) -> void:
 	var normalized := _normalize_weather_type(weather_type)
-	if _weather_type == normalized:
+	var safe_wind_speed := maxf(wind_speed_mps, 0.0)
+	if _weather_type == normalized and is_equal_approx(_wind_speed_mps, safe_wind_speed):
 		return
 
 	_weather_type = normalized
-	_verbose_log("weather_type=%s" % _weather_type)
+	_wind_speed_mps = safe_wind_speed
+	_verbose_log("weather_type=%s wind=%.2f" % [_weather_type, _wind_speed_mps])
 	queue_redraw()
 
 
@@ -207,10 +215,10 @@ func _draw() -> void:
 
 func _draw_wave_lines(tint: Color, intensity: float) -> void:
 	var wave_count := _get_wave_count()
-	var wave_speed := float(_profile.get("wave_speed", 0.2)) * (1.28 if debug_visible_water_effect else 1.0)
+	var wave_speed := float(_profile.get("wave_speed", 0.2)) * (1.28 if debug_visible_water_effect else 1.0) * _get_wind_motion_scale()
 	var wave_alpha := float(_profile.get("wave_alpha", 0.04))
-	var movement_scale := float(_profile.get("movement_scale", 0.7)) * (1.25 if debug_visible_water_effect else 1.0)
-	var line_width := clampf(0.42 + intensity * (0.82 if debug_visible_water_effect else 0.52), 0.42, 1.05 if debug_visible_water_effect else 0.70)
+	var movement_scale := float(_profile.get("movement_scale", 0.7)) * (1.25 if debug_visible_water_effect else 1.0) * _get_wind_motion_scale()
+	var line_width := clampf(0.46 + intensity * (0.82 if debug_visible_water_effect else 0.54), 0.46, 1.05 if debug_visible_water_effect else 0.78)
 	var step := maxf(size.x / 54.0, 13.0)
 
 	for i in range(wave_count):
@@ -222,7 +230,7 @@ func _draw_wave_lines(tint: Color, intensity: float) -> void:
 				continue
 
 			var alpha_variation := 0.54 + _stable_unit(float(i * 13 + segment_index * 7), 4.2) * 0.34
-			var alpha := minf(wave_alpha * intensity * alpha_variation * _get_alpha_scale() * _get_weather_wave_scale(), _get_max_wave_alpha())
+			var alpha := minf(wave_alpha * intensity * alpha_variation * _get_alpha_scale() * _get_weather_wave_scale() * _get_wind_alpha_scale() * _get_near_visibility_scale(progress), _get_max_wave_alpha())
 			var color := _make_water_stroke_color(tint, alpha)
 			draw_polyline(points, color, line_width, true)
 
@@ -230,8 +238,8 @@ func _draw_wave_lines(tint: Color, intensity: float) -> void:
 func _draw_ripples(tint: Color, intensity: float) -> void:
 	var ripple_count := _get_ripple_count()
 	var ripple_alpha := float(_profile.get("ripple_alpha", 0.04))
-	var wave_speed := float(_profile.get("wave_speed", 0.2)) * (1.24 if debug_visible_water_effect else 1.0)
-	var movement_scale := float(_profile.get("movement_scale", 0.7)) * (1.20 if debug_visible_water_effect else 1.0)
+	var wave_speed := float(_profile.get("wave_speed", 0.2)) * (1.24 if debug_visible_water_effect else 1.0) * _get_wind_motion_scale()
+	var movement_scale := float(_profile.get("movement_scale", 0.7)) * (1.20 if debug_visible_water_effect else 1.0) * _get_wind_motion_scale()
 
 	for i in range(ripple_count):
 		var cycle := fmod(_time * (0.14 + wave_speed * 0.26) + float(i) * 0.37, 1.0)
@@ -243,7 +251,8 @@ func _draw_ripples(tint: Color, intensity: float) -> void:
 		var max_radius := maxf(18.0, minf(size.x, size.y) * (0.13 + 0.04 * movement_scale))
 		var radius := lerpf(6.0, max_radius, cycle)
 		var fade := 1.0 - cycle
-		var alpha := minf(ripple_alpha * intensity * fade * _get_alpha_scale() * _get_weather_ripple_scale(), _get_max_ripple_alpha())
+		var depth_scale := _get_near_visibility_scale(center.y / maxf(size.y, 1.0))
+		var alpha := minf(ripple_alpha * intensity * fade * _get_alpha_scale() * _get_weather_ripple_scale() * _get_wind_ripple_scale() * depth_scale, _get_max_ripple_alpha())
 		var color := _make_water_stroke_color(tint, alpha)
 		draw_arc(center, radius, PI * 0.10, PI * 1.18, 28, color, 0.85 if debug_visible_water_effect else 0.65, true)
 		draw_arc(center, radius * 0.64, PI * 1.08, PI * 1.78, 20, color * Color(1.0, 1.0, 1.0, 0.72), 0.70 if debug_visible_water_effect else 0.55, true)
@@ -262,7 +271,8 @@ func _draw_highlights(tint: Color, intensity: float) -> void:
 		var x := size.x * fposmod(0.19 * seed + _time * 0.018 * movement_scale, 1.0)
 		var y := size.y * (0.20 + 0.60 * fposmod(sin(seed * 2.41) * 0.5 + 0.5, 1.0))
 		var length := clampf(size.x * (0.045 + 0.012 * sin(seed)), 18.0, 58.0)
-		var alpha := minf(highlight_alpha * intensity * (0.55 + 0.45 * sin(_time * 0.7 + seed)) * _get_alpha_scale() * _get_weather_highlight_scale(), _get_max_highlight_alpha())
+		var depth_scale := _get_near_visibility_scale(y / maxf(size.y, 1.0))
+		var alpha := minf(highlight_alpha * intensity * (0.55 + 0.45 * sin(_time * 0.7 + seed)) * _get_alpha_scale() * _get_weather_highlight_scale() * _get_wind_alpha_scale() * depth_scale, _get_max_highlight_alpha())
 		var color := Color(1.0, 0.96, 0.78, maxf(alpha, 0.0))
 		draw_line(Vector2(x, y), Vector2(minf(x + length, size.x), y + sin(_time + seed) * 1.2), color, 0.90 if debug_visible_water_effect else 0.65, true)
 
@@ -297,17 +307,35 @@ func _get_draw_intensity() -> float:
 
 
 func _get_alpha_scale() -> float:
-	return DEBUG_ALPHA_SCALE if debug_visible_water_effect else SAFE_ALPHA_SCALE
+	var base_scale := DEBUG_ALPHA_SCALE if debug_visible_water_effect else SAFE_ALPHA_SCALE
+	return base_scale * TEST_WATER_INTENSITY_MULT
+
+
+func _get_near_visibility_scale(local_y_ratio: float) -> float:
+	var near_t := smoothstep(0.18, 0.86, clampf(local_y_ratio, 0.0, 1.0))
+	return lerpf(0.62, 1.36, near_t)
+
+
+func _get_wind_motion_scale() -> float:
+	return 1.0 + clampf(_wind_speed_mps / 9.0, 0.0, 0.32)
+
+
+func _get_wind_alpha_scale() -> float:
+	return 1.0 + clampf(_wind_speed_mps / 10.0, 0.0, 0.24)
+
+
+func _get_wind_ripple_scale() -> float:
+	return 1.0 + clampf(_wind_speed_mps / 12.0, 0.0, 0.18)
 
 
 func _get_weather_wave_scale() -> float:
 	match _weather_type:
 		"storm":
-			return 0.42
-		"rain":
 			return 0.56
+		"rain":
+			return 0.76
 		"cloudy":
-			return 0.82
+			return 0.92
 		_:
 			return 1.0
 
@@ -315,9 +343,9 @@ func _get_weather_wave_scale() -> float:
 func _get_weather_ripple_scale() -> float:
 	match _weather_type:
 		"storm":
-			return 0.72
+			return 1.10
 		"rain":
-			return 0.82
+			return 1.16
 		_:
 			return 1.0
 
@@ -325,11 +353,11 @@ func _get_weather_ripple_scale() -> float:
 func _get_weather_highlight_scale() -> float:
 	match _weather_type:
 		"storm":
-			return 0.16
+			return 0.24
 		"rain":
-			return 0.28
+			return 0.38
 		"cloudy":
-			return 0.58
+			return 0.72
 		_:
 			return 1.0
 
