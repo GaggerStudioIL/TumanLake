@@ -26,6 +26,7 @@ const CatchResultHandlerScript := preload("res://scripts/gameplay/handlers/Catch
 const WeatherEffectsControllerScript := preload("res://scripts/environment/WeatherEffectsController.gd")
 const AmbientVoicesControllerScript := preload("res://scripts/environment/AmbientVoicesController.gd")
 const WaterAnimationLayerScript := preload("res://scripts/environment/WaterAnimationLayer.gd")
+const WeatherUIHelperScript := preload("res://scripts/ui/helpers/WeatherUIHelper.gd")
 const NAVIGATION_CONTROLLER_PATH := "res://scripts/ui/controllers/NavigationController.gd"
 const SIDE_MENU_CONTROLLER_PATH := "res://scripts/ui/controllers/SideMenuController.gd"
 const FishHarborScene := preload("res://scenes/economy/FishHarbor.tscn")
@@ -46,6 +47,8 @@ const LEFT_NAV_HEIGHT := 222.0
 const ACTION_BAR_HEIGHT := 46.0
 const MENU_BACKDROP_Z := 300
 const MENU_PANEL_Z := 301
+const WATER_ANIMATION_DAY_NIGHT_Z := -104
+const WATER_ANIMATION_LEGACY_Z := -12
 const MODAL_TAP_GUARD_MSEC := 320
 const WATER_SURFACE_Y := 402.0
 const FLOAT_DEFAULT_POS := Vector2(500.0, 402.0)
@@ -422,6 +425,7 @@ var _rod_bend_amount_visual := 3.0
 var _water_surface_y := 0.0
 var _water_zone_top := 0.0
 var _water_zone_bottom := 0.0
+var _last_water_animation_log_key := ""
 var _rod_anchor_pos := Vector2.ZERO
 var _rod_target_pos := Vector2.ZERO
 var _depth_hud_refresh_queued := false
@@ -636,6 +640,7 @@ func _ensure_water_animation_layer() -> void:
 	if water_animation_layer != null and is_instance_valid(water_animation_layer):
 		return
 
+	var was_created := false
 	var existing_layer := get_node_or_null("WaterAnimationLayer") as Control
 	if existing_layer != null:
 		water_animation_layer = existing_layer
@@ -643,18 +648,22 @@ func _ensure_water_animation_layer() -> void:
 		water_animation_layer = WaterAnimationLayerScript.new() as Control
 		water_animation_layer.name = "WaterAnimationLayer"
 		add_child(water_animation_layer)
+		was_created = true
 
 	water_animation_layer.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	water_animation_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	water_animation_layer.z_as_relative = false
 	_update_water_animation_layer_z()
+	water_animation_layer.set("debug_visible_water_effect", false)
+	if was_created and BuildConfig.ENABLE_VERBOSE_LOGS:
+		print("WaterAnimationLayer created z=%s parent=%s beta_debug=%s" % [water_animation_layer.z_index, water_animation_layer.get_parent().name, water_animation_layer.get("debug_visible_water_effect")])
 
 func _update_water_animation_layer_z() -> void:
 	if water_animation_layer == null:
 		return
 
 	water_animation_layer.z_as_relative = false
-	water_animation_layer.z_index = -106 if day_night_controller != null else -13
+	water_animation_layer.z_index = WATER_ANIMATION_DAY_NIGHT_Z if day_night_controller != null else WATER_ANIMATION_LEGACY_Z
 
 func _get_current_water_profile_id() -> String:
 	var spot := SpotDatabase.get_spot(PlayerData.current_spot)
@@ -667,7 +676,9 @@ func _apply_current_water_profile() -> void:
 
 	if water_animation_layer.has_method("set_water_profile"):
 		water_animation_layer.call("set_water_profile", _get_current_water_profile_id())
+	_apply_water_animation_weather()
 	_layout_water_animation_layer(get_viewport_rect().size)
+	_log_water_animation_state()
 
 func _layout_water_animation_layer(screen_size: Vector2) -> void:
 	_ensure_water_animation_layer()
@@ -682,6 +693,7 @@ func _layout_water_animation_layer(screen_size: Vector2) -> void:
 		water_animation_layer.position = rect.position
 		water_animation_layer.size = rect.size
 	water_animation_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_log_water_animation_state()
 
 func _get_safe_water_animation_rect(screen_size: Vector2) -> Rect2:
 	if screen_size.x <= 1.0 or screen_size.y <= 1.0:
@@ -690,19 +702,64 @@ func _get_safe_water_animation_rect(screen_size: Vector2) -> Rect2:
 	var water_top := _water_zone_top
 	var water_bottom := _water_zone_bottom
 	if water_top <= 0.0 or water_bottom <= water_top:
-		water_top = screen_size.y * 0.72
-		water_bottom = water_top + screen_size.y * 0.06
+		water_top = screen_size.y * 0.52
+		water_bottom = screen_size.y * 0.88
 
-	var horizontal_padding := clampf(screen_size.x * 0.035, 18.0, 48.0)
-	var rect_top := maxf(water_top - screen_size.y * 0.10, screen_size.y * 0.50)
-	var rect_bottom := minf(water_bottom + screen_size.y * 0.18, screen_size.y * 0.91)
-	if rect_bottom <= rect_top + 48.0:
-		rect_bottom = minf(rect_top + maxf(86.0, screen_size.y * 0.18), screen_size.y * 0.91)
+	var horizontal_padding := clampf(screen_size.x * 0.025, 12.0, 36.0)
+	var rect_top := clampf(water_top - screen_size.y * 0.08, screen_size.y * 0.42, screen_size.y * 0.66)
+	var rect_bottom := minf(water_bottom + screen_size.y * 0.16, screen_size.y * 0.93)
+	var min_height := maxf(130.0, screen_size.y * 0.24)
+	if rect_bottom <= rect_top + min_height:
+		rect_bottom = minf(rect_top + min_height, screen_size.y * 0.93)
 
 	return Rect2(
 		Vector2(horizontal_padding, rect_top),
 		Vector2(maxf(screen_size.x - horizontal_padding * 2.0, 1.0), maxf(rect_bottom - rect_top, 1.0))
 	)
+
+func _log_water_animation_state() -> void:
+	if not BuildConfig.ENABLE_VERBOSE_LOGS or water_animation_layer == null:
+		return
+
+	var profile_id := ""
+	if water_animation_layer.has_method("get_water_profile"):
+		profile_id = str(water_animation_layer.call("get_water_profile"))
+	else:
+		profile_id = _get_current_water_profile_id()
+	var rect := Rect2(water_animation_layer.position, water_animation_layer.size)
+	var key: String = "%s|%s|%s|%s|%s|%s|%s" % [
+		profile_id,
+		rect,
+		water_animation_layer.visible,
+		water_animation_layer.z_index,
+		water_animation_layer.mouse_filter,
+		water_animation_layer.get("debug_visible_water_effect"),
+		water_animation_layer.is_processing()
+	]
+	if key == _last_water_animation_log_key:
+		return
+
+	_last_water_animation_log_key = key
+	print("WaterAnimationLayer state profile_id=%s rect=%s size=%s visible=%s z=%s mouse_ignore=%s processing=%s debug_visible=%s" % [
+		profile_id,
+		rect,
+		water_animation_layer.size,
+		water_animation_layer.visible,
+		water_animation_layer.z_index,
+		water_animation_layer.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+		water_animation_layer.is_processing(),
+		water_animation_layer.get("debug_visible_water_effect")
+	])
+
+func _apply_water_animation_weather() -> void:
+	if water_animation_layer == null or not water_animation_layer.has_method("set_weather_context"):
+		return
+
+	water_animation_layer.call("set_weather_context", _get_current_weather_type())
+
+func _get_current_weather_type() -> String:
+	var weather_state := WeatherUIHelperScript.get_current_weather_state(_get_time_manager())
+	return str(weather_state.get("weather_type", "clear"))
 
 func _ensure_ui_canvas_layer() -> void:
 	if ui_canvas_layer == null:
@@ -5224,6 +5281,7 @@ func _update_time_hud() -> void:
 	if main_hud_controller != null:
 		main_hud_controller.update_time()
 		main_hud_controller.update_weather()
+		_apply_water_animation_weather()
 		return
 
 	if clock_label == null or weather_label == null:
@@ -5231,6 +5289,7 @@ func _update_time_hud() -> void:
 
 	clock_label.text = _get_clock_text()
 	weather_label.text = _get_time_of_day_title()
+	_apply_water_animation_weather()
 
 func _apply_time_atmosphere() -> void:
 	if day_night_controller != null:
