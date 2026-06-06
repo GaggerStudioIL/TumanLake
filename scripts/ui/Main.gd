@@ -216,11 +216,13 @@ var tackle_action_bar_panel: Panel
 var tackle_rod_stats_panel: Panel
 var tackle_rod_description_panel: Panel
 var tackle_final_stats_panel: Panel
+var tackle_status_panel: Panel
 var tackle_title_divider_left: ColorRect
 var tackle_title_divider_right: ColorRect
 var tackle_title_label: Label
 var tackle_current_label: Label
 var tackle_rod_name_label: Label
+var tackle_rod_meta_label: Label
 var tackle_picker_title_label: Label
 var tackle_visual_title_label: Label
 var tackle_visual_rod_line: Line2D
@@ -3554,6 +3556,7 @@ func _setup_layout() -> void:
 		tackle_current_label,
 		tackle_rod_button,
 		tackle_rod_name_label,
+		tackle_rod_meta_label,
 		tackle_line_button,
 		tackle_leader_button,
 		tackle_float_button,
@@ -3567,6 +3570,7 @@ func _setup_layout() -> void:
 		tackle_depth_label,
 		tackle_depth_minus_button,
 		tackle_depth_plus_button,
+		tackle_status_panel,
 		tackle_hint_label,
 		tackle_equip_button,
 		tackle_repair_button,
@@ -4562,17 +4566,29 @@ func _setup_layout() -> void:
 	tackle_rod_button.position = Vector2(tackle_left_x + 12.0, rod_showcase_y)
 	tackle_rod_button.size = Vector2(tackle_left_width - 24.0, rod_showcase_height)
 	tackle_rod_button.add_theme_font_size_override("font_size", 13)
-	tackle_rod_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	tackle_rod_button.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tackle_rod_button.add_theme_constant_override("icon_max_width", int(min(tackle_left_width - 76.0, 210.0)))
 
 	if tackle_rod_name_label != null:
-		tackle_rod_name_label.position = Vector2(tackle_left_x + 28.0, rod_showcase_y + 12.0)
-		tackle_rod_name_label.size = Vector2(tackle_left_width - 84.0, 48.0)
+		tackle_rod_name_label.position = Vector2(tackle_left_x + 26.0, rod_showcase_y + 14.0)
+		tackle_rod_name_label.size = Vector2(tackle_left_width - 70.0, 58.0)
 		tackle_rod_name_label.z_index = MENU_PANEL_Z + 5
-		tackle_rod_name_label.add_theme_font_size_override("font_size", 16)
+		tackle_rod_name_label.add_theme_font_size_override("font_size", 18)
 		tackle_rod_name_label.add_theme_color_override("font_color", Color(1.0, 0.84, 0.48, 1.0))
 		tackle_rod_name_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.72))
 		tackle_rod_name_label.add_theme_constant_override("shadow_offset_x", 1)
 		tackle_rod_name_label.add_theme_constant_override("shadow_offset_y", 1)
+
+	if tackle_rod_meta_label != null:
+		tackle_rod_meta_label.position = Vector2(tackle_left_x + 26.0, rod_showcase_y + 78.0)
+		tackle_rod_meta_label.size = Vector2(tackle_left_width - 52.0, 86.0)
+		tackle_rod_meta_label.z_index = MENU_PANEL_Z + 5
+		tackle_rod_meta_label.add_theme_font_size_override("font_size", 12)
+		tackle_rod_meta_label.add_theme_color_override("font_color", Color(0.77, 0.92, 0.86, 0.96))
+		tackle_rod_meta_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.62))
+		tackle_rod_meta_label.add_theme_constant_override("shadow_offset_x", 1)
+		tackle_rod_meta_label.add_theme_constant_override("shadow_offset_y", 1)
+		tackle_rod_meta_label.clip_text = true
 
 	if tackle_info_button != null:
 		tackle_info_button.position = Vector2(tackle_left_x + tackle_left_width - 52.0, rod_showcase_y + 10.0)
@@ -4610,10 +4626,18 @@ func _setup_layout() -> void:
 	tackle_compare_label.add_theme_color_override("font_color", Color(0.78, 0.90, 0.86, 0.94))
 	tackle_compare_label.clip_text = true
 
-	tackle_hint_label.position = Vector2(tackle_left_x + 16.0, tackle_action_y + 46.0)
-	tackle_hint_label.size = Vector2(tackle_inner_width - 32.0, 20.0)
-	tackle_hint_label.add_theme_font_size_override("font_size", 11)
+	if tackle_status_panel != null:
+		tackle_status_panel.position = Vector2(tackle_left_x + 16.0, tackle_action_y + 44.0)
+		tackle_status_panel.size = Vector2(tackle_inner_width - 32.0, 22.0)
+		tackle_status_panel.z_index = MENU_PANEL_Z + 3
+
+	tackle_hint_label.position = Vector2(tackle_left_x + 28.0, tackle_action_y + 46.0)
+	tackle_hint_label.size = Vector2(tackle_inner_width - 56.0, 18.0)
+	tackle_hint_label.z_index = MENU_PANEL_Z + 4
+	tackle_hint_label.add_theme_font_size_override("font_size", 12)
 	tackle_hint_label.add_theme_color_override("font_color", Color(0.82, 0.72, 0.48, 0.92))
+	tackle_hint_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.52))
+	tackle_hint_label.add_theme_constant_override("shadow_offset_y", 1)
 	tackle_hint_label.clip_text = true
 
 	tackle_depth_label.position = Vector2(tackle_padding + 16.0, tackle_action_y + 10.0)
