@@ -25,6 +25,7 @@ const CatchPopupControllerScript := preload("res://scripts/ui/controllers/CatchP
 const CatchResultHandlerScript := preload("res://scripts/gameplay/handlers/CatchResultHandler.gd")
 const WeatherEffectsControllerScript := preload("res://scripts/environment/WeatherEffectsController.gd")
 const AmbientVoicesControllerScript := preload("res://scripts/environment/AmbientVoicesController.gd")
+const WaterAnimationLayerScript := preload("res://scripts/environment/WaterAnimationLayer.gd")
 const NAVIGATION_CONTROLLER_PATH := "res://scripts/ui/controllers/NavigationController.gd"
 const SIDE_MENU_CONTROLLER_PATH := "res://scripts/ui/controllers/SideMenuController.gd"
 const FishHarborScene := preload("res://scenes/economy/FishHarbor.tscn")
@@ -340,6 +341,7 @@ var harbor_button: Button
 var environment_layer: Node2D
 var environment_sprites: Dictionary = {}
 var day_night_controller: Node2D
+var water_animation_layer: Control
 var time_hud_panel: Panel
 var weather_hud_row: HBoxContainer
 var weather_hud_panel: Panel
@@ -629,6 +631,78 @@ func _setup_ui_controllers() -> void:
 	keepnet_ui.sell_fish_requested.connect(_on_keepnet_sell_fish_pressed)
 	catch_popup_controller.keep_requested.connect(_on_catch_keep_button_pressed)
 	catch_popup_controller.release_requested.connect(_on_catch_release_button_pressed)
+
+func _ensure_water_animation_layer() -> void:
+	if water_animation_layer != null and is_instance_valid(water_animation_layer):
+		return
+
+	var existing_layer := get_node_or_null("WaterAnimationLayer") as Control
+	if existing_layer != null:
+		water_animation_layer = existing_layer
+	else:
+		water_animation_layer = WaterAnimationLayerScript.new() as Control
+		water_animation_layer.name = "WaterAnimationLayer"
+		add_child(water_animation_layer)
+
+	water_animation_layer.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	water_animation_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	water_animation_layer.z_as_relative = false
+	_update_water_animation_layer_z()
+
+func _update_water_animation_layer_z() -> void:
+	if water_animation_layer == null:
+		return
+
+	water_animation_layer.z_as_relative = false
+	water_animation_layer.z_index = -106 if day_night_controller != null else -13
+
+func _get_current_water_profile_id() -> String:
+	var spot := SpotDatabase.get_spot(PlayerData.current_spot)
+	return str(spot.get("water_profile", "calm_pier"))
+
+func _apply_current_water_profile() -> void:
+	_ensure_water_animation_layer()
+	if water_animation_layer == null:
+		return
+
+	if water_animation_layer.has_method("set_water_profile"):
+		water_animation_layer.call("set_water_profile", _get_current_water_profile_id())
+	_layout_water_animation_layer(get_viewport_rect().size)
+
+func _layout_water_animation_layer(screen_size: Vector2) -> void:
+	_ensure_water_animation_layer()
+	if water_animation_layer == null:
+		return
+
+	_update_water_animation_layer_z()
+	var rect := _get_safe_water_animation_rect(screen_size)
+	if water_animation_layer.has_method("set_water_rect"):
+		water_animation_layer.call("set_water_rect", rect)
+	else:
+		water_animation_layer.position = rect.position
+		water_animation_layer.size = rect.size
+	water_animation_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+func _get_safe_water_animation_rect(screen_size: Vector2) -> Rect2:
+	if screen_size.x <= 1.0 or screen_size.y <= 1.0:
+		return Rect2(Vector2.ZERO, Vector2.ZERO)
+
+	var water_top := _water_zone_top
+	var water_bottom := _water_zone_bottom
+	if water_top <= 0.0 or water_bottom <= water_top:
+		water_top = screen_size.y * 0.72
+		water_bottom = water_top + screen_size.y * 0.06
+
+	var horizontal_padding := clampf(screen_size.x * 0.035, 18.0, 48.0)
+	var rect_top := maxf(water_top - screen_size.y * 0.10, screen_size.y * 0.50)
+	var rect_bottom := minf(water_bottom + screen_size.y * 0.18, screen_size.y * 0.91)
+	if rect_bottom <= rect_top + 48.0:
+		rect_bottom = minf(rect_top + maxf(86.0, screen_size.y * 0.18), screen_size.y * 0.91)
+
+	return Rect2(
+		Vector2(horizontal_padding, rect_top),
+		Vector2(maxf(screen_size.x - horizontal_padding * 2.0, 1.0), maxf(rect_bottom - rect_top, 1.0))
+	)
 
 func _ensure_ui_canvas_layer() -> void:
 	if ui_canvas_layer == null:
@@ -3421,6 +3495,7 @@ func _set_float_presence(center: Vector2, state: String, intensity: float) -> vo
 
 func _update_fishing_presence(delta: float) -> void:
 	fishing_presence_ui._update_fishing_presence(delta)
+	_layout_water_animation_layer(get_viewport_rect().size)
 
 func _setup_layout() -> void:
 	_ensure_modal_layer()
@@ -4112,6 +4187,7 @@ func _setup_layout() -> void:
 	fight_hint_label.visible = false
 
 	_apply_gameplay_screen_composition(screen_size)
+	_layout_water_animation_layer(screen_size)
 	if system_menu_ui != null and system_menu_ui.has_method("layout"):
 		system_menu_ui.layout(screen_size)
 	if tuman_fm_hud != null and tuman_fm_hud.has_method("layout"):
@@ -5031,6 +5107,7 @@ func _setup_spots() -> void:
 
 	spot_option_button.select(selected_index)
 	PlayerData.set_current_spot(str(spot_option_button.get_item_metadata(selected_index)))
+	_apply_current_water_profile()
 
 func _connect_signals() -> void:
 	spot_option_button.item_selected.connect(_on_spot_selected)
@@ -5981,6 +6058,7 @@ func _on_spot_selected(index: int) -> void:
 		return
 
 	PlayerData.set_current_spot(str(spot_option_button.get_item_metadata(index)))
+	_apply_current_water_profile()
 	var spot := SpotDatabase.get_spot(PlayerData.current_spot)
 	result_label.text = "Выбрано: %s\nГлубина воды: до %.1f м | снасть %.1f м" % [
 		spot["name"],
