@@ -243,7 +243,10 @@ const REEDS_PIER_VISUAL_PROFILE := {
 	"sun_path_end": Vector2(0.90, 0.58),
 	"moon_path_start": Vector2(0.16, 0.57),
 	"moon_path_end": Vector2(0.84, 0.55),
-	"sun_arc_height": 0.30,
+	"sun_arc_height": 0.47,
+	"sun_size": 88.0,
+	"sun_halo_boost": 1.25,
+	"sun_alpha_boost": 1.10,
 	"moon_arc_height": 0.23
 }
 const GREEN_DUCKWEED_VISUAL_PROFILE := {
@@ -455,11 +458,14 @@ func update_sun_position(minutes: float) -> void:
 	var visual_profile := _get_current_visual_profile()
 	var profile_sun_arc_height := _get_profile_float(visual_profile, "sun_arc_height", sun_arc_height)
 	var profile_sun_size := _get_profile_float(visual_profile, "sun_size", sun_size)
+	var profile_sun_halo_boost := _get_profile_float(visual_profile, "sun_halo_boost", 1.0)
+	var profile_sun_alpha_boost := _get_profile_float(visual_profile, "sun_alpha_boost", 1.0)
 	var screen_scale: float = clampf(_viewport_size.y / 540.0, 0.82, 1.35)
 	var target_size: float = profile_sun_size * screen_scale
 	var position_data: Dictionary = _get_celestial_position_data(sun_t, profile_sun_arc_height, false, visual_profile, target_size)
 	var position: Vector2 = position_data["position"] as Vector2
 	var horizon_alpha: float = float(position_data.get("horizon_alpha", 1.0))
+	var final_sun_alpha: float = clampf(sun_alpha * disk_visibility * horizon_alpha * profile_sun_alpha_boost, 0.0, 1.0)
 	var sun_color := Color(1.10, lerpf(1.04, 0.82, sun_warmth), lerpf(0.92, 0.54, sun_warmth), 1.0)
 	var halo_color := Color(1.0, lerpf(0.92, 0.70, sun_warmth), lerpf(0.66, 0.36, sun_warmth), 1.0)
 	var material := _sun_sprite.material as ShaderMaterial
@@ -467,17 +473,17 @@ func update_sun_position(minutes: float) -> void:
 		material.set_shader_parameter("light_color", sun_color)
 		material.set_shader_parameter("halo_color", halo_color)
 		material.set_shader_parameter("texture_mix", lerpf(0.0, 0.010, sun_warmth))
-		material.set_shader_parameter("halo_strength", lerpf(0.78, 0.92, sun_warmth))
-		material.set_shader_parameter("ray_strength", lerpf(0.12, 0.18, sun_warmth))
+		material.set_shader_parameter("halo_strength", lerpf(0.78, 0.92, sun_warmth) * profile_sun_halo_boost)
+		material.set_shader_parameter("ray_strength", lerpf(0.12, 0.18, sun_warmth) * profile_sun_halo_boost)
 
 	_sun_sprite.position = position
 	_sun_sprite.scale = _get_sprite_uniform_scale(_sun_sprite, target_size)
-	_sun_sprite.visible = sun_alpha * horizon_alpha > 0.01
+	_sun_sprite.visible = final_sun_alpha > 0.01
 	_sun_sprite.modulate = Color(
 		1.0,
 		1.0,
 		1.0,
-		sun_alpha * disk_visibility * horizon_alpha
+		final_sun_alpha
 	)
 
 func update_moon_position(minutes: float) -> void:
