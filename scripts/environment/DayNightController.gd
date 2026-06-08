@@ -52,7 +52,15 @@ const OLD_OAK_PIER_VISUAL_PROFILE := {
 	"show_forest": false,
 	"show_light_overlay": false,
 	"show_foreground": false,
-	"mist_enabled": false
+	"mist_enabled": false,
+	"sky_rect": [0.05, 0.04, 0.90, 0.52],
+	"horizon_y": 0.56,
+	"sun_path_start": Vector2(0.12, 0.59),
+	"sun_path_end": Vector2(0.90, 0.58),
+	"moon_path_start": Vector2(0.18, 0.58),
+	"moon_path_end": Vector2(0.84, 0.57),
+	"sun_arc_height": 0.30,
+	"moon_arc_height": 0.24
 }
 const QUIET_WATER_PIER_VISUAL_PROFILE := {
 	"profile_key": "quiet_water_pier",
@@ -66,7 +74,15 @@ const QUIET_WATER_PIER_VISUAL_PROFILE := {
 	"show_forest": false,
 	"show_light_overlay": false,
 	"show_foreground": true,
-	"mist_enabled": false
+	"mist_enabled": false,
+	"sky_rect": [0.05, 0.05, 0.90, 0.53],
+	"horizon_y": 0.58,
+	"sun_path_start": Vector2(0.10, 0.61),
+	"sun_path_end": Vector2(0.90, 0.60),
+	"moon_path_start": Vector2(0.16, 0.60),
+	"moon_path_end": Vector2(0.84, 0.58),
+	"sun_arc_height": 0.31,
+	"moon_arc_height": 0.24
 }
 const MORNING_PIER_VISUAL_PROFILE := {
 	"profile_key": "morning_pier",
@@ -81,7 +97,15 @@ const MORNING_PIER_VISUAL_PROFILE := {
 	"show_light_overlay": false,
 	"show_foreground": true,
 	"foreground_z": 5,
-	"mist_enabled": false
+	"mist_enabled": false,
+	"sky_rect": [0.04, 0.04, 0.92, 0.56],
+	"horizon_y": 0.60,
+	"sun_path_start": Vector2(0.08, 0.63),
+	"sun_path_end": Vector2(0.92, 0.62),
+	"moon_path_start": Vector2(0.14, 0.61),
+	"moon_path_end": Vector2(0.86, 0.60),
+	"sun_arc_height": 0.32,
+	"moon_arc_height": 0.25
 }
 const OLD_BOAT_PIER_VISUAL_PROFILE := {
 	"profile_key": "old_boat_pier",
@@ -96,7 +120,15 @@ const OLD_BOAT_PIER_VISUAL_PROFILE := {
 	"show_light_overlay": false,
 	"show_foreground": true,
 	"foreground_z": 5,
-	"mist_enabled": false
+	"mist_enabled": false,
+	"sky_rect": [0.05, 0.05, 0.90, 0.52],
+	"horizon_y": 0.57,
+	"sun_path_start": Vector2(0.10, 0.60),
+	"sun_path_end": Vector2(0.88, 0.59),
+	"moon_path_start": Vector2(0.16, 0.58),
+	"moon_path_end": Vector2(0.84, 0.57),
+	"sun_arc_height": 0.30,
+	"moon_arc_height": 0.24
 }
 const DEEP_PIER_VISUAL_PROFILE := {
 	"profile_key": "deep_pier",
@@ -113,9 +145,16 @@ const DEEP_PIER_VISUAL_PROFILE := {
 	"foreground_z": 5,
 	"celestial_z": 1,
 	"sun_horizon_y_ratio": 0.37,
-	"sun_arc_height": 0.22,
 	"sun_size": 54.0,
-	"mist_enabled": false
+	"mist_enabled": false,
+	"sky_rect": [0.06, 0.04, 0.86, 0.48],
+	"horizon_y": 0.52,
+	"sun_path_start": Vector2(0.14, 0.55),
+	"sun_path_end": Vector2(0.84, 0.53),
+	"moon_path_start": Vector2(0.20, 0.53),
+	"moon_path_end": Vector2(0.80, 0.51),
+	"sun_arc_height": 0.28,
+	"moon_arc_height": 0.22
 }
 const COLD_WATER_VISUAL_PROFILE := {
 	"profile_key": "cold_water",
@@ -130,7 +169,15 @@ const COLD_WATER_VISUAL_PROFILE := {
 	"show_light_overlay": false,
 	"show_foreground": true,
 	"foreground_z": 5,
-	"mist_enabled": false
+	"mist_enabled": false,
+	"sky_rect": [0.05, 0.04, 0.90, 0.52],
+	"horizon_y": 0.56,
+	"sun_path_start": Vector2(0.10, 0.59),
+	"sun_path_end": Vector2(0.88, 0.58),
+	"moon_path_start": Vector2(0.16, 0.58),
+	"moon_path_end": Vector2(0.84, 0.56),
+	"sun_arc_height": 0.30,
+	"moon_arc_height": 0.23
 }
 const DARK_HOLE_VISUAL_PROFILE := {
 	"profile_key": "dark_hole",
@@ -145,7 +192,15 @@ const DARK_HOLE_VISUAL_PROFILE := {
 	"show_light_overlay": false,
 	"show_foreground": true,
 	"foreground_z": 5,
-	"mist_enabled": false
+	"mist_enabled": false,
+	"sky_rect": [0.07, 0.04, 0.84, 0.50],
+	"horizon_y": 0.54,
+	"sun_path_start": Vector2(0.14, 0.57),
+	"sun_path_end": Vector2(0.84, 0.56),
+	"moon_path_start": Vector2(0.20, 0.55),
+	"moon_path_end": Vector2(0.78, 0.53),
+	"sun_arc_height": 0.28,
+	"moon_arc_height": 0.22
 }
 const MIST_PIER_VISUAL_PROFILE := {
 	"profile_key": "mist_pier",
@@ -159,7 +214,15 @@ const MIST_PIER_VISUAL_PROFILE := {
 	"show_light_overlay": false,
 	"show_foreground": true,
 	"foreground_z": 5,
-	"mist_enabled": false
+	"mist_enabled": false,
+	"sky_rect": [0.08, 0.05, 0.84, 0.52],
+	"horizon_y": 0.57,
+	"sun_path_start": Vector2(0.16, 0.60),
+	"sun_path_end": Vector2(0.84, 0.59),
+	"moon_path_start": Vector2(0.22, 0.58),
+	"moon_path_end": Vector2(0.78, 0.56),
+	"sun_arc_height": 0.27,
+	"moon_arc_height": 0.22
 }
 const REEDS_PIER_VISUAL_PROFILE := {
 	"profile_key": "reeds_pier",
@@ -173,7 +236,15 @@ const REEDS_PIER_VISUAL_PROFILE := {
 	"show_light_overlay": false,
 	"show_foreground": true,
 	"foreground_z": 5,
-	"mist_enabled": false
+	"mist_enabled": false,
+	"sky_rect": [0.05, 0.04, 0.90, 0.52],
+	"horizon_y": 0.56,
+	"sun_path_start": Vector2(0.10, 0.59),
+	"sun_path_end": Vector2(0.90, 0.58),
+	"moon_path_start": Vector2(0.16, 0.57),
+	"moon_path_end": Vector2(0.84, 0.55),
+	"sun_arc_height": 0.30,
+	"moon_arc_height": 0.23
 }
 const GREEN_DUCKWEED_VISUAL_PROFILE := {
 	"profile_key": "green_duckweed",
@@ -189,13 +260,19 @@ const GREEN_DUCKWEED_VISUAL_PROFILE := {
 	"sun_start_x_ratio": 0.56,
 	"sun_end_x_ratio": 1.05,
 	"sun_horizon_y_ratio": 0.30,
-	"sun_arc_height": 0.22,
 	"sun_size": 58.0,
 	"moon_start_x_ratio": 0.54,
 	"moon_end_x_ratio": 0.98,
 	"moon_horizon_y_ratio": 0.31,
-	"moon_arc_height": 0.20,
-	"mist_enabled": false
+	"mist_enabled": false,
+	"sky_rect": [0.34, 0.04, 0.62, 0.41],
+	"horizon_y": 0.45,
+	"sun_path_start": Vector2(0.38, 0.48),
+	"sun_path_end": Vector2(0.98, 0.47),
+	"moon_path_start": Vector2(0.36, 0.47),
+	"moon_path_end": Vector2(0.94, 0.45),
+	"sun_arc_height": 0.24,
+	"moon_arc_height": 0.20
 }
 const FROG_BACKWATER_VISUAL_PROFILE := {
 	"profile_key": "frog_backwater",
@@ -207,7 +284,15 @@ const FROG_BACKWATER_VISUAL_PROFILE := {
 	"show_forest": false,
 	"show_light_overlay": false,
 	"show_foreground": false,
-	"mist_enabled": false
+	"mist_enabled": false,
+	"sky_rect": [0.06, 0.04, 0.86, 0.50],
+	"horizon_y": 0.54,
+	"sun_path_start": Vector2(0.12, 0.57),
+	"sun_path_end": Vector2(0.84, 0.56),
+	"moon_path_start": Vector2(0.18, 0.55),
+	"moon_path_end": Vector2(0.80, 0.53),
+	"sun_arc_height": 0.28,
+	"moon_arc_height": 0.22
 }
 const SPOT_VISUAL_PROFILES := {
 	"old_oak_pier": OLD_OAK_PIER_VISUAL_PROFILE,
@@ -246,6 +331,11 @@ const STARS_LAYER_Z := 0
 const MOON_SPRITE_Z := 0
 const SUN_SPRITE_Z := 0
 const MOUNTAINS_LAYER_Z := 2
+const SKY_REFERENCE_SIZE := Vector2(960.0, 540.0)
+const CELESTIAL_HORIZON_FADE_RATIO := 0.065
+const CELESTIAL_HORIZON_CLAMP_MARGIN_RATIO := 0.012
+const SKY_DEBUG_RECT_Z := 18
+const HORIZON_DEBUG_LINE_Z := 19
 
 var _time_manager: Node
 var _viewport_size: Vector2 = Vector2.ZERO
@@ -262,6 +352,8 @@ var _light_overlay_layer: TextureRect
 var _night_tint_overlay: ColorRect
 var _sunset_tint_overlay: ColorRect
 var _foreground_grass_layer: TextureRect
+var _sky_debug_rect: Panel
+var _horizon_debug_line: ColorRect
 var _last_debug_phase := ""
 var _last_debug_viewport := Vector2.ZERO
 var _warned_missing_visual_paths := {}
@@ -305,13 +397,15 @@ func layout_environment(screen_size: Vector2) -> void:
 			(rect as TextureRect).expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			(rect as TextureRect).stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 
-	_apply_visual_profile_layout(_get_current_visual_profile(), screen_size)
+	var visual_profile := _get_current_visual_profile()
+	_apply_visual_profile_layout(visual_profile, screen_size)
 
 	if _stars_layer != null and _stars_layer.has_method("set_viewport_size"):
 		_stars_layer.call("set_viewport_size", screen_size)
 	if _stars_layer != null and _stars_layer.has_method("set_horizon_y_ratio"):
-		_stars_layer.call("set_horizon_y_ratio", horizon_y_ratio)
+		_stars_layer.call("set_horizon_y_ratio", _get_sky_horizon_y_ratio(visual_profile))
 
+	_update_sky_debug_overlay(visual_profile)
 	_debug_print_layout()
 	update_day_night_visuals()
 
@@ -326,6 +420,7 @@ func update_day_night_visuals(_time_state: Dictionary = {}) -> void:
 	update_moon_position(minutes)
 	update_stars_visibility(minutes)
 	update_scene_tint(minutes, phase)
+	_update_sky_debug_overlay(_get_current_visual_profile())
 
 func update_sun_position(minutes: float) -> void:
 	if not show_dynamic_sun:
@@ -333,8 +428,7 @@ func update_sun_position(minutes: float) -> void:
 		return
 
 	var sun_t: float = clampf((minutes - DAWN_START) / maxf(NIGHT_START - DAWN_START, 1.0), 0.0, 1.0)
-	var sun_arc: float = sin(sun_t * PI)
-	var sun_alpha: float = _fade_between(minutes, DAWN_START, DAWN_START + 65.0) * (1.0 - _fade_between(minutes, NIGHT_START - 80.0, NIGHT_START))
+	var sun_alpha: float = _fade_between(minutes, DAWN_START, DAWN_START + 105.0) * (1.0 - _fade_between(minutes, NIGHT_START - 120.0, NIGHT_START))
 	var disk_visibility: float = _sample_time_value(minutes, [
 		[DAWN_START, 0.0],
 		[390.0, 0.18],
@@ -361,44 +455,49 @@ func update_sun_position(minutes: float) -> void:
 	var visual_profile := _get_current_visual_profile()
 	var profile_sun_arc_height := _get_profile_float(visual_profile, "sun_arc_height", sun_arc_height)
 	var profile_sun_size := _get_profile_float(visual_profile, "sun_size", sun_size)
-	var position: Vector2 = get_celestial_position(sun_t, profile_sun_arc_height, false, visual_profile)
 	var screen_scale: float = clampf(_viewport_size.y / 540.0, 0.82, 1.35)
-	var sun_color := Color(1.04, lerpf(0.98, 0.70, sun_warmth), lerpf(0.86, 0.44, sun_warmth), 1.0)
-	var halo_color := Color(1.0, lerpf(0.90, 0.62, sun_warmth), lerpf(0.58, 0.26, sun_warmth), 1.0)
+	var target_size: float = profile_sun_size * screen_scale
+	var position_data: Dictionary = _get_celestial_position_data(sun_t, profile_sun_arc_height, false, visual_profile, target_size)
+	var position: Vector2 = position_data["position"] as Vector2
+	var horizon_alpha: float = float(position_data.get("horizon_alpha", 1.0))
+	var sun_color := Color(1.10, lerpf(1.04, 0.82, sun_warmth), lerpf(0.92, 0.54, sun_warmth), 1.0)
+	var halo_color := Color(1.0, lerpf(0.92, 0.70, sun_warmth), lerpf(0.66, 0.36, sun_warmth), 1.0)
 	var material := _sun_sprite.material as ShaderMaterial
 	if material != null:
 		material.set_shader_parameter("light_color", sun_color)
 		material.set_shader_parameter("halo_color", halo_color)
-		material.set_shader_parameter("texture_mix", lerpf(0.015, 0.045, sun_warmth))
-		material.set_shader_parameter("halo_strength", lerpf(0.58, 0.72, sun_warmth))
-		material.set_shader_parameter("ray_strength", lerpf(0.08, 0.13, sun_warmth))
+		material.set_shader_parameter("texture_mix", lerpf(0.0, 0.010, sun_warmth))
+		material.set_shader_parameter("halo_strength", lerpf(0.78, 0.92, sun_warmth))
+		material.set_shader_parameter("ray_strength", lerpf(0.12, 0.18, sun_warmth))
 
 	_sun_sprite.position = position
-	_sun_sprite.scale = _get_sprite_uniform_scale(_sun_sprite, profile_sun_size * screen_scale)
-	_sun_sprite.visible = sun_alpha > 0.01
+	_sun_sprite.scale = _get_sprite_uniform_scale(_sun_sprite, target_size)
+	_sun_sprite.visible = sun_alpha * horizon_alpha > 0.01
 	_sun_sprite.modulate = Color(
 		1.0,
 		1.0,
 		1.0,
-		sun_alpha * disk_visibility
+		sun_alpha * disk_visibility * horizon_alpha
 	)
 
 func update_moon_position(minutes: float) -> void:
 	var night_length: float = MINUTES_PER_DAY - NIGHT_START + DAWN_START
 	var moon_minutes: float = minutes - NIGHT_START if minutes >= NIGHT_START else minutes + MINUTES_PER_DAY - NIGHT_START
 	var moon_t: float = clampf(moon_minutes / maxf(night_length, 1.0), 0.0, 1.0)
-	var moon_arc: float = sin(moon_t * PI)
-	var moon_alpha: float = _fade_between(moon_minutes, 0.0, 75.0) * (1.0 - _fade_between(moon_minutes, night_length - 75.0, night_length))
+	var moon_alpha: float = _fade_between(moon_minutes, 0.0, 105.0) * (1.0 - _fade_between(moon_minutes, night_length - 105.0, night_length))
 	var visual_profile := _get_current_visual_profile()
 	var profile_moon_arc_height := _get_profile_float(visual_profile, "moon_arc_height", moon_arc_height)
 	var profile_moon_size := _get_profile_float(visual_profile, "moon_size", moon_size)
-	var position: Vector2 = get_celestial_position(moon_t, profile_moon_arc_height, true, visual_profile)
 	var screen_scale: float = clampf(_viewport_size.y / 540.0, 0.82, 1.35)
+	var target_size: float = profile_moon_size * screen_scale
+	var position_data: Dictionary = _get_celestial_position_data(moon_t, profile_moon_arc_height, true, visual_profile, target_size)
+	var position: Vector2 = position_data["position"] as Vector2
+	var horizon_alpha: float = float(position_data.get("horizon_alpha", 1.0))
 
 	_moon_sprite.position = position
-	_moon_sprite.scale = _get_sprite_uniform_scale(_moon_sprite, profile_moon_size * screen_scale)
-	_moon_sprite.visible = moon_alpha > 0.01
-	_moon_sprite.modulate = Color(0.80, 0.90, 1.0, moon_alpha * 0.92)
+	_moon_sprite.scale = _get_sprite_uniform_scale(_moon_sprite, target_size)
+	_moon_sprite.visible = moon_alpha * horizon_alpha > 0.01
+	_moon_sprite.modulate = Color(0.80, 0.90, 1.0, moon_alpha * horizon_alpha * 0.92)
 
 func update_stars_visibility(minutes: float) -> void:
 	var stars_alpha: float = _sample_time_value(minutes, [
@@ -493,11 +592,12 @@ func update_scene_tint(minutes: float, _phase: String = "") -> void:
 
 func _apply_sunset_tint(sunset_strength: float) -> void:
 	var strength: float = clampf(sunset_strength * sunset_tint_strength, 0.0, 1.0)
+	var active_horizon_y: float = _get_sky_horizon_y_ratio(_get_current_visual_profile())
 	var material := _sunset_tint_overlay.material as ShaderMaterial
 	if material != null:
 		material.set_shader_parameter("tint_color", Color(1.0, 0.46, 0.16, 1.0))
 		material.set_shader_parameter("strength", strength)
-		material.set_shader_parameter("horizon_y", horizon_y_ratio)
+		material.set_shader_parameter("horizon_y", active_horizon_y)
 		_sunset_tint_overlay.color = Color.WHITE
 		return
 
@@ -505,11 +605,12 @@ func _apply_sunset_tint(sunset_strength: float) -> void:
 
 func _apply_night_tint(night_strength: float) -> void:
 	var strength: float = clampf(night_strength * night_tint_strength, 0.0, 1.0)
+	var active_horizon_y: float = _get_sky_horizon_y_ratio(_get_current_visual_profile())
 	var material := _night_tint_overlay.material as ShaderMaterial
 	if material != null:
 		material.set_shader_parameter("tint_color", Color(0.02, 0.05, 0.13, 1.0))
 		material.set_shader_parameter("strength", strength)
-		material.set_shader_parameter("horizon_y", horizon_y_ratio)
+		material.set_shader_parameter("horizon_y", active_horizon_y)
 		material.set_shader_parameter("water_relief", 0.86)
 		_night_tint_overlay.color = Color.WHITE
 		return
@@ -532,6 +633,16 @@ func get_celestial_position(
 	moon: bool = false,
 	profile: Dictionary = {}
 ) -> Vector2:
+	var data: Dictionary = _get_celestial_position_data(phase_t, arc_height, moon, profile)
+	return data["position"] as Vector2
+
+func _get_celestial_position_data(
+	phase_t: float,
+	arc_height: float,
+	moon: bool = false,
+	profile: Dictionary = {},
+	target_size: float = 0.0
+) -> Dictionary:
 	if _viewport_size == Vector2.ZERO:
 		_viewport_size = get_viewport_rect().size
 
@@ -539,7 +650,7 @@ func get_celestial_position(
 	if active_profile.is_empty():
 		active_profile = _get_current_visual_profile()
 	var safe_t: float = clampf(phase_t, 0.0, 1.0)
-	var horizon_ratio := _get_profile_float(
+	var old_horizon_ratio := _get_profile_float(
 		active_profile,
 		"moon_horizon_y_ratio" if moon else "sun_horizon_y_ratio",
 		moon_horizon_y_ratio if moon else sun_horizon_y_ratio
@@ -554,17 +665,130 @@ func get_celestial_position(
 		"moon_end_x_ratio" if moon else "sun_end_x_ratio",
 		moon_end_x_ratio if moon else sun_end_x_ratio
 	)
-	var horizon_y: float = _viewport_size.y * horizon_ratio
-	var x: float
-	if moon:
-		x = lerpf(_viewport_size.x * start_x_ratio, _viewport_size.x * end_x_ratio, safe_t)
-	else:
-		x = lerpf(_viewport_size.x * start_x_ratio, _viewport_size.x * end_x_ratio, safe_t)
+	var horizon_y: float = _get_sky_horizon_y(active_profile)
+	var sky_rect: Rect2 = _get_sky_rect(active_profile)
+	var start_point: Vector2 = _get_celestial_path_point(
+		active_profile,
+		"moon_path_start" if moon else "sun_path_start",
+		start_x_ratio,
+		old_horizon_ratio,
+		sky_rect,
+		horizon_y
+	)
+	var end_point: Vector2 = _get_celestial_path_point(
+		active_profile,
+		"moon_path_end" if moon else "sun_path_end",
+		end_x_ratio,
+		old_horizon_ratio,
+		sky_rect,
+		horizon_y
+	)
+	var raw_position: Vector2 = start_point.lerp(end_point, safe_t)
 	var arc: float = sin(safe_t * PI)
-	var y: float = horizon_y - arc * _viewport_size.y * arc_height
+	var arc_pixels: float = minf(_viewport_size.y * arc_height, maxf(sky_rect.size.y * 0.92, 1.0))
+	raw_position.y -= arc * arc_pixels
 	if moon:
-		y -= _viewport_size.y * 0.035
-	return Vector2(x, y)
+		raw_position.y -= minf(_viewport_size.y * 0.035, sky_rect.size.y * 0.12)
+
+	var horizon_alpha: float = _get_celestial_horizon_visibility(raw_position.y, horizon_y, target_size)
+	var position: Vector2 = raw_position
+	position.x = clampf(position.x, sky_rect.position.x, sky_rect.end.x)
+	var top_limit: float = sky_rect.position.y + maxf(target_size * 0.18, _viewport_size.y * 0.015)
+	var bottom_limit: float = minf(horizon_y - maxf(1.0, target_size * 0.10), sky_rect.end.y - 1.0)
+	if bottom_limit < top_limit:
+		bottom_limit = top_limit
+	position.y = clampf(position.y, top_limit, bottom_limit)
+	return {
+		"position": position,
+		"raw_position": raw_position,
+		"horizon_alpha": horizon_alpha,
+		"sky_rect": sky_rect,
+		"horizon_y": horizon_y
+	}
+
+func _get_celestial_horizon_visibility(raw_y: float, profile_horizon_y: float, target_size: float) -> float:
+	var fade_distance: float = maxf(_viewport_size.y * CELESTIAL_HORIZON_FADE_RATIO, target_size * 0.85)
+	var fade_start: float = profile_horizon_y - maxf(target_size * 0.32, _viewport_size.y * CELESTIAL_HORIZON_CLAMP_MARGIN_RATIO)
+	var fade_end: float = profile_horizon_y + fade_distance
+	return 1.0 - _fade_between(raw_y, fade_start, fade_end)
+
+func _get_celestial_path_point(
+	profile: Dictionary,
+	key: String,
+	fallback_x_ratio: float,
+	fallback_y_ratio: float,
+	sky_rect: Rect2,
+	profile_horizon_y: float
+) -> Vector2:
+	var point := Vector2(_viewport_size.x * fallback_x_ratio, _viewport_size.y * fallback_y_ratio)
+	if profile.has(key):
+		var raw_value: Variant = profile.get(key)
+		if raw_value is Vector2:
+			point = _scale_sky_point(raw_value as Vector2)
+		elif raw_value is Array:
+			var raw_array := raw_value as Array
+			if raw_array.size() >= 2:
+				point = _scale_sky_point(Vector2(float(raw_array[0]), float(raw_array[1])))
+
+	var lower_limit: float = profile_horizon_y + maxf(_viewport_size.y * CELESTIAL_HORIZON_FADE_RATIO, 1.0)
+	point.x = clampf(point.x, sky_rect.position.x, sky_rect.end.x)
+	point.y = clampf(point.y, sky_rect.position.y, lower_limit)
+	return point
+
+func _get_sky_rect(profile: Dictionary) -> Rect2:
+	var horizon_y: float = _get_sky_horizon_y(profile)
+	var sky_top: float = _viewport_size.y * 0.04
+	var default_rect := Rect2(
+		Vector2(_viewport_size.x * sky_padding_ratio, sky_top),
+		Vector2(_viewport_size.x * maxf(1.0 - sky_padding_ratio * 2.0, 0.20), maxf(horizon_y - sky_top, _viewport_size.y * 0.24))
+	)
+	var rect := default_rect
+	if profile.has("sky_rect"):
+		var raw_value: Variant = profile.get("sky_rect")
+		if raw_value is Rect2:
+			rect = _scale_sky_rect(raw_value as Rect2)
+		elif raw_value is Array:
+			var raw_array := raw_value as Array
+			if raw_array.size() >= 4:
+				rect = _scale_sky_rect(Rect2(
+					Vector2(float(raw_array[0]), float(raw_array[1])),
+					Vector2(float(raw_array[2]), float(raw_array[3]))
+				))
+
+	rect.position.x = clampf(rect.position.x, 0.0, maxf(_viewport_size.x - 1.0, 0.0))
+	rect.position.y = clampf(rect.position.y, 0.0, maxf(_viewport_size.y - 1.0, 0.0))
+	rect.size.x = clampf(rect.size.x, _viewport_size.x * 0.12, _viewport_size.x - rect.position.x)
+	rect.size.y = clampf(rect.size.y, _viewport_size.y * 0.12, _viewport_size.y - rect.position.y)
+	var horizon_bottom: float = minf(horizon_y, _viewport_size.y)
+	if rect.end.y > horizon_bottom:
+		rect.size.y = maxf(horizon_bottom - rect.position.y, _viewport_size.y * 0.12)
+	return rect
+
+func _get_sky_horizon_y(profile: Dictionary) -> float:
+	return _viewport_size.y * _get_sky_horizon_y_ratio(profile)
+
+func _get_sky_horizon_y_ratio(profile: Dictionary) -> float:
+	if profile.has("horizon_y"):
+		var raw_horizon: float = float(profile.get("horizon_y"))
+		if raw_horizon <= 1.5:
+			return clampf(raw_horizon, 0.20, 0.86)
+		var screen_height: float = _viewport_size.y if _viewport_size.y > 0.0 else get_viewport_rect().size.y
+		return clampf(raw_horizon / maxf(screen_height, 1.0), 0.20, 0.86)
+	return clampf(_get_profile_float(profile, "horizon_y_ratio", horizon_y_ratio), 0.20, 0.86)
+
+func _scale_sky_point(point: Vector2) -> Vector2:
+	if absf(point.x) <= 1.5 and absf(point.y) <= 1.5:
+		return Vector2(point.x * _viewport_size.x, point.y * _viewport_size.y)
+	return Vector2(point.x * _viewport_size.x / SKY_REFERENCE_SIZE.x, point.y * _viewport_size.y / SKY_REFERENCE_SIZE.y)
+
+func _scale_sky_rect(rect: Rect2) -> Rect2:
+	var position := _scale_sky_point(rect.position)
+	var size: Vector2
+	if absf(rect.size.x) <= 1.5 and absf(rect.size.y) <= 1.5:
+		size = Vector2(rect.size.x * _viewport_size.x, rect.size.y * _viewport_size.y)
+	else:
+		size = Vector2(rect.size.x * _viewport_size.x / SKY_REFERENCE_SIZE.x, rect.size.y * _viewport_size.y / SKY_REFERENCE_SIZE.y)
+	return Rect2(position, size)
 
 func _ensure_nodes() -> void:
 	z_as_relative = false
@@ -803,6 +1027,54 @@ func _apply_visual_profile_layout(profile: Dictionary, screen_size: Vector2) -> 
 	if bool(profile.get("water_stretch_scale", false)):
 		_water_layer.stretch_mode = TextureRect.STRETCH_SCALE
 
+func _is_sky_debug_enabled() -> bool:
+	return BuildConfig.ENABLE_DEBUG_PANEL or (SHOW_ENVIRONMENT_DEBUG and BuildConfig.ENABLE_VERBOSE_LOGS)
+
+func _ensure_sky_debug_nodes() -> void:
+	if _environment_root == null:
+		return
+	if _sky_debug_rect == null:
+		_sky_debug_rect = Panel.new()
+		_sky_debug_rect.name = "SkyDebugRect"
+		_sky_debug_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_sky_debug_rect.z_as_relative = true
+		_sky_debug_rect.z_index = SKY_DEBUG_RECT_Z
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color(0.20, 0.58, 1.0, 0.06)
+		style.border_color = Color(0.42, 0.78, 1.0, 0.50)
+		style.set_border_width_all(2)
+		_sky_debug_rect.add_theme_stylebox_override("panel", style)
+		_environment_root.add_child(_sky_debug_rect)
+	if _horizon_debug_line == null:
+		_horizon_debug_line = ColorRect.new()
+		_horizon_debug_line.name = "HorizonDebugLine"
+		_horizon_debug_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_horizon_debug_line.color = Color(1.0, 0.74, 0.24, 0.70)
+		_horizon_debug_line.z_as_relative = true
+		_horizon_debug_line.z_index = HORIZON_DEBUG_LINE_Z
+		_environment_root.add_child(_horizon_debug_line)
+
+func _update_sky_debug_overlay(profile: Dictionary) -> void:
+	if not _is_sky_debug_enabled():
+		if _sky_debug_rect != null:
+			_sky_debug_rect.visible = false
+		if _horizon_debug_line != null:
+			_horizon_debug_line.visible = false
+		return
+	if _viewport_size == Vector2.ZERO:
+		_viewport_size = get_viewport_rect().size
+	_ensure_sky_debug_nodes()
+	if _sky_debug_rect == null or _horizon_debug_line == null:
+		return
+	var sky_rect: Rect2 = _get_sky_rect(profile)
+	var horizon_y: float = _get_sky_horizon_y(profile)
+	_sky_debug_rect.position = sky_rect.position
+	_sky_debug_rect.size = sky_rect.size
+	_sky_debug_rect.visible = true
+	_horizon_debug_line.position = Vector2(0.0, horizon_y)
+	_horizon_debug_line.size = Vector2(_viewport_size.x, maxf(2.0, _viewport_size.y * 0.003))
+	_horizon_debug_line.visible = true
+
 func _move_water_under_spot_layers() -> void:
 	if _environment_root == null or _sky_layer == null or _water_layer == null:
 		return
@@ -863,17 +1135,17 @@ func _make_sun_disc_material() -> ShaderMaterial:
 			vec4 tex = texture(TEXTURE, UV);
 			vec2 centered = UV * 2.0 - 1.0;
 			float dist = length(centered);
-			float core = 1.0 - smoothstep(0.00, 0.17, dist);
-			float hot_disk = 1.0 - smoothstep(0.14, 0.39, dist);
-			float soft_halo = 1.0 - smoothstep(0.24, 0.88, dist);
-			float outer_glow = 1.0 - smoothstep(0.50, 1.10, dist);
+			float white_core = 1.0 - smoothstep(0.00, 0.23, dist);
+			float soft_body = 1.0 - smoothstep(0.10, 0.54, dist);
+			float soft_halo = 1.0 - smoothstep(0.22, 1.02, dist);
+			float outer_glow = 1.0 - smoothstep(0.45, 1.22, dist);
 			float horizontal_ray = (1.0 - smoothstep(0.0, 0.13, abs(centered.y))) * (1.0 - smoothstep(0.20, 1.08, abs(centered.x)));
 			float diagonal_ray = (1.0 - smoothstep(0.0, 0.10, abs(centered.x + centered.y * 0.72))) * (1.0 - smoothstep(0.12, 0.98, dist));
 			float ray = (horizontal_ray * 0.45 + diagonal_ray * 0.20) * ray_strength;
-			vec3 texture_detail = mix(vec3(1.0), tex.rgb, texture_mix);
-			vec3 sun_body = mix(halo_color.rgb, light_color.rgb, clamp(core + hot_disk * 0.62, 0.0, 1.0));
-			vec3 color = sun_body * texture_detail + halo_color.rgb * (soft_halo * 0.10 + outer_glow * 0.08);
-			float alpha = clamp(core * 0.96 + hot_disk * 0.78 + soft_halo * halo_strength * 0.34 + outer_glow * 0.14 + ray, 0.0, 1.0);
+			vec3 texture_detail = mix(vec3(1.0), tex.rgb, texture_mix * (1.0 - white_core * 0.80));
+			vec3 body_color = mix(halo_color.rgb, light_color.rgb, clamp(white_core + soft_body * 0.44, 0.0, 1.0));
+			vec3 color = body_color * texture_detail + halo_color.rgb * (soft_halo * 0.18 + outer_glow * 0.16 + ray * 0.22);
+			float alpha = clamp(white_core * 0.88 + soft_body * 0.62 + soft_halo * halo_strength * 0.38 + outer_glow * 0.20 + ray, 0.0, 1.0);
 			COLOR = vec4(color * vertex_color.rgb, alpha * vertex_color.a * light_color.a);
 		}
 	"""
