@@ -36,6 +36,57 @@ const WORM_BAIT_PRICE_OVERRIDES := {
 	"cherv_leningradskiy": 5.6,
 	"vipolzok": 5.8
 }
+const LEVEL_UP_REWARDS := {
+	2: {
+		"silver": 25,
+		"items": [{"id": "worm", "quantity": 10}],
+		"unlocks": ["Награды за новые уровни"]
+	},
+	3: {
+		"silver": 30,
+		"items": [{"id": "maggot", "quantity": 10}],
+		"unlocks": ["Опарыш для активной рыбы"]
+	},
+	4: {
+		"silver": 40,
+		"items": [{"id": "float_feather_basic", "quantity": 1}],
+		"unlocks": ["Запасной чувствительный поплавок"]
+	},
+	5: {
+		"silver": 50,
+		"items": [{"id": "small_hook_12", "quantity": 5}],
+		"unlocks": ["Набор крючков для частой ловли"]
+	},
+	6: {
+		"silver": 60,
+		"items": [{"id": "nylon_leader_15cm_1kg", "quantity": 3}],
+		"unlocks": ["Короткие поводки для осторожной рыбы"]
+	},
+	7: {
+		"silver": 75,
+		"items": [{"id": "bread", "quantity": 10}],
+		"unlocks": ["Хлебная наживка для мирной рыбы"]
+	},
+	8: {
+		"silver": 90,
+		"items": [{"id": "lakeline_nylon_basic_2kg", "quantity": 1}],
+		"unlocks": ["Более крепкая базовая леска"]
+	},
+	9: {
+		"silver": 100,
+		"items": [
+			{"id": "worm", "quantity": 10},
+			{"id": "maggot", "quantity": 10},
+			{"id": "motil", "quantity": 8}
+		],
+		"unlocks": ["Набор наживки для разных точек"]
+	},
+	10: {
+		"silver": 150,
+		"items": [{"id": "shore_pole_rod_5m", "quantity": 1}],
+		"unlocks": ["Береговая удочка 5 м"]
+	}
+}
 
 const TACKLE_CATALOG := {
 	"simple_pole_rod_4m": {
@@ -3664,6 +3715,7 @@ var alpha_tester_bonus_claimed := false
 var level: int = 1
 var current_xp: int = 0
 var xp_to_next_level: int = 175
+var claimed_level_rewards: Dictionary = {}
 var skill_points: int = 0
 var total_skill_points_earned: int = 0
 var learned_skills: Dictionary = {}
@@ -3729,12 +3781,15 @@ func add_xp(amount: int) -> Dictionary:
 	var gained_xp: int = max(amount, 0)
 	var levels_gained: int = 0
 	var skill_points_gained := 0
+	var previous_level := level
+	var gained_levels: Array = []
 
 	current_xp += gained_xp
 
 	while current_xp >= xp_to_next_level:
 		current_xp -= xp_to_next_level
 		level += 1
+		gained_levels.append(level)
 		levels_gained += 1
 		var points_for_level := get_skill_points_for_level(level)
 		skill_points += points_for_level
@@ -3748,12 +3803,160 @@ func add_xp(amount: int) -> Dictionary:
 	return {
 		"gained_xp": gained_xp,
 		"levels_gained": levels_gained,
+		"gained_levels": gained_levels,
 		"skill_points_gained": skill_points_gained,
 		"leveled_up": levels_gained > 0,
+		"previous_level": previous_level,
 		"level": level,
 		"current_xp": current_xp,
 		"xp_to_next_level": xp_to_next_level
 	}
+
+func get_level_up_reward_config(reward_level: int) -> Dictionary:
+	if not LEVEL_UP_REWARDS.has(reward_level):
+		return {}
+	return (LEVEL_UP_REWARDS[reward_level] as Dictionary).duplicate(true)
+
+func claim_level_rewards_for_xp_result(xp_result: Dictionary) -> Array:
+	var claimed_rewards: Array = []
+	if xp_result.is_empty() or not bool(xp_result.get("leveled_up", false)):
+		return claimed_rewards
+
+	for reward_level in _get_level_reward_numbers_from_xp_result(xp_result):
+		var result := claim_level_reward(int(reward_level))
+		if bool(result.get("success", false)):
+			claimed_rewards.append(result)
+
+	return claimed_rewards
+
+func claim_level_reward(reward_level: int) -> Dictionary:
+	var reward: Dictionary = get_level_up_reward_config(reward_level)
+	if reward.is_empty():
+		return {
+			"success": false,
+			"level": reward_level,
+			"reason": "no_reward_config"
+		}
+
+	if _is_level_reward_claimed(reward_level):
+		return {
+			"success": false,
+			"level": reward_level,
+			"reason": "already_claimed"
+		}
+
+	_set_level_reward_claimed(reward_level)
+
+	var silver_reward: int = maxi(int(reward.get("silver", 0)), 0)
+	if silver_reward > 0:
+		money += float(silver_reward)
+
+	var granted_items: Array = []
+	var skipped_items: Array = []
+	for item_reward in reward.get("items", []):
+		if typeof(item_reward) != TYPE_DICTIONARY:
+			continue
+		var item_id := str(item_reward.get("id", "")).strip_edges()
+		var quantity: int = maxi(int(item_reward.get("quantity", 1)), 1)
+		var granted_item := _grant_level_reward_item(reward_level, item_id, quantity)
+		if granted_item.is_empty():
+			skipped_items.append({
+				"id": item_id,
+				"quantity": quantity
+			})
+			continue
+		granted_items.append(granted_item)
+
+	return {
+		"success": true,
+		"level": reward_level,
+		"silver": silver_reward,
+		"items": granted_items,
+		"skipped_items": skipped_items,
+		"unlocks": _safe_saved_array(reward.get("unlocks", []))
+	}
+
+func set_claimed_level_rewards(saved_rewards, mark_current_levels_claimed: bool = false) -> void:
+	claimed_level_rewards = {}
+
+	if typeof(saved_rewards) == TYPE_DICTIONARY:
+		for raw_key in (saved_rewards as Dictionary).keys():
+			var reward_level := int(raw_key)
+			if reward_level > 0 and bool((saved_rewards as Dictionary).get(raw_key, false)):
+				claimed_level_rewards[reward_level] = true
+	elif typeof(saved_rewards) == TYPE_ARRAY:
+		for raw_level in saved_rewards:
+			var reward_level := int(raw_level)
+			if reward_level > 0:
+				claimed_level_rewards[reward_level] = true
+
+	if mark_current_levels_claimed:
+		mark_level_rewards_claimed_through(level)
+
+func mark_level_rewards_claimed_through(max_level: int) -> void:
+	for reward_level in range(2, mini(maxi(max_level, 1), 10) + 1):
+		_set_level_reward_claimed(reward_level)
+
+func get_claimed_level_rewards_save_data() -> Dictionary:
+	var result: Dictionary = {}
+	for raw_level in claimed_level_rewards.keys():
+		var reward_level := int(raw_level)
+		if reward_level > 0 and bool(claimed_level_rewards.get(raw_level, false)):
+			result[str(reward_level)] = true
+	return result
+
+func _grant_level_reward_item(reward_level: int, item_id: String, quantity: int) -> Dictionary:
+	if item_id == "":
+		push_warning("Level reward has empty item id at level %d" % reward_level)
+		return {}
+
+	var catalog_item := get_tackle_catalog_item(item_id)
+	if catalog_item.is_empty():
+		push_warning("Level reward item not found: %s at level %d" % [item_id, reward_level])
+		return {}
+	if _is_beta_hidden_tackle_item(catalog_item):
+		push_warning("Level reward item is hidden in beta: %s at level %d" % [item_id, reward_level])
+		return {}
+
+	var owned_item := _make_owned_catalog_item(item_id, quantity)
+	if owned_item.is_empty():
+		push_warning("Level reward item cannot be created: %s at level %d" % [item_id, reward_level])
+		return {}
+
+	add_owned_item(owned_item, quantity)
+	return {
+		"id": item_id,
+		"name": str(catalog_item.get("display_name_ru", catalog_item.get("name", item_id))),
+		"quantity": quantity
+	}
+
+func _get_level_reward_numbers_from_xp_result(xp_result: Dictionary) -> Array:
+	var result: Array = []
+	var raw_levels = xp_result.get("gained_levels", [])
+	if typeof(raw_levels) == TYPE_ARRAY:
+		for raw_level in raw_levels:
+			var reward_level := int(raw_level)
+			if reward_level > 0 and not result.has(reward_level):
+				result.append(reward_level)
+
+	if not result.is_empty():
+		return result
+
+	var levels_gained: int = maxi(int(xp_result.get("levels_gained", 0)), 0)
+	var final_level := int(xp_result.get("level", level))
+	var first_level := int(xp_result.get("previous_level", final_level - levels_gained)) + 1
+	for reward_level in range(first_level, final_level + 1):
+		if reward_level > 0 and not result.has(reward_level):
+			result.append(reward_level)
+
+	return result
+
+func _is_level_reward_claimed(reward_level: int) -> bool:
+	return bool(claimed_level_rewards.get(reward_level, claimed_level_rewards.get(str(reward_level), false)))
+
+func _set_level_reward_claimed(reward_level: int) -> void:
+	if reward_level > 0:
+		claimed_level_rewards[reward_level] = true
 
 func register_catch_stats(catch_data: Dictionary) -> void:
 	if catch_data.is_empty():

@@ -19,6 +19,7 @@ func save_game() -> void:
 		"current_xp": PlayerData.current_xp,
 		"xp": PlayerData.current_xp,
 		"xp_to_next_level": PlayerData.xp_to_next_level,
+		"claimed_level_rewards": PlayerData.get_claimed_level_rewards_save_data() if PlayerData.has_method("get_claimed_level_rewards_save_data") else {},
 		"skill_points": PlayerData.skill_points,
 		"total_skill_points_earned": PlayerData.total_skill_points_earned,
 		"learned_skills": PlayerData.get_skill_ranks_save_data() if PlayerData.has_method("get_skill_ranks_save_data") else PlayerData.learned_skills,
@@ -109,6 +110,9 @@ func load_game() -> void:
 		int(save_data.get("level", 1)),
 		int(save_data.get("current_xp", save_data.get("xp", 0)))
 	)
+	var missing_level_rewards := not (save_data as Dictionary).has("claimed_level_rewards")
+	if PlayerData.has_method("set_claimed_level_rewards"):
+		PlayerData.set_claimed_level_rewards(save_data.get("claimed_level_rewards", {}), missing_level_rewards)
 	PlayerData.set_skill_state(
 		int(save_data.get("skill_points", 0)),
 		save_data.get("learned_skills", {}),
@@ -157,7 +161,7 @@ func load_game() -> void:
 
 	if BuildConfig.ENABLE_VERBOSE_LOGS:
 		print("Game loaded")
-	if should_save_after_time_load or migrated_freshness or migrated_save or removed_zero_value_fish or missing_recent_tackle_items or missing_ranked_skill_state or repaired_location:
+	if should_save_after_time_load or migrated_freshness or migrated_save or removed_zero_value_fish or missing_recent_tackle_items or missing_ranked_skill_state or missing_level_rewards or repaired_location:
 		save_game()
 
 func delete_save() -> void:

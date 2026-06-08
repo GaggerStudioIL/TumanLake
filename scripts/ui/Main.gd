@@ -52,6 +52,7 @@ const SPOT_BACKGROUND_LAYER_Z := -110
 const SPOT_WATER_LAYER_Z := -13
 const SPOT_FOREGROUND_LAYER_Z := -10
 const MODAL_TAP_GUARD_MSEC := 320
+const LEVEL_UP_MODAL_NAME := "level_up_reward"
 const WATER_SURFACE_Y := 402.0
 const FLOAT_DEFAULT_POS := Vector2(500.0, 402.0)
 const ROD_ANCHOR_POS := Vector2(610.0, 562.0)
@@ -296,6 +297,14 @@ var waterbody_spot_prev_page_button: Button
 var waterbody_spot_next_page_button: Button
 var waterbody_spot_page_label: Label
 var waterbody_spot_buttons: Array = []
+var level_up_backdrop: ColorRect
+var level_up_panel: Panel
+var level_up_title_label: Label
+var level_up_level_label: Label
+var level_up_unlocks_label: Label
+var level_up_rewards_label: Label
+var level_up_warning_label: Label
+var level_up_confirm_button: Button
 var toast_label: Label
 var main_hud_controller
 var popup_manager
@@ -404,6 +413,9 @@ var _waterbody_spot_page: int = 0
 var _visible_waterbody_spots: Array = []
 var _selected_waterbody_spot_id: String = ""
 var _pending_reward_catch: Dictionary = {}
+var _level_up_reward_queue: Array = []
+var _current_level_up_reward: Dictionary = {}
+var _level_up_popup_tween: Tween
 var _catch_popup_tween: Tween
 var _catch_fish_tween: Tween
 var _fish_reward_atlas: Texture2D
@@ -591,6 +603,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed("ui_cancel"):
 		if _block_pending_catch_reward_close_attempt():
+			get_viewport().set_input_as_handled()
+			return
+		if _block_level_up_reward_close_attempt():
 			get_viewport().set_input_as_handled()
 			return
 		close_current_modal()
@@ -1261,6 +1276,8 @@ func _move_modal_roots_to_layer() -> void:
 		tackle_panel,
 		waterbody_backdrop,
 		waterbody_panel,
+		level_up_backdrop,
+		level_up_panel,
 		fish_harbor_ui
 	]:
 		_reparent_node(node, root)
@@ -1320,6 +1337,10 @@ func close_current_modal() -> void:
 			if _block_pending_catch_reward_close_attempt():
 				return
 			_hide_catch_reward_popup()
+		"level_up_reward":
+			if _block_level_up_reward_close_attempt():
+				return
+			_hide_level_up_reward_popup()
 		_:
 			_hide_modal_roots_except("")
 			if profile_ui != null:
@@ -1371,6 +1392,11 @@ func _hide_modal_roots_except(modal_name: String) -> void:
 			catch_popup_panel.visible = false
 		if catch_popup_backdrop != null:
 			catch_popup_backdrop.visible = false
+	if modal_name != LEVEL_UP_MODAL_NAME:
+		if level_up_panel != null:
+			level_up_panel.visible = false
+		if level_up_backdrop != null:
+			level_up_backdrop.visible = false
 	if modal_name != "profile" and profile_ui != null:
 		profile_ui.close(false)
 	if modal_name != "encyclopedia" and encyclopedia_ui != null:
@@ -1398,7 +1424,8 @@ func _is_any_modal_visible() -> bool:
 		shop_panel,
 		tackle_panel,
 		waterbody_panel,
-		catch_popup_panel
+		catch_popup_panel,
+		level_up_panel
 	]:
 		if _is_visible_ui_control(control):
 			return true
@@ -1770,6 +1797,132 @@ func _reparent_node(node: Node, new_parent: Node) -> void:
 	if old_parent != null:
 		old_parent.remove_child(node)
 	new_parent.add_child(node)
+
+func _ensure_level_up_reward_popup() -> void:
+	if modal_content_root == null:
+		_ensure_modal_layer()
+	var root := modal_content_root
+	if root == null:
+		return
+
+	if level_up_backdrop == null:
+		level_up_backdrop = ColorRect.new()
+		level_up_backdrop.name = "LevelUpBackdrop"
+		level_up_backdrop.visible = false
+		level_up_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+		level_up_backdrop.color = Color(0.0, 0.0, 0.0, 0.76)
+		root.add_child(level_up_backdrop)
+
+	if level_up_panel == null:
+		level_up_panel = Panel.new()
+		level_up_panel.name = "LevelUpPanel"
+		level_up_panel.visible = false
+		level_up_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		root.add_child(level_up_panel)
+
+	if level_up_title_label == null:
+		level_up_title_label = _create_level_up_label("LevelUpTitle", 24, Color(0.96, 1.0, 0.92, 1.0), true)
+		level_up_title_label.text = "Новый уровень!"
+		level_up_panel.add_child(level_up_title_label)
+
+	if level_up_level_label == null:
+		level_up_level_label = _create_level_up_label("LevelUpNumber", 42, Color(0.72, 1.0, 0.80, 1.0), true)
+		level_up_panel.add_child(level_up_level_label)
+
+	if level_up_unlocks_label == null:
+		level_up_unlocks_label = _create_level_up_label("LevelUpUnlocks", 14, Color(0.82, 0.94, 0.86, 0.96), false)
+		level_up_unlocks_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		level_up_panel.add_child(level_up_unlocks_label)
+
+	if level_up_rewards_label == null:
+		level_up_rewards_label = _create_level_up_label("LevelUpRewards", 15, Color(0.96, 0.96, 0.84, 0.98), false)
+		level_up_rewards_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		level_up_panel.add_child(level_up_rewards_label)
+
+	if level_up_warning_label == null:
+		level_up_warning_label = _create_level_up_label("LevelUpWarning", 12, Color(1.0, 0.76, 0.52, 0.92), true)
+		level_up_warning_label.visible = false
+		level_up_panel.add_child(level_up_warning_label)
+
+	if level_up_confirm_button == null:
+		level_up_confirm_button = Button.new()
+		level_up_confirm_button.name = "LevelUpConfirmButton"
+		level_up_confirm_button.text = "Забрать"
+		level_up_confirm_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		level_up_panel.add_child(level_up_confirm_button)
+		var callback := Callable(self, "_on_level_up_confirm_pressed")
+		if not level_up_confirm_button.pressed.is_connected(callback):
+			level_up_confirm_button.pressed.connect(callback)
+
+func _create_level_up_label(label_name: String, font_size: int, color: Color, centered: bool) -> Label:
+	var label := Label.new()
+	label.name = label_name
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if centered else HORIZONTAL_ALIGNMENT_LEFT
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.58))
+	label.add_theme_constant_override("shadow_offset_x", 0)
+	label.add_theme_constant_override("shadow_offset_y", 2)
+	return label
+
+func _layout_level_up_reward_popup(screen_size: Vector2) -> void:
+	_ensure_level_up_reward_popup()
+	if level_up_panel == null or level_up_backdrop == null:
+		return
+
+	level_up_backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	level_up_backdrop.offset_left = 0.0
+	level_up_backdrop.offset_top = 0.0
+	level_up_backdrop.offset_right = 0.0
+	level_up_backdrop.offset_bottom = 0.0
+	level_up_backdrop.z_index = 220
+	if ui_theme != null:
+		ui_theme.apply_modal_backdrop_style(level_up_backdrop)
+
+	var popup_width: float = min(screen_size.x - 40.0, 520.0)
+	var popup_height: float = min(screen_size.y - 42.0, 368.0)
+	popup_width = max(popup_width, 320.0)
+	popup_height = max(popup_height, 304.0)
+	level_up_panel.position = Vector2((screen_size.x - popup_width) * 0.5, (screen_size.y - popup_height) * 0.5)
+	level_up_panel.size = Vector2(popup_width, popup_height)
+	level_up_panel.pivot_offset = level_up_panel.size * 0.5
+	level_up_panel.z_index = 221
+	level_up_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	level_up_panel.add_theme_stylebox_override(
+		"panel",
+		_make_panel_style(Color(0.018, 0.050, 0.046, 0.96), Color(0.78, 1.0, 0.82, 0.42), 12, 8, Color(0.0, 0.0, 0.0, 0.34))
+	)
+
+	var padding := 22.0
+	var inner_width := popup_width - padding * 2.0
+	level_up_title_label.position = Vector2(padding, 18.0)
+	level_up_title_label.size = Vector2(inner_width, 30.0)
+	level_up_title_label.add_theme_font_size_override("font_size", 24)
+
+	level_up_level_label.position = Vector2(padding, 50.0)
+	level_up_level_label.size = Vector2(inner_width, 54.0)
+	level_up_level_label.add_theme_font_size_override("font_size", 42)
+
+	level_up_unlocks_label.position = Vector2(padding, 112.0)
+	level_up_unlocks_label.size = Vector2(inner_width, 70.0)
+	level_up_unlocks_label.add_theme_font_size_override("font_size", 14)
+
+	level_up_rewards_label.position = Vector2(padding, 188.0)
+	level_up_rewards_label.size = Vector2(inner_width, max(popup_height - 286.0, 44.0))
+	level_up_rewards_label.add_theme_font_size_override("font_size", 15)
+
+	level_up_warning_label.position = Vector2(padding, popup_height - 88.0)
+	level_up_warning_label.size = Vector2(inner_width, 24.0)
+	level_up_warning_label.add_theme_font_size_override("font_size", 12)
+
+	var button_size := Vector2(150.0, 42.0)
+	level_up_confirm_button.position = Vector2((popup_width - button_size.x) * 0.5, popup_height - 58.0)
+	level_up_confirm_button.size = button_size
+	level_up_confirm_button.custom_minimum_size = button_size
+	level_up_confirm_button.add_theme_font_size_override("font_size", 14)
+	_apply_button_style(level_up_confirm_button, STYLE_PRIMARY_BUTTON)
 
 func _ensure_shop_ui_nodes() -> void:
 	shop_ui._ensure_shop_ui_nodes()
@@ -3751,6 +3904,8 @@ func _is_visible_ui_control(control: CanvasItem) -> bool:
 func _is_menu_overlay_open() -> bool:
 	if _is_catch_reward_open():
 		return true
+	if _is_level_up_reward_popup_open():
+		return true
 	if _is_visible_ui_control(basket_panel) or _is_visible_ui_control(inventory_panel):
 		return true
 	if _is_visible_ui_control(shop_panel) or _is_visible_ui_control(tackle_panel):
@@ -3865,6 +4020,7 @@ func _update_fishing_presence(delta: float) -> void:
 
 func _setup_layout() -> void:
 	_ensure_modal_layer()
+	_ensure_level_up_reward_popup()
 	_move_modal_roots_to_layer()
 	_layout_modal_layer()
 	var screen_size := get_viewport_rect().size
@@ -3942,7 +4098,9 @@ func _setup_layout() -> void:
 		shop_backdrop,
 		shop_panel,
 		catch_popup_backdrop,
-		catch_popup_panel
+		catch_popup_panel,
+		level_up_backdrop,
+		level_up_panel
 	]:
 		node.set_anchors_preset(Control.PRESET_TOP_LEFT)
 
@@ -4038,7 +4196,13 @@ func _setup_layout() -> void:
 		catch_fish_visual,
 		catch_popup_stats_label,
 		catch_keep_button,
-		catch_release_button
+		catch_release_button,
+		level_up_title_label,
+		level_up_level_label,
+		level_up_unlocks_label,
+		level_up_rewards_label,
+		level_up_warning_label,
+		level_up_confirm_button
 	]:
 		node.set_anchors_preset(Control.PRESET_TOP_LEFT)
 
@@ -4171,6 +4335,7 @@ func _setup_layout() -> void:
 	catch_popup_panel.z_index = 201
 	catch_popup_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	ui_theme.apply_popup_window_style(catch_popup_panel)
+	_layout_level_up_reward_popup(screen_size)
 
 	water_panel.position = Vector2(margin, content_top)
 	water_panel.size = Vector2(screen_size.x - margin * 2.0, content_height)
@@ -6122,6 +6287,160 @@ func _show_toast(message: String, success: bool = true) -> void:
 	if popup_manager != null:
 		popup_manager.show_toast(message, success)
 
+func _queue_level_up_rewards(rewards: Array) -> void:
+	for reward in rewards:
+		if typeof(reward) != TYPE_DICTIONARY:
+			continue
+		var reward_data: Dictionary = reward
+		if not bool(reward_data.get("success", false)):
+			continue
+		_level_up_reward_queue.append(reward_data.duplicate(true))
+
+	if not _level_up_reward_queue.is_empty():
+		_try_show_queued_level_up_reward()
+
+func _try_show_queued_level_up_reward() -> void:
+	if _level_up_reward_queue.is_empty():
+		return
+	if not _current_level_up_reward.is_empty():
+		return
+	if _is_catch_reward_open() or _has_pending_catch_reward():
+		return
+	if is_modal_open and _current_modal_name != LEVEL_UP_MODAL_NAME:
+		return
+
+	_show_next_level_up_reward()
+
+func _show_next_level_up_reward() -> void:
+	if _level_up_reward_queue.is_empty():
+		_current_level_up_reward = {}
+		return
+
+	_ensure_level_up_reward_popup()
+	_current_level_up_reward = (_level_up_reward_queue.pop_front() as Dictionary).duplicate(true)
+	_update_level_up_reward_popup(_current_level_up_reward)
+
+	if _current_modal_name != LEVEL_UP_MODAL_NAME:
+		open_modal(LEVEL_UP_MODAL_NAME)
+	_bring_level_up_reward_popup_to_front()
+	level_up_backdrop.visible = true
+	level_up_panel.visible = true
+	level_up_backdrop.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	level_up_panel.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	level_up_panel.scale = Vector2.ONE
+	_refresh_modal_input_blocker()
+
+func _update_level_up_reward_popup(reward: Dictionary) -> void:
+	if level_up_panel == null:
+		return
+
+	var reward_level := int(reward.get("level", PlayerData.level))
+	level_up_level_label.text = "LVL %d" % reward_level
+	level_up_unlocks_label.text = _format_level_up_unlocks_text(reward)
+	level_up_rewards_label.text = _format_level_up_rewards_text(reward)
+
+	var skipped_items: Array = reward.get("skipped_items", [])
+	level_up_warning_label.visible = not skipped_items.is_empty()
+	level_up_warning_label.text = "Часть наград пропущена, подробности в warning log." if not skipped_items.is_empty() else ""
+	level_up_confirm_button.text = "Забрать"
+
+func _format_level_up_unlocks_text(reward: Dictionary) -> String:
+	var unlocks: Array = reward.get("unlocks", [])
+	var lines: Array = ["Открылось:"]
+	if unlocks.is_empty():
+		lines.append("- Награда за новый уровень")
+	else:
+		for unlock in unlocks:
+			var text := str(unlock).strip_edges()
+			if text != "":
+				lines.append("- %s" % text)
+	return "\n".join(lines)
+
+func _format_level_up_rewards_text(reward: Dictionary) -> String:
+	var lines: Array = ["Получено:"]
+	var silver := int(reward.get("silver", 0))
+	if silver > 0:
+		lines.append("- %d серебра" % silver)
+
+	var items: Array = reward.get("items", [])
+	for item in items:
+		if typeof(item) != TYPE_DICTIONARY:
+			continue
+		var item_data: Dictionary = item
+		var item_name := str(item_data.get("name", item_data.get("id", "-")))
+		var quantity: int = maxi(int(item_data.get("quantity", 1)), 1)
+		lines.append("- %s x%d" % [item_name, quantity])
+
+	if lines.size() == 1:
+		lines.append("- Награда уже учтена")
+	return "\n".join(lines)
+
+func _bring_level_up_reward_popup_to_front() -> void:
+	var parent: Node = level_up_panel.get_parent() if level_up_panel != null else null
+	if parent == null:
+		return
+	if level_up_backdrop != null and level_up_backdrop.get_parent() == parent:
+		parent.move_child(level_up_backdrop, parent.get_child_count() - 1)
+	if level_up_panel != null and level_up_panel.get_parent() == parent:
+		parent.move_child(level_up_panel, parent.get_child_count() - 1)
+
+func _is_level_up_reward_popup_open() -> bool:
+	return level_up_panel != null and level_up_panel.visible
+
+func _hide_level_up_reward_popup(animated: bool = true) -> void:
+	if level_up_panel == null or level_up_backdrop == null:
+		close_modal(LEVEL_UP_MODAL_NAME)
+		return
+
+	if is_instance_valid(_level_up_popup_tween):
+		_level_up_popup_tween.kill()
+
+	if not animated:
+		_set_level_up_reward_popup_hidden()
+		return
+
+	_level_up_popup_tween = create_tween()
+	_level_up_popup_tween.tween_property(level_up_panel, "modulate:a", 0.0, 0.10)
+	_level_up_popup_tween.parallel().tween_property(level_up_backdrop, "modulate:a", 0.0, 0.10)
+	_level_up_popup_tween.tween_callback(Callable(self, "_set_level_up_reward_popup_hidden"))
+
+func _set_level_up_reward_popup_hidden() -> void:
+	if level_up_backdrop != null:
+		level_up_backdrop.visible = false
+		level_up_backdrop.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	if level_up_panel != null:
+		level_up_panel.visible = false
+		level_up_panel.modulate = Color(1.0, 1.0, 1.0, 1.0)
+		level_up_panel.scale = Vector2.ONE
+	close_modal(LEVEL_UP_MODAL_NAME)
+
+func _on_level_up_confirm_pressed() -> void:
+	if _current_level_up_reward.is_empty():
+		_hide_level_up_reward_popup(false)
+		return
+
+	var completed_level := int(_current_level_up_reward.get("level", PlayerData.level))
+	result_label.text = "Награда за LVL %d получена." % completed_level
+	_current_level_up_reward = {}
+	SaveManager.save_game()
+	_update_ui()
+
+	if not _level_up_reward_queue.is_empty():
+		_show_next_level_up_reward()
+		return
+
+	_hide_level_up_reward_popup()
+
+func _block_level_up_reward_close_attempt() -> bool:
+	if _current_modal_name != LEVEL_UP_MODAL_NAME:
+		return false
+	if _current_level_up_reward.is_empty():
+		return false
+
+	_bring_level_up_reward_popup_to_front()
+	_show_toast("Сначала заберите награду", false)
+	return true
+
 func _should_show_first_run_hints() -> bool:
 	return BuildConfig.IS_BETA_BUILD and PlayerData.total_fish_caught <= 0
 
@@ -6962,6 +7281,7 @@ func _on_catch_keep_button_pressed() -> void:
 	SaveManager.save_game()
 	_return_to_idle_after_result()
 	_show_first_run_hint("sell_fish")
+	_try_show_queued_level_up_reward()
 
 # Gameplay flow completion intentionally stays in Main for now.
 func _on_catch_release_button_pressed() -> void:
@@ -6989,6 +7309,7 @@ func _on_catch_release_button_pressed() -> void:
 
 	SaveManager.save_game()
 	_return_to_idle_after_result()
+	_try_show_queued_level_up_reward()
 
 func _set_inventory_category(category: String) -> void:
 	inventory_ui._set_inventory_category(category)
@@ -7346,6 +7667,8 @@ func _on_fish_caught(catch_data: Dictionary) -> void:
 
 	if bool(xp_result.get("leveled_up", false)):
 		xp_text += "\nНовый уровень! LVL %d" % int(xp_result.get("level", PlayerData.level))
+		if PlayerData.has_method("claim_level_rewards_for_xp_result"):
+			_queue_level_up_rewards(PlayerData.claim_level_rewards_for_xp_result(xp_result))
 	if wear_text != "":
 		xp_text += "\n%s" % wear_text
 
