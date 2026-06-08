@@ -326,7 +326,7 @@ const DAWN_START := 300.0
 const DAY_START := 480.0
 const SUNSET_START := 1080.0
 const NIGHT_START := 1260.0
-const CELESTIAL_LAYER_Z := 1
+const CELESTIAL_LAYER_Z := 3
 const STARS_LAYER_Z := 0
 const MOON_SPRITE_Z := 0
 const SUN_SPRITE_Z := 0
@@ -819,7 +819,7 @@ func _ensure_nodes() -> void:
 		_celestial_layer.name = "CelestialLayer"
 		_environment_root.add_child(_celestial_layer)
 	_celestial_layer.z_as_relative = true
-	_celestial_layer.z_index = int(visual_profile.get("celestial_z", CELESTIAL_LAYER_Z))
+	_celestial_layer.z_index = maxi(int(visual_profile.get("celestial_z", CELESTIAL_LAYER_Z)), CELESTIAL_LAYER_Z)
 
 	if _stars_layer == null:
 		_stars_layer = StarsLayerScript.new()
