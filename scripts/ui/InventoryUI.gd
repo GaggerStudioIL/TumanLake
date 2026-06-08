@@ -1230,7 +1230,7 @@ func _get_visible_inventory_items() -> Array:
 	var items: Array = []
 
 	if main._inventory_category == "all":
-		items.append_array(PlayerData.owned_items)
+		items.append_array(PlayerData.get_owned_items_for_category("all"))
 	elif main._inventory_category == "line":
 		items.append_array(PlayerData.get_owned_items_for_category("line"))
 		items.append_array(PlayerData.get_owned_items_for_category("leader"))

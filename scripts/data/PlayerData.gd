@@ -5,6 +5,19 @@ const BASIC_FLOAT_ID := "float_drop_basic"
 const BASIC_LEADER_ID := "nylon_leader_20cm_1kg"
 const BASIC_REEL_ID := "river_reel_1000"
 const BASIC_LURE_ID := "silver_spinner_5g"
+const BETA_HIDDEN_TACKLE_CATEGORIES := {
+	"reel": true,
+	"lure": true,
+	"spoon": true,
+	"wobbler": true,
+	"spinner_bait": true
+}
+const BETA_HIDDEN_LURE_TYPES := {
+	"spinner": true,
+	"spoon": true,
+	"wobbler": true,
+	"spinner_bait": true
+}
 const LEGACY_TACKLE_ITEM_ALIASES := {
 	"light_float": "float_feather_basic",
 	"medium_float": "float_drop_basic",
@@ -4456,6 +4469,9 @@ func get_tackle_shop_items() -> Array:
 	}
 
 	for item in get_tackle_catalog_items("all"):
+		if _is_beta_hidden_tackle_item(item):
+			continue
+
 		if starter_ids.has(str(item.get("id", ""))):
 			continue
 
@@ -5112,13 +5128,10 @@ func _is_quick_tackle_item_available(item: Dictionary, category: String) -> bool
 func get_default_owned_items() -> Array:
 	return [
 		_make_owned_catalog_item("simple_pole_rod_4m", 1),
-		_make_owned_catalog_item("river_spin_210", 1),
-		_make_owned_catalog_item(BASIC_REEL_ID, 1),
 		_make_owned_catalog_item("mono_1_2kg", 1),
 		_make_owned_catalog_item(BASIC_LEADER_ID, 1),
 		_make_owned_catalog_item(BASIC_FLOAT_ID, 1),
 		_make_owned_catalog_item("small_hook_12", 1),
-		_make_owned_catalog_item(BASIC_LURE_ID, 1),
 		_make_owned_catalog_item("worm", 30)
 	]
 
@@ -5184,6 +5197,8 @@ func set_current_tackle(saved_tackle: Dictionary) -> void:
 			for key in ["tackle_type", "fishing_type", "assembly_type", "rod_type"]:
 				if slot_catalog_item.has(key) and not merged_component.has(key):
 					merged_component[key] = str(slot_catalog_item.get(key, ""))
+		if _is_beta_hidden_tackle_item(merged_component):
+			continue
 		current_tackle[slot] = merged_component
 
 	if current_tackle.get("float", {}).is_empty():
@@ -5232,6 +5247,9 @@ func _ensure_default_leader_owned() -> void:
 		owned_items.append(fallback_leader)
 
 func _ensure_starter_reel_tackle_owned() -> void:
+	if not BuildConfig.ENABLE_SPINNING_FEATURES:
+		return
+
 	for item_id in ["river_spin_210", BASIC_REEL_ID, BASIC_LURE_ID]:
 		if not get_owned_item(str(item_id)).is_empty():
 			continue
@@ -5247,15 +5265,50 @@ func _has_owned_category(category: String) -> bool:
 
 func get_owned_items_for_category(category_filter: String) -> Array:
 	if category_filter == "all":
-		return owned_items
+		return get_visible_owned_items()
 
 	var items: Array = []
 
 	for item in owned_items:
+		if _is_beta_hidden_tackle_item(item):
+			continue
 		if str(item.get("category", "misc")) == category_filter:
 			items.append(item)
 
 	return items
+
+func get_visible_owned_items() -> Array:
+	var items: Array = []
+
+	for item in owned_items:
+		if _is_beta_hidden_tackle_item(item):
+			continue
+		items.append(item)
+
+	return items
+
+func _is_beta_hidden_tackle_item(item: Dictionary) -> bool:
+	if BuildConfig.ENABLE_SPINNING_FEATURES or item.is_empty():
+		return false
+
+	var category := str(item.get("category", item.get("type", ""))).strip_edges().to_lower()
+	if BETA_HIDDEN_TACKLE_CATEGORIES.has(category):
+		return true
+
+	var stats: Dictionary = item.get("stats", {}) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
+	var lure_type := str(stats.get("lure_type", item.get("lure_type", ""))).strip_edges().to_lower()
+	if lure_type != "" and BETA_HIDDEN_LURE_TYPES.has(lure_type):
+		return true
+
+	if category == "rod":
+		var rod_type := str(stats.get("rod_type", item.get("rod_type", item.get("tackle_type", "")))).strip_edges().to_lower()
+		var tackle_type := str(stats.get("tackle_type", item.get("tackle_type", rod_type))).strip_edges().to_lower()
+		if rod_type == "spinning" or tackle_type == "spinning":
+			return true
+		if bool(stats.get("requires_reel", item.get("requires_reel", false))):
+			return true
+
+	return false
 
 func normalize_tackle_type(raw_type: String) -> String:
 	var type_key := raw_type.strip_edges().to_lower()
