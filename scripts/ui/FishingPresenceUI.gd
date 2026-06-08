@@ -23,6 +23,7 @@ var _drop_splash_sprite: Sprite2D
 var _regular_splash_sprite: Sprite2D
 var _bobber_ripple: Node2D
 var _bobber_contact_waterline: Node2D
+var _cast_area_debug_rect: Panel
 var _cast_timer := 0.0
 var _drop_splash_timer := 0.0
 var _float_nudge_timer := 0.0
@@ -95,6 +96,10 @@ const SPOT_FLOAT_PROFILES := {
 		"shore_cast_target": Vector2(560.0, 408.0),
 		"near_cast_target": Vector2(520.0, 358.0),
 		"far_cast_target": Vector2(470.0, 246.0),
+		"cast_area_min": Vector2(410.0, 236.0),
+		"cast_area_max": Vector2(610.0, 416.0),
+		"near_cast_y": 408.0,
+		"far_cast_y": 244.0,
 		"water_top": 236.0,
 		"water_bottom": 416.0
 	},
@@ -103,6 +108,10 @@ const SPOT_FLOAT_PROFILES := {
 		"shore_cast_target": Vector2(560.0, 408.0),
 		"near_cast_target": Vector2(520.0, 358.0),
 		"far_cast_target": Vector2(472.0, 268.0),
+		"cast_area_min": Vector2(410.0, 258.0),
+		"cast_area_max": Vector2(625.0, 416.0),
+		"near_cast_y": 408.0,
+		"far_cast_y": 266.0,
 		"water_top": 258.0,
 		"water_bottom": 416.0
 	},
@@ -111,6 +120,10 @@ const SPOT_FLOAT_PROFILES := {
 		"shore_cast_target": Vector2(620.0, 404.0),
 		"near_cast_target": Vector2(600.0, 356.0),
 		"far_cast_target": Vector2(524.0, 252.0),
+		"cast_area_min": Vector2(470.0, 242.0),
+		"cast_area_max": Vector2(675.0, 416.0),
+		"near_cast_y": 406.0,
+		"far_cast_y": 250.0,
 		"water_top": 242.0,
 		"water_bottom": 416.0
 	},
@@ -119,6 +132,10 @@ const SPOT_FLOAT_PROFILES := {
 		"shore_cast_target": Vector2(560.0, 408.0),
 		"near_cast_target": Vector2(520.0, 356.0),
 		"far_cast_target": Vector2(476.0, 286.0),
+		"cast_area_min": Vector2(410.0, 276.0),
+		"cast_area_max": Vector2(630.0, 416.0),
+		"near_cast_y": 408.0,
+		"far_cast_y": 284.0,
 		"water_top": 276.0,
 		"water_bottom": 416.0
 	},
@@ -127,6 +144,10 @@ const SPOT_FLOAT_PROFILES := {
 		"shore_cast_target": Vector2(560.0, 408.0),
 		"near_cast_target": Vector2(520.0, 356.0),
 		"far_cast_target": Vector2(476.0, 294.0),
+		"cast_area_min": Vector2(410.0, 284.0),
+		"cast_area_max": Vector2(630.0, 416.0),
+		"near_cast_y": 408.0,
+		"far_cast_y": 292.0,
 		"water_top": 284.0,
 		"water_bottom": 416.0
 	},
@@ -135,6 +156,10 @@ const SPOT_FLOAT_PROFILES := {
 		"shore_cast_target": Vector2(560.0, 408.0),
 		"near_cast_target": Vector2(520.0, 356.0),
 		"far_cast_target": Vector2(476.0, 292.0),
+		"cast_area_min": Vector2(410.0, 282.0),
+		"cast_area_max": Vector2(630.0, 416.0),
+		"near_cast_y": 408.0,
+		"far_cast_y": 290.0,
 		"water_top": 282.0,
 		"water_bottom": 416.0
 	},
@@ -143,6 +168,10 @@ const SPOT_FLOAT_PROFILES := {
 		"shore_cast_target": Vector2(560.0, 408.0),
 		"near_cast_target": Vector2(520.0, 356.0),
 		"far_cast_target": Vector2(476.0, 294.0),
+		"cast_area_min": Vector2(410.0, 284.0),
+		"cast_area_max": Vector2(630.0, 416.0),
+		"near_cast_y": 408.0,
+		"far_cast_y": 292.0,
 		"water_top": 284.0,
 		"water_bottom": 416.0
 	},
@@ -151,6 +180,10 @@ const SPOT_FLOAT_PROFILES := {
 		"shore_cast_target": Vector2(560.0, 408.0),
 		"near_cast_target": Vector2(520.0, 356.0),
 		"far_cast_target": Vector2(476.0, 300.0),
+		"cast_area_min": Vector2(410.0, 290.0),
+		"cast_area_max": Vector2(620.0, 416.0),
+		"near_cast_y": 408.0,
+		"far_cast_y": 298.0,
 		"water_top": 290.0,
 		"water_bottom": 416.0
 	},
@@ -159,6 +192,10 @@ const SPOT_FLOAT_PROFILES := {
 		"shore_cast_target": Vector2(560.0, 406.0),
 		"near_cast_target": Vector2(520.0, 354.0),
 		"far_cast_target": Vector2(476.0, 296.0),
+		"cast_area_min": Vector2(410.0, 286.0),
+		"cast_area_max": Vector2(630.0, 414.0),
+		"near_cast_y": 406.0,
+		"far_cast_y": 294.0,
 		"water_top": 286.0,
 		"water_bottom": 414.0
 	},
@@ -167,6 +204,10 @@ const SPOT_FLOAT_PROFILES := {
 		"shore_cast_target": Vector2(560.0, 404.0),
 		"near_cast_target": Vector2(518.0, 350.0),
 		"far_cast_target": Vector2(458.0, 252.0),
+		"cast_area_min": Vector2(398.0, 246.0),
+		"cast_area_max": Vector2(610.0, 396.0),
+		"near_cast_y": 396.0,
+		"far_cast_y": 250.0,
 		"water_top": 246.0,
 		"water_bottom": 396.0
 	},
@@ -175,13 +216,22 @@ const SPOT_FLOAT_PROFILES := {
 		"shore_cast_target": Vector2(560.0, 404.0),
 		"near_cast_target": Vector2(520.0, 354.0),
 		"far_cast_target": Vector2(470.0, 286.0),
+		"cast_area_min": Vector2(410.0, 278.0),
+		"cast_area_max": Vector2(625.0, 406.0),
+		"near_cast_y": 404.0,
+		"far_cast_y": 284.0,
 		"water_top": 278.0,
 		"water_bottom": 406.0
 	}
 }
 const BOBBER_LINE_ATTACH_OFFSET := Vector2(0.0, -8.0)
-const BOBBER_FAR_VISUAL_SCALE := 0.62
-const BOBBER_NEAR_VISUAL_SCALE := 1.08
+const BOBBER_CLOSE_VISUAL_SCALE := 1.0
+const BOBBER_MID_VISUAL_SCALE := 0.75
+const BOBBER_FAR_VISUAL_SCALE := 0.5
+const BOBBER_VERY_FAR_VISUAL_SCALE := 0.4
+const BOBBER_MID_DISTANCE_RATIO := 0.42
+const BOBBER_FAR_DISTANCE_RATIO := 0.76
+const BOBBER_VERY_FAR_ALPHA := 0.78
 const CAST_PERSPECTIVE_FAR_Y_RATIO := 0.22
 const CAST_PERSPECTIVE_NEAR_Y_RATIO := 0.74
 const FLOAT_DRIFT_PIXELS_PER_MPS := 2.75
@@ -1185,6 +1235,18 @@ func _scale_cast_point(point: Vector2) -> Vector2:
 		point.y * screen_size.y / 540.0
 	)
 
+func _scale_cast_rect(rect: Rect2) -> Rect2:
+	var screen_size: Vector2 = main.get_viewport_rect().size
+	var scaled_position := Vector2(
+		rect.position.x * screen_size.x / 960.0,
+		rect.position.y * screen_size.y / 540.0
+	)
+	var scaled_size := Vector2(
+		rect.size.x * screen_size.x / 960.0,
+		rect.size.y * screen_size.y / 540.0
+	)
+	return Rect2(scaled_position, scaled_size)
+
 func _get_current_spot_float_profile() -> Dictionary:
 	if main == null:
 		return {}
@@ -1204,6 +1266,85 @@ func _get_spot_profile_point(profile: Dictionary, key: String, fallback: Vector2
 		return _scale_cast_point(profile[key] as Vector2)
 
 	return fallback
+
+func _get_spot_profile_y(profile: Dictionary, key: String, fallback: float) -> float:
+	if profile.has(key):
+		return float(profile[key]) * main.get_viewport_rect().size.y / 540.0
+	return fallback
+
+func _get_cast_area_rect(profile: Dictionary, screen_size: Vector2, scene_scale: float) -> Rect2:
+	var fallback_top: float = main._water_zone_top if main != null else screen_size.y * CAST_PERSPECTIVE_FAR_Y_RATIO
+	var fallback_bottom: float = main._water_zone_bottom if main != null else screen_size.y * CAST_PERSPECTIVE_NEAR_Y_RATIO
+	var rect := Rect2(
+		Vector2(screen_size.x * 0.20, fallback_top),
+		Vector2(screen_size.x * 0.60, maxf(fallback_bottom - fallback_top, 1.0))
+	)
+
+	if profile.has("allowed_float_area") and profile["allowed_float_area"] is Rect2:
+		rect = _scale_cast_rect(profile["allowed_float_area"] as Rect2)
+	elif profile.has("water_cast_rect") and profile["water_cast_rect"] is Rect2:
+		rect = _scale_cast_rect(profile["water_cast_rect"] as Rect2)
+	elif profile.has("cast_area_min") and profile.has("cast_area_max"):
+		var raw_min = profile["cast_area_min"]
+		var raw_max = profile["cast_area_max"]
+		if raw_min is Vector2 and raw_max is Vector2:
+			var point_a := _scale_cast_point(raw_min as Vector2)
+			var point_b := _scale_cast_point(raw_max as Vector2)
+			var min_point := Vector2(minf(point_a.x, point_b.x), minf(point_a.y, point_b.y))
+			var max_point := Vector2(maxf(point_a.x, point_b.x), maxf(point_a.y, point_b.y))
+			rect = Rect2(min_point, max_point - min_point)
+
+	if rect.size.x <= 1.0 or rect.size.y <= 1.0:
+		return Rect2(
+			Vector2(screen_size.x * 0.24, fallback_top),
+			Vector2(screen_size.x * 0.52, maxf(fallback_bottom - fallback_top, 1.0))
+		)
+
+	var inset := minf(4.0 * scene_scale, minf(rect.size.x, rect.size.y) * 0.12)
+	return Rect2(rect.position + Vector2(inset, inset), rect.size - Vector2(inset * 2.0, inset * 2.0))
+
+func _clamp_point_to_cast_area(point: Vector2, profile: Dictionary, screen_size: Vector2, scene_scale: float) -> Vector2:
+	var rect := _get_cast_area_rect(profile, screen_size, scene_scale)
+	return Vector2(
+		clampf(point.x, rect.position.x, rect.end.x),
+		clampf(point.y, rect.position.y, rect.end.y)
+	)
+
+func _is_cast_area_debug_enabled() -> bool:
+	return BuildConfig.ENABLE_DEBUG_PANEL or BuildConfig.ENABLE_WATER_DEBUG_VISUALS
+
+func _ensure_cast_area_debug_rect() -> void:
+	if _cast_area_debug_rect != null and is_instance_valid(_cast_area_debug_rect):
+		return
+	if main == null:
+		return
+
+	_cast_area_debug_rect = Panel.new()
+	_cast_area_debug_rect.name = "CastAreaDebugRect"
+	_cast_area_debug_rect.visible = false
+	_cast_area_debug_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cast_area_debug_rect.z_index = 1
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.22, 0.68, 0.98, 0.08)
+	style.border_color = Color(0.40, 0.86, 1.0, 0.56)
+	style.set_border_width_all(2)
+	_cast_area_debug_rect.add_theme_stylebox_override("panel", style)
+	main.add_child(_cast_area_debug_rect)
+
+func _update_cast_area_debug_rect(profile: Dictionary, screen_size: Vector2, scene_scale: float) -> void:
+	if not _is_cast_area_debug_enabled():
+		if _cast_area_debug_rect != null and is_instance_valid(_cast_area_debug_rect):
+			_cast_area_debug_rect.visible = false
+		return
+
+	_ensure_cast_area_debug_rect()
+	if _cast_area_debug_rect == null:
+		return
+
+	var rect := _get_cast_area_rect(profile, screen_size, scene_scale)
+	_cast_area_debug_rect.position = rect.position
+	_cast_area_debug_rect.size = rect.size
+	_cast_area_debug_rect.visible = true
 
 func _apply_spot_float_profile(profile: Dictionary, screen_size: Vector2) -> void:
 	if profile.is_empty():
@@ -1360,7 +1501,7 @@ func _get_reeling_pull_target(screen_size: Vector2, scene_scale: float) -> Vecto
 	var shore_target := Vector2(main._rod_anchor_pos.x - 84.0 * scene_scale, main._water_zone_bottom - 8.0 * scene_scale)
 	shore_target.x = clamp(shore_target.x, screen_size.x * 0.34, screen_size.x * 0.72)
 	shore_target.y = clamp(shore_target.y, main._water_zone_top, main._water_zone_bottom)
-	return shore_target
+	return _clamp_point_to_cast_area(shore_target, _get_current_spot_float_profile(), screen_size, scene_scale)
 
 func _get_reeling_progress_ratio() -> float:
 	var progress := 0.0
@@ -1435,7 +1576,7 @@ func _get_cast_landing_target_for_power(spot_profile: Dictionary, _scene_scale: 
 	if min_landing_y > max_landing_y:
 		max_landing_y = min_landing_y
 	landing_target.y = clamp(landing_target.y, min_landing_y, max_landing_y)
-	return landing_target
+	return _clamp_point_to_cast_area(landing_target, spot_profile, screen_size, _scene_scale)
 
 func _get_effective_cast_power_adjustment() -> float:
 	var float_data: Dictionary = _get_current_float_data()
@@ -1485,11 +1626,42 @@ func _get_bobber_perspective_scale(center: Vector2, state: String) -> float:
 	if state != "casting" and not _uses_cast_landing_surface(state):
 		return 1.0
 
+	var distance_t := _get_bobber_distance_ratio(center, state)
+	if distance_t <= BOBBER_MID_DISTANCE_RATIO:
+		return lerp(BOBBER_CLOSE_VISUAL_SCALE, BOBBER_MID_VISUAL_SCALE, distance_t / maxf(BOBBER_MID_DISTANCE_RATIO, 0.01))
+	if distance_t <= BOBBER_FAR_DISTANCE_RATIO:
+		return lerp(
+			BOBBER_MID_VISUAL_SCALE,
+			BOBBER_FAR_VISUAL_SCALE,
+			(distance_t - BOBBER_MID_DISTANCE_RATIO) / maxf(BOBBER_FAR_DISTANCE_RATIO - BOBBER_MID_DISTANCE_RATIO, 0.01)
+		)
+	return lerp(
+		BOBBER_FAR_VISUAL_SCALE,
+		BOBBER_VERY_FAR_VISUAL_SCALE,
+		(distance_t - BOBBER_FAR_DISTANCE_RATIO) / maxf(1.0 - BOBBER_FAR_DISTANCE_RATIO, 0.01)
+	)
+
+func _get_bobber_distance_ratio(center: Vector2, state: String) -> float:
+	if main == null:
+		return 0.0
+	if state == "final_catch" or state == "landed":
+		return 0.0
+	if state != "casting" and not _uses_cast_landing_surface(state):
+		return 0.0
+
 	var screen_size: Vector2 = main.get_viewport_rect().size
-	var far_y: float = screen_size.y * CAST_PERSPECTIVE_FAR_Y_RATIO
+	var profile := _get_current_spot_float_profile()
 	var near_y: float = screen_size.y * CAST_PERSPECTIVE_NEAR_Y_RATIO
-	var near_t: float = _smooth_unit(clamp(inverse_lerp(far_y, near_y, center.y), 0.0, 1.0))
-	return lerp(BOBBER_FAR_VISUAL_SCALE, BOBBER_NEAR_VISUAL_SCALE, near_t)
+	var far_y: float = screen_size.y * CAST_PERSPECTIVE_FAR_Y_RATIO
+	near_y = _get_spot_profile_y(profile, "near_cast_y", near_y)
+	far_y = _get_spot_profile_y(profile, "far_cast_y", far_y)
+	if abs(near_y - far_y) < 1.0:
+		return 0.0
+	return clamp(inverse_lerp(near_y, far_y, center.y), 0.0, 1.0)
+
+func _get_bobber_distance_visibility(center: Vector2, state: String) -> float:
+	var distance_t := _get_bobber_distance_ratio(center, state)
+	return lerp(1.0, BOBBER_VERY_FAR_ALPHA, pow(distance_t, 0.85))
 
 func _get_bobber_visual_center(center: Vector2, state: String) -> Vector2:
 	var offset_scale: float = _get_bobber_waterline_offset_weight(state) * _get_bobber_perspective_scale(center, state)
@@ -1785,12 +1957,18 @@ func _set_float_presence(center: Vector2, state: String, intensity: float) -> vo
 		glow_alpha += float(glow_profile.get("power", 1.0)) * 0.36
 
 	var perspective_scale := _get_bobber_perspective_scale(center, state)
+	var distance_visibility := _get_bobber_distance_visibility(center, state)
 	ripple_scale *= perspective_scale
 	glow_scale *= perspective_scale
 	reflection_scale *= perspective_scale
 	marker_height *= perspective_scale
 	marker_width *= perspective_scale
 	marker_sink *= perspective_scale
+	ripple_alpha *= distance_visibility
+	glow_alpha *= lerp(distance_visibility, 1.0, 0.35)
+	reflection_alpha *= distance_visibility
+	var marker_alpha: float = clampf(distance_visibility, 0.70, 1.0)
+	var distance_contrast: float = lerp(0.88, 1.0, distance_visibility)
 
 	var bobber_contact := _get_bobber_contact_point(center, surface_y, state, marker_sink)
 	var ripple_size = Vector2(34.0, 12.5) * ripple_scale
@@ -1817,7 +1995,7 @@ func _set_float_presence(center: Vector2, state: String, intensity: float) -> vo
 	main.float_marker.pivot_offset = main.float_marker.size * Vector2(0.5, 0.72)
 	main.float_marker.position = Vector2(bobber_center.x - marker_width * 0.5, surface_y - marker_height * 0.58 + marker_sink + bobber_center.y - center.y)
 	main.float_marker.rotation = deg_to_rad(marker_tilt)
-	main.float_marker.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	main.float_marker.modulate = Color(distance_contrast, distance_contrast, distance_contrast, marker_alpha)
 	main.float_marker.visible = _float_sprite == null
 
 	if _ripple_sprite != null:
@@ -1857,7 +2035,9 @@ func _set_float_presence(center: Vector2, state: String, intensity: float) -> vo
 		_float_sprite.offset = Vector2.ZERO if _float_texture_uses_custom else Vector2(0.0, -FLOAT_TEXTURE_REGION.size.y * 0.080)
 		_float_sprite.rotation = deg_to_rad(marker_tilt)
 		_float_sprite.visible = true
-		_float_sprite.modulate = Color(1.08, 1.12, 0.82, 0.98) if bool(glow_profile.get("active", false)) else Color(1.0, 1.0, 1.0, 0.98)
+		var float_sprite_alpha: float = 0.98 * marker_alpha
+		var float_sprite_contrast: float = distance_contrast
+		_float_sprite.modulate = Color(1.08 * float_sprite_contrast, 1.12 * float_sprite_contrast, 0.82 * float_sprite_contrast, float_sprite_alpha) if bool(glow_profile.get("active", false)) else Color(float_sprite_contrast, float_sprite_contrast, float_sprite_contrast, float_sprite_alpha)
 
 	_update_bobber_ripple_node(center, surface_y, state, ripple_scale, ripple_alpha, marker_sink)
 	_update_bobber_contact_waterline(bobber_contact, state, ripple_scale, ripple_alpha)
@@ -2006,6 +2186,7 @@ func _update_fishing_presence(delta: float) -> void:
 	var scene_scale: float = clamp(screen_size.y / 540.0, 0.86, 1.26)
 	var spot_float_profile := _get_current_spot_float_profile()
 	_apply_spot_float_profile(spot_float_profile, screen_size)
+	_update_cast_area_debug_rect(spot_float_profile, screen_size, scene_scale)
 	var scene_breath = Vector2(sin(main._presence_time * 0.34) * 1.0, sin(main._presence_time * 0.27) * 0.6)
 	var light_alpha: float = 0.96 + sin(main._presence_time * 0.22) * 0.04
 	main.reflection_layer.modulate = Color(1.0, 1.0, 1.0, light_alpha)
@@ -2059,8 +2240,7 @@ func _update_fishing_presence(delta: float) -> void:
 
 	var target_float_center = base_float_center + float_offset + _wind_drift_offset + scene_breath * 0.35
 	if has_cast_landing_surface:
-		target_float_center.x = clamp(target_float_center.x, screen_size.x * 0.20, screen_size.x * 0.80)
-		target_float_center.y = clamp(target_float_center.y, main._water_zone_top, main._water_zone_bottom)
+		target_float_center = _clamp_point_to_cast_area(target_float_center, spot_float_profile, screen_size, scene_scale)
 	else:
 		target_float_center.x = clamp(target_float_center.x, screen_size.x * 0.26, screen_size.x * 0.74)
 		target_float_center.y = clamp(target_float_center.y, main._water_zone_top, main._water_zone_bottom)
