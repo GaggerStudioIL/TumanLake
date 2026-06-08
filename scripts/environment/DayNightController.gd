@@ -356,6 +356,7 @@ var _water_layer: TextureRect
 var _light_overlay_layer: TextureRect
 var _night_tint_overlay: ColorRect
 var _sunset_tint_overlay: ColorRect
+var _sun_water_reflection_layer: ColorRect
 var _foreground_grass_layer: TextureRect
 var _sky_debug_rect: Panel
 var _horizon_debug_line: ColorRect
@@ -390,6 +391,7 @@ func layout_environment(screen_size: Vector2) -> void:
 		_forest_layer,
 		_water_layer,
 		_light_overlay_layer,
+		_sun_water_reflection_layer,
 		_night_tint_overlay,
 		_sunset_tint_overlay,
 		_foreground_grass_layer
@@ -430,6 +432,7 @@ func update_day_night_visuals(_time_state: Dictionary = {}) -> void:
 func update_sun_position(minutes: float) -> void:
 	if not show_dynamic_sun:
 		_sun_sprite.visible = false
+		_update_sun_water_reflection({}, Vector2.ZERO, 0.0, 0.0)
 		return
 
 	var sun_t: float = clampf((minutes - DAWN_START) / maxf(NIGHT_START - DAWN_START, 1.0), 0.0, 1.0)
@@ -474,9 +477,9 @@ func update_sun_position(minutes: float) -> void:
 	if material != null:
 		material.set_shader_parameter("light_color", sun_color)
 		material.set_shader_parameter("halo_color", halo_color)
-		material.set_shader_parameter("texture_mix", lerpf(0.0, 0.010, sun_warmth))
-		material.set_shader_parameter("halo_strength", lerpf(0.90, 1.08, sun_warmth) * profile_sun_halo_boost)
-		material.set_shader_parameter("ray_strength", lerpf(0.15, 0.22, sun_warmth) * profile_sun_halo_boost)
+		material.set_shader_parameter("texture_mix", 0.0)
+		material.set_shader_parameter("halo_strength", lerpf(1.06, 1.26, sun_warmth) * profile_sun_halo_boost)
+		material.set_shader_parameter("ray_strength", lerpf(0.18, 0.28, sun_warmth) * profile_sun_halo_boost)
 
 	_sun_sprite.position = position
 	_sun_sprite.scale = _get_sprite_uniform_scale(_sun_sprite, target_size)
@@ -487,6 +490,7 @@ func update_sun_position(minutes: float) -> void:
 		1.0,
 		final_sun_alpha
 	)
+	_update_sun_water_reflection(visual_profile, position, final_sun_alpha, sun_warmth)
 
 func update_moon_position(minutes: float) -> void:
 	var night_length: float = MINUTES_PER_DAY - NIGHT_START + DAWN_START
@@ -506,6 +510,26 @@ func update_moon_position(minutes: float) -> void:
 	_moon_sprite.scale = _get_sprite_uniform_scale(_moon_sprite, target_size)
 	_moon_sprite.visible = moon_alpha * horizon_alpha > 0.01
 	_moon_sprite.modulate = Color(0.80, 0.90, 1.0, moon_alpha * horizon_alpha * 0.92)
+
+func _update_sun_water_reflection(profile: Dictionary, sun_position: Vector2, sun_alpha: float, sun_warmth: float) -> void:
+	if _sun_water_reflection_layer == null:
+		return
+	var reflection_strength: float = clampf(sun_alpha * _get_profile_float(profile, "sun_reflection_alpha", 0.18), 0.0, 0.30)
+	_sun_water_reflection_layer.visible = reflection_strength > 0.006
+	_sun_water_reflection_layer.color = Color.WHITE
+	var material := _sun_water_reflection_layer.material as ShaderMaterial
+	if material == null:
+		return
+	var horizon_ratio: float = _get_sky_horizon_y_ratio(profile)
+	var sun_uv := Vector2(
+		clampf(sun_position.x / maxf(_viewport_size.x, 1.0), 0.0, 1.0),
+		clampf(sun_position.y / maxf(_viewport_size.y, 1.0), 0.0, 1.0)
+	)
+	material.set_shader_parameter("sun_uv", sun_uv)
+	material.set_shader_parameter("horizon_y", horizon_ratio)
+	material.set_shader_parameter("strength", reflection_strength)
+	material.set_shader_parameter("lane_width", _get_profile_float(profile, "sun_reflection_width", 0.115))
+	material.set_shader_parameter("tint_color", Color(1.0, lerpf(0.78, 0.96, 1.0 - sun_warmth), lerpf(0.40, 0.74, 1.0 - sun_warmth), 1.0))
 
 func update_stars_visibility(minutes: float) -> void:
 	var stars_alpha: float = _sample_time_value(minutes, [
@@ -881,6 +905,7 @@ func _ensure_nodes() -> void:
 	_forest_layer = _ensure_texture_layer(_forest_layer, "ForestLayer", forest_path, 3)
 	_water_layer = _ensure_texture_layer(_water_layer, "WaterLayer", water_path, 4)
 	_light_overlay_layer = _ensure_texture_layer(_light_overlay_layer, "LightOverlayLayer", light_overlay_path, 5)
+	_sun_water_reflection_layer = _ensure_color_layer(_sun_water_reflection_layer, "SunWaterReflectionLayer", 6)
 	_sunset_tint_overlay = _ensure_color_layer(_sunset_tint_overlay, "SunsetTintOverlay", 7)
 	_night_tint_overlay = _ensure_color_layer(_night_tint_overlay, "NightTintOverlay", 8)
 	_foreground_grass_layer = _ensure_texture_layer(_foreground_grass_layer, "ForegroundGrassLayer", foreground_path, 9)
@@ -891,6 +916,8 @@ func _ensure_nodes() -> void:
 		_sunset_tint_overlay.material = _make_sunset_tint_material()
 	if _night_tint_overlay.material == null:
 		_night_tint_overlay.material = _make_night_tint_material()
+	if _sun_water_reflection_layer.material == null:
+		_sun_water_reflection_layer.material = _make_sun_water_reflection_material()
 
 func _ensure_texture_layer(layer: TextureRect, layer_name: String, path: String, z: int) -> TextureRect:
 	if layer == null:
@@ -1159,6 +1186,7 @@ func _make_sun_disc_material() -> ShaderMaterial:
 	var shader := Shader.new()
 	shader.code = """
 		shader_type canvas_item;
+		render_mode blend_add;
 
 		uniform vec4 light_color : source_color = vec4(1.0, 0.84, 0.50, 1.0);
 		uniform vec4 halo_color : source_color = vec4(1.0, 0.78, 0.42, 1.0);
@@ -1171,18 +1199,49 @@ func _make_sun_disc_material() -> ShaderMaterial:
 			vec4 tex = texture(TEXTURE, UV);
 			vec2 centered = UV * 2.0 - 1.0;
 			float dist = length(centered);
-			float white_core = 1.0 - smoothstep(0.00, 0.23, dist);
-			float soft_body = 1.0 - smoothstep(0.10, 0.54, dist);
-			float soft_halo = 1.0 - smoothstep(0.22, 1.02, dist);
-			float outer_glow = 1.0 - smoothstep(0.45, 1.22, dist);
-			float horizontal_ray = (1.0 - smoothstep(0.0, 0.13, abs(centered.y))) * (1.0 - smoothstep(0.20, 1.08, abs(centered.x)));
-			float diagonal_ray = (1.0 - smoothstep(0.0, 0.10, abs(centered.x + centered.y * 0.72))) * (1.0 - smoothstep(0.12, 0.98, dist));
-			float ray = (horizontal_ray * 0.45 + diagonal_ray * 0.20) * ray_strength;
-			vec3 texture_detail = mix(vec3(1.0), tex.rgb, texture_mix * (1.0 - white_core * 0.80));
-			vec3 body_color = mix(halo_color.rgb, light_color.rgb, clamp(white_core + soft_body * 0.44, 0.0, 1.0));
-			vec3 color = body_color * texture_detail + halo_color.rgb * (soft_halo * 0.18 + outer_glow * 0.16 + ray * 0.22);
-			float alpha = clamp(white_core * 0.88 + soft_body * 0.62 + soft_halo * halo_strength * 0.38 + outer_glow * 0.20 + ray, 0.0, 1.0);
+			float hot_center = 1.0 - smoothstep(0.00, 0.16, dist);
+			float bloom = 1.0 - smoothstep(0.06, 0.72, dist);
+			float soft_halo = 1.0 - smoothstep(0.20, 1.20, dist);
+			float outer_glow = 1.0 - smoothstep(0.46, 1.48, dist);
+			float horizontal_ray = (1.0 - smoothstep(0.0, 0.24, abs(centered.y))) * (1.0 - smoothstep(0.12, 1.42, abs(centered.x)));
+			float vertical_ray = (1.0 - smoothstep(0.0, 0.22, abs(centered.x))) * (1.0 - smoothstep(0.12, 1.36, abs(centered.y)));
+			float diagonal_ray_a = (1.0 - smoothstep(0.0, 0.20, abs(centered.x + centered.y * 0.72))) * (1.0 - smoothstep(0.10, 1.22, dist));
+			float diagonal_ray_b = (1.0 - smoothstep(0.0, 0.18, abs(centered.x - centered.y * 0.82))) * (1.0 - smoothstep(0.12, 1.16, dist));
+			float ray = (horizontal_ray * 0.30 + vertical_ray * 0.16 + diagonal_ray_a * 0.18 + diagonal_ray_b * 0.12) * ray_strength;
+			vec3 texture_detail = mix(vec3(1.0), tex.rgb, texture_mix * 0.18);
+			vec3 body_color = mix(halo_color.rgb, light_color.rgb, clamp(hot_center * 0.52 + bloom * 0.28, 0.0, 1.0));
+			vec3 color = (body_color * (hot_center * 0.56 + bloom * 0.42) + halo_color.rgb * (soft_halo * 0.24 + outer_glow * 0.18 + ray * 0.42)) * texture_detail;
+			float alpha = clamp(hot_center * 0.38 + bloom * 0.30 + soft_halo * halo_strength * 0.30 + outer_glow * 0.20 + ray, 0.0, 0.82);
 			COLOR = vec4(color * vertex_color.rgb, alpha * vertex_color.a * light_color.a);
+		}
+	"""
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	return material
+
+func _make_sun_water_reflection_material() -> ShaderMaterial:
+	var shader := Shader.new()
+	shader.code = """
+		shader_type canvas_item;
+		render_mode blend_add;
+
+		uniform vec2 sun_uv = vec2(0.5, 0.18);
+		uniform float horizon_y = 0.56;
+		uniform float strength = 0.0;
+		uniform float lane_width = 0.115;
+		uniform vec4 tint_color : source_color = vec4(1.0, 0.88, 0.58, 1.0);
+
+		void fragment() {
+			float water_mask = smoothstep(horizon_y - 0.010, horizon_y + 0.055, UV.y);
+			float depth_fade = 1.0 - smoothstep(horizon_y + 0.02, 1.05, UV.y) * 0.55;
+			float x_offset = abs(UV.x - sun_uv.x);
+			float widening = lane_width * mix(0.46, 1.24, clamp((UV.y - horizon_y) / max(1.0 - horizon_y, 0.001), 0.0, 1.0));
+			float lane = 1.0 - smoothstep(0.0, widening, x_offset);
+			float soft_lane = 1.0 - smoothstep(widening * 0.34, widening * 2.4, x_offset);
+			float shimmer = 0.72 + 0.28 * sin(UV.y * 210.0 + UV.x * 66.0);
+			float horizon_glow = 1.0 - smoothstep(0.0, 0.13, abs(UV.y - horizon_y));
+			float alpha = clamp((lane * 0.34 + soft_lane * 0.20 + horizon_glow * 0.22) * water_mask * depth_fade * shimmer * strength, 0.0, 0.24);
+			COLOR = vec4(tint_color.rgb, alpha);
 		}
 	"""
 	var material := ShaderMaterial.new()
