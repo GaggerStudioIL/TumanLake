@@ -4,7 +4,7 @@ const StarsLayerScript := preload("res://scripts/environment/StarsLayer.gd")
 
 const SHOW_ENVIRONMENT_DEBUG := false
 
-@export var sun_size: float = 72.0
+@export var sun_size: float = 84.0
 @export var show_dynamic_sun: bool = true
 @export var remove_static_sun_from_art: bool = true
 @export var moon_size: float = 54.0
@@ -145,7 +145,7 @@ const DEEP_PIER_VISUAL_PROFILE := {
 	"foreground_z": 5,
 	"celestial_z": 1,
 	"sun_horizon_y_ratio": 0.37,
-	"sun_size": 54.0,
+	"sun_size": 80.0,
 	"mist_enabled": false,
 	"sky_rect": [0.06, 0.04, 0.86, 0.48],
 	"horizon_y": 0.52,
@@ -263,7 +263,7 @@ const GREEN_DUCKWEED_VISUAL_PROFILE := {
 	"sun_start_x_ratio": 0.56,
 	"sun_end_x_ratio": 1.05,
 	"sun_horizon_y_ratio": 0.30,
-	"sun_size": 58.0,
+	"sun_size": 82.0,
 	"moon_start_x_ratio": 0.54,
 	"moon_end_x_ratio": 0.98,
 	"moon_horizon_y_ratio": 0.31,
@@ -337,6 +337,8 @@ const MOUNTAINS_LAYER_Z := 2
 const SKY_REFERENCE_SIZE := Vector2(960.0, 540.0)
 const CELESTIAL_HORIZON_FADE_RATIO := 0.065
 const CELESTIAL_HORIZON_CLAMP_MARGIN_RATIO := 0.012
+const SUN_NOON_SKY_RATIO := 0.13
+const MOON_NOON_SKY_RATIO := 0.20
 const SKY_DEBUG_RECT_Z := 18
 const HORIZON_DEBUG_LINE_Z := 19
 
@@ -458,8 +460,8 @@ func update_sun_position(minutes: float) -> void:
 	var visual_profile := _get_current_visual_profile()
 	var profile_sun_arc_height := _get_profile_float(visual_profile, "sun_arc_height", sun_arc_height)
 	var profile_sun_size := _get_profile_float(visual_profile, "sun_size", sun_size)
-	var profile_sun_halo_boost := _get_profile_float(visual_profile, "sun_halo_boost", 1.0)
-	var profile_sun_alpha_boost := _get_profile_float(visual_profile, "sun_alpha_boost", 1.0)
+	var profile_sun_halo_boost := _get_profile_float(visual_profile, "sun_halo_boost", 1.12)
+	var profile_sun_alpha_boost := _get_profile_float(visual_profile, "sun_alpha_boost", 1.06)
 	var screen_scale: float = clampf(_viewport_size.y / 540.0, 0.82, 1.35)
 	var target_size: float = profile_sun_size * screen_scale
 	var position_data: Dictionary = _get_celestial_position_data(sun_t, profile_sun_arc_height, false, visual_profile, target_size)
@@ -473,8 +475,8 @@ func update_sun_position(minutes: float) -> void:
 		material.set_shader_parameter("light_color", sun_color)
 		material.set_shader_parameter("halo_color", halo_color)
 		material.set_shader_parameter("texture_mix", lerpf(0.0, 0.010, sun_warmth))
-		material.set_shader_parameter("halo_strength", lerpf(0.78, 0.92, sun_warmth) * profile_sun_halo_boost)
-		material.set_shader_parameter("ray_strength", lerpf(0.12, 0.18, sun_warmth) * profile_sun_halo_boost)
+		material.set_shader_parameter("halo_strength", lerpf(0.90, 1.08, sun_warmth) * profile_sun_halo_boost)
+		material.set_shader_parameter("ray_strength", lerpf(0.15, 0.22, sun_warmth) * profile_sun_halo_boost)
 
 	_sun_sprite.position = position
 	_sun_sprite.scale = _get_sprite_uniform_scale(_sun_sprite, target_size)
@@ -689,10 +691,14 @@ func _get_celestial_position_data(
 		sky_rect,
 		horizon_y
 	)
-	var raw_position: Vector2 = start_point.lerp(end_point, safe_t)
+	var baseline_position: Vector2 = start_point.lerp(end_point, safe_t)
 	var arc: float = sin(safe_t * PI)
 	var arc_pixels: float = minf(_viewport_size.y * arc_height, maxf(sky_rect.size.y * 0.92, 1.0))
-	raw_position.y -= arc * arc_pixels
+	var legacy_peak_y: float = baseline_position.y - arc_pixels
+	var sky_peak_y: float = _get_celestial_peak_y(active_profile, moon, sky_rect, horizon_y, baseline_position.y, target_size)
+	var peak_y: float = minf(legacy_peak_y, sky_peak_y)
+	var raw_position: Vector2 = baseline_position
+	raw_position.y = lerpf(baseline_position.y, peak_y, arc)
 	if moon:
 		raw_position.y -= minf(_viewport_size.y * 0.035, sky_rect.size.y * 0.12)
 
@@ -717,6 +723,30 @@ func _get_celestial_horizon_visibility(raw_y: float, profile_horizon_y: float, t
 	var fade_start: float = profile_horizon_y - maxf(target_size * 0.32, _viewport_size.y * CELESTIAL_HORIZON_CLAMP_MARGIN_RATIO)
 	var fade_end: float = profile_horizon_y + fade_distance
 	return 1.0 - _fade_between(raw_y, fade_start, fade_end)
+
+func _get_celestial_peak_y(
+	profile: Dictionary,
+	moon: bool,
+	sky_rect: Rect2,
+	profile_horizon_y: float,
+	baseline_y: float,
+	target_size: float
+) -> float:
+	var key := "moon_peak_y" if moon else "sun_peak_y"
+	var sky_ratio := MOON_NOON_SKY_RATIO if moon else SUN_NOON_SKY_RATIO
+	var peak_y: float = sky_rect.position.y + sky_rect.size.y * sky_ratio
+	if profile.has(key):
+		var raw_value: float = float(profile.get(key))
+		if raw_value <= 1.5:
+			peak_y = raw_value * _viewport_size.y
+		else:
+			peak_y = raw_value * _viewport_size.y / SKY_REFERENCE_SIZE.y
+
+	var top_limit: float = sky_rect.position.y + maxf(target_size * 0.22, _viewport_size.y * 0.018)
+	var bottom_limit: float = minf(profile_horizon_y - maxf(target_size * 0.36, 2.0), baseline_y - maxf(target_size * 0.50, 2.0))
+	if bottom_limit < top_limit:
+		bottom_limit = top_limit
+	return clampf(peak_y, top_limit, bottom_limit)
 
 func _get_celestial_path_point(
 	profile: Dictionary,
