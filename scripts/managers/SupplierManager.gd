@@ -146,7 +146,7 @@ func _apply_supplier_freshness_defaults(supplier_id: String, supplier: Dictionar
 	match supplier_id:
 		"local_market":
 			if not supplier.has("max_freshness_age_hours"):
-				supplier["max_freshness_age_hours"] = 36.0
+				supplier["max_freshness_age_hours"] = -1.0
 		"fish_shop":
 			if not supplier.has("max_freshness_age_hours"):
 				supplier["max_freshness_age_hours"] = 24.0

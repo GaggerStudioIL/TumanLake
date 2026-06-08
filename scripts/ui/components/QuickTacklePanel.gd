@@ -1,12 +1,17 @@
 extends Control
 
-const CATEGORY_ORDER := ["line", "leader", "float", "hook", "bait", "tackle"]
+const DEFAULT_CATEGORY_ORDER := ["line", "leader", "float", "hook", "bait", "tackle"]
 const CATEGORY_TITLES := {
 	"line": "Леска",
 	"leader": "Поводок",
 	"float": "Поплавок",
 	"hook": "Крючок",
 	"bait": "Наживка",
+	"reel": "Катушка",
+	"lure": "Приманка",
+	"feeder_rig": "Оснастка",
+	"hook_or_lure": "Крючок/приманка",
+	"sinker_or_rig": "Груз/оснастка",
 	"tackle": "Снасти"
 }
 const CATEGORY_ICONS := {
@@ -15,6 +20,11 @@ const CATEGORY_ICONS := {
 	"float": "res://assets/ui/icons/quick_tackle/floats_button.png",
 	"hook": "res://assets/ui/icons/quick_tackle/hooks_button.png",
 	"bait": "res://assets/ui/icons/quick_tackle/baits_button.png",
+	"reel": "res://assets/ui/icons/quick_tackle/fishing_tackle.png",
+	"lure": "res://assets/ui/icons/quick_tackle/baits_button.png",
+	"feeder_rig": "res://assets/ui/icons/quick_tackle/fishing_tackle.png",
+	"hook_or_lure": "res://assets/ui/icons/quick_tackle/hooks_button.png",
+	"sinker_or_rig": "res://assets/ui/icons/quick_tackle/fishing_tackle.png",
 	"tackle": "res://assets/ui/icons/quick_tackle/fishing_tackle.png"
 }
 const QUICK_SLOT_COUNT := 3
@@ -32,6 +42,7 @@ var _popup_item_count := 0
 var _button_edge := 44.0
 var _ui_scale := 1.0
 var _texture_cache: Dictionary = {}
+var _current_category_order: Array = []
 
 
 func setup(main_ref) -> void:
@@ -44,6 +55,7 @@ func setup(main_ref) -> void:
 
 func layout(rect: Rect2, ui_scale: float) -> void:
 	_ui_scale = clamp(ui_scale, 0.82, 1.24)
+	_ensure_nodes()
 	_ensure_popup_overlay_parent()
 	position = rect.position
 	size = rect.size
@@ -52,13 +64,22 @@ func layout(rect: Rect2, ui_scale: float) -> void:
 	z_index = 266
 
 	_button_edge = clamp(rect.size.y - 8.0 * _ui_scale, 88.0, 98.0)
-	var gap: float = max((rect.size.x - _button_edge * float(CATEGORY_ORDER.size())) / float(CATEGORY_ORDER.size() - 1), 8.0 * _ui_scale)
-	var total_width: float = _button_edge * float(CATEGORY_ORDER.size()) + gap * float(CATEGORY_ORDER.size() - 1)
+	var category_order: Array = _get_category_order()
+	var category_count: int = maxi(category_order.size(), 1)
+	var gap: float = 8.0 * _ui_scale
+	if category_count > 1:
+		gap = max((rect.size.x - _button_edge * float(category_count)) / float(category_count - 1), 8.0 * _ui_scale)
+	var total_width: float = _button_edge * float(category_count) + gap * float(maxi(category_count - 1, 0))
 	var start_x: float = max((rect.size.x - total_width) * 0.5, 0.0)
 	var y: float = max((rect.size.y - _button_edge) * 0.5, 0.0)
 
-	for i in CATEGORY_ORDER.size():
-		var category := str(CATEGORY_ORDER[i])
+	for key in _buttons.keys():
+		var stale_button := _buttons.get(key) as Button
+		if stale_button != null:
+			stale_button.visible = category_order.has(str(key))
+
+	for i in category_order.size():
+		var category := str(category_order[i])
 		var button := _buttons.get(category) as Button
 		if button == null:
 			continue
@@ -77,19 +98,28 @@ func layout(rect: Rect2, ui_scale: float) -> void:
 
 
 func refresh() -> void:
-	for category in CATEGORY_ORDER:
+	_ensure_nodes()
+	var category_order: Array = _get_category_order()
+	for key in _buttons.keys():
+		var stale_button := _buttons.get(key) as Button
+		if stale_button != null:
+			stale_button.visible = category_order.has(str(key))
+
+	for category in category_order:
 		var key := str(category)
 		var equipped := _is_slot_equipped(key)
 		var button := _buttons.get(key) as Button
 		if button != null:
 			button.disabled = false
-			button.tooltip_text = ""
+			button.tooltip_text = _get_button_tooltip(key)
 			button.modulate = Color.WHITE
 			_apply_slot_button_style(button, equipped, false)
 		var icon := _button_icons.get(key) as TextureRect
 		if icon != null:
 			icon.modulate = Color(1.0, 1.0, 1.0, 1.0) if equipped or key == "tackle" else Color(0.78, 0.84, 0.82, 0.78)
 
+	if _popup_panel != null and _popup_panel.visible and _popup_category != "" and not category_order.has(_popup_category):
+		hide_popup()
 	if _popup_panel != null and _popup_panel.visible and _popup_category != "":
 		_rebuild_popup(_popup_category)
 		_layout_popup()
@@ -126,7 +156,8 @@ func _input(event: InputEvent) -> void:
 
 
 func _ensure_nodes() -> void:
-	for category in CATEGORY_ORDER:
+	var category_order: Array = _get_category_order()
+	for category in category_order:
 		var key := str(category)
 		if not _buttons.has(key):
 			var button := Button.new()
@@ -149,6 +180,10 @@ func _ensure_nodes() -> void:
 			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 			button.add_child(icon)
 			_button_icons[key] = icon
+		else:
+			var icon := _button_icons.get(key) as TextureRect
+			if icon != null:
+				icon.texture = _get_category_texture(key)
 
 	if _popup_panel == null:
 		_popup_panel = Panel.new()
@@ -172,6 +207,54 @@ func _ensure_nodes() -> void:
 		_popup_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_popup_row.add_theme_constant_override("separation", 6)
 		_popup_scroll.add_child(_popup_row)
+
+
+func _get_category_order() -> Array:
+	var order: Array = []
+	if PlayerData != null and PlayerData.has_method("get_tackle_schema_slots"):
+		var slot_schemas: Array = PlayerData.get_tackle_schema_slots()
+		for slot_schema in slot_schemas:
+			if typeof(slot_schema) != TYPE_DICTIONARY:
+				continue
+			var slot_id := str((slot_schema as Dictionary).get("id", ""))
+			if slot_id == "" or slot_id == "rod" or slot_id == "bait_2":
+				continue
+			if PlayerData.has_method("is_tackle_slot_locked") and bool(PlayerData.call("is_tackle_slot_locked", slot_id)):
+				continue
+			if not order.has(slot_id):
+				order.append(slot_id)
+
+	if order.is_empty():
+		order = DEFAULT_CATEGORY_ORDER.duplicate()
+	elif not order.has("tackle"):
+		order.append("tackle")
+
+	_current_category_order = order.duplicate()
+	return order
+
+
+func _get_allowed_item_categories(category: String) -> Array:
+	if category == "tackle":
+		return []
+	if PlayerData != null and PlayerData.has_method("get_tackle_slot_item_categories"):
+		var configured = PlayerData.call("get_tackle_slot_item_categories", category)
+		if typeof(configured) == TYPE_ARRAY:
+			var result: Array = []
+			for item_category in configured:
+				var item_category_key := str(item_category)
+				if item_category_key != "" and not result.has(item_category_key):
+					result.append(item_category_key)
+			if not result.is_empty():
+				return result
+	return [category]
+
+
+func _get_category_title(category: String) -> String:
+	if PlayerData != null and PlayerData.has_method("get_tackle_slot_title"):
+		var title := str(PlayerData.call("get_tackle_slot_title", category))
+		if title != "":
+			return title
+	return str(CATEGORY_TITLES.get(category, category))
 
 
 func _ensure_popup_overlay_parent() -> void:
@@ -518,19 +601,26 @@ func _get_quick_slot_items(category: String) -> Array:
 
 func _get_owned_picker_items(category: String) -> Array:
 	var result: Array = []
-	for item in PlayerData.get_owned_items_for_category(category):
-		if typeof(item) != TYPE_DICTIONARY:
-			continue
-		var owned_item: Dictionary = item
-		if _is_owned_quick_item_available(owned_item, category):
-			result.append(owned_item)
+	var seen_ids: Dictionary = {}
+	for item_category in _get_allowed_item_categories(category):
+		for item in PlayerData.get_owned_items_for_category(str(item_category)):
+			if typeof(item) != TYPE_DICTIONARY:
+				continue
+			var owned_item: Dictionary = item
+			var item_id := str(owned_item.get("id", ""))
+			if item_id == "" or seen_ids.has(item_id):
+				continue
+			if _is_owned_quick_item_available(owned_item, category):
+				seen_ids[item_id] = true
+				result.append(owned_item)
 	return result
 
 
 func _is_owned_quick_item_available(item: Dictionary, category: String) -> bool:
 	if item.is_empty():
 		return false
-	if str(item.get("category", item.get("type", ""))) != category:
+	var item_category := str(item.get("category", item.get("type", "")))
+	if not _get_allowed_item_categories(category).has(item_category):
 		return false
 	if int(item.get("quantity", 0)) <= 0:
 		return false
@@ -538,15 +628,16 @@ func _is_owned_quick_item_available(item: Dictionary, category: String) -> bool:
 
 
 func _has_owned_quick_items(category: String) -> bool:
-	for item in PlayerData.get_owned_items_for_category(category):
-		if typeof(item) != TYPE_DICTIONARY:
-			continue
-		var item_id := str(item.get("id", ""))
-		if item_id == "":
-			continue
-		if int(item.get("quantity", 0)) <= 0:
-			continue
-		return true
+	for item_category in _get_allowed_item_categories(category):
+		for item in PlayerData.get_owned_items_for_category(str(item_category)):
+			if typeof(item) != TYPE_DICTIONARY:
+				continue
+			var item_id := str(item.get("id", ""))
+			if item_id == "":
+				continue
+			if int(item.get("quantity", 0)) <= 0:
+				continue
+			return true
 	return false
 
 
@@ -556,7 +647,11 @@ func _open_full_category_or_shop(category: String) -> void:
 			main.open_tackle_category_from_quick_panel(category)
 			return
 	if main != null and main.has_method("open_shop_category"):
-		main.open_shop_category(category)
+		var shop_category := category
+		var allowed_categories := _get_allowed_item_categories(category)
+		if not allowed_categories.is_empty():
+			shop_category = str(allowed_categories[0])
+		main.open_shop_category(shop_category)
 
 
 func _can_change_tackle() -> bool:
@@ -589,7 +684,7 @@ func _get_button_tooltip(category: String) -> String:
 	if category == "tackle":
 		return "Полная сборка снасти"
 	var equipped: Variant = PlayerData.current_tackle.get(category, {})
-	var title := str(CATEGORY_TITLES.get(category, category))
+	var title := _get_category_title(category)
 	if typeof(equipped) == TYPE_DICTIONARY and str(equipped.get("id", "")) != "":
 		return "%s: %s" % [title, _get_item_display_name(equipped)]
 	return "%s: не установлено" % title
@@ -601,11 +696,22 @@ func _get_item_display_name(item: Dictionary) -> String:
 
 func _get_short_item_label(category: String, item: Dictionary) -> String:
 	var stats: Dictionary = item.get("stats", {}) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
+	var item_category := str(item.get("category", item.get("type", "")))
+	if category != item_category and ["hook_or_lure", "sinker_or_rig"].has(category):
+		return _get_short_item_label(item_category, item)
 	match category:
 		"line", "leader":
 			var strength := float(stats.get("max_load_kg", stats.get("max_load", stats.get("strength", 0.0))))
 			if strength > 0.0:
 				return "%.1fкг" % strength
+		"reel":
+			var reel_size := int(stats.get("reel_size", item.get("reel_size", 0)))
+			if reel_size > 0:
+				return "%d" % reel_size
+		"lure":
+			var lure_weight := float(stats.get("weight", item.get("weight", 0.0)))
+			if lure_weight > 0.0:
+				return "%.0fг" % lure_weight
 		"hook":
 			if stats.has("hook_size_label"):
 				return "№%s" % str(stats.get("hook_size_label", ""))

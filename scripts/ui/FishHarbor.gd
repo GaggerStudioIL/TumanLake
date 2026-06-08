@@ -2233,9 +2233,6 @@ func _get_fish_texture(fish_id: String) -> Texture2D:
 
 
 func _load_background_texture() -> Texture2D:
-	var image = Image.load_from_file(BACKGROUND_PATH)
-	if image:
-		return ImageTexture.create_from_image(image)
 	if ResourceLoader.exists(BACKGROUND_PATH):
 		return load(BACKGROUND_PATH) as Texture2D
 	return null

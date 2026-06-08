@@ -3,6 +3,8 @@ extends Node
 const PHYSICAL_SHORE_MIN_DEPTH := 0.16
 const BASIC_FLOAT_ID := "float_drop_basic"
 const BASIC_LEADER_ID := "nylon_leader_20cm_1kg"
+const BASIC_REEL_ID := "river_reel_1000"
+const BASIC_LURE_ID := "silver_spinner_5g"
 const LEGACY_TACKLE_ITEM_ALIASES := {
 	"light_float": "float_feather_basic",
 	"medium_float": "float_drop_basic",
@@ -572,6 +574,330 @@ const TACKLE_CATALOG := {
 			"handling_bonus": 0.03,
 			"durability": 1.0,
 			"durability_loss": 0.005
+		}
+	},
+	"river_spin_210": {
+		"id": "river_spin_210",
+		"name": "River Spin 210",
+		"type": "rod",
+		"category": "rod",
+		"rod_type": "spinning",
+		"tackle_type": "spinning",
+		"rarity": "common",
+		"price": 180,
+		"description": "Лёгкий спиннинг для окуня, щуки-травянки и первых катушечных проводок.",
+		"stats": {
+			"rod_type": "spinning",
+			"tackle_type": "spinning",
+			"requires_reel": true,
+			"length": 2.1,
+			"length_m": 2.1,
+			"rod_class": "light",
+			"power": 0.88,
+			"test_min": 3.0,
+			"test_max": 12.0,
+			"flexibility": 0.62,
+			"compatible_reel_min_size": 1000,
+			"compatible_reel_max_size": 2500,
+			"max_fish_weight": 3.0,
+			"strength": 0.95,
+			"stiffness": 0.90,
+			"tension_bonus": 0.10,
+			"control_bonus": 0.10,
+			"reach_bonus": 0.08,
+			"handling_bonus": 0.05,
+			"durability": 1.0,
+			"durability_loss": 0.009
+		}
+	},
+	"lake_spin_240": {
+		"id": "lake_spin_240",
+		"name": "Lake Spin 240",
+		"type": "rod",
+		"category": "rod",
+		"rod_type": "spinning",
+		"tackle_type": "spinning",
+		"rarity": "uncommon",
+		"price": 420,
+		"description": "Универсальный спиннинг для озёрной щуки, судака и дальнего заброса.",
+		"stats": {
+			"rod_type": "spinning",
+			"tackle_type": "spinning",
+			"requires_reel": true,
+			"length": 2.4,
+			"length_m": 2.4,
+			"rod_class": "medium",
+			"power": 1.15,
+			"test_min": 7.0,
+			"test_max": 28.0,
+			"flexibility": 0.54,
+			"compatible_reel_min_size": 2000,
+			"compatible_reel_max_size": 4000,
+			"max_fish_weight": 6.0,
+			"strength": 1.24,
+			"stiffness": 1.16,
+			"tension_bonus": 0.13,
+			"control_bonus": 0.13,
+			"reach_bonus": 0.12,
+			"handling_bonus": 0.02,
+			"durability": 1.0,
+			"durability_loss": 0.007
+		}
+	},
+	"carp_cast_360": {
+		"id": "carp_cast_360",
+		"name": "Carp Cast 360",
+		"type": "rod",
+		"category": "rod",
+		"rod_type": "feeder",
+		"tackle_type": "feeder",
+		"rarity": "rare",
+		"price": 760,
+		"description": "Силовое донное удилище под большую шпулю, кормушку и тяжёлую рыбу.",
+		"stats": {
+			"rod_type": "feeder",
+			"tackle_type": "feeder",
+			"requires_reel": true,
+			"length": 3.6,
+			"length_m": 3.6,
+			"rod_class": "heavy",
+			"power": 1.45,
+			"test_min": 40.0,
+			"test_max": 120.0,
+			"flexibility": 0.42,
+			"compatible_reel_min_size": 4000,
+			"compatible_reel_max_size": 6000,
+			"max_fish_weight": 12.0,
+			"strength": 1.72,
+			"stiffness": 1.55,
+			"tension_bonus": 0.10,
+			"control_bonus": 0.10,
+			"reach_bonus": 0.18,
+			"handling_bonus": -0.01,
+			"durability": 1.0,
+			"durability_loss": 0.006
+		}
+	},
+	"river_reel_1000": {
+		"id": "river_reel_1000",
+		"name": "River Reel 1000",
+		"type": "reel",
+		"category": "reel",
+		"rarity": "common",
+		"price": 95,
+		"description": "Лёгкая безынерционная катушка для маленьких спиннингов.",
+		"stats": {
+			"reel_size": 1000,
+			"reel_type": "spinning",
+			"max_drag": 2.5,
+			"retrieve_speed": 0.62,
+			"spool_capacity": 85.0,
+			"durability": 1.0,
+			"weight": 190.0,
+			"wear_rate": 0.010,
+			"body_texture": "",
+			"spool_texture": "",
+			"handle_texture": ""
+		}
+	},
+	"river_reel_2000": {
+		"id": "river_reel_2000",
+		"name": "River Reel 2000",
+		"type": "reel",
+		"category": "reel",
+		"rarity": "common",
+		"price": 155,
+		"description": "Универсальная ранняя катушка для лёгкого берега.",
+		"stats": {
+			"reel_size": 2000,
+			"reel_type": "spinning",
+			"max_drag": 4.0,
+			"retrieve_speed": 0.70,
+			"spool_capacity": 120.0,
+			"durability": 1.0,
+			"weight": 225.0,
+			"wear_rate": 0.009,
+			"body_texture": "",
+			"spool_texture": "",
+			"handle_texture": ""
+		}
+	},
+	"lake_reel_2500": {
+		"id": "lake_reel_2500",
+		"name": "Lake Reel 2500",
+		"type": "reel",
+		"category": "reel",
+		"rarity": "uncommon",
+		"price": 240,
+		"description": "Средняя катушка для озёрного спиннинга и аккуратной щуки.",
+		"stats": {
+			"reel_size": 2500,
+			"reel_type": "spinning",
+			"max_drag": 5.5,
+			"retrieve_speed": 0.78,
+			"spool_capacity": 155.0,
+			"durability": 1.0,
+			"weight": 260.0,
+			"wear_rate": 0.008,
+			"body_texture": "",
+			"spool_texture": "",
+			"handle_texture": ""
+		}
+	},
+	"lake_reel_3000": {
+		"id": "lake_reel_3000",
+		"name": "Lake Reel 3000",
+		"type": "reel",
+		"category": "reel",
+		"rarity": "uncommon",
+		"price": 330,
+		"description": "Надёжная катушка с запасом фрикциона для средней хищной рыбы.",
+		"stats": {
+			"reel_size": 3000,
+			"reel_type": "spinning",
+			"max_drag": 7.0,
+			"retrieve_speed": 0.84,
+			"spool_capacity": 190.0,
+			"durability": 1.0,
+			"weight": 295.0,
+			"wear_rate": 0.007,
+			"body_texture": "",
+			"spool_texture": "",
+			"handle_texture": ""
+		}
+	},
+	"feeder_reel_4000": {
+		"id": "feeder_reel_4000",
+		"name": "Feeder Reel 4000",
+		"type": "reel",
+		"category": "reel",
+		"rarity": "rare",
+		"price": 520,
+		"description": "Большая шпуля для дальнего заброса и уверенного донного темпа.",
+		"stats": {
+			"reel_size": 4000,
+			"reel_type": "feeder",
+			"max_drag": 9.0,
+			"retrieve_speed": 0.92,
+			"spool_capacity": 240.0,
+			"durability": 1.0,
+			"weight": 360.0,
+			"wear_rate": 0.006,
+			"body_texture": "",
+			"spool_texture": "",
+			"handle_texture": ""
+		}
+	},
+	"feeder_reel_5000": {
+		"id": "feeder_reel_5000",
+		"name": "Feeder Reel 5000",
+		"type": "reel",
+		"category": "reel",
+		"rarity": "rare",
+		"price": 690,
+		"description": "Тяговая катушка под кормушку, течение и крупного леща.",
+		"stats": {
+			"reel_size": 5000,
+			"reel_type": "feeder",
+			"max_drag": 11.0,
+			"retrieve_speed": 0.96,
+			"spool_capacity": 285.0,
+			"durability": 1.0,
+			"weight": 410.0,
+			"wear_rate": 0.006,
+			"body_texture": "",
+			"spool_texture": "",
+			"handle_texture": ""
+		}
+	},
+	"carp_reel_6000": {
+		"id": "carp_reel_6000",
+		"name": "Carp Reel 6000",
+		"type": "reel",
+		"category": "reel",
+		"rarity": "epic",
+		"price": 980,
+		"description": "Силовая катушка для тяжёлых монтажей и долгого вываживания.",
+		"stats": {
+			"reel_size": 6000,
+			"reel_type": "carp",
+			"max_drag": 13.0,
+			"retrieve_speed": 1.02,
+			"spool_capacity": 340.0,
+			"durability": 1.0,
+			"weight": 480.0,
+			"wear_rate": 0.005,
+			"body_texture": "",
+			"spool_texture": "",
+			"handle_texture": ""
+		}
+	},
+	"carp_reel_8000": {
+		"id": "carp_reel_8000",
+		"name": "Carp Reel 8000",
+		"type": "reel",
+		"category": "reel",
+		"rarity": "epic",
+		"price": 1320,
+		"description": "Большая карповая шпуля для дальнего берега и мощных рывков.",
+		"stats": {
+			"reel_size": 8000,
+			"reel_type": "carp",
+			"max_drag": 16.0,
+			"retrieve_speed": 1.08,
+			"spool_capacity": 430.0,
+			"durability": 1.0,
+			"weight": 560.0,
+			"wear_rate": 0.0045,
+			"body_texture": "",
+			"spool_texture": "",
+			"handle_texture": ""
+		}
+	},
+	"trophy_reel_10000": {
+		"id": "trophy_reel_10000",
+		"name": "Trophy Reel 10000",
+		"type": "reel",
+		"category": "reel",
+		"rarity": "trophy",
+		"price": 1850,
+		"description": "Трофейная катушка с огромной шпулей и мощным фрикционом.",
+		"stats": {
+			"reel_size": 10000,
+			"reel_type": "big_game",
+			"max_drag": 20.0,
+			"retrieve_speed": 1.12,
+			"spool_capacity": 540.0,
+			"durability": 1.0,
+			"weight": 680.0,
+			"wear_rate": 0.004,
+			"body_texture": "",
+			"spool_texture": "",
+			"handle_texture": ""
+		}
+	},
+	"silver_spinner_5g": {
+		"id": "silver_spinner_5g",
+		"name": "Серебристая вертушка 5 г",
+		"type": "lure",
+		"category": "lure",
+		"rarity": "common",
+		"price": 65,
+		"description": "Небольшая блесна для окуня и щуки-травянки.",
+		"stats": {
+			"lure_type": "spinner",
+			"bait_type": "lure",
+			"bait_tags": ["metal", "moving", "predator", "small"],
+			"target_fish_ids": ["perch", "young_pike", "pike"],
+			"secondary_fish_ids": ["zander", "young_chub", "ide"],
+			"fish_attraction": 0.055,
+			"hook_size": 8,
+			"hook_chance": 0.11,
+			"hook_strength": 1.05,
+			"fish_escape_modifier": 0.95,
+			"weight": 5.0,
+			"durability": 1.0,
+			"wear_rate": 0.006
 		}
 	},
 	"mono_1_2kg": {
@@ -4103,7 +4429,7 @@ func get_tackle_catalog_items(type_filter: String = "all") -> Array:
 				items.append(item)
 
 	items.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		var category_order := {"rod": 0, "line": 1, "leader": 2, "hook": 3, "float": 4, "bait": 5}
+		var category_order := {"rod": 0, "reel": 1, "line": 2, "leader": 3, "hook": 4, "float": 5, "lure": 6, "bait": 7, "feeder_rig": 8}
 		var type_a := str(a.get("type", a.get("category", "misc")))
 		var type_b := str(b.get("type", b.get("category", "misc")))
 		var order_a: int = int(category_order.get(type_a, 9))
@@ -4121,6 +4447,8 @@ func get_tackle_shop_items() -> Array:
 		"simple_pole_rod_4m": true,
 		"mono_1_2kg": true,
 		BASIC_FLOAT_ID: true,
+		BASIC_REEL_ID: true,
+		BASIC_LURE_ID: true,
 		"light_float": true,
 		"medium_float": true,
 		"night_float": true,
@@ -4179,6 +4507,8 @@ func _get_item_icon(item_type: String) -> String:
 	match item_type:
 		"rod":
 			return "R"
+		"reel":
+			return "C"
 		"line":
 			return "L"
 		"leader":
@@ -4187,6 +4517,8 @@ func _get_item_icon(item_type: String) -> String:
 			return "F"
 		"hook":
 			return "H"
+		"lure":
+			return "U"
 		"bait":
 			return "B"
 		_:
@@ -4197,8 +4529,22 @@ func _normalize_equipment_stats(stats: Dictionary, category: String, item_id: St
 
 	match category:
 		"rod":
+			var rod_type_key := str(normalized.get("rod_type", normalized.get("tackle_type", DEFAULT_TACKLE_TYPE))).strip_edges().to_lower()
+			if rod_type_key == "" or rod_type_key == DEFAULT_TACKLE_TYPE:
+				rod_type_key = "pole"
+			var requires_reel_default := ["spinning", "feeder", "sea"].has(rod_type_key)
+			var raw_requires_reel = normalized.get("requires_reel", requires_reel_default)
+			if typeof(raw_requires_reel) == TYPE_STRING:
+				normalized["requires_reel"] = ["1", "true", "yes", "да"].has(str(raw_requires_reel).strip_edges().to_lower())
+			else:
+				normalized["requires_reel"] = bool(raw_requires_reel)
+			normalized["rod_type"] = rod_type_key
+			if not normalized.has("tackle_type"):
+				normalized["tackle_type"] = rod_type_key if bool(normalized["requires_reel"]) else DEFAULT_TACKLE_TYPE
 			if not normalized.has("length_m"):
-				normalized["length_m"] = 4.0
+				normalized["length_m"] = float(normalized.get("length", 4.0))
+			if not normalized.has("length"):
+				normalized["length"] = float(normalized.get("length_m", 4.0))
 			if not normalized.has("rod_class"):
 				normalized["rod_class"] = _get_default_rod_class(float(normalized["length_m"]))
 			if not normalized.has("control_bonus"):
@@ -4219,9 +4565,31 @@ func _normalize_equipment_stats(stats: Dictionary, category: String, item_id: St
 				normalized["durability"] = 1.0
 			if not normalized.has("durability_loss"):
 				normalized["durability_loss"] = 0.012
-			normalized["length_m"] = clamp(float(normalized["length_m"]), 2.7, 7.2)
+			if not normalized.has("power"):
+				normalized["power"] = float(normalized.get("strength", normalized.get("stiffness", 1.0)))
+			if not normalized.has("test_min"):
+				normalized["test_min"] = 0.0 if not bool(normalized["requires_reel"]) else 3.0
+			if not normalized.has("test_max"):
+				normalized["test_max"] = float(normalized.get("max_fish_weight", 1.0)) * 4.0 if bool(normalized["requires_reel"]) else float(normalized.get("max_fish_weight", 1.0))
+			if not normalized.has("flexibility"):
+				normalized["flexibility"] = clamp(1.25 - float(normalized.get("stiffness", 1.0)) * 0.45, 0.20, 0.95)
+			if not normalized.has("compatible_reel_min_size"):
+				normalized["compatible_reel_min_size"] = 1000 if bool(normalized["requires_reel"]) else 0
+			if not normalized.has("compatible_reel_max_size"):
+				normalized["compatible_reel_max_size"] = 4000 if bool(normalized["requires_reel"]) else 0
+			var min_rod_length := 1.5 if bool(normalized["requires_reel"]) else 2.7
+			normalized["length_m"] = clamp(float(normalized["length_m"]), min_rod_length, 7.2)
+			normalized["length"] = float(normalized["length_m"])
 			normalized["reach_bonus"] = clamp(float(normalized["reach_bonus"]), -0.06, 0.22)
 			normalized["handling_bonus"] = clamp(float(normalized["handling_bonus"]), -0.08, 0.08)
+			normalized["power"] = clamp(float(normalized["power"]), 0.25, 3.0)
+			normalized["test_min"] = max(float(normalized["test_min"]), 0.0)
+			normalized["test_max"] = max(float(normalized["test_max"]), float(normalized["test_min"]))
+			normalized["flexibility"] = clamp(float(normalized["flexibility"]), 0.05, 1.0)
+			normalized["compatible_reel_min_size"] = max(int(normalized["compatible_reel_min_size"]), 0)
+			normalized["compatible_reel_max_size"] = max(int(normalized["compatible_reel_max_size"]), int(normalized["compatible_reel_min_size"]))
+			normalized["compatible_reel_min"] = int(normalized["compatible_reel_min_size"])
+			normalized["compatible_reel_max"] = int(normalized["compatible_reel_max_size"])
 			normalized["durability"] = clamp(float(normalized["durability"]), 0.0, 1.0)
 		"line":
 			var max_load: float = float(normalized.get("max_load", normalized.get("max_load_kg", normalized.get("strength", 1.0))))
@@ -4371,6 +4739,71 @@ func _normalize_equipment_stats(stats: Dictionary, category: String, item_id: St
 			normalized["setup_comfort"] = clamp(float(normalized["setup_comfort"]), 0.0, 0.20)
 			normalized["recommended_spots"] = _to_string_array(normalized["recommended_spots"])
 			normalized["bonus_tags"] = _to_string_array(normalized["bonus_tags"])
+		"reel":
+			if not normalized.has("reel_size"):
+				normalized["reel_size"] = 2000
+			if not normalized.has("reel_type"):
+				normalized["reel_type"] = "spinning"
+			if not normalized.has("max_drag"):
+				normalized["max_drag"] = 4.0
+			if not normalized.has("retrieve_speed"):
+				normalized["retrieve_speed"] = 0.70
+			if not normalized.has("spool_capacity"):
+				normalized["spool_capacity"] = 120.0
+			if not normalized.has("durability"):
+				normalized["durability"] = 1.0
+			if not normalized.has("weight"):
+				normalized["weight"] = 250.0
+			if not normalized.has("wear_rate"):
+				normalized["wear_rate"] = 0.008
+			if not normalized.has("body_texture"):
+				normalized["body_texture"] = ""
+			if not normalized.has("spool_texture"):
+				normalized["spool_texture"] = ""
+			if not normalized.has("handle_texture"):
+				normalized["handle_texture"] = ""
+			normalized["reel_size"] = clampi(int(normalized["reel_size"]), 1000, 10000)
+			normalized["reel_type"] = str(normalized["reel_type"])
+			normalized["max_drag"] = clamp(float(normalized["max_drag"]), 0.5, 30.0)
+			normalized["retrieve_speed"] = clamp(float(normalized["retrieve_speed"]), 0.20, 2.0)
+			normalized["spool_capacity"] = clamp(float(normalized["spool_capacity"]), 25.0, 650.0)
+			normalized["durability"] = clamp(float(normalized["durability"]), 0.0, 1.0)
+			normalized["weight"] = clamp(float(normalized["weight"]), 80.0, 1200.0)
+			normalized["wear_rate"] = clamp(float(normalized["wear_rate"]), 0.001, 0.040)
+			normalized["body_texture"] = str(normalized["body_texture"])
+			normalized["spool_texture"] = str(normalized["spool_texture"])
+			normalized["handle_texture"] = str(normalized["handle_texture"])
+		"lure":
+			var lure_id := item_id
+			if lure_id == "":
+				lure_id = str(normalized.get("id", normalized.get("bait_id", "")))
+			if not normalized.has("bait_type"):
+				normalized["bait_type"] = "lure"
+			if not normalized.has("lure_type"):
+				normalized["lure_type"] = "spinner"
+			if not normalized.has("hook_chance"):
+				normalized["hook_chance"] = 0.10
+			if not normalized.has("hook_strength"):
+				normalized["hook_strength"] = 1.0
+			if not normalized.has("fish_escape_modifier"):
+				normalized["fish_escape_modifier"] = 1.0
+			if not normalized.has("hook_size"):
+				normalized["hook_size"] = 8
+			if not normalized.has("weight"):
+				normalized["weight"] = 5.0
+			if not normalized.has("durability"):
+				normalized["durability"] = 1.0
+			if not normalized.has("wear_rate"):
+				normalized["wear_rate"] = 0.006
+			normalized = _apply_bait_target_profile(normalized, lure_id)
+			normalized["lure_type"] = str(normalized["lure_type"])
+			normalized["hook_chance"] = clamp(float(normalized["hook_chance"]), 0.0, 0.35)
+			normalized["hook_strength"] = clamp(float(normalized["hook_strength"]), 0.25, 2.5)
+			normalized["fish_escape_modifier"] = clamp(float(normalized["fish_escape_modifier"]), 0.45, 1.80)
+			normalized["hook_size"] = clampi(int(normalized["hook_size"]), 2, 24)
+			normalized["weight"] = clamp(float(normalized["weight"]), 0.5, 160.0)
+			normalized["durability"] = clamp(float(normalized["durability"]), 0.0, 1.0)
+			normalized["wear_rate"] = clamp(float(normalized["wear_rate"]), 0.001, 0.040)
 		"bait":
 			var bait_id := item_id
 			if bait_id == "":
@@ -4679,10 +5112,13 @@ func _is_quick_tackle_item_available(item: Dictionary, category: String) -> bool
 func get_default_owned_items() -> Array:
 	return [
 		_make_owned_catalog_item("simple_pole_rod_4m", 1),
+		_make_owned_catalog_item("river_spin_210", 1),
+		_make_owned_catalog_item(BASIC_REEL_ID, 1),
 		_make_owned_catalog_item("mono_1_2kg", 1),
 		_make_owned_catalog_item(BASIC_LEADER_ID, 1),
 		_make_owned_catalog_item(BASIC_FLOAT_ID, 1),
 		_make_owned_catalog_item("small_hook_12", 1),
+		_make_owned_catalog_item(BASIC_LURE_ID, 1),
 		_make_owned_catalog_item("worm", 30)
 	]
 
@@ -4754,6 +5190,7 @@ func set_current_tackle(saved_tackle: Dictionary) -> void:
 		current_tackle["float"] = _make_tackle_component(BASIC_FLOAT_ID)
 	if current_tackle.get("leader", {}).is_empty():
 		current_tackle["leader"] = _make_tackle_component(BASIC_LEADER_ID)
+	_sync_tackle_slots_for_current_rod()
 
 func set_owned_items(saved_items: Array) -> void:
 	if saved_items.is_empty():
@@ -4778,6 +5215,7 @@ func set_owned_items(saved_items: Array) -> void:
 	else:
 		_ensure_default_float_owned()
 		_ensure_default_leader_owned()
+		_ensure_starter_reel_tackle_owned()
 
 func _ensure_default_float_owned() -> void:
 	if _has_owned_category("float"):
@@ -4792,6 +5230,14 @@ func _ensure_default_leader_owned() -> void:
 	var fallback_leader := _make_owned_catalog_item(BASIC_LEADER_ID, 1)
 	if not fallback_leader.is_empty():
 		owned_items.append(fallback_leader)
+
+func _ensure_starter_reel_tackle_owned() -> void:
+	for item_id in ["river_spin_210", BASIC_REEL_ID, BASIC_LURE_ID]:
+		if not get_owned_item(str(item_id)).is_empty():
+			continue
+		var starter_item := _make_owned_catalog_item(str(item_id), 1)
+		if not starter_item.is_empty():
+			owned_items.append(starter_item)
 
 func _has_owned_category(category: String) -> bool:
 	for item in owned_items:
@@ -4817,10 +5263,77 @@ func normalize_tackle_type(raw_type: String) -> String:
 
 func get_current_tackle_type() -> String:
 	var rod := get_current_tackle_slot("rod")
-	return normalize_tackle_type(_get_tackle_type_from_item(rod))
+	var tackle_type := normalize_tackle_type(_get_tackle_type_from_item(rod))
+	if not BuildConfig.ENABLE_SPINNING_FEATURES and tackle_type == "spinning":
+		return DEFAULT_TACKLE_TYPE
+	return tackle_type
 
 func get_current_tackle_type_title() -> String:
 	return str(TACKLE_TYPE_TITLES.get(get_current_tackle_type(), TACKLE_TYPE_TITLES[DEFAULT_TACKLE_TYPE]))
+
+func get_current_rod_data() -> Dictionary:
+	var raw_component = current_tackle.get("rod", {})
+	if typeof(raw_component) != TYPE_DICTIONARY:
+		return {}
+	var component: Dictionary = (raw_component as Dictionary).duplicate(true)
+	if str(component.get("id", "")) == "":
+		return {}
+	return _normalize_equipment_stats(component, "rod", str(component.get("id", "")))
+
+func get_current_rod_requires_reel() -> bool:
+	if not BuildConfig.ENABLE_SPINNING_FEATURES:
+		return false
+	var rod := get_current_rod_data()
+	return bool(rod.get("requires_reel", false)) if not rod.is_empty() else false
+
+func get_current_fight_mode() -> String:
+	if not BuildConfig.ENABLE_SPINNING_FEATURES:
+		return "pole"
+	return "reel" if get_current_rod_requires_reel() else "pole"
+
+func get_current_reel_data() -> Dictionary:
+	if not BuildConfig.ENABLE_SPINNING_FEATURES:
+		return {}
+	var raw_component = current_tackle.get("reel", {})
+	if typeof(raw_component) != TYPE_DICTIONARY or str(raw_component.get("id", "")) == "":
+		return {}
+	var component: Dictionary = (raw_component as Dictionary).duplicate(true)
+	var resolved_id := _resolve_tackle_item_id(str(component.get("id", "")))
+	var catalog_item := get_tackle_catalog_item(resolved_id)
+	var stats: Dictionary = {}
+	if not catalog_item.is_empty() and typeof(catalog_item.get("stats", {})) == TYPE_DICTIONARY:
+		stats = (catalog_item.get("stats", {}) as Dictionary).duplicate(true)
+	stats.merge(component, true)
+	stats = _normalize_equipment_stats(stats, "reel", resolved_id)
+	stats["id"] = resolved_id
+	stats["name"] = str(catalog_item.get("name", component.get("name", "-")))
+	stats["type"] = "reel"
+	stats["category"] = "reel"
+	stats["rarity"] = str(catalog_item.get("rarity", component.get("rarity", "common")))
+	stats["price"] = float(catalog_item.get("price", component.get("price", 0.0)))
+	return stats
+
+func is_reel_compatible_with_rod(reel: Dictionary, rod: Dictionary = {}) -> bool:
+	return get_reel_compatibility_issue(reel, rod) == ""
+
+func get_reel_compatibility_issue(reel: Dictionary, rod: Dictionary = {}) -> String:
+	var rod_data := rod.duplicate(true) if not rod.is_empty() else get_current_rod_data()
+	if rod_data.is_empty():
+		return "Удилище не выбрано."
+	rod_data = _normalize_equipment_stats(rod_data, "rod", str(rod_data.get("id", "")))
+	if not bool(rod_data.get("requires_reel", false)):
+		return "На маховую удочку катушка не ставится."
+	if reel.is_empty() or str(reel.get("id", "")) == "":
+		return "Катушка не выбрана."
+	var reel_data := _normalize_equipment_stats(reel.duplicate(true), "reel", str(reel.get("id", "")))
+	var reel_size := int(reel_data.get("reel_size", 0))
+	var min_size := int(rod_data.get("compatible_reel_min_size", rod_data.get("compatible_reel_min", 0)))
+	var max_size := int(rod_data.get("compatible_reel_max_size", rod_data.get("compatible_reel_max", 0)))
+	if min_size > 0 and reel_size < min_size:
+		return "Размер катушки меньше диапазона удилища (%d-%d)." % [min_size, max_size]
+	if max_size > 0 and reel_size > max_size:
+		return "Размер катушки больше диапазона удилища (%d-%d)." % [min_size, max_size]
+	return ""
 
 func _get_tackle_type_from_item(item: Dictionary) -> String:
 	if item.is_empty():
@@ -4941,13 +5454,15 @@ func set_current_tackle_slot(slot_id: String, item: Dictionary) -> bool:
 		return false
 	if is_tackle_slot_locked(slot_id):
 		return false
-	if item.is_empty() or not can_equip_item(item):
+	if item.is_empty():
 		return false
 
 	var slot_category := _get_tackle_slot_item_category(slot_id)
 	var item_category := str(item.get("category", item.get("type", "")))
 	var allowed_categories := get_tackle_slot_item_categories(slot_id)
 	if not allowed_categories.has(item_category):
+		return false
+	if get_equip_block_reason(item, slot_id) != "":
 		return false
 	slot_category = item_category
 
@@ -4977,6 +5492,8 @@ func set_current_tackle_slot(slot_id: String, item: Dictionary) -> bool:
 		component["quantity"] = int(item.get("quantity", 0))
 
 	current_tackle[slot_id] = component
+	if slot_id == "rod":
+		_sync_tackle_slots_for_current_rod()
 	if QUICK_TACKLE_CATEGORIES.has(slot_id):
 		remember_recent_tackle_item(slot_id, resolved_item_id)
 	return true
@@ -4985,6 +5502,20 @@ func clear_current_tackle_slot(slot_id: String) -> void:
 	if not is_tackle_slot_supported(slot_id):
 		return
 	current_tackle[slot_id] = {}
+
+func _sync_tackle_slots_for_current_rod() -> void:
+	var rod := get_current_rod_data()
+	if rod.is_empty():
+		return
+	if not bool(rod.get("requires_reel", false)):
+		for reel_only_slot in ["reel", "lure", "feeder_rig", "hook_or_lure", "sinker_or_rig"]:
+			if current_tackle.has(reel_only_slot):
+				current_tackle[reel_only_slot] = {}
+		return
+
+	var reel := get_current_reel_data()
+	if not reel.is_empty() and get_reel_compatibility_issue(reel, rod) != "":
+		current_tackle["reel"] = {}
 
 func can_equip_item(item: Dictionary) -> bool:
 	return get_equip_block_reason(item) == ""
@@ -5010,6 +5541,13 @@ func get_equip_block_reason(item: Dictionary, slot_type: String = "") -> String:
 			return "Предмет сломан."
 		if wear_percent >= REPAIR_BLOCK_WEAR_PERCENT:
 			return "%s требует ремонта." % _get_tackle_slot_title(category)
+
+	if category == "reel":
+		var reel_stats: Dictionary = item.get("stats", {}).duplicate(true) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else item.duplicate(true)
+		reel_stats["id"] = str(item.get("id", reel_stats.get("id", "")))
+		var reel_issue := get_reel_compatibility_issue(reel_stats)
+		if reel_issue != "":
+			return reel_issue
 
 	if int(item.get("quantity", 0)) <= 0:
 		if category == "bait":
@@ -5109,7 +5647,7 @@ func discard_owned_item(item_id: String) -> Dictionary:
 	}
 
 func _is_durable_tackle_category(category: String) -> bool:
-	return ["rod", "line", "leader", "hook"].has(category)
+	return ["rod", "reel", "line", "leader", "hook"].has(category)
 
 func has_usable_basic_tackle() -> bool:
 	for slot in get_required_tackle_slots():
@@ -5201,7 +5739,7 @@ func _is_current_tackle_slot_usable(slot: String) -> bool:
 	if _get_owned_item_quantity(item_id) <= 0:
 		return false
 
-	if ["rod", "line", "leader", "hook"].has(slot):
+	if ["rod", "reel", "line", "leader", "hook"].has(slot):
 		return get_item_wear_percent(component) < REPAIR_BLOCK_WEAR_PERCENT
 
 	return true
@@ -5305,7 +5843,7 @@ func add_owned_item(item: Dictionary, amount: int = 1) -> void:
 		owned_item["description_ru"] = str(normalized_item.get("description_ru", owned_item.get("description_ru", owned_item.get("description", ""))))
 		owned_item["bonus_tags"] = _to_string_array(normalized_item.get("bonus_tags", owned_item.get("bonus_tags", [])))
 
-		if ["rod", "line", "leader", "hook"].has(item_category):
+		if ["rod", "reel", "line", "leader", "hook"].has(item_category):
 			var refreshed_stats: Dictionary = normalized_item.get("stats", {}).duplicate(true)
 			var owned_stats: Dictionary = owned_item.get("stats", {})
 			refreshed_stats["durability"] = max(
@@ -5395,6 +5933,10 @@ func get_tackle_setup_issues() -> Array:
 		if issue != "":
 			issues.append(issue)
 
+	var dangling_reel = current_tackle.get("reel", {})
+	if not get_current_rod_requires_reel() and typeof(dangling_reel) == TYPE_DICTIONARY and str(dangling_reel.get("id", "")) != "":
+		issues.append("На маховую удочку катушка не ставится.")
+
 	return issues
 
 func get_tackle_setup_status_text() -> String:
@@ -5445,12 +5987,17 @@ func _get_tackle_slot_issue(slot: String, slot_schema: Dictionary = {}) -> Strin
 	if _get_owned_item_quantity(item_id) <= 0:
 		return "%s отсутствует в инвентаре: %s." % [title, item_name]
 
-	if ["rod", "line", "leader", "hook"].has(slot):
+	if _is_durable_tackle_category(str(component.get("category", slot))):
 		var wear_percent := get_item_wear_percent(component)
 		if wear_percent >= BROKEN_WEAR_PERCENT:
 			return "%s сломана: %s." % [title, item_name]
 		if wear_percent >= REPAIR_BLOCK_WEAR_PERCENT:
 			return "%s требует ремонта: %s." % [title, item_name]
+
+	if slot == "reel":
+		var reel_issue := get_reel_compatibility_issue(component)
+		if reel_issue != "":
+			return reel_issue
 
 	return ""
 
@@ -5462,6 +6009,8 @@ func _get_tackle_slot_title(slot: String) -> String:
 	match slot:
 		"rod":
 			return "Удочка"
+		"reel":
+			return "Катушка"
 		"line":
 			return "Леска"
 		"float":
@@ -5470,6 +6019,14 @@ func _get_tackle_slot_title(slot: String) -> String:
 			return "Крючок"
 		"bait":
 			return "Наживка"
+		"lure":
+			return "Приманка"
+		"feeder_rig":
+			return "Оснастка"
+		"hook_or_lure":
+			return "Крючок или приманка"
+		"sinker_or_rig":
+			return "Груз/оснастка"
 		_:
 			return "Слот"
 
@@ -5483,18 +6040,20 @@ func _get_owned_item_quantity(item_id: String) -> int:
 func apply_tackle_wear(wear: Dictionary) -> Dictionary:
 	var result := {
 		"rod_broken": bool(wear.get("rod_broken", false)),
+		"reel_broken": bool(wear.get("reel_broken", false)),
 		"line_broken": bool(wear.get("line_broken", false)),
 		"leader_broken": bool(wear.get("leader_broken", false)),
 		"leader_lost": bool(wear.get("leader_lost", false)),
 		"float_lost": bool(wear.get("float_lost", false)),
 		"hook_lost": bool(wear.get("hook_lost", false)),
 		"rod_old": get_tackle_condition("rod"),
+		"reel_old": get_tackle_condition("reel"),
 		"line_old": get_tackle_condition("line"),
 		"leader_old": get_tackle_condition("leader"),
 		"hook_old": get_tackle_condition("hook")
 	}
 
-	for slot in ["rod", "line", "leader", "hook"]:
+	for slot in ["rod", "reel", "line", "leader", "hook"]:
 		if not current_tackle.has(slot):
 			continue
 
@@ -5505,6 +6064,8 @@ func apply_tackle_wear(wear: Dictionary) -> Dictionary:
 		var new_condition: float = clamp(old_condition - max(float(wear.get(slot, 0.0)), 0.0), 0.0, 1.0)
 
 		if slot == "rod" and bool(wear.get("rod_broken", false)):
+			new_condition = min(new_condition, 0.04)
+		elif slot == "reel" and bool(wear.get("reel_broken", false)):
 			new_condition = min(new_condition, 0.04)
 		elif slot == "line" and bool(wear.get("line_broken", false)):
 			var remaining_lines := _change_owned_item_quantity(item_id, -1)
@@ -5549,6 +6110,9 @@ func get_current_bait_quantity(slot_id: String = "bait") -> int:
 	return 0
 
 func has_current_bait() -> bool:
+	if get_current_tackle_type() == "spinning":
+		var lure_id := str(current_tackle.get("lure", {}).get("id", ""))
+		return lure_id != "" and _get_owned_item_quantity(lure_id) > 0
 	if get_current_bait_quantity("bait") <= 0:
 		return false
 	if _has_active_second_bait() and get_current_bait_quantity("bait_2") <= 0:
@@ -5585,6 +6149,12 @@ func consume_current_tackle_baits(amount: int = 1) -> bool:
 		_change_owned_item_quantity(second_bait_id, -amount)
 
 	return true
+
+func consume_current_terminal_tackle_for_bite(amount: int = 1) -> bool:
+	if get_current_tackle_type() == "spinning":
+		var lure_id := str(current_tackle.get("lure", {}).get("id", ""))
+		return lure_id != "" and _get_owned_item_quantity(lure_id) > 0
+	return consume_current_tackle_baits(amount)
 
 func consume_primary_bait(amount: int = 1) -> bool:
 	var bait_id := str(current_tackle.get("bait", {}).get("id", ""))
@@ -5692,7 +6262,19 @@ func get_tackle_stats() -> Dictionary:
 	var float_part: Dictionary = get_current_float_data()
 	var hook: Dictionary = _normalize_equipment_stats(current_tackle.get("hook", {}).duplicate(true), "hook")
 	var bait: Dictionary = _normalize_equipment_stats(current_tackle.get("bait", {}).duplicate(true), "bait", str(current_tackle.get("bait", {}).get("id", "")))
-	var second_bait: Dictionary = _normalize_equipment_stats(current_tackle.get("bait_2", {}).duplicate(true), "bait", str(current_tackle.get("bait_2", {}).get("id", ""))) if _has_active_second_bait() else {}
+	var tackle_type_key := normalize_tackle_type(_get_tackle_type_from_item(rod))
+	var rod_requires_reel := bool(rod.get("requires_reel", false))
+	var fight_mode := "reel" if rod_requires_reel else "pole"
+	if not BuildConfig.ENABLE_SPINNING_FEATURES:
+		tackle_type_key = DEFAULT_TACKLE_TYPE
+		rod_requires_reel = false
+		fight_mode = "pole"
+	var reel: Dictionary = get_current_reel_data() if rod_requires_reel else {}
+	var lure: Dictionary = _normalize_equipment_stats(current_tackle.get("lure", {}).duplicate(true), "lure", str(current_tackle.get("lure", {}).get("id", "")))
+	if tackle_type_key == "spinning":
+		hook = lure.duplicate(true)
+		bait = lure.duplicate(true)
+	var second_bait: Dictionary = _normalize_equipment_stats(current_tackle.get("bait_2", {}).duplicate(true), "bait", str(current_tackle.get("bait_2", {}).get("id", ""))) if _has_active_second_bait() and tackle_type_key != "spinning" else {}
 	var skill_effects := get_skill_effects()
 	var hook_skill_bonus: float = max(float(skill_effects.get("hook_success_chance", 0.0)), 0.0)
 	var float_stability_skill_bonus: float = max(float(skill_effects.get("float_reeling_stability", 0.0)), 0.0)
@@ -5701,10 +6283,12 @@ func get_tackle_stats() -> Dictionary:
 	var double_bait_skill_bonus: float = clamp(float(skill_effects.get("double_bait_bite_bonus", 0.0)), 0.0, 0.20)
 	var cautious_fish_bite_bonus: float = clamp(float(skill_effects.get("cautious_fish_bite_chance", 0.0)), 0.0, 0.20)
 	var rod_durability: float = clamp(float(rod.get("durability", 1.0)), 0.0, 1.0)
+	var reel_durability: float = clamp(float(reel.get("durability", 1.0)), 0.0, 1.0) if rod_requires_reel and not reel.is_empty() else 1.0
 	var line_durability: float = clamp(float(line.get("durability", 1.0)), 0.0, 1.0)
 	var leader_durability: float = clamp(float(leader.get("durability", 1.0)), 0.0, 1.0)
 	var hook_durability: float = clamp(float(hook.get("durability", 1.0)), 0.0, 1.0)
 	var rod_condition: float = lerp(0.45, 1.0, rod_durability)
+	var reel_condition: float = lerp(0.45, 1.0, reel_durability)
 	var line_condition: float = lerp(0.45, 1.0, line_durability)
 	var leader_condition: float = lerp(0.45, 1.0, leader_durability)
 	var hook_condition: float = lerp(0.35, 1.0, hook_durability)
@@ -5802,8 +6386,12 @@ func get_tackle_stats() -> Dictionary:
 	bite_detection_bonus = max(bite_detection_bonus - heavy_bait_penalty * 0.35, -0.15)
 
 	return {
-		"tackle_type": get_current_tackle_type(),
+		"tackle_type": tackle_type_key,
 		"tackle_type_title": get_current_tackle_type_title(),
+		"fight_mode": fight_mode,
+		"rod_type": str(rod.get("rod_type", "pole")),
+		"requires_reel": rod_requires_reel,
+		"reel_equipped": rod_requires_reel and not reel.is_empty(),
 		"control_bonus": rod_tension_bonus + leader_control_bonus,
 		"tension_bonus": rod_tension_bonus + leader_control_bonus,
 		"base_control_bonus": raw_rod_control * rod_condition,
@@ -5812,8 +6400,31 @@ func get_tackle_stats() -> Dictionary:
 		"length_m": float(rod.get("length_m", 4.0)),
 		"rod_length_m": float(rod.get("length_m", 4.0)),
 		"rod_class": str(rod.get("rod_class", "medium")),
+		"rod_power": float(rod.get("power", rod.get("strength", 1.0))),
+		"rod_test_min": float(rod.get("test_min", 0.0)),
+		"rod_test_max": float(rod.get("test_max", rod.get("max_fish_weight", 1.0))),
+		"rod_flexibility": float(rod.get("flexibility", 0.5)),
+		"compatible_reel_min_size": int(rod.get("compatible_reel_min_size", 0)),
+		"compatible_reel_max_size": int(rod.get("compatible_reel_max_size", 0)),
 		"durability": rod_durability,
 		"rod_durability": rod_durability,
+		"reel_durability": reel_durability,
+		"reel_id": str(reel.get("id", "")),
+		"reel_name": str(reel.get("name", "")),
+		"reel_size": int(reel.get("reel_size", 0)),
+		"reel_type": str(reel.get("reel_type", "")),
+		"reel_max_drag": float(reel.get("max_drag", 0.0)) * reel_condition if rod_requires_reel and not reel.is_empty() else 0.0,
+		"max_drag": float(reel.get("max_drag", 0.0)) * reel_condition if rod_requires_reel and not reel.is_empty() else 0.0,
+		"drag_value": float(reel.get("max_drag", 0.0)) * reel_condition * 0.45 if rod_requires_reel and not reel.is_empty() else 0.0,
+		"drag_percent": 0.45 if rod_requires_reel and not reel.is_empty() else 0.0,
+		"retrieve_speed": float(reel.get("retrieve_speed", 0.0)) * reel_condition if rod_requires_reel and not reel.is_empty() else 0.0,
+		"spool_capacity": float(reel.get("spool_capacity", 0.0)) if rod_requires_reel and not reel.is_empty() else 0.0,
+		"line_out": 0.0,
+		"reel_weight": float(reel.get("weight", 0.0)) if rod_requires_reel and not reel.is_empty() else 0.0,
+		"reel_wear_rate": float(reel.get("wear_rate", 0.0)) if rod_requires_reel and not reel.is_empty() else 0.0,
+		"reel_body_texture": str(reel.get("body_texture", "")),
+		"reel_spool_texture": str(reel.get("spool_texture", "")),
+		"reel_handle_texture": str(reel.get("handle_texture", "")),
 		"line_durability": line_durability,
 		"leader_durability": leader_durability if has_leader else 1.0,
 		"hook_durability": hook_durability,
@@ -5879,6 +6490,10 @@ func get_tackle_stats() -> Dictionary:
 		"hook_wear_rate": float(hook.get("wear_rate", 0.026)),
 		"target_fish_size": str(hook.get("target_fish_size", "small")),
 		"fish_escape_modifier": raw_escape_modifier * lerp(1.45, 1.0, hook_durability),
+		"lure_id": str(lure.get("id", lure.get("bait_id", ""))),
+		"lure_type": str(lure.get("lure_type", "")),
+		"lure_weight": float(lure.get("weight", 0.0)),
+		"lure_durability": clamp(float(lure.get("durability", 1.0)), 0.0, 1.0),
 		"bait_id": bait_id,
 		"bait_type": str(bait.get("bait_type", "worm")),
 		"secondary_bait_id": secondary_bait_id,
@@ -5984,6 +6599,20 @@ func _get_bait_fish_names(bait_id: String, field: String, limit: int) -> Array:
 	return names
 
 func get_tackle_text() -> String:
+	var stats := get_tackle_stats()
+	if str(stats.get("fight_mode", "pole")) == "reel":
+		return "Текущая снасть:\nУдилище: %s\nКатушка: %s (%d)\nЛеска: %s\nПриманка/крючок: %s\nФрикцион: %.1f кг | Шпуля: %.0f м\nПрочность: уд. %d%% | кат. %d%% | леска %d%%" % [
+			current_tackle.get("rod", {}).get("name", "-"),
+			current_tackle.get("reel", {}).get("name", "-"),
+			int(stats.get("reel_size", 0)),
+			current_tackle.get("line", {}).get("name", "-"),
+			current_tackle.get("lure", {}).get("name", current_tackle.get("hook", {}).get("name", "-")),
+			float(stats.get("max_drag", 0.0)),
+			float(stats.get("spool_capacity", 0.0)),
+			roundi(get_tackle_condition("rod") * 100.0),
+			roundi(get_tackle_condition("reel") * 100.0),
+			roundi(get_tackle_condition("line") * 100.0)
+		]
 	return "Текущая снасть:\nУдочка: %s\nЛеска: %s\nПоводок: %s\nПоплавок: %s\nКрючок: %s\nНаживка: %s x%d\nГлубина: %.1f м\nПрочность: уд. %d%% | леска %d%% | поводок %d%% | крючок %d%%" % [
 		current_tackle.get("rod", {}).get("name", "-"),
 		current_tackle.get("line", {}).get("name", "-"),

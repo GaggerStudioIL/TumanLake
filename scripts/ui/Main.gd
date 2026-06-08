@@ -25,7 +25,6 @@ const CatchPopupControllerScript := preload("res://scripts/ui/controllers/CatchP
 const CatchResultHandlerScript := preload("res://scripts/gameplay/handlers/CatchResultHandler.gd")
 const WeatherEffectsControllerScript := preload("res://scripts/environment/WeatherEffectsController.gd")
 const AmbientVoicesControllerScript := preload("res://scripts/environment/AmbientVoicesController.gd")
-const WaterLiveLayerScript := preload("res://scripts/environment/WaterLiveLayer.gd")
 const WeatherUIHelperScript := preload("res://scripts/ui/helpers/WeatherUIHelper.gd")
 const NAVIGATION_CONTROLLER_PATH := "res://scripts/ui/controllers/NavigationController.gd"
 const SIDE_MENU_CONTROLLER_PATH := "res://scripts/ui/controllers/SideMenuController.gd"
@@ -47,8 +46,11 @@ const LEFT_NAV_HEIGHT := 222.0
 const ACTION_BAR_HEIGHT := 46.0
 const MENU_BACKDROP_Z := 300
 const MENU_PANEL_Z := 301
-const WATER_ANIMATION_DAY_NIGHT_Z := -104
-const WATER_ANIMATION_LEGACY_Z := -12
+const PILOT_WATER_SPOT_ID := "old_oak_pier"
+const PILOT_WATER_MASK_ID := "old_oak_pier_lake"
+const SPOT_BACKGROUND_LAYER_Z := -110
+const SPOT_WATER_LAYER_Z := -13
+const SPOT_FOREGROUND_LAYER_Z := -10
 const MODAL_TAP_GUARD_MSEC := 320
 const WATER_SURFACE_Y := 402.0
 const FLOAT_DEFAULT_POS := Vector2(500.0, 402.0)
@@ -345,6 +347,11 @@ var environment_layer: Node2D
 var environment_sprites: Dictionary = {}
 var day_night_controller: Node2D
 var water_animation_layer: Control
+var spot_visual_root: Control
+var spot_background_layer: Control
+var spot_water_layer: Control
+var spot_foreground_layer: Control
+var spot_cutout_rect: TextureRect
 var time_hud_panel: Panel
 var weather_hud_row: HBoxContainer
 var weather_hud_panel: Panel
@@ -441,6 +448,7 @@ var _last_reeling_visual_key := ""
 var _last_reeling_state := {
 	"fish_name": "-",
 	"fish_weight": 0.0,
+	"fight_mode": "pole",
 	"tension": 0.46,
 	"green_min": 0.38,
 	"green_max": 0.68,
@@ -454,6 +462,7 @@ var _last_reeling_state := {
 	"feedback_message": "Держи зеленую зону.",
 	"behavior": "-",
 	"fight_power": 0.0,
+	"reel_handle_speed": 0.0,
 	"line_strength": 0.0,
 	"critical_break_risk": 0.0,
 	"break_risk": 0.0,
@@ -636,32 +645,124 @@ func _setup_ui_controllers() -> void:
 	catch_popup_controller.keep_requested.connect(_on_catch_keep_button_pressed)
 	catch_popup_controller.release_requested.connect(_on_catch_release_button_pressed)
 
-func _ensure_water_animation_layer() -> void:
-	if water_animation_layer != null and is_instance_valid(water_animation_layer):
+func _ensure_spot_visual_layers() -> void:
+	_disable_failed_live_water_layers()
+
+func _disable_failed_live_water_layers() -> void:
+	if day_night_controller != null:
+		if day_night_controller.get_parent() != self:
+			_reparent_node(day_night_controller, self)
+		day_night_controller.visible = true
+
+	for layer in [
+		water_animation_layer,
+		spot_cutout_rect,
+		spot_water_layer,
+		spot_foreground_layer,
+		spot_background_layer,
+		spot_visual_root
+	]:
+		if layer == null:
+			continue
+		layer.visible = false
+		if layer is Control:
+			(layer as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if layer.has_method("set_process"):
+			layer.set_process(false)
+
+	var legacy_layer := get_node_or_null("WaterLiveLayer") as Control
+	if legacy_layer != null:
+		if legacy_layer.has_method("set_water_profile"):
+			legacy_layer.call("set_water_profile", "disabled")
+		legacy_layer.visible = false
+		legacy_layer.set_process(false)
+
+func _ensure_spot_visual_layer(layer: Control, layer_name: String, z: int) -> Control:
+	if layer == null:
+		layer = Control.new()
+		layer.name = layer_name
+		layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		spot_visual_root.add_child(layer)
+
+	layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	layer.offset_left = 0.0
+	layer.offset_top = 0.0
+	layer.offset_right = 0.0
+	layer.offset_bottom = 0.0
+	layer.z_as_relative = false
+	layer.z_index = z
+	layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return layer
+
+func _layout_spot_visual_layers(_screen_size: Vector2) -> void:
+	_disable_failed_live_water_layers()
+
+func _attach_environment_background_to_spot_layer() -> void:
+	if day_night_controller == null or spot_background_layer == null:
+		return
+	if day_night_controller.get_parent() == spot_background_layer:
 		return
 
-	_disable_legacy_water_animation_layer()
-	var was_created := false
-	var existing_layer := get_node_or_null("WaterLiveLayer") as Control
-	if existing_layer != null:
-		water_animation_layer = existing_layer
-	else:
-		water_animation_layer = WaterLiveLayerScript.new() as Control
-		water_animation_layer.name = "WaterLiveLayer"
-		add_child(water_animation_layer)
-		was_created = true
+	_reparent_node(day_night_controller, spot_background_layer)
 
-	water_animation_layer.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	water_animation_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	water_animation_layer.z_as_relative = false
-	_update_water_animation_layer_z()
-	water_animation_layer.set("debug_visible_water_effect", false)
-	_apply_water_debug_visuals()
-	if was_created and BuildConfig.ENABLE_VERBOSE_LOGS:
-		print("WaterLiveLayer created z=%s parent=%s debug_visible=%s" % [water_animation_layer.z_index, water_animation_layer.get_parent().name, water_animation_layer.get("debug_visible_water_effect")])
+func _get_current_spot_visual_layer_config() -> Dictionary:
+	var spot := SpotDatabase.get_spot(PlayerData.current_spot)
+	var raw_layers = spot.get("visual_layers", {})
+	if raw_layers is Dictionary:
+		return (raw_layers as Dictionary).duplicate(true)
+	return {}
 
-func _disable_legacy_water_animation_layer() -> void:
-	var legacy_layer := get_node_or_null("WaterAnimationLayer") as Control
+func _apply_current_spot_visual_layers() -> void:
+	_disable_failed_live_water_layers()
+
+func _uses_current_spot_cutout_pipeline() -> bool:
+	if not _is_water_animation_pilot_spot():
+		return false
+
+	var visual_layers := _get_current_spot_visual_layer_config()
+	var cutout_path := _get_spot_visual_layer_asset_path(visual_layers, [
+		"background_without_water",
+		"foreground_overlay",
+		"foreground_asset",
+		"foreground"
+	])
+	return cutout_path != "" and ResourceLoader.exists(cutout_path)
+
+func _ensure_spot_cutout_rect() -> void:
+	if spot_foreground_layer == null:
+		return
+	if spot_cutout_rect == null:
+		spot_cutout_rect = TextureRect.new()
+		spot_cutout_rect.name = "SpotCutoutLayer"
+		spot_cutout_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		spot_cutout_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		spot_cutout_rect.stretch_mode = TextureRect.STRETCH_SCALE
+		spot_cutout_rect.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		spot_cutout_rect.z_as_relative = true
+		spot_cutout_rect.z_index = 0
+		spot_foreground_layer.add_child(spot_cutout_rect)
+
+	spot_cutout_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	spot_cutout_rect.offset_left = 0.0
+	spot_cutout_rect.offset_top = 0.0
+	spot_cutout_rect.offset_right = 0.0
+	spot_cutout_rect.offset_bottom = 0.0
+	spot_cutout_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+func _load_spot_visual_texture(path: String) -> Texture2D:
+	if path == "" or path == "procedural" or not ResourceLoader.exists(path):
+		return null
+
+	var resource := load(path)
+	if resource is Texture2D:
+		return resource as Texture2D
+	return null
+
+func _ensure_water_animation_layer() -> void:
+	_disable_failed_live_water_layers()
+
+func _disable_legacy_water_live_layer() -> void:
+	var legacy_layer := get_node_or_null("WaterLiveLayer") as Control
 	if legacy_layer == null:
 		return
 
@@ -674,8 +775,8 @@ func _update_water_animation_layer_z() -> void:
 	if water_animation_layer == null:
 		return
 
-	water_animation_layer.z_as_relative = false
-	water_animation_layer.z_index = WATER_ANIMATION_DAY_NIGHT_Z if day_night_controller != null else WATER_ANIMATION_LEGACY_Z
+	water_animation_layer.z_as_relative = true
+	water_animation_layer.z_index = 0
 
 func _apply_water_debug_visuals() -> void:
 	if water_animation_layer == null:
@@ -684,46 +785,109 @@ func _apply_water_debug_visuals() -> void:
 	if water_animation_layer.has_method("set_debug_visuals"):
 		water_animation_layer.call("set_debug_visuals", BuildConfig.ENABLE_WATER_DEBUG_VISUALS)
 
+func _apply_water_surface_visibility() -> void:
+	if water_animation_layer == null:
+		return
+
+	if water_animation_layer.has_method("set_surface_visible"):
+		water_animation_layer.call("set_surface_visible", _should_show_current_water_surface())
+
+func _apply_water_alpha_mask_texture() -> void:
+	if water_animation_layer == null:
+		return
+
+	var texture: Texture2D = null
+	var mask_path := _get_current_water_alpha_mask_asset_path()
+	if mask_path != "":
+		texture = _load_spot_visual_texture(mask_path)
+	if water_animation_layer.has_method("set_alpha_mask_texture"):
+		water_animation_layer.call("set_alpha_mask_texture", texture)
+
+func _should_show_current_water_surface() -> bool:
+	if not _is_water_animation_pilot_spot():
+		return false
+
+	var visual_layers := _get_current_spot_visual_layer_config()
+	if not bool(visual_layers.get("enable_live_water_surface", false)):
+		return false
+
+	return _uses_current_spot_cutout_pipeline() and _get_current_water_alpha_mask_asset_path() != ""
+
+func _get_current_water_alpha_mask_asset_path() -> String:
+	if not _is_water_animation_pilot_spot():
+		return ""
+
+	var visual_layers := _get_current_spot_visual_layer_config()
+	var mask_path := _get_spot_visual_layer_asset_path(visual_layers, [
+		"water_mask_asset",
+		"background_without_water",
+		"foreground_overlay",
+		"foreground_asset",
+		"foreground"
+	])
+	if mask_path != "" and ResourceLoader.exists(mask_path):
+		return mask_path
+	return ""
+
+func _get_spot_visual_layer_asset_path(visual_layers: Dictionary, keys: Array) -> String:
+	for key in keys:
+		var path := str(visual_layers.get(str(key), "")).strip_edges()
+		if path != "":
+			return path
+	return ""
+
 func _get_current_water_profile_id() -> String:
+	if not _is_water_animation_pilot_spot():
+		return "disabled"
+
 	var spot := SpotDatabase.get_spot(PlayerData.current_spot)
+	var visual_layers := _get_current_spot_visual_layer_config()
+	var layer_profile := str(visual_layers.get("water_profile", "")).strip_edges()
+	if layer_profile != "":
+		return layer_profile
 	return str(spot.get("water_profile", "calm_pier"))
 
 func _get_current_water_mask_id() -> String:
 	var spot := SpotDatabase.get_spot(PlayerData.current_spot)
+	var visual_layers := _get_current_spot_visual_layer_config()
+	var layer_mask := str(visual_layers.get("water_mask", "")).strip_edges()
+	if layer_mask != "":
+		return layer_mask
+	if _is_water_animation_pilot_spot():
+		return PILOT_WATER_MASK_ID
 	return str(spot.get("water_mask", "default_lake"))
 
-func _apply_current_water_profile() -> void:
-	_ensure_water_animation_layer()
+func _is_water_animation_pilot_spot() -> bool:
+	if str(PlayerData.current_spot) != PILOT_WATER_SPOT_ID:
+		return false
+
+	var spot := SpotDatabase.get_spot(PlayerData.current_spot)
+	return bool(spot.get("water_visual_pilot", false))
+
+func _set_water_animation_enabled(value: bool) -> void:
 	if water_animation_layer == null:
 		return
 
-	if water_animation_layer.has_method("set_water_profile"):
-		water_animation_layer.call("set_water_profile", _get_current_water_profile_id())
-	_apply_water_animation_weather()
-	_layout_water_animation_layer(get_viewport_rect().size)
-	_log_water_animation_state()
-
-func _layout_water_animation_layer(screen_size: Vector2) -> void:
-	_ensure_water_animation_layer()
-	if water_animation_layer == null:
-		return
-
-	_update_water_animation_layer_z()
-	_apply_water_debug_visuals()
-	var rect := _get_safe_water_animation_rect(screen_size)
-	if water_animation_layer.has_method("set_water_area"):
-		water_animation_layer.call("set_water_area", _get_water_animation_area(rect))
-	elif water_animation_layer.has_method("set_water_rect"):
-		water_animation_layer.call("set_water_rect", rect)
+	if water_animation_layer.has_method("set_enabled"):
+		water_animation_layer.call("set_enabled", value)
 	else:
-		water_animation_layer.position = rect.position
-		water_animation_layer.size = rect.size
-	water_animation_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_log_water_animation_state()
+		water_animation_layer.visible = value
+		water_animation_layer.set_process(value)
+
+func _apply_current_water_profile() -> void:
+	_disable_failed_live_water_layers()
+
+func _layout_water_animation_layer(_screen_size: Vector2) -> void:
+	_disable_failed_live_water_layers()
 
 func _get_safe_water_animation_rect(screen_size: Vector2) -> Rect2:
 	if screen_size.x <= 1.0 or screen_size.y <= 1.0:
 		return Rect2(Vector2.ZERO, Vector2.ZERO)
+
+	if _is_water_animation_pilot_spot():
+		if _get_current_water_alpha_mask_asset_path() != "":
+			return Rect2(Vector2.ZERO, screen_size)
+		return _get_old_oak_pier_water_rect(screen_size)
 
 	var water_top := _water_zone_top
 	var water_bottom := _water_zone_bottom
@@ -743,13 +907,39 @@ func _get_safe_water_animation_rect(screen_size: Vector2) -> Rect2:
 		Vector2(maxf(screen_size.x - horizontal_padding * 2.0, 1.0), maxf(rect_bottom - rect_top, 1.0))
 	)
 
+func _get_old_oak_pier_water_rect(screen_size: Vector2) -> Rect2:
+	return Rect2(
+		Vector2(0.0, screen_size.y * 0.34),
+		Vector2(screen_size.x, screen_size.y * 0.60)
+	)
+
 func _get_water_animation_area(rect: Rect2) -> Dictionary:
 	var mask_id := _get_current_water_mask_id()
+	var polygons := [_get_full_water_layer_polygon(rect.size)] if _get_current_water_alpha_mask_asset_path() != "" else _get_water_mask_polygons(mask_id, rect.size)
 	return {
 		"mask_id": mask_id,
 		"rect": rect,
-		"polygon": _get_water_mask_polygon(mask_id, rect.size)
+		"polygon": polygons[0] if not polygons.is_empty() else PackedVector2Array(),
+		"polygons": polygons
 	}
+
+func _get_full_water_layer_polygon(rect_size: Vector2) -> PackedVector2Array:
+	return PackedVector2Array([
+		Vector2.ZERO,
+		Vector2(rect_size.x, 0.0),
+		rect_size,
+		Vector2(0.0, rect_size.y)
+	])
+
+func _get_water_mask_polygons(mask_id: String, rect_size: Vector2) -> Array[PackedVector2Array]:
+	if rect_size.x <= 1.0 or rect_size.y <= 1.0:
+		return []
+
+	match mask_id:
+		PILOT_WATER_MASK_ID:
+			return _get_old_oak_pier_water_polygons(rect_size)
+		_:
+			return [_get_water_mask_polygon(mask_id, rect_size)]
 
 func _get_water_mask_polygon(mask_id: String, rect_size: Vector2) -> PackedVector2Array:
 	if rect_size.x <= 1.0 or rect_size.y <= 1.0:
@@ -777,6 +967,48 @@ func _get_water_mask_polygon(mask_id: String, rect_size: Vector2) -> PackedVecto
 				Vector2(0.0, rect_size.y)
 			])
 
+func _get_old_oak_pier_water_polygons(rect_size: Vector2) -> Array[PackedVector2Array]:
+	return [
+		_make_scaled_polygon(rect_size, [
+			Vector2(0.47, 0.05),
+			Vector2(0.66, 0.05),
+			Vector2(0.82, 0.10),
+			Vector2(0.95, 0.24),
+			Vector2(0.995, 0.54),
+			Vector2(0.94, 0.88),
+			Vector2(0.72, 0.99),
+			Vector2(0.50, 0.95),
+			Vector2(0.40, 0.72),
+			Vector2(0.40, 0.45),
+			Vector2(0.45, 0.22)
+		]),
+		_make_scaled_polygon(rect_size, [
+			Vector2(0.00, 0.48),
+			Vector2(0.15, 0.42),
+			Vector2(0.29, 0.42),
+			Vector2(0.38, 0.55),
+			Vector2(0.47, 0.94),
+			Vector2(0.22, 0.98),
+			Vector2(0.03, 0.86),
+			Vector2(0.00, 0.66)
+		]),
+		_make_scaled_polygon(rect_size, [
+			Vector2(0.23, 0.20),
+			Vector2(0.33, 0.12),
+			Vector2(0.43, 0.13),
+			Vector2(0.42, 0.25),
+			Vector2(0.32, 0.30),
+			Vector2(0.22, 0.28)
+		])
+	]
+
+func _make_scaled_polygon(rect_size: Vector2, normalized_points: Array) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for point in normalized_points:
+		var normalized: Vector2 = point
+		points.append(Vector2(normalized.x * rect_size.x, normalized.y * rect_size.y))
+	return points
+
 func _log_water_animation_state() -> void:
 	if not BuildConfig.ENABLE_VERBOSE_LOGS or water_animation_layer == null:
 		return
@@ -787,20 +1019,19 @@ func _log_water_animation_state() -> void:
 	else:
 		profile_id = _get_current_water_profile_id()
 	var rect := Rect2(water_animation_layer.position, water_animation_layer.size)
-	var key: String = "%s|%s|%s|%s|%s|%s|%s" % [
+	var key: String = "%s|%s|%s|%s|%s|%s" % [
 		profile_id,
 		rect,
 		water_animation_layer.visible,
 		water_animation_layer.z_index,
 		water_animation_layer.mouse_filter,
-		water_animation_layer.get("debug_visible_water_effect"),
 		water_animation_layer.is_processing()
 	]
 	if key == _last_water_animation_log_key:
 		return
 
 	_last_water_animation_log_key = key
-	print("WaterLiveLayer state profile_id=%s rect=%s size=%s visible=%s z=%s mouse_ignore=%s processing=%s debug_visible=%s" % [
+	print("WaterAnimationLayer state profile_id=%s rect=%s size=%s visible=%s z=%s mouse_ignore=%s processing=%s debug=%s" % [
 		profile_id,
 		rect,
 		water_animation_layer.size,
@@ -808,19 +1039,11 @@ func _log_water_animation_state() -> void:
 		water_animation_layer.z_index,
 		water_animation_layer.mouse_filter == Control.MOUSE_FILTER_IGNORE,
 		water_animation_layer.is_processing(),
-		water_animation_layer.get("debug_visible_water_effect")
+		BuildConfig.ENABLE_WATER_DEBUG_VISUALS
 	])
 
 func _apply_water_animation_weather() -> void:
-	if water_animation_layer == null:
-		return
-
-	var weather_type := _get_current_weather_type()
-	var wind_speed := _get_current_water_wind_speed()
-	if water_animation_layer.has_method("set_environment_context"):
-		water_animation_layer.call("set_environment_context", weather_type, wind_speed)
-	elif water_animation_layer.has_method("set_weather_context"):
-		water_animation_layer.call("set_weather_context", weather_type)
+	_disable_failed_live_water_layers()
 
 func _get_current_weather_type() -> String:
 	var weather_state := WeatherUIHelperScript.get_current_weather_state(_get_time_manager())
@@ -2962,7 +3185,7 @@ func _set_primary_fishing_button_icon(button: Button, icon_name: String, icon_si
 func _get_primary_fishing_action_icon() -> String:
 	match _fishing_ui_state:
 		FishingUiState.WAITING:
-			return "hud_hook"
+			return "hud_pull" if _is_reel_tackle_mode() else "hud_hook"
 		FishingUiState.FIGHTING:
 			return "hud_pull"
 		FishingUiState.CAUGHT, FishingUiState.FAILED:
@@ -3628,6 +3851,8 @@ func _setup_layout() -> void:
 	_move_modal_roots_to_layer()
 	_layout_modal_layer()
 	var screen_size := get_viewport_rect().size
+	_ensure_spot_visual_layers()
+	_layout_spot_visual_layers(screen_size)
 	var margin := 10.0
 	var top_height := 58.0
 	var bottom_nav_height := 50.0
@@ -5305,6 +5530,9 @@ func _connect_signals() -> void:
 	FishingManager.fishing_failed_detailed.connect(_on_fishing_failed_detailed)
 	FishingManager.fishing_failed.connect(_on_fishing_failed)
 	FishingManager.waiting_for_bite_started.connect(_on_waiting_for_bite_started)
+	FishingManager.lure_retrieve_started.connect(_on_lure_retrieve_started)
+	FishingManager.lure_retrieve_updated.connect(_on_lure_retrieve_updated)
+	FishingManager.lure_retrieve_finished.connect(_on_lure_retrieve_finished)
 	FishingManager.float_nudge.connect(_on_float_nudge)
 	FishingManager.bite_started.connect(_on_bite_started)
 	FishingManager.bite_window_updated.connect(_on_bite_window_updated)
@@ -6218,6 +6446,9 @@ func _on_fish_button_pressed(cast_power: float = MIN_CAST_POWER, cast_hold_time:
 		_return_to_idle_after_result()
 		return
 
+	if _fishing_ui_state == FishingUiState.WAITING and _is_reel_tackle_mode():
+		return
+
 	if _fishing_ui_state == FishingUiState.WAITING and bool(FishingManager.get("use_new_bite_system")):
 		FishingManager.try_hook()
 		return
@@ -6304,6 +6535,9 @@ func _cancel_current_fishing_wait() -> void:
 func _on_reel_button_down() -> void:
 	if _can_begin_cast_charge():
 		_start_cast_charge()
+		return
+	if _fishing_ui_state == FishingUiState.WAITING and _is_reel_tackle_mode():
+		FishingManager.set_reel_input(true)
 		return
 	if _fishing_ui_state == FishingUiState.FIGHTING and FishingManager.is_reeling:
 		FishingManager.set_reel_input(true)
@@ -6836,10 +7070,22 @@ func _return_to_idle_after_result() -> void:
 	_reset_reeling_ui()
 	_update_ui()
 
+func _is_reel_tackle_mode() -> bool:
+	if not BuildConfig.ENABLE_SPINNING_FEATURES:
+		return false
+	if PlayerData == null:
+		return false
+	if PlayerData.has_method("get_current_fight_mode"):
+		return str(PlayerData.call("get_current_fight_mode")) == "reel"
+	if PlayerData.has_method("get_current_rod_requires_reel"):
+		return bool(PlayerData.call("get_current_rod_requires_reel"))
+	return false
+
 func _on_cast_visual_finished() -> void:
 	if not is_cast_animating:
 		return
 
+	var reel_tackle_mode := _is_reel_tackle_mode()
 	var spot_id := _pending_cast_spot_id
 	var cast_valid := _pending_cast_valid
 	var cast_depth_context := _pending_cast_depth_context.duplicate(true)
@@ -6854,7 +7100,7 @@ func _on_cast_visual_finished() -> void:
 
 	if not cast_valid:
 		_fishing_ui_state = FishingUiState.IDLE
-		if fishing_presence_ui != null and fishing_presence_ui.has_method("play_float_lay_down_animation"):
+		if not reel_tackle_mode and fishing_presence_ui != null and fishing_presence_ui.has_method("play_float_lay_down_animation"):
 			fishing_presence_ui.play_float_lay_down_animation()
 		var shallow_message := "Слишком мелко. Забросьте дальше или уменьшите глубину."
 		result_label.text = shallow_message
@@ -6869,7 +7115,7 @@ func _on_cast_visual_finished() -> void:
 		return
 
 	_fishing_ui_state = FishingUiState.WAITING
-	if fishing_presence_ui != null and fishing_presence_ui.has_method("set_float_in_water"):
+	if not reel_tackle_mode and fishing_presence_ui != null and fishing_presence_ui.has_method("set_float_in_water"):
 		fishing_presence_ui.set_float_in_water(true)
 	result_label.text = "Туман сгущается. Ждем клев..."
 	FishingManager.start_fishing(spot_id)
@@ -6879,12 +7125,16 @@ func _on_fishing_started(seconds: int) -> void:
 	_presence_bite_timer = 0.0
 	_presence_caught_timer = 0.0
 	_fishing_ui_state = FishingUiState.WAITING
-	if fishing_presence_ui != null and fishing_presence_ui.has_method("set_float_in_water"):
+	var reel_tackle_mode := _is_reel_tackle_mode()
+	if not reel_tackle_mode and fishing_presence_ui != null and fishing_presence_ui.has_method("set_float_in_water"):
 		fishing_presence_ui.set_float_in_water(true)
 	_reset_reeling_ui()
 	if bool(FishingManager.get("use_new_bite_system")):
 		timer_label.text = "Следи за поплавком"
 		fight_status_label.text = "Ждём поклёвку. Нажимай только когда поплавок резко уйдёт."
+		if reel_tackle_mode:
+			timer_label.text = "Проводка"
+			fight_status_label.text = "Зажми кнопку, чтобы мотать катушкой."
 	else:
 		timer_label.text = "Клев через: %d сек." % seconds
 		fight_status_label.text = "Ожидание поклевки..."
@@ -6897,20 +7147,67 @@ func _on_waiting_for_bite_started() -> void:
 	_presence_bite_timer = 0.0
 	_presence_caught_timer = 0.0
 	_fishing_ui_state = FishingUiState.WAITING
-	if fishing_presence_ui != null and fishing_presence_ui.has_method("set_float_in_water"):
+	var reel_tackle_mode := _is_reel_tackle_mode()
+	if not reel_tackle_mode and fishing_presence_ui != null and fishing_presence_ui.has_method("set_float_in_water"):
 		fishing_presence_ui.set_float_in_water(true)
 	_reset_reeling_ui()
 	timer_label.text = "Следи за поплавком"
 	result_label.text = "Поплавок в воде. Жди настоящую поклёвку и нажми “Подсечь”."
 	fight_status_label.text = "Ожидание поклёвки..."
+	if reel_tackle_mode:
+		timer_label.text = "Проводка"
+		result_label.text = "Приманка в воде. Зажми кнопку и веди её катушкой."
+		fight_status_label.text = "Мотай катушкой: поклёвка будет на проводке."
 	_update_ui()
 
 func _on_float_nudge(nudge_data: Dictionary) -> void:
+	if _is_reel_tackle_mode():
+		return
 	if fishing_presence_ui != null and fishing_presence_ui.has_method("play_float_nudge"):
 		fishing_presence_ui.play_float_nudge(nudge_data)
 
 	if str(nudge_data.get("kind", "small")) == "suspicious":
 		fight_status_label.text = "Поплавок подозрительно качнулся..."
+
+func _on_lure_retrieve_started(state: Dictionary) -> void:
+	_fishing_ui_state = FishingUiState.WAITING
+	_presence_bite_timer = 0.0
+	_presence_caught_timer = 0.0
+	_apply_lure_retrieve_state(state)
+	timer_label.text = "Проводка"
+	result_label.text = "Приманка упала в воду. Зажми кнопку и мотай катушкой."
+	fight_status_label.text = "Веди приманку к берегу, поклёвка будет на движении."
+	_update_ui()
+
+func _on_lure_retrieve_updated(state: Dictionary) -> void:
+	if _fishing_ui_state != FishingUiState.WAITING:
+		return
+	_apply_lure_retrieve_state(state)
+	var progress: float = clamp(float(state.get("retrieve_progress", 0.0)), 0.0, 1.0)
+	var input_active: bool = bool(state.get("input_active", false))
+	timer_label.text = "Проводка %.0f%%" % (progress * 100.0)
+	fight_status_label.text = "Катушка мотает. Приманка идёт к берегу." if input_active else "Зажми кнопку, чтобы продолжить проводку."
+	_update_ui()
+
+func _on_lure_retrieve_finished(state: Dictionary) -> void:
+	_apply_lure_retrieve_state(state)
+	_fishing_ui_state = FishingUiState.IDLE
+	_presence_bite_timer = 0.0
+	_presence_caught_timer = 0.0
+	if fishing_presence_ui != null and fishing_presence_ui.has_method("set_rod_uncasted"):
+		fishing_presence_ui.set_rod_uncasted()
+	timer_label.text = "Готов к забросу"
+	result_label.text = "Проводка закончилась без поклёвки. Забрось снова."
+	fight_status_label.text = "Спиннинг готов к следующему забросу."
+	_reset_reeling_ui()
+	_update_ui()
+
+func _apply_lure_retrieve_state(state: Dictionary) -> void:
+	_last_reeling_state = state.duplicate(true)
+	_last_reeling_state["fight_mode"] = "reel"
+	_last_reeling_state["phase"] = "retrieve"
+	if not _last_reeling_state.has("progress"):
+		_last_reeling_state["progress"] = float(state.get("retrieve_progress", 0.0))
 
 func _on_bite_started(bite_data: Dictionary) -> void:
 	_fishing_ui_state = FishingUiState.WAITING
@@ -6964,14 +7261,17 @@ func _on_reeling_started(catch_data: Dictionary, state: Dictionary) -> void:
 	_fishing_ui_state = FishingUiState.FIGHTING
 	if fishing_presence_ui != null and fishing_presence_ui.has_method("set_rod_visual_state"):
 		fishing_presence_ui.set_rod_visual_state("reeling")
-	timer_label.text = "Поклевка!"
+	timer_label.text = "Удар по приманке!" if str(state.get("fight_mode", "pole")) == "reel" else "Поклевка!"
 	result_label.text = "На крючке: %s\nВес: %s\nРедкость: %s\nПоведение: %s" % [
 		catch_data["name"],
 		UIFormatters.format_weight_kg(float(catch_data["weight"])),
 		catch_data["rarity"],
 		catch_data.get("behavior", "-")
 	]
-	fight_hint_label.text = "Удерживай кнопку, чтобы тянуть. Отпускай, когда натяжение уходит выше зеленой зоны."
+	if str(state.get("fight_mode", "pole")) == "reel":
+		fight_hint_label.text = "Удерживай кнопку для подмотки. Отпускай, когда фрикцион и натяжение перегружены."
+	else:
+		fight_hint_label.text = "Удерживай кнопку, чтобы тянуть. Отпускай, когда натяжение уходит выше зеленой зоны."
 	_update_reeling_ui(state)
 	_update_ui()
 	SaveManager.save_game()

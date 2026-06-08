@@ -9,6 +9,9 @@ signal fishing_failed(message: String)
 signal fishing_failed_detailed(failure_data: Dictionary)
 signal cast_started()
 signal waiting_for_bite_started()
+signal lure_retrieve_started(state: Dictionary)
+signal lure_retrieve_updated(state: Dictionary)
+signal lure_retrieve_finished(state: Dictionary)
 signal float_nudge(nudge_data: Dictionary)
 signal bite_started(bite_data: Dictionary)
 signal bite_window_updated(bite_data: Dictionary)
@@ -56,6 +59,18 @@ var _green_min: float = 0.38
 var _green_max: float = 0.68
 var _difficulty: float = 1.0
 var _tackle_stats: Dictionary = {}
+var _fight_mode: String = "pole"
+var _reel_drag_value: float = 0.0
+var _reel_drag_percent: float = 0.0
+var _line_out: float = 0.0
+var _spool_capacity: float = 0.0
+var _fish_pulling_line_out: bool = false
+var _reel_handle_speed: float = 0.0
+var _reel_line_out_speed: float = 0.0
+var _reel_wear_pressure: float = 0.0
+var _lure_retrieve_progress: float = 0.0
+var _lure_retrieve_speed: float = 0.0
+var _lure_retrieve_update_timer: float = 0.0
 var _fight_power: float = 1.0
 var _fish_stamina: float = 1.0
 var _fish_strength: float = 1.0
@@ -116,6 +131,14 @@ const TENSION_VELOCITY_LIMIT := 0.72
 const BASE_FISH_DRAG := -0.055
 const PROGRESS_DECAY := 0.095
 const NEAR_ZONE_PROGRESS_MARGIN := 0.12
+const REEL_LINE_OUT_START_RATIO := 0.16
+const REEL_LINE_OUT_PULL_SCALE := 5.4
+const REEL_HANDLE_FORWARD_SPEED := 7.5
+const REEL_HANDLE_BACKWARD_SPEED := -5.4
+const LURE_RETRIEVE_CHECK_INTERVAL := 0.48
+const LURE_RETRIEVE_UPDATE_INTERVAL := 0.10
+const LURE_RETRIEVE_MIN_PROGRESS_FOR_BITE := 0.08
+const LURE_RETRIEVE_MAX_PROGRESS_FOR_BITE := 0.94
 const TENSION_FIGHT_DEBUG := false
 const MIN_FIGHT_DURATION := 6.5
 const MAX_FIGHT_DURATION := 36.0
@@ -188,6 +211,9 @@ func start_fishing(spot_id: String) -> void:
 	_last_hook_attempt_msec = 0
 	_clear_active_bite_data()
 	_tackle_stats = PlayerData.get_tackle_stats()
+	_fight_mode = str(_tackle_stats.get("fight_mode", "pole"))
+	if not BuildConfig.ENABLE_SPINNING_FEATURES:
+		_fight_mode = "pole"
 	cast_started.emit()
 	var tackle_block_reason := PlayerData.get_tackle_block_reason()
 	if tackle_block_reason != "":
@@ -288,7 +314,7 @@ func start_fishing(spot_id: String) -> void:
 		weather_modifiers
 	)
 
-	if not PlayerData.consume_current_tackle_baits(1):
+	if not PlayerData.consume_current_terminal_tackle_for_bite(1):
 		is_fishing = false
 		_emit_fishing_failure(
 			FAILURE_WEAK_TACKLE,
@@ -394,6 +420,9 @@ func _start_waiting_for_active_bite(spot: Dictionary, spot_id: String, available
 	fishing_state = FishingState.WAITING_FOR_BITE
 	waiting_for_bite_started.emit()
 	fishing_started.emit(0)
+	if _fight_mode == "reel":
+		_initialize_lure_retrieve()
+		lure_retrieve_started.emit(_get_lure_retrieve_state())
 
 
 func _update_active_bite_system(delta: float) -> void:
@@ -401,6 +430,10 @@ func _update_active_bite_system(delta: float) -> void:
 		return
 
 	if fishing_state == FishingState.WAITING_FOR_BITE:
+		if _fight_mode == "reel":
+			_update_lure_retrieve(delta)
+			return
+
 		_hook_cooldown_timer = max(_hook_cooldown_timer - delta, 0.0)
 		_update_false_nudge(delta)
 
@@ -424,8 +457,142 @@ func _update_active_bite_system(delta: float) -> void:
 				"message": "Рыба сорвалась!"
 			})
 
+func _initialize_lure_retrieve() -> void:
+	_lure_retrieve_progress = 0.0
+	_lure_retrieve_speed = 0.0
+	_lure_retrieve_update_timer = 0.0
+	_bite_check_timer = LURE_RETRIEVE_CHECK_INTERVAL
+	_hook_cooldown_timer = 0.0
+	_spool_capacity = max(float(_tackle_stats.get("spool_capacity", 0.0)), 10.0)
+	_line_out = clamp(max(8.0, _spool_capacity * 0.22), 4.0, max(_spool_capacity * 0.70, 4.0))
+	_reel_handle_speed = 0.0
+	_reel_line_out_speed = 0.0
+	_feedback_message = "Веди приманку подмоткой."
+
+
+func _update_lure_retrieve(delta: float) -> void:
+	var retrieve_speed: float = max(float(_tackle_stats.get("retrieve_speed", 0.0)), 0.35)
+	var target_speed: float = retrieve_speed if _reel_input_active else 0.0
+	_lure_retrieve_speed = lerp(_lure_retrieve_speed, target_speed, clamp(delta * 7.0, 0.0, 1.0))
+
+	if _reel_input_active:
+		var retrieve_duration: float = clamp(10.5 / clamp(retrieve_speed, 0.55, 1.85), 6.2, 14.5)
+		var previous_progress := _lure_retrieve_progress
+		_lure_retrieve_progress = clamp(_lure_retrieve_progress + delta / retrieve_duration, 0.0, 1.0)
+		_reel_line_out_speed = (_lure_retrieve_progress - previous_progress) / max(delta, 0.001)
+		_line_out = lerp(max(_spool_capacity * 0.22, 8.0), 0.0, _lure_retrieve_progress)
+		_reel_handle_speed = REEL_HANDLE_FORWARD_SPEED * clamp(_lure_retrieve_speed / retrieve_speed, 0.25, 1.35)
+		_feedback_message = "Проводка: приманка идёт к берегу."
+		_update_lure_retrieve_bite_check(delta)
+	else:
+		_reel_line_out_speed = 0.0
+		_reel_handle_speed = lerp(_reel_handle_speed, 0.0, clamp(delta * 6.0, 0.0, 1.0))
+		_feedback_message = "Зажми кнопку, чтобы вести приманку."
+
+	_lure_retrieve_update_timer -= delta
+	if _lure_retrieve_update_timer <= 0.0:
+		_lure_retrieve_update_timer = LURE_RETRIEVE_UPDATE_INTERVAL
+		lure_retrieve_updated.emit(_get_lure_retrieve_state())
+
+	if _lure_retrieve_progress >= 1.0:
+		_finish_lure_retrieve_no_bite()
+
+
+func _update_lure_retrieve_bite_check(delta: float) -> void:
+	if _lure_retrieve_progress < LURE_RETRIEVE_MIN_PROGRESS_FOR_BITE or _lure_retrieve_progress > LURE_RETRIEVE_MAX_PROGRESS_FOR_BITE:
+		return
+
+	_bite_check_timer -= delta
+	if _bite_check_timer > 0.0:
+		return
+	_bite_check_timer = LURE_RETRIEVE_CHECK_INTERVAL
+	_try_start_lure_retrieve_bite()
+
+
+func _try_start_lure_retrieve_bite() -> void:
+	if _active_available_fish.is_empty() or _active_spot.is_empty():
+		_finish_lure_retrieve_no_bite()
+		return
+
+	var bite_data := _get_active_bite_balance_data()
+	var middle_water_bonus: float = sin(clamp(_lure_retrieve_progress, 0.0, 1.0) * PI)
+	var retrieve_speed: float = max(float(_tackle_stats.get("retrieve_speed", 0.0)), 0.35)
+	var motion_bonus: float = clamp(_lure_retrieve_speed / retrieve_speed, 0.25, 1.20)
+	var bite_chance: float = clamp(float(bite_data.get("bite_chance", 0.08)) * (0.72 + middle_water_bonus * 0.78) * (0.72 + motion_bonus * 0.30), 0.025, 0.24)
+	if randf() > bite_chance:
+		return
+
+	var weather_modifiers: Dictionary = bite_data.get("weather_modifiers", {})
+	var fish_id: String = _get_random_tackle_fish_id(
+		_active_available_fish,
+		float(_active_spot.get("rare_chance_modifier", 1.0)),
+		weather_modifiers
+	)
+
+	if not PlayerData.consume_current_terminal_tackle_for_bite(1):
+		is_fishing = false
+		fishing_state = FishingState.FAILED
+		_emit_fishing_failure(
+			FAILURE_WEAK_TACKLE,
+			"Нет приманки",
+			"Приманка потеряна до поклёвки.",
+			"Проверьте оснащение спиннинга.",
+			{"severity": "low", "spot_id": _active_spot_id}
+		)
+		return
+
+	var catch_data := _prepare_catch_data_for_bite(fish_id, bite_data)
+	if catch_data.is_empty():
+		is_fishing = false
+		fishing_state = FishingState.FAILED
+		_emit_fishing_failure(
+			FAILURE_FISH_ESCAPED_HOOK,
+			"",
+			"Рыба ударила по приманке и сорвалась.",
+			"Проверьте приманку, поводок и состояние снасти.",
+			{"severity": "medium", "fish_id": fish_id, "spot_id": _active_spot_id}
+		)
+		return
+
+	catch_data["lure_retrieve_progress"] = _lure_retrieve_progress
+	fishing_state = FishingState.HOOKED
+	_feedback_message = "Удар по приманке! Вываживай."
+	_start_reeling(catch_data)
+
+
+func _finish_lure_retrieve_no_bite() -> void:
+	if not is_fishing or is_reeling or _fight_mode != "reel":
+		return
+
+	_fishing_cycle_id += 1
+	is_fishing = false
+	fishing_state = FishingState.IDLE
+	_reel_input_active = false
+	_reel_handle_speed = 0.0
+	_lure_retrieve_speed = 0.0
+	lure_retrieve_finished.emit(_get_lure_retrieve_state())
+	_clear_active_bite_data()
+
+
+func _get_lure_retrieve_state() -> Dictionary:
+	return {
+		"fight_mode": "reel",
+		"phase": "retrieve",
+		"retrieve_progress": _lure_retrieve_progress,
+		"retrieve_speed": _lure_retrieve_speed,
+		"input_active": _reel_input_active,
+		"line_out": _line_out,
+		"spool_capacity": _spool_capacity,
+		"reel_handle_speed": _reel_handle_speed,
+		"reel_line_out_speed": _reel_line_out_speed,
+		"feedback_message": _feedback_message
+	}
+
 
 func _update_false_nudge(delta: float) -> void:
+	if _fight_mode == "reel":
+		return
+
 	_false_nudge_timer -= delta
 	if _false_nudge_timer > 0.0:
 		return
@@ -488,7 +655,7 @@ func _try_start_active_bite() -> void:
 		weather_modifiers
 	)
 
-	if not PlayerData.consume_current_tackle_baits(1):
+	if not PlayerData.consume_current_terminal_tackle_for_bite(1):
 		is_fishing = false
 		fishing_state = FishingState.FAILED
 		_emit_fishing_failure(
@@ -608,6 +775,10 @@ func _attach_catch_context_metadata(catch_data: Dictionary) -> void:
 				catch_data["tackle_name"] = rod_name
 
 	catch_data["tackle_type"] = str(_tackle_stats.get("tackle_type", "float"))
+	catch_data["fight_mode"] = str(_tackle_stats.get("fight_mode", _fight_mode))
+	if str(_tackle_stats.get("reel_name", "")) != "":
+		catch_data["reel_name"] = str(_tackle_stats.get("reel_name", ""))
+		catch_data["reel_size"] = int(_tackle_stats.get("reel_size", 0))
 	catch_data["fishing_depth"] = float(_tackle_stats.get("fishing_depth", PlayerData.fishing_depth))
 
 
@@ -692,6 +863,9 @@ func _clear_active_bite_data() -> void:
 	_bite_window_seconds = 0.0
 	_false_nudge_timer = 0.0
 	_hook_cooldown_timer = 0.0
+	_lure_retrieve_progress = 0.0
+	_lure_retrieve_speed = 0.0
+	_lure_retrieve_update_timer = 0.0
 
 
 func reset_after_result() -> void:
@@ -1301,7 +1475,13 @@ func _get_fish_size_class(fish: Dictionary, catch_weight: float = -1.0) -> Strin
 	return "large"
 
 func set_reel_input(active: bool) -> void:
-	_reel_input_active = active and is_reeling
+	if is_reeling:
+		_reel_input_active = active
+		return
+	if _fight_mode == "reel" and is_fishing and fishing_state == FishingState.WAITING_FOR_BITE:
+		_reel_input_active = active
+		return
+	_reel_input_active = false
 
 func set_vibration_enabled(enabled: bool) -> void:
 	vibration_enabled = enabled
@@ -1589,9 +1769,12 @@ func _process(delta: float) -> void:
 	if not is_reeling:
 		return
 
-	_update_struggle(delta)
-	_update_tension(delta)
-	_update_progress_and_danger(delta)
+	if _fight_mode == "reel":
+		_update_reel_fight(delta)
+	else:
+		_update_struggle(delta)
+		_update_tension(delta)
+		_update_progress_and_danger(delta)
 	update_fight_vibration(delta)
 
 	if not is_reeling:
@@ -1610,6 +1793,9 @@ func _start_reeling(catch_data: Dictionary) -> void:
 	fishing_state = FishingState.REELING
 	_reel_input_active = false
 	_tackle_stats = PlayerData.get_tackle_stats()
+	_fight_mode = str(_tackle_stats.get("fight_mode", "pole"))
+	if not BuildConfig.ENABLE_SPINNING_FEATURES:
+		_fight_mode = "pole"
 
 	var fish: Dictionary = FishDatabase.get_fish(str(catch_data["id"]))
 	var rarity: String = str(catch_data.get("rarity", "common"))
@@ -1723,6 +1909,7 @@ func _start_reeling(catch_data: Dictionary) -> void:
 	_high_fail_limit = clamp((1.30 * break_safety) / (_difficulty * float(tuning["danger"]) * (1.0 + overload_penalty * 0.45)), 0.42, 1.55)
 	_low_fail_limit = clamp((1.52 * escape_safety) / (_difficulty * float(tuning["danger"]) * (1.0 + _escape_risk)), 0.52, 1.85)
 	_target_progress_time = _get_target_fight_duration(catch_data, fish, tuning, rod_strength)
+	_initialize_reel_mode(catch_data)
 
 	if BuildConfig.ENABLE_VERBOSE_LOGS:
 		print("[TensionFight] fish=%s, weight=%.2fkg, strength=%.2f, safe_zone=%d%%-%d%%, target_duration=%.1fs" % [
@@ -1736,6 +1923,109 @@ func _start_reeling(catch_data: Dictionary) -> void:
 
 	reeling_started.emit(_current_catch, _get_reeling_state())
 	reeling_updated.emit(_get_reeling_state())
+
+func _initialize_reel_mode(catch_data: Dictionary) -> void:
+	_reel_drag_value = 0.0
+	_reel_drag_percent = 0.0
+	_line_out = 0.0
+	_spool_capacity = 0.0
+	_fish_pulling_line_out = false
+	_reel_handle_speed = 0.0
+	_reel_line_out_speed = 0.0
+	_reel_wear_pressure = 0.0
+
+	if _fight_mode != "reel":
+		return
+
+	_spool_capacity = max(float(_tackle_stats.get("spool_capacity", 0.0)), 10.0)
+	var max_drag: float = max(float(_tackle_stats.get("max_drag", _tackle_stats.get("reel_max_drag", 0.0))), 0.1)
+	_reel_drag_percent = clamp(float(_tackle_stats.get("drag_percent", 0.45)), 0.15, 0.95)
+	_reel_drag_value = clamp(float(_tackle_stats.get("drag_value", max_drag * _reel_drag_percent)), max_drag * 0.12, max_drag)
+	_reel_drag_percent = clamp(_reel_drag_value / max_drag, 0.0, 1.0)
+
+	var catch_weight: float = float(catch_data.get("weight", 0.0))
+	var opening_line: float = max(7.0, catch_weight * 3.8 + _weight_ratio * 12.0)
+	_line_out = clamp(max(_spool_capacity * REEL_LINE_OUT_START_RATIO, opening_line), 3.0, _spool_capacity * 0.58)
+	_feedback_message = "Работай катушкой и держи натяжение."
+
+func _update_reel_fight(delta: float) -> void:
+	_update_struggle(delta)
+	_update_reel_tension(delta)
+	_update_progress_and_danger(delta)
+
+	if not is_reeling:
+		return
+
+	_update_reel_spool_failure()
+	if not is_reeling:
+		return
+
+	if _fish_pulling_line_out:
+		_feedback_message = "Фрикцион отдаёт леску."
+		if _spool_capacity > 0.0 and _line_out >= _spool_capacity * 0.82:
+			_feedback_message = "Шпуля почти пуста!"
+	elif _reel_input_active:
+		_feedback_message = "Катушка подматывает."
+
+func _update_reel_tension(delta: float) -> void:
+	var tuning: Dictionary = _get_behavior_tuning(_current_behavior)
+	var max_drag: float = max(float(_tackle_stats.get("max_drag", _tackle_stats.get("reel_max_drag", 0.0))), 0.1)
+	if _reel_drag_value <= 0.0:
+		_reel_drag_value = max_drag * 0.45
+	_reel_drag_percent = clamp(_reel_drag_value / max_drag, 0.05, 1.0)
+
+	var retrieve_speed: float = max(float(_tackle_stats.get("retrieve_speed", 0.0)), 0.05)
+	var drag_hold: float = _reel_drag_percent * (0.72 + _control_value * 0.16)
+	var fish_pull: float = max(_fish_force, 0.0) + _struggle_power * 0.20 + _fish_strength * 0.055 + _difficulty * 0.025
+	var fish_line_delta: float = max(fish_pull - drag_hold, 0.0) * REEL_LINE_OUT_PULL_SCALE * (0.58 + _difficulty * 0.18) * delta
+	var retrieve_delta: float = 0.0
+
+	if _reel_input_active and _tension < 0.93:
+		var tension_slowdown: float = clamp(inverse_lerp(0.76, 0.94, _tension), 0.0, 1.0)
+		var retrieve_control: float = lerp(0.62, 1.22, clamp(_control_value, 0.0, 1.0))
+		retrieve_delta = retrieve_speed * retrieve_control * (1.0 - tension_slowdown * 0.62) * 2.15 * delta
+
+	var old_line_out: float = _line_out
+	_line_out = clamp(_line_out + fish_line_delta - retrieve_delta, 0.0, max(_spool_capacity, 0.0))
+	_reel_line_out_speed = (_line_out - old_line_out) / max(delta, 0.001)
+	_fish_pulling_line_out = fish_line_delta > retrieve_delta + 0.002 and _reel_line_out_speed > 0.0
+
+	if _fish_pulling_line_out:
+		_reel_handle_speed = REEL_HANDLE_BACKWARD_SPEED * clamp(abs(_reel_line_out_speed) / max(retrieve_speed, 0.1), 0.35, 1.8)
+	elif _reel_input_active and retrieve_delta > 0.0:
+		_reel_handle_speed = REEL_HANDLE_FORWARD_SPEED * clamp(retrieve_delta / max(retrieve_speed * delta, 0.001), 0.25, 1.7)
+	else:
+		_reel_handle_speed = lerp(_reel_handle_speed, 0.0, clamp(delta * 5.0, 0.0, 1.0))
+
+	var player_target: float = PLAYER_PULL_FORCE * 0.52 + retrieve_speed * 0.18 if _reel_input_active else PLAYER_RELEASE_FORCE * 0.28
+	var player_response: float = PLAYER_FORCE_RESPONSE * 0.92 * float(tuning["player_response"])
+	_player_force = lerp(_player_force, player_target, clamp(delta * player_response, 0.0, 1.0))
+
+	var drag_pressure: float = lerp(0.12, 0.50, _reel_drag_percent)
+	var damping: float = TENSION_DAMPING * 1.10 * float(tuning["damping"])
+	var acceleration: float = _player_force + _fish_force * (0.68 + _reel_drag_percent * 0.34) + BASE_FISH_DRAG * _difficulty - drag_pressure - _tension_velocity * damping
+	acceleration -= max(_reel_line_out_speed, 0.0) * 0.14
+	acceleration += max(-_reel_line_out_speed, 0.0) * 0.045
+
+	_tension_velocity = clamp(
+		_tension_velocity + acceleration * delta,
+		-TENSION_VELOCITY_LIMIT,
+		TENSION_VELOCITY_LIMIT
+	)
+	_tension = clamp(_tension + _tension_velocity * delta, 0.0, 1.0)
+
+	if _tension <= 0.0 and _tension_velocity < 0.0:
+		_tension_velocity = 0.0
+	elif _tension >= 1.0 and _tension_velocity > 0.0:
+		_tension_velocity = 0.0
+
+	_reel_wear_pressure = max(_reel_wear_pressure, _reel_drag_percent * (0.45 + max(_line_load_ratio, _rod_load_ratio) * 0.38) + abs(_reel_line_out_speed) * 0.018)
+
+func _update_reel_spool_failure() -> void:
+	if _fight_mode != "reel" or _spool_capacity <= 0.0:
+		return
+	if _line_out >= _spool_capacity - 0.15:
+		_finish_reeling_failed("Леска сошла со шпули. Рыба ушла.", "spool_empty", FAILURE_FISH_TOO_STRONG)
 
 func _update_struggle(delta: float) -> void:
 	if _struggle_active:
@@ -1893,6 +2183,12 @@ func _get_current_load_info() -> Dictionary:
 	var tension_load: float = lerp(0.55, 1.55, _tension)
 	var struggle_load: float = clamp(_struggle_power * 0.38, 0.0, 0.65)
 	var load_kg: float = base_load * tension_load * (1.0 + struggle_load)
+	if _fight_mode == "reel":
+		var drag_load: float = lerp(0.76, 1.18, clamp(_reel_drag_percent, 0.0, 1.0))
+		var line_out_relief: float = 1.0 - clamp(max(_reel_line_out_speed, 0.0) * 0.035, 0.0, 0.28)
+		var retrieve_load: float = 1.0 + clamp(max(-_reel_line_out_speed, 0.0) * 0.014, 0.0, 0.18)
+		tension_load = lerp(0.48, 1.34, _tension)
+		load_kg = base_load * tension_load * (1.0 + struggle_load) * drag_load * line_out_relief * retrieve_load
 	var main_line_capacity: float = max(float(_tackle_stats.get("raw_line_strength", _tackle_stats.get("line_strength", 1.0))), 0.1)
 	var leader_capacity: float = max(float(_tackle_stats.get("leader_strength", 0.0)), 0.0)
 	var main_line_ratio: float = load_kg / main_line_capacity
@@ -2128,6 +2424,13 @@ func _apply_reeling_wear(outcome: String) -> Dictionary:
 	elif outcome == "escape":
 		wear["hook_lost"] = randf() < clamp(_escape_risk * 0.10, 0.02, 0.12)
 
+	if _fight_mode == "reel":
+		var reel_pressure: float = clamp(max(_reel_wear_pressure, max(_line_load_ratio, _rod_load_ratio) * 0.45), 0.25, 3.0)
+		wear["reel"] = base_wear * reel_pressure * float(_tackle_stats.get("reel_wear_rate", 0.008)) / 0.008
+		wear["reel_broken"] = outcome == "spool_empty" and randf() < clamp(reel_pressure * 0.08, 0.03, 0.22)
+		if outcome == "spool_empty":
+			wear["line_broken"] = true
+
 	return PlayerData.apply_tackle_wear(wear)
 
 func _finish_reeling_success() -> void:
@@ -2176,6 +2479,8 @@ func _finish_reeling_failed(message: String, fail_kind: String = "escape", reaso
 		final_message += "\nПоводок потерян."
 	if bool(wear_result.get("rod_broken", false)) and final_message.find("Удочка") == -1:
 		final_message += "\nУдочка повреждена!"
+	if bool(wear_result.get("reel_broken", false)) and final_message.find("Катушка") == -1:
+		final_message += "\nКатушка повреждена!"
 	if bool(wear_result.get("hook_lost", false)):
 		final_message += "\nКрючок потерян."
 	if bool(wear_result.get("float_lost", false)):
@@ -2259,6 +2564,11 @@ func _get_failure_context(extra_data: Dictionary = {}) -> Dictionary:
 		"leader_load_ratio": _leader_load_ratio,
 		"rod_load_ratio": _rod_load_ratio,
 		"tension": _tension,
+		"fight_mode": _fight_mode,
+		"reel_name": str(_tackle_stats.get("reel_name", "")),
+		"reel_size": int(_tackle_stats.get("reel_size", 0)),
+		"line_out": _line_out,
+		"spool_capacity": _spool_capacity,
 		"fishing_depth": float(_tackle_stats.get("fishing_depth", PlayerData.fishing_depth)),
 		"bait": str(PlayerData.current_tackle.get("bait", {}).get("name", "")),
 		"hook": str(PlayerData.current_tackle.get("hook", {}).get("name", "")),
@@ -2376,6 +2686,8 @@ func _get_failure_reason_for_fail_kind(fail_kind: String) -> String:
 			return FAILURE_LINE_BROKE
 		"rod_break":
 			return FAILURE_ROD_OVERLOAD
+		"spool_empty":
+			return FAILURE_FISH_TOO_STRONG
 		_:
 			if _tension > _green_max:
 				return FAILURE_FISH_ESCAPED_HIGH_TENSION
@@ -2576,6 +2888,7 @@ func _get_reeling_state() -> Dictionary:
 	return {
 		"fish_name": str(_current_catch.get("name", "-")),
 		"fish_weight": float(_current_catch.get("weight", 0.0)),
+		"fight_mode": _fight_mode,
 		"tension": _tension,
 		"green_min": _green_min,
 		"green_max": _green_max,
@@ -2597,6 +2910,18 @@ func _get_reeling_state() -> Dictionary:
 		"leader_load_ratio": leader_load_ratio,
 		"rod_load_ratio": rod_load_ratio,
 		"rod_durability": float(_tackle_stats.get("rod_durability", _tackle_stats.get("durability", 1.0))),
+		"reel_durability": float(_tackle_stats.get("reel_durability", 1.0)),
+		"reel_name": str(_tackle_stats.get("reel_name", "")),
+		"reel_size": int(_tackle_stats.get("reel_size", 0)),
+		"reel_max_drag": float(_tackle_stats.get("reel_max_drag", _tackle_stats.get("max_drag", 0.0))),
+		"drag_value": _reel_drag_value,
+		"drag_percent": _reel_drag_percent,
+		"retrieve_speed": float(_tackle_stats.get("retrieve_speed", 0.0)),
+		"line_out": _line_out,
+		"spool_capacity": _spool_capacity,
+		"fish_pulling_line_out": _fish_pulling_line_out,
+		"reel_handle_speed": _reel_handle_speed,
+		"reel_line_out_speed": _reel_line_out_speed,
 		"line_durability": float(_tackle_stats.get("line_durability", 1.0)),
 		"leader_durability": float(_tackle_stats.get("leader_durability", 1.0)),
 		"hook_durability": float(_tackle_stats.get("hook_durability", 1.0)),

@@ -50,9 +50,11 @@ func _update_ui() -> void:
 		main.xp_progress_bar.max_value = max(PlayerData.xp_to_next_level, 1)
 		main.xp_progress_bar.value = clamp(PlayerData.current_xp, 0, PlayerData.xp_to_next_level)
 
-	var active_hook_input: bool = main._fishing_ui_state == FishingUiState.WAITING and bool(FishingManager.get("use_new_bite_system"))
+	var reel_tackle_mode: bool = main._is_reel_tackle_mode() if main != null and main.has_method("_is_reel_tackle_mode") else false
+	var active_retrieve_input: bool = main._fishing_ui_state == FishingUiState.WAITING and reel_tackle_mode
+	var active_hook_input: bool = main._fishing_ui_state == FishingUiState.WAITING and bool(FishingManager.get("use_new_bite_system")) and not reel_tackle_mode
 	var locked_for_result_or_fishing: bool = main._fishing_ui_state != FishingUiState.IDLE or main.is_cast_animating
-	main.fish_button.disabled = (main._fishing_ui_state == FishingUiState.WAITING and not active_hook_input) or main.is_cast_animating
+	main.fish_button.disabled = (main._fishing_ui_state == FishingUiState.WAITING and not active_hook_input and not active_retrieve_input) or main.is_cast_animating
 	main.spot_option_button.visible = false
 	main.spot_option_button.disabled = true
 	main.basket_button.disabled = main._fishing_ui_state == FishingUiState.WAITING or main._fishing_ui_state == FishingUiState.FIGHTING or main.is_cast_animating
@@ -91,9 +93,9 @@ func _update_ui() -> void:
 
 	match main._fishing_ui_state:
 		FishingUiState.WAITING:
-			main.fish_button.text = "Подсечь" if active_hook_input else "Ожидание"
+			main.fish_button.text = "Мотать" if active_retrieve_input else ("Подсечь" if active_hook_input else "Ожидание")
 		FishingUiState.FIGHTING:
-			main.fish_button.text = "Тянуть"
+			main.fish_button.text = "Мотать" if reel_tackle_mode else "Тянуть"
 		FishingUiState.CAUGHT, FishingUiState.FAILED:
 			main.fish_button.text = "Вытянуть"
 		_:
@@ -165,6 +167,17 @@ func _get_main_hud_text() -> String:
 		bottom_type = "яма"
 
 	var activity = "ровная"
+	if str(tackle_stats.get("fight_mode", "pole")) == "reel":
+		return "%s\n%s\nГлубина %.1f м · снасть %.1f м\nУд. %.1f кг · леска %.1f кг\nКат. %d · шпуля %.0f м" % [
+			main.timer_label.text,
+			str(waterbody.get("name", "-")),
+			depth,
+			float(tackle_stats.get("fishing_depth", PlayerData.fishing_depth)),
+			float(tackle_stats.get("max_fish_weight", 0.0)),
+			float(tackle_stats.get("line_strength", 0.0)),
+			int(tackle_stats.get("reel_size", 0)),
+			float(tackle_stats.get("spool_capacity", 0.0))
+		]
 	return "%s\n%s\nГлубина %.1f м · снасть %.1f м\nУд. %.1f кг · леска %.1f кг\nКлёв +%d%%" % [
 		main.timer_label.text,
 		str(waterbody.get("name", "-")),
@@ -199,6 +212,7 @@ func _reset_reeling_ui() -> void:
 	main._last_reeling_state = {
 		"fish_name": "-",
 		"fish_weight": 0.0,
+		"fight_mode": "pole",
 		"tension": 0.46,
 		"green_min": 0.38,
 		"green_max": 0.68,
@@ -218,6 +232,17 @@ func _reset_reeling_ui() -> void:
 		"line_load_ratio": 0.0,
 		"rod_load_ratio": 0.0,
 		"rod_durability": 1.0,
+		"reel_durability": 1.0,
+		"reel_name": "",
+		"reel_size": 0,
+		"drag_value": 0.0,
+		"drag_percent": 0.0,
+		"retrieve_speed": 0.0,
+		"line_out": 0.0,
+		"spool_capacity": 0.0,
+		"fish_pulling_line_out": false,
+		"reel_handle_speed": 0.0,
+		"reel_line_out_speed": 0.0,
 		"line_durability": 1.0,
 		"hook_durability": 1.0,
 		"line_strength": 0.0,
@@ -313,6 +338,16 @@ func _update_reeling_ui(state: Dictionary) -> void:
 	var status = str(state.get("status", "green"))
 	var behavior = str(state.get("behavior", "-"))
 	var fish_name = str(state.get("fish_name", "-"))
+	var fight_mode = str(state.get("fight_mode", "pole"))
+	var is_reel_mode: bool = fight_mode == "reel"
+	var reel_name = str(state.get("reel_name", ""))
+	var reel_size: int = int(state.get("reel_size", 0))
+	var reel_durability: float = clamp(float(state.get("reel_durability", 1.0)), 0.0, 1.0)
+	var drag_value: float = max(float(state.get("drag_value", 0.0)), 0.0)
+	var drag_percent: float = clamp(float(state.get("drag_percent", 0.0)), 0.0, 1.0)
+	var line_out: float = max(float(state.get("line_out", 0.0)), 0.0)
+	var spool_capacity: float = max(float(state.get("spool_capacity", 0.0)), 0.0)
+	var reel_handle_speed: float = float(state.get("reel_handle_speed", 0.0))
 	var struggle_event = str(state.get("struggle_event", "пауза"))
 	var feedback_message = str(state.get("feedback_message", "Держи зеленую зону."))
 	var critical_min: float = clamp(max(TENSION_VISUAL_CRITICAL_MIN, green_max), green_max, 1.0)
@@ -346,9 +381,13 @@ func _update_reeling_ui(state: Dictionary) -> void:
 	main.progress_fill.size = Vector2(progress_width * progress, main.progress_track.size.y)
 	main.progress_fill.color = Color(0.62, 0.92, 0.34, 0.72)
 
+	main.fight_title_label.text = "Вываживание · катушка" if is_reel_mode else "Вываживание"
 	main.tension_label.text = "Натяжение: %d%% — %s" % [roundi(tension * 100.0), visual_label]
 	main.tension_label.add_theme_color_override("font_color", Color(0.94, 0.98, 0.94, 1.0))
-	main.progress_label.text = "Прогресс: %d%%" % roundi(catch_progress * 100.0)
+	if is_reel_mode:
+		main.progress_label.text = "Прогр. %d%% · %.0fм" % [roundi(catch_progress * 100.0), line_out]
+	else:
+		main.progress_label.text = "Прогресс: %d%%" % roundi(catch_progress * 100.0)
 	main.progress_label.add_theme_color_override("font_color", Color(0.72, 0.82, 0.78, 0.96))
 	main.debug_label.text = "fish: %s %.2fkg | behavior: %s\nfight: %.2f | strength: %.2f | aggr: %.2f\nload: %.2fkg | line %.0f%% | rod %.0f%%\ntension: %d%% | green: %d-%d%%\nbreak risk: %d%% | escape risk: %d%%\ndurability: rod %d%% | line %d%% | hook %d%%\ncatch progress: %d%% | event: %s" % [
 		fish_name,
@@ -371,6 +410,17 @@ func _update_reeling_ui(state: Dictionary) -> void:
 		roundi(catch_progress * 100.0),
 		struggle_event
 	]
+	if is_reel_mode:
+		main.debug_label.text += "\nreel: %s %d | drag %.1fkg (%d%%)\nspool: %.0f/%.0fm | reel %d%% | handle %.1f" % [
+			reel_name,
+			reel_size,
+			drag_value,
+			roundi(drag_percent * 100.0),
+			line_out,
+			spool_capacity,
+			roundi(reel_durability * 100.0),
+			reel_handle_speed
+		]
 
 	if FishingManager.is_reeling:
 		main.fight_hint_label.text = feedback_message
@@ -387,3 +437,5 @@ func _update_reeling_ui(state: Dictionary) -> void:
 		_:
 			if FishingManager.is_reeling:
 				main.fight_status_label.text = "Норма"
+	if is_reel_mode and FishingManager.is_reeling:
+		main.fight_status_label.text = "%s · %.0fм" % [main.fight_status_label.text, line_out]

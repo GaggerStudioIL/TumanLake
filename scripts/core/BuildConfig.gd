@@ -5,3 +5,4 @@ const ENABLE_ALPHA_TESTER_BONUS := false
 const ENABLE_DEBUG_PANEL := false
 const ENABLE_VERBOSE_LOGS := false
 const ENABLE_WATER_DEBUG_VISUALS := false
+const ENABLE_SPINNING_FEATURES := false

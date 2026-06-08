@@ -991,6 +991,8 @@ func _get_tackle_slot_icon(category: String) -> String:
 	match category:
 		"rod":
 			return "⌁"
+		"reel":
+			return "◎"
 		"line":
 			return "◎"
 		"leader":
@@ -1001,6 +1003,10 @@ func _get_tackle_slot_icon(category: String) -> String:
 			return "◈"
 		"bait", "bait_2":
 			return "•"
+		"lure":
+			return "J"
+		"feeder_rig":
+			return "▣"
 		_:
 			return "□"
 
@@ -1041,6 +1047,11 @@ func _get_tackle_slot_param_text(category: String) -> String:
 	match category:
 		"line":
 			return "Прочность: %s" % _format_tackle_stat_value("max_load", current.get("max_load", current.get("max_load_kg", 0.0)))
+		"reel":
+			return "%d / фрикц. %s" % [
+				int(current.get("reel_size", 0)),
+				_format_tackle_stat_value("max_drag", current.get("max_drag", 0.0))
+			]
 		"leader":
 			return "%d см / %s" % [
 				int(current.get("length_cm", 0)),
@@ -1052,7 +1063,17 @@ func _get_tackle_slot_param_text(category: String) -> String:
 			return "Стабильность: %s" % _format_tackle_stat_value("stability", current.get("stability", 0.0))
 		"bait", "bait_2":
 			return "Тип: %s" % _format_tackle_stat_value("bait_type", current.get("bait_type", current.get("stats", {}).get("bait_type", "")))
+		"lure":
+			return "%s / %s" % [
+				_format_tackle_stat_value("lure_type", current.get("lure_type", "")),
+				_format_tackle_stat_value("weight", current.get("weight", 0.0))
+			]
 		"rod":
+			if bool(current.get("requires_reel", false)):
+				return "Катушка: %d-%d" % [
+					int(current.get("compatible_reel_min_size", 0)),
+					int(current.get("compatible_reel_max_size", 0))
+				]
 			return "Макс. рыба: %s" % _format_tackle_stat_value("max_fish_weight", current.get("max_fish_weight", 0.0))
 		_:
 			return ""
@@ -1179,18 +1200,35 @@ func _update_tackle_visual_scheme() -> void:
 	var has_leader: bool = str(PlayerData.current_tackle.get("leader", {}).get("id", "")) != ""
 	var has_second_bait: bool = PlayerData.can_use_second_bait() and str(PlayerData.current_tackle.get("bait_2", {}).get("id", "")) != ""
 	var visual_visible: bool = not main.tackle_item_list.visible
+	var reel_mode: bool = PlayerData.get_current_rod_requires_reel() if PlayerData.has_method("get_current_rod_requires_reel") else false
+	var tackle_type := PlayerData.get_current_tackle_type()
+
+	for node in _get_tackle_visual_nodes():
+		if node != null:
+			node.visible = visual_visible
 
 	main.tackle_visual_line_label.text = "Леска\n%s" % _get_tackle_slot_equipped_name("line")
-	main.tackle_visual_float_label.text = "Поплавок\n%s" % _get_tackle_slot_equipped_name("float")
 	main.tackle_visual_leader_label.text = "Поводок\n%s" % _get_tackle_slot_equipped_name("leader")
-	main.tackle_visual_hook_label.text = "Крючок\n%s" % _get_tackle_slot_equipped_name("hook")
-	main.tackle_visual_bait_label.text = "Наживка 1\n%s" % _get_tackle_slot_equipped_name("bait")
-	main.tackle_visual_bait_2_label.text = "Наживка 2\n%s" % _get_tackle_slot_equipped_name("bait_2")
+	if reel_mode:
+		main.tackle_visual_float_label.text = "Катушка\n%s" % _get_tackle_slot_equipped_name("reel")
+		main.tackle_visual_hook_label.text = "Приманка\n%s" % (_get_tackle_slot_equipped_name("lure") if tackle_type == "spinning" else _get_tackle_slot_equipped_name("hook"))
+		main.tackle_visual_bait_label.text = ""
+		main.tackle_visual_bait_2_label.text = ""
+		main.tackle_visual_float_marker.visible = false
+		main.tackle_visual_bait_marker.visible = false
+		main.tackle_visual_bait_2_marker.visible = false
+		main.tackle_visual_bait_label.visible = false
+		main.tackle_visual_bait_2_label.visible = false
+	else:
+		main.tackle_visual_float_label.text = "Поплавок\n%s" % _get_tackle_slot_equipped_name("float")
+		main.tackle_visual_hook_label.text = "Крючок\n%s" % _get_tackle_slot_equipped_name("hook")
+		main.tackle_visual_bait_label.text = "Наживка 1\n%s" % _get_tackle_slot_equipped_name("bait")
+		main.tackle_visual_bait_2_label.text = "Наживка 2\n%s" % _get_tackle_slot_equipped_name("bait_2")
 
 	main.tackle_visual_leader_line.default_color = Color(0.92, 0.78, 0.48, 0.78) if has_leader else Color(0.42, 0.50, 0.54, 0.42)
 	main.tackle_visual_leader_label.add_theme_color_override("font_color", Color(0.84, 0.94, 0.92, 0.94) if has_leader else Color(0.54, 0.60, 0.62, 0.84))
-	main.tackle_visual_bait_2_marker.visible = visual_visible and has_second_bait
-	main.tackle_visual_bait_2_label.visible = visual_visible and PlayerData.can_use_second_bait()
+	main.tackle_visual_bait_2_marker.visible = visual_visible and has_second_bait and not reel_mode
+	main.tackle_visual_bait_2_label.visible = visual_visible and PlayerData.can_use_second_bait() and not reel_mode
 
 
 func _get_rod_description_text() -> String:
@@ -1213,6 +1251,21 @@ func _get_final_tackle_stats_text() -> String:
 		var bait_2_text := _get_tackle_slot_equipped_name("bait_2")
 		if bait_2_text != "Не установлено":
 			bait_text = "%s + %s" % [bait_text, bait_2_text]
+
+	if str(stats.get("fight_mode", "pole")) == "reel":
+		var reel_text := _get_tackle_slot_equipped_name("reel")
+		var terminal_text := _get_tackle_slot_equipped_name("lure") if str(stats.get("tackle_type", "")) == "spinning" else bait_text
+		return "Итоговые характеристики снасти\nРежим: катушка\nКатушка: %s (%d)\nФрикцион: %s · шпуля: %.0f м\nСкорость: %.2f м/с\nЛеска/поводок: %s / %s\nПриманка/наживка: %s\nСтатус: %s" % [
+			reel_text,
+			int(stats.get("reel_size", 0)),
+			_format_tackle_stat_value("max_drag", stats.get("max_drag", 0.0)),
+			float(stats.get("spool_capacity", 0.0)),
+			float(stats.get("retrieve_speed", 0.0)),
+			_format_tackle_stat_value("max_load", stats.get("line_strength", 0.0)),
+			_format_tackle_stat_value("max_load", stats.get("leader_strength", 0.0)),
+			terminal_text,
+			status
+		]
 
 	return "Итоговые характеристики снасти\nЛеска/поводок: %s / %s\nРазмер крючка: %s\nНаживка: %s\nВидимость: %s\nКонтроль: %s\nСтатус: %s" % [
 		_format_tackle_stat_value("max_load", stats.get("line_strength", 0.0)),
@@ -1568,7 +1621,7 @@ func _get_tackle_item_condition_details_text(item: Dictionary) -> String:
 		if int(item.get("quantity", 0)) <= 0:
 			return "Состояние: закончилась\nПричина: Наживка закончилась."
 		return ""
-	if not ["rod", "line", "leader", "hook"].has(category):
+	if not ["rod", "reel", "line", "leader", "hook"].has(category):
 		return ""
 
 	var wear_percent := _get_item_wear_percent(item)
@@ -1590,7 +1643,7 @@ func _get_tackle_stats_text(item: Dictionary) -> String:
 	var category = str(item.get("category", item.get("type", "misc")))
 	var lines: Array = []
 
-	for key in _get_tackle_stat_keys(category):
+	for key in _get_tackle_stat_keys(category, item):
 		if not stats.has(key):
 			continue
 
@@ -1621,7 +1674,7 @@ func _get_tackle_compare_text(item: Dictionary) -> String:
 
 	var lines: Array = ["Сравнение с текущей снастью:"]
 
-	for key in _get_tackle_stat_keys(category):
+	for key in _get_tackle_stat_keys(category, item):
 		if not stats.has(key) and not current.has(key):
 			continue
 
@@ -1840,10 +1893,16 @@ func _any_bait_matches(preferred_baits: Array, bait_types: Array) -> bool:
 	return false
 
 
-func _get_tackle_stat_keys(category: String) -> Array:
+func _get_tackle_stat_keys(category: String, item: Dictionary = {}) -> Array:
 	match category:
 		"rod":
-			return ["length_m", "rod_class", "max_fish_weight", "control_bonus", "handling_bonus", "reach_bonus", "stiffness", "durability", "durability_loss"]
+			var stats: Dictionary = item.get("stats", {}) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
+			var requires_reel := bool(stats.get("requires_reel", item.get("requires_reel", false)))
+			if requires_reel:
+				return ["rod_type", "requires_reel", "length_m", "rod_class", "power", "test_min", "test_max", "flexibility", "compatible_reel_min_size", "compatible_reel_max_size", "max_fish_weight", "control_bonus", "handling_bonus", "reach_bonus", "stiffness", "durability", "durability_loss"]
+			return ["rod_type", "length_m", "rod_class", "max_fish_weight", "control_bonus", "handling_bonus", "reach_bonus", "stiffness", "durability", "durability_loss"]
+		"reel":
+			return ["reel_size", "reel_type", "max_drag", "retrieve_speed", "spool_capacity", "weight", "durability", "wear_rate"]
 		"line":
 			return ["max_load", "break_resistance", "break_chance", "visibility", "durability", "wear_rate"]
 		"leader":
@@ -1854,6 +1913,8 @@ func _get_tackle_stat_keys(category: String) -> Array:
 			return ["hook_size", "hook_strength", "hook_chance", "target_fish_size", "fish_escape_modifier", "durability", "wear_rate"]
 		"bait":
 			return ["bait_type", "fish_attraction"]
+		"lure":
+			return ["lure_type", "weight", "hook_size", "hook_strength", "hook_chance", "fish_attraction", "durability", "wear_rate"]
 		_:
 			return []
 
@@ -1864,6 +1925,36 @@ func _get_tackle_stat_title(key: String) -> String:
 			return "Длина"
 		"rod_class":
 			return "Класс"
+		"rod_type":
+			return "Тип удилища"
+		"requires_reel":
+			return "Требует катушку"
+		"power":
+			return "Мощность"
+		"test_min":
+			return "Тест мин."
+		"test_max":
+			return "Тест макс."
+		"flexibility":
+			return "Гибкость"
+		"compatible_reel_min_size":
+			return "Катушка мин."
+		"compatible_reel_max_size":
+			return "Катушка макс."
+		"reel_size":
+			return "Размер"
+		"reel_type":
+			return "Тип катушки"
+		"max_drag":
+			return "Фрикцион"
+		"retrieve_speed":
+			return "Подмотка"
+		"spool_capacity":
+			return "Шпуля"
+		"weight":
+			return "Вес"
+		"lure_type":
+			return "Тип приманки"
 		"max_fish_weight":
 			return "Макс. рыба"
 		"strength":
@@ -1960,17 +2051,27 @@ func _format_tackle_stat_value(key: String, value) -> String:
 			return "%.1f м" % float(value)
 		"length_cm":
 			return "%d см" % int(value)
+		"reel_size", "compatible_reel_min_size", "compatible_reel_max_size":
+			return "%d" % int(value)
 		"depth_min", "depth_max":
 			return "%.1f м" % float(value)
-		"max_fish_weight", "max_load_kg", "max_load":
+		"max_fish_weight", "max_load_kg", "max_load", "max_drag":
 			return "%.1f кг" % float(value)
+		"test_min", "test_max", "weight":
+			return "%.0f г" % float(value)
+		"retrieve_speed":
+			return "%.2f м/с" % float(value)
+		"spool_capacity":
+			return "%.0f м" % float(value)
 		"cast_distance_bonus":
 			var percent := roundi(float(value) * 100.0)
 			if percent > 0:
 				return "+%d%%" % percent
 			return "%d%%" % percent
-		"tension_bonus", "control_bonus", "handling_bonus", "reach_bonus", "break_resistance", "break_chance", "visibility", "sensitivity", "stability", "bite_visibility", "wind_resistance", "drift_resistance", "false_bite_resistance", "night_bonus", "vegetation_control", "heavy_bait_support", "hook_timing_bonus", "long_range_accuracy_bonus", "setup_comfort", "bite_protection", "hook_chance", "fish_escape_modifier", "fish_attraction", "strength", "stiffness", "durability", "durability_loss", "wear_rate", "hook_strength", "cautious_bite_bonus", "small_fish_penalty":
+		"tension_bonus", "control_bonus", "handling_bonus", "reach_bonus", "break_resistance", "break_chance", "visibility", "sensitivity", "stability", "bite_visibility", "wind_resistance", "drift_resistance", "false_bite_resistance", "night_bonus", "vegetation_control", "heavy_bait_support", "hook_timing_bonus", "long_range_accuracy_bonus", "setup_comfort", "bite_protection", "hook_chance", "fish_escape_modifier", "fish_attraction", "strength", "stiffness", "durability", "durability_loss", "wear_rate", "hook_strength", "cautious_bite_bonus", "small_fish_penalty", "power", "flexibility":
 			return "%d%%" % roundi(float(value) * 100.0)
+		"requires_reel":
+			return "да" if bool(value) else "нет"
 		"leader_type":
 			return _format_leader_material(str(value))
 		"rod_class":
@@ -2011,6 +2112,40 @@ func _format_tackle_stat_value(key: String, value) -> String:
 					return "опарыш"
 				_:
 					return str(value)
+		"rod_type":
+			match str(value):
+				"pole":
+					return "маховая"
+				"spinning":
+					return "спиннинг"
+				"feeder":
+					return "фидер"
+				"sea":
+					return "морская"
+				_:
+					return str(value)
+		"reel_type":
+			match str(value):
+				"spinning":
+					return "безынерционная"
+				"feeder":
+					return "фидерная"
+				"carp":
+					return "карповая"
+				"big_game":
+					return "трофейная"
+				_:
+					return str(value)
+		"lure_type":
+			match str(value):
+				"spinner":
+					return "вертушка"
+				"spoon":
+					return "колебалка"
+				"wobbler":
+					return "воблер"
+				_:
+					return str(value)
 		_:
 			return str(value)
 
@@ -2036,6 +2171,7 @@ func _format_tackle_wear_message(wear: Dictionary) -> String:
 
 	var lines: Array = []
 	var rod_loss: int = max(roundi((float(wear.get("rod_old", 1.0)) - float(wear.get("rod_new", wear.get("rod_old", 1.0)))) * 100.0), 0)
+	var reel_loss: int = max(roundi((float(wear.get("reel_old", 1.0)) - float(wear.get("reel_new", wear.get("reel_old", 1.0)))) * 100.0), 0)
 	var line_loss: int = max(roundi((float(wear.get("line_old", 1.0)) - float(wear.get("line_new", wear.get("line_old", 1.0)))) * 100.0), 0)
 	var leader_loss: int = max(roundi((float(wear.get("leader_old", 1.0)) - float(wear.get("leader_new", wear.get("leader_old", 1.0)))) * 100.0), 0)
 	var hook_loss: int = max(roundi((float(wear.get("hook_old", 1.0)) - float(wear.get("hook_new", wear.get("hook_old", 1.0)))) * 100.0), 0)
@@ -2043,6 +2179,8 @@ func _format_tackle_wear_message(wear: Dictionary) -> String:
 
 	if rod_loss > 0:
 		wear_parts.append("уд. -%d%%" % rod_loss)
+	if reel_loss > 0:
+		wear_parts.append("катушка -%d%%" % reel_loss)
 	if line_loss > 0:
 		wear_parts.append("леска -%d%%" % line_loss)
 	if leader_loss > 0:
@@ -2058,6 +2196,8 @@ func _format_tackle_wear_message(wear: Dictionary) -> String:
 		lines.append("Поводок потерян.")
 	if bool(wear.get("rod_broken", false)):
 		lines.append("Удочка повреждена.")
+	if bool(wear.get("reel_broken", false)):
+		lines.append("Катушка повреждена.")
 	if bool(wear.get("hook_lost", false)):
 		lines.append("Крючок потерян.")
 	if bool(wear.get("float_lost", false)):

@@ -7,6 +7,9 @@ signal final_catch_visual_finished
 var main
 var theme
 var _rod_texture: Texture2D
+var _spinning_rod_texture: Texture2D
+var _spinning_rod_frame_float := 0.0
+var _spinning_rod_spin_speed := 0.0
 var _rod_uses_external_texture := false
 var _float_texture: Texture2D
 var _float_texture_path := ""
@@ -41,13 +44,14 @@ var _final_catch_signal_sent := false
 var _landed_hold_active := false
 var is_cast_animating := false
 var rod_visual_state: int = 0
+var _reel_handle_rotation := 0.0
 @export var bobber_waterline_offset: Vector2 = Vector2(0.0, 34.0)
 const LAKE_BG_BASE_PATHS := [
-	"res://assets/environment/lake_bg_base.png",
 	"res://assets/environment/lake/lake_bg_base.png.png"
 ]
 const LAKE_BG_VERTICAL_BIAS := 0.12
 const ROD_TEXTURE_PATH := "res://assets/art/fishing/rod_first_person.png"
+const SPINNING_ROD_TEXTURE_PATH := ""
 const FLOAT_TEXTURE_PATH := "res://assets/art/fishing/float_marker.png"
 const RIPPLE_TEXTURE_PATH := "res://assets/art/fishing/water_ripple.png"
 const DROP_SPLASH_TEXTURE_PATH := "res://assets/art/fishing/splash_on_drop.png"
@@ -59,6 +63,14 @@ const BOBBER_CONTACT_OFFSET_RATIO := 1.10
 const ROD_TEXTURE_SIZE := Vector2i(760, 104)
 const ROD_ASSET_TIP_RATIO := Vector2(0.294, 0.042)
 const ROD_ASSET_BUTT_RATIO := Vector2(0.843, 0.990)
+const SPINNING_ROD_ASSET_TIP_RATIO := Vector2(0.370, 0.018)
+const SPINNING_ROD_ASSET_BUTT_RATIO := Vector2(0.644, 0.963)
+const SPINNING_ROD_HFRAMES := 4
+const SPINNING_ROD_VFRAMES := 3
+const SPINNING_ROD_FRAME_COUNT := 12
+const SPINNING_ROD_BASE_FPS := 14.0
+const SPINNING_ROD_STOP_SMOOTHNESS := 8.0
+const SPINNING_ROD_FORWARD_FRAME_SIGN := 1.0
 const FLOAT_TEXTURE_REGION := Rect2(520.0, 72.0, 220.0, 1110.0)
 const RIPPLE_TEXTURE_REGION := Rect2(104.0, 386.0, 1060.0, 520.0)
 const CAST_VISUAL_DURATION := 1.05
@@ -269,10 +281,15 @@ func set_float_in_water(active: bool) -> void:
 		_float_laid_down = false
 		_float_lay_down_timer = 0.0
 		rod_visual_state = RodVisualState.FLOAT_IN_WATER
+		if _is_reel_visual_mode():
+			_hide_float_presence_visuals()
 	else:
 		set_rod_uncasted()
 
 func play_float_lay_down_animation() -> void:
+	if _is_reel_visual_mode():
+		_hide_float_presence_visuals()
+		return
 	_cast_timer = 0.0
 	_drop_splash_timer = max(_drop_splash_timer, 0.10)
 	_float_nudge_timer = 0.0
@@ -369,6 +386,27 @@ func _hide_float_and_line_visuals() -> void:
 		main.float_reflection,
 		main.fishing_line,
 		main.fishing_line_glow,
+		main.rod_reel_stem,
+		main.rod_reel_spool,
+		main.rod_reel_handle,
+		_float_sprite,
+		_ripple_sprite,
+		_drop_splash_sprite,
+		_regular_splash_sprite,
+		_bobber_ripple,
+		_bobber_contact_waterline
+	]:
+		if node != null:
+			node.visible = false
+
+func _hide_float_presence_visuals() -> void:
+	if main == null:
+		return
+	for node in [
+		main.float_marker,
+		main.float_glow,
+		main.float_ripple,
+		main.float_reflection,
 		_float_sprite,
 		_ripple_sprite,
 		_drop_splash_sprite,
@@ -380,6 +418,8 @@ func _hide_float_and_line_visuals() -> void:
 			node.visible = false
 
 func play_float_nudge(data: Dictionary) -> void:
+	if _is_reel_visual_mode():
+		return
 	if rod_visual_state == RodVisualState.UNCASTED or rod_visual_state == RodVisualState.LANDED:
 		return
 	_float_nudge_duration = max(float(data.get("duration", 0.35)), 0.1)
@@ -554,6 +594,8 @@ func _hide_procedural_environment_layers() -> void:
 func _ensure_rod_sprite_nodes() -> void:
 	if _rod_texture == null:
 		_rod_texture = _load_rod_texture()
+	if BuildConfig.ENABLE_SPINNING_FEATURES and _spinning_rod_texture == null:
+		_spinning_rod_texture = _load_texture_resource(SPINNING_ROD_TEXTURE_PATH)
 
 	if main.rod_shadow_sprite == null:
 		main.rod_shadow_sprite = Sprite2D.new()
@@ -571,14 +613,50 @@ func _ensure_rod_sprite_nodes() -> void:
 		main.rod_sprite.z_index = 21
 		main.fishing_presence_layer.add_child(main.rod_sprite)
 
+	var active_texture := _get_active_rod_texture()
+	var spinning_texture_active := _is_using_spinning_rod_texture()
 	for sprite in [main.rod_shadow_sprite, main.rod_sprite]:
-		sprite.texture = _rod_texture
+		sprite.texture = active_texture
 		sprite.centered = false
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		_configure_rod_sprite_frames(sprite, spinning_texture_active)
 		sprite.visible = true
 
 	main.rod_shadow_sprite.modulate = Color(0.0, 0.0, 0.0, 0.22)
 	main.rod_sprite.modulate = Color(1.0, 1.0, 1.0, 0.98)
+
+
+func _is_using_spinning_rod_texture() -> bool:
+	return _is_reel_visual_mode() and _spinning_rod_texture != null
+
+
+func _get_active_rod_texture() -> Texture2D:
+	if _is_using_spinning_rod_texture():
+		return _spinning_rod_texture
+	return _rod_texture
+
+
+func _active_rod_uses_external_texture() -> bool:
+	if _is_using_spinning_rod_texture():
+		return true
+	return _rod_uses_external_texture
+
+
+func _get_spinning_rod_frame_index() -> int:
+	return int(floor(_spinning_rod_frame_float)) % SPINNING_ROD_FRAME_COUNT
+
+
+func _configure_rod_sprite_frames(sprite: Sprite2D, spinning_texture_active: bool) -> void:
+	if sprite == null:
+		return
+	if spinning_texture_active:
+		sprite.hframes = SPINNING_ROD_HFRAMES
+		sprite.vframes = SPINNING_ROD_VFRAMES
+		sprite.frame = _get_spinning_rod_frame_index()
+	else:
+		sprite.hframes = 1
+		sprite.vframes = 1
+		sprite.frame = 0
 
 
 func _ensure_float_sprite_nodes() -> void:
@@ -776,7 +854,6 @@ func _create_rod_texture() -> Texture2D:
 	for ring_t in [0.66, 0.78, 0.90]:
 		_draw_rod_ring(image, int(round(float(ROD_TEXTURE_SIZE.x) * ring_t)), center_y)
 
-	_draw_reel_on_rod_texture(image, center_y)
 	return ImageTexture.create_from_image(image)
 
 
@@ -889,16 +966,22 @@ func _configure_fishing_presence_style() -> void:
 	main.rod_ferrule_tip.antialiased = true
 
 	main.rod_reel_stem.width = 2.0
-	main.rod_reel_stem.default_color = Color(0.17, 0.18, 0.15, 0.66)
+	main.rod_reel_stem.default_color = Color(0.08, 0.10, 0.08, 0.88)
 	main.rod_reel_stem.antialiased = true
+	main.rod_reel_stem.z_as_relative = false
+	main.rod_reel_stem.z_index = 32
 
-	main.rod_reel_spool.width = 1.8
-	main.rod_reel_spool.default_color = Color(0.52, 0.58, 0.50, 0.54)
+	main.rod_reel_spool.width = 3.1
+	main.rod_reel_spool.default_color = Color(0.82, 0.88, 0.72, 0.86)
 	main.rod_reel_spool.antialiased = true
+	main.rod_reel_spool.z_as_relative = false
+	main.rod_reel_spool.z_index = 33
 
-	main.rod_reel_handle.width = 1.3
-	main.rod_reel_handle.default_color = Color(0.52, 0.58, 0.50, 0.50)
+	main.rod_reel_handle.width = 2.5
+	main.rod_reel_handle.default_color = Color(0.86, 0.92, 0.76, 0.90)
 	main.rod_reel_handle.antialiased = true
+	main.rod_reel_handle.z_as_relative = false
+	main.rod_reel_handle.z_index = 34
 
 	main.fishing_line_glow.width = 0.55
 	main.fishing_line_glow.default_color = Color(0.66, 0.82, 0.78, 0.025)
@@ -915,8 +998,14 @@ func _configure_fishing_presence_style() -> void:
 
 func _update_rod_sprite(rod_butt: Vector2, rod_tip: Vector2, scene_scale: float, intensity: float) -> void:
 	_ensure_rod_sprite_nodes()
-	if _rod_uses_external_texture:
-		_update_external_rod_sprite(rod_butt, rod_tip, scene_scale, intensity)
+	var active_texture := _get_active_rod_texture()
+	var spinning_texture_active := _is_using_spinning_rod_texture()
+	for sprite in [main.rod_shadow_sprite, main.rod_sprite]:
+		sprite.texture = active_texture
+		_configure_rod_sprite_frames(sprite, spinning_texture_active)
+
+	if _active_rod_uses_external_texture():
+		_update_external_rod_sprite(rod_butt, rod_tip, scene_scale, intensity, active_texture)
 		return
 
 	var direction: Vector2 = rod_tip - rod_butt
@@ -943,10 +1032,19 @@ func _update_rod_sprite(rod_butt: Vector2, rod_tip: Vector2, scene_scale: float,
 	main.rod_shadow_sprite.modulate = Color(0.0, 0.0, 0.0, 0.20)
 
 
-func _update_external_rod_sprite(rod_butt: Vector2, rod_tip: Vector2, scene_scale: float, intensity: float) -> void:
-	var texture_size: Vector2 = _rod_texture.get_size()
-	var asset_butt: Vector2 = Vector2(texture_size.x * ROD_ASSET_BUTT_RATIO.x, texture_size.y * ROD_ASSET_BUTT_RATIO.y)
-	var asset_tip: Vector2 = Vector2(texture_size.x * ROD_ASSET_TIP_RATIO.x, texture_size.y * ROD_ASSET_TIP_RATIO.y)
+func _update_external_rod_sprite(rod_butt: Vector2, rod_tip: Vector2, scene_scale: float, intensity: float, texture: Texture2D) -> void:
+	var texture_size: Vector2 = texture.get_size()
+	var asset_butt_ratio: Vector2 = ROD_ASSET_BUTT_RATIO
+	var asset_tip_ratio: Vector2 = ROD_ASSET_TIP_RATIO
+	if _is_using_spinning_rod_texture():
+		texture_size = Vector2(
+			texture_size.x / float(SPINNING_ROD_HFRAMES),
+			texture_size.y / float(SPINNING_ROD_VFRAMES)
+		)
+		asset_butt_ratio = SPINNING_ROD_ASSET_BUTT_RATIO
+		asset_tip_ratio = SPINNING_ROD_ASSET_TIP_RATIO
+	var asset_butt: Vector2 = Vector2(texture_size.x * asset_butt_ratio.x, texture_size.y * asset_butt_ratio.y)
+	var asset_tip: Vector2 = Vector2(texture_size.x * asset_tip_ratio.x, texture_size.y * asset_tip_ratio.y)
 	var asset_direction: Vector2 = asset_tip - asset_butt
 	var target_direction: Vector2 = rod_tip - rod_butt
 	var asset_length: float = max(asset_direction.length(), 1.0)
@@ -969,7 +1067,6 @@ func _update_external_rod_sprite(rod_butt: Vector2, rod_tip: Vector2, scene_scal
 	main.rod_shadow_sprite.z_index = 18
 	main.rod_shadow_sprite.visible = true
 	main.rod_shadow_sprite.modulate = Color(0.0, 0.0, 0.0, 0.24 + intensity * 0.04)
-
 
 func _get_line_normal(from: Vector2, to: Vector2, prefer_down: bool = false) -> Vector2:
 	var direction = (to - from).normalized()
@@ -994,6 +1091,69 @@ func _make_ellipse_points(center: Vector2, radius: Vector2, steps: int = 16) -> 
 		points.append(center + Vector2(cos(angle) * radius.x, sin(angle) * radius.y))
 
 	return points
+
+func _make_reel_handle_points(center: Vector2, scene_scale: float) -> PackedVector2Array:
+	var arm := Vector2(cos(_reel_handle_rotation), sin(_reel_handle_rotation))
+	var tangent := Vector2(-arm.y, arm.x)
+	var root := center + arm * (8.5 * scene_scale)
+	var mid := center + arm * (19.0 * scene_scale) + tangent * (1.2 * scene_scale)
+	var knob := center + arm * (27.0 * scene_scale) + tangent * (4.2 * scene_scale)
+	return PackedVector2Array([root, mid, knob])
+
+
+func _update_spinning_rod_animation(delta: float, reel_handle_speed: float) -> void:
+	main.rod_reel_stem.visible = false
+	main.rod_reel_spool.visible = false
+	main.rod_reel_handle.visible = false
+	main.rod_reel_stem.points = PackedVector2Array()
+	main.rod_reel_spool.points = PackedVector2Array()
+	main.rod_reel_handle.points = PackedVector2Array()
+
+	if not _is_using_spinning_rod_texture():
+		return
+
+	var target_speed := 0.0
+	if abs(reel_handle_speed) > 0.01:
+		var direction := 1.0 if reel_handle_speed > 0.0 else -1.0
+		var speed_multiplier: float = clamp(abs(reel_handle_speed) / 7.5, 0.10, 1.80)
+		target_speed = direction * SPINNING_ROD_FORWARD_FRAME_SIGN * SPINNING_ROD_BASE_FPS * speed_multiplier
+
+	var acceleration: float = SPINNING_ROD_STOP_SMOOTHNESS * SPINNING_ROD_BASE_FPS * delta
+	_spinning_rod_spin_speed = move_toward(_spinning_rod_spin_speed, target_speed, acceleration)
+	if abs(_spinning_rod_spin_speed) < 0.05:
+		_spinning_rod_spin_speed = 0.0
+	else:
+		_spinning_rod_frame_float = fposmod(_spinning_rod_frame_float + _spinning_rod_spin_speed * delta, float(SPINNING_ROD_FRAME_COUNT))
+
+	var frame_index := _get_spinning_rod_frame_index()
+	for sprite in [main.rod_shadow_sprite, main.rod_sprite]:
+		_configure_rod_sprite_frames(sprite, true)
+		sprite.frame = frame_index
+
+func _is_reel_visual_mode() -> bool:
+	if PlayerData == null:
+		return false
+	if PlayerData.has_method("get_current_rod_requires_reel"):
+		return bool(PlayerData.call("get_current_rod_requires_reel"))
+	if PlayerData.has_method("get_current_fight_mode"):
+		return str(PlayerData.call("get_current_fight_mode")) == "reel"
+	return false
+
+func _should_show_reel_visual() -> bool:
+	if not _is_reel_visual_mode():
+		return false
+	if PlayerData.has_method("get_current_reel_data"):
+		var reel_data = PlayerData.call("get_current_reel_data")
+		return reel_data is Dictionary and not (reel_data as Dictionary).is_empty()
+	return false
+
+func _get_reel_handle_speed() -> float:
+	if main == null:
+		return 0.0
+	var state = main.get("_last_reeling_state")
+	if state is Dictionary and str((state as Dictionary).get("fight_mode", "pole")) == "reel":
+		return float((state as Dictionary).get("reel_handle_speed", 0.0))
+	return 0.0
 
 
 func _set_short_cross_line(line: Line2D, center: Vector2, direction_to_tip: Vector2, length: float) -> void:
@@ -1123,6 +1283,10 @@ func _get_presence_state() -> String:
 
 
 func _get_presence_reeling_intensity() -> float:
+	if str(main._last_reeling_state.get("fight_mode", "pole")) == "reel" and str(main._last_reeling_state.get("phase", "")) == "retrieve":
+		var retrieve_speed: float = abs(float(main._last_reeling_state.get("reel_handle_speed", 0.0)))
+		var input_active: bool = bool(main._last_reeling_state.get("input_active", false))
+		return clamp((0.38 if input_active else 0.12) + retrieve_speed * 0.055, 0.0, 0.78)
 	var tension: float = clamp(float(main._last_reeling_state.get("tension", 0.0)), 0.0, 1.0)
 	var fish_force: float = clamp(float(main._last_reeling_state.get("fish_force", 0.0)) * 0.7, 0.0, 1.0)
 	var struggle_power: float = clamp(float(main._last_reeling_state.get("struggle_power", 0.0)) * 0.6, 0.0, 1.0)
@@ -1209,6 +1373,14 @@ func _get_reeling_progress_ratio() -> float:
 	if main._last_reeling_state.has("landing_progress"):
 		progress = max(progress, float(main._last_reeling_state.get("landing_progress", 0.0)))
 	return clamp(progress, 0.0, 1.0)
+
+func _get_lure_retrieve_progress_ratio() -> float:
+	if main == null:
+		return 0.0
+	var state = main.get("_last_reeling_state")
+	if state is Dictionary and str((state as Dictionary).get("fight_mode", "pole")) == "reel":
+		return clamp(float((state as Dictionary).get("retrieve_progress", 0.0)), 0.0, 1.0)
+	return 0.0
 
 
 func _get_cast_float_center(_target_center: Vector2, scene_scale: float) -> Vector2:
@@ -1747,6 +1919,10 @@ func _update_splash_sprites(center: Vector2, surface_y: float, visual_scale: flo
 
 
 func _update_wind_drift(delta: float, state: String, screen_size: Vector2, has_cast_landing_surface: bool) -> void:
+	if _is_reel_visual_mode():
+		_wind_drift_offset = _wind_drift_offset.lerp(Vector2.ZERO, clamp(delta * 3.0, 0.0, 1.0))
+		return
+
 	if not ["waiting", "bite", "laid_down"].has(state):
 		_wind_drift_offset = _wind_drift_offset.lerp(Vector2.ZERO, clamp(delta * 2.2, 0.0, 1.0))
 		return
@@ -1805,6 +1981,7 @@ func _update_fishing_presence(delta: float) -> void:
 
 	var state = _get_presence_state()
 	var intensity = _get_presence_reeling_intensity()
+	var reel_visual_mode := _is_reel_visual_mode()
 
 	if state == "casting":
 		intensity = max(intensity, 0.55)
@@ -1846,6 +2023,10 @@ func _update_fishing_presence(delta: float) -> void:
 		var pull_progress: float = _smooth_unit(_get_reeling_progress_ratio())
 		var shore_target := _get_reeling_pull_target(screen_size, scene_scale)
 		base_float_center = base_float_center.lerp(shore_target, clamp(pull_progress * 0.84 + intensity * 0.08, 0.0, 0.92))
+	elif reel_visual_mode and state == "waiting" and has_cast_landing_surface:
+		var retrieve_progress: float = _smooth_unit(_get_lure_retrieve_progress_ratio())
+		var retrieve_target := _get_reeling_pull_target(screen_size, scene_scale)
+		base_float_center = base_float_center.lerp(retrieve_target, clamp(retrieve_progress * 0.96, 0.0, 0.96))
 
 	match state:
 		"bite":
@@ -1862,6 +2043,9 @@ func _update_fishing_presence(delta: float) -> void:
 			float_offset += Vector2(sin(main._presence_time * 22.0) * 4.0, 6.0 + abs(sin(main._presence_time * 18.0)) * 5.0)
 		"reeling":
 			float_offset += Vector2(sin(main._presence_time * 7.7) * (2.0 + intensity * 3.5), sin(main._presence_time * 6.3) * (2.0 + intensity * 3.0))
+		"waiting":
+			if reel_visual_mode:
+				float_offset += Vector2(sin(main._presence_time * 8.8) * 2.8, sin(main._presence_time * 7.3) * 1.6) * scene_scale
 		"caught":
 			float_offset += Vector2(sin(main._presence_time * 1.8) * 1.4, -4.0 + sin(main._presence_time * 2.1) * 1.0)
 
@@ -1905,7 +2089,11 @@ func _update_fishing_presence(delta: float) -> void:
 		main._float_visual_center = target_float_center
 	else:
 		main._float_visual_center = main._float_visual_center.lerp(target_float_center, clamp(delta * float_follow, 0.0, 1.0))
-	_set_float_presence(main._float_visual_center, state, intensity)
+
+	if reel_visual_mode:
+		_hide_float_presence_visuals()
+	else:
+		_set_float_presence(main._float_visual_center, state, intensity)
 
 	var cast_sweep_offset: Vector2 = _get_cast_sweep_offset(scene_scale) if state == "casting" else Vector2.ZERO
 	var rod_butt: Vector2 = main._rod_anchor_pos + scene_breath + cast_sweep_offset * 0.55
@@ -1968,7 +2156,7 @@ func _update_fishing_presence(delta: float) -> void:
 	else:
 		main._rod_tip_visual = main._rod_tip_visual.lerp(rod_tip_target, clamp(delta * rod_tip_follow, 0.0, 1.0))
 
-	var line_end = _get_bobber_line_attach_point(main._float_visual_center, state, scene_scale)
+	var line_end = main._float_visual_center if reel_visual_mode else _get_bobber_line_attach_point(main._float_visual_center, state, scene_scale)
 	if state == "uncasted":
 		line_end = main._rod_tip_visual
 	var line_pull_direction = (line_end - main._rod_tip_visual).normalized()
@@ -2074,15 +2262,33 @@ func _update_fishing_presence(delta: float) -> void:
 	_set_short_cross_line(main.rod_handle_wrap_a, handle_end.lerp(rod_butt, 0.34), rod_butt, 4.2)
 	_set_short_cross_line(main.rod_handle_wrap_b, handle_end.lerp(rod_butt, 0.66), rod_butt, 3.6)
 
-	var reel_mount = _cubic_bezier_point(rod_butt, rod_control_near, rod_control_tip, main._rod_tip_visual, 0.16)
-	var reel_center = reel_mount + main._rod_bend_direction_visual * ((12.0 + intensity * 1.4) * scene_scale)
-	main.rod_reel_stem.points = PackedVector2Array([reel_mount, reel_center])
-	main.rod_reel_spool.points = _make_ellipse_points(reel_center, Vector2(8.0, 5.0) * scene_scale, 18)
-	main.rod_reel_handle.points = PackedVector2Array([
-		reel_center + Vector2(5.5, -2.0) * scene_scale,
-		reel_center + Vector2(14.0, -0.6) * scene_scale,
-		reel_center + Vector2(16.5, 3.0) * scene_scale
-	])
+	var reel_mount = _cubic_bezier_point(rod_butt, rod_control_near, rod_control_tip, main._rod_tip_visual, 0.13)
+	var reel_center = reel_mount + main._rod_bend_direction_visual * ((15.0 + intensity * 1.6) * scene_scale) + Vector2(-4.0, -8.0) * scene_scale
+	var show_reel := _should_show_reel_visual()
+	main.rod_reel_stem.visible = show_reel
+	main.rod_reel_spool.visible = show_reel
+	main.rod_reel_handle.visible = show_reel
+	if show_reel:
+		var reel_handle_speed := _get_reel_handle_speed()
+		if _is_using_spinning_rod_texture():
+			_update_spinning_rod_animation(delta, reel_handle_speed)
+		else:
+			_reel_handle_rotation += reel_handle_speed * delta
+			main.rod_reel_stem.z_index = 32
+			main.rod_reel_spool.z_index = 33
+			main.rod_reel_handle.z_index = 34
+			main.rod_reel_stem.default_color = Color(0.08, 0.10, 0.08, 0.88)
+			main.rod_reel_spool.default_color = Color(0.82, 0.88, 0.72, 0.86)
+			main.rod_reel_handle.default_color = Color(0.86, 0.92, 0.76, 0.90)
+			main.rod_reel_stem.points = PackedVector2Array([reel_mount, reel_center])
+			main.rod_reel_spool.points = _make_ellipse_points(reel_center, Vector2(17.0, 10.5) * scene_scale, 24)
+			main.rod_reel_handle.points = _make_reel_handle_points(reel_center, scene_scale)
+	else:
+		if _is_using_spinning_rod_texture():
+			_update_spinning_rod_animation(delta, 0.0)
+		main.rod_reel_stem.points = PackedVector2Array()
+		main.rod_reel_spool.points = PackedVector2Array()
+		main.rod_reel_handle.points = PackedVector2Array()
 
 	var sag = 20.0
 

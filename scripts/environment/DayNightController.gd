@@ -30,8 +30,7 @@ const MOUNTAINS_PATH := "res://assets/environment/lake/mountains_morning.png.png
 const FOREST_PATH := "res://assets/environment/lake/forest_morning.png.png"
 const WATER_PATH := "res://assets/environment/lake/Water_morning.png.png"
 const LIGHT_OVERLAY_PATH := "res://assets/environment/lake/Light_overlay.png.png"
-const FOREGROUND_GRASS_PATH := "res://assets/environment/lake/Foreground_grass.png.png"
-const FOREGROUND_GRASS_FALLBACK_PATH := "res://assets/environment/lake/Foregraund_grass.png.png"
+const FOREGROUND_GRASS_PATH := "res://assets/environment/lake/Foregraund_grass.png.png"
 const OLD_OAK_PIER_ASSET_ROOT := "res://assets/environment/agamin_lake/spots/old_oak_pier"
 const QUIET_WATER_PIER_ASSET_ROOT := "res://assets/environment/agamin_lake/spots/quiet_water_pier"
 const MORNING_PIER_ASSET_ROOT := "res://assets/environment/agamin_lake/spots/morning_pier"
@@ -586,8 +585,7 @@ func _ensure_nodes() -> void:
 		visual_profile,
 		"foreground",
 		FOREGROUND_GRASS_PATH,
-		"foreground",
-		[FOREGROUND_GRASS_FALLBACK_PATH]
+		"foreground"
 	)
 
 	_sky_layer = _ensure_texture_layer(_sky_layer, "SkyLayer", sky_path, 0)
