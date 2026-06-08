@@ -254,11 +254,16 @@ func setup(main_ref) -> void:
 	_hide_shop_pager()
 	_ensure_shop_details_nodes()
 
+func _is_beta_consumable_shop_hidden() -> bool:
+	return BuildConfig.IS_BETA_BUILD
+
 func open() -> void:
 	if main._is_catch_reward_open() or main.shop_button.disabled:
 		return
 	if main._shop_category == SHOP_CATEGORY_TACKLE:
 		main._shop_category = SHOP_CATEGORY_ROD
+	if _is_beta_consumable_shop_hidden() and main._shop_category == SHOP_CATEGORY_CONSUMABLE:
+		main._shop_category = SHOP_CATEGORY_BAIT
 
 	main.open_modal("shop")
 	main._active_nav_tab = "shop"
@@ -296,6 +301,8 @@ func _get_shop_items_for_category(category: String) -> Array:
 		return _get_tackle_shop_items_for_type(category)
 	if category == SHOP_CATEGORY_BAIT:
 		return _get_bait_shop_items()
+	if category == SHOP_CATEGORY_CONSUMABLE and _is_beta_consumable_shop_hidden():
+		return []
 
 	var items: Array = []
 	for item in CONSUMABLE_ITEMS:
@@ -690,6 +697,11 @@ func _update_shop_ui() -> void:
 		return
 
 	_update_shop_money_display()
+	var hide_consumables := _is_beta_consumable_shop_hidden()
+	if hide_consumables and main._shop_category == SHOP_CATEGORY_CONSUMABLE:
+		main._shop_category = SHOP_CATEGORY_BAIT
+	main.shop_consumable_category_button.visible = not hide_consumables
+	main.shop_consumable_category_button.disabled = hide_consumables
 	theme.apply_tab_button_style(main.shop_bait_category_button, main._shop_category == SHOP_CATEGORY_BAIT)
 	theme.apply_tab_button_style(main.shop_consumable_category_button, main._shop_category == SHOP_CATEGORY_CONSUMABLE)
 	theme.apply_tab_button_style(main.shop_tackle_category_button, main._shop_category == SHOP_CATEGORY_ROD)
@@ -1782,6 +1794,8 @@ func _get_shop_key_stat_text(item: Dictionary) -> String:
 
 
 func _set_shop_category(category: String) -> void:
+	if category == SHOP_CATEGORY_CONSUMABLE and _is_beta_consumable_shop_hidden():
+		category = SHOP_CATEGORY_BAIT
 	main._shop_category = category
 	main._shop_page = 0
 	_reset_shop_scroll_to_top()

@@ -64,6 +64,8 @@ func close_current_modal() -> void:
 			if main.encyclopedia_ui != null:
 				main.encyclopedia_ui.close()
 		"catch_reward":
+			if main.has_method("_block_pending_catch_reward_close_attempt") and main._block_pending_catch_reward_close_attempt():
+				return
 			main._hide_catch_reward_popup()
 		_:
 			hide_modal_roots_except("")

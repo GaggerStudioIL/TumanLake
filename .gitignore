@@ -35,6 +35,9 @@ Thumbs.db
 build/
 saves/
 
+# Beta builds must not accidentally package local future-scope spinning art.
+assets/fishing/spinning/
+
 *.apk
 *.aab
 *.idsig

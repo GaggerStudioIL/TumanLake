@@ -64,6 +64,13 @@ const MIN_SHORE_DEPTH := 0.16
 const DEPTH_TOLERANCE := 0.05
 const ALPHA_TESTER_BONUS_MONEY := 5000.0
 const ALPHA_TESTER_BONUS_MESSAGE := "Привет альфа тестер, для удобного теста мы даем тебе 5000 монет."
+const FIRST_RUN_HINT_TEXTS := {
+	"choose_spot": "Выберите точку ловли на карте",
+	"cast": "Нажмите Заброс",
+	"wait_bite": "Дождитесь поклёвки",
+	"hook": "Подсеките рыбу",
+	"sell_fish": "Рыба в садке. Её можно продать"
+}
 
 @onready var background: ColorRect = $Background
 @onready var scene_gradient: ColorRect = $SceneGradient
@@ -438,6 +445,8 @@ var _rod_target_pos := Vector2.ZERO
 var _depth_hud_refresh_queued := false
 var _depth_hud_visibility_check_accumulator := 0.0
 var _last_detailed_failure_msec := -100000
+var _first_run_hints_active := false
+var _first_run_hints_shown: Dictionary = {}
 var reeling_panel_frame: Panel
 var tension_slack_zone: ColorRect
 var tension_warning_zone: ColorRect
@@ -502,6 +511,9 @@ func _ready() -> void:
 	_update_ui()
 	_grant_alpha_tester_bonus_if_needed()
 	_ensure_mobile_scroll_helper()
+	_first_run_hints_active = _should_show_first_run_hints()
+	if _first_run_hints_active:
+		call_deferred("_show_first_run_hint", "choose_spot")
 
 func _process(delta: float) -> void:
 	_update_fishing_presence(delta)
@@ -578,6 +590,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not is_modal_open:
 		return
 	if event.is_action_pressed("ui_cancel"):
+		if _block_pending_catch_reward_close_attempt():
+			get_viewport().set_input_as_handled()
+			return
 		close_current_modal()
 		get_viewport().set_input_as_handled()
 
@@ -1302,6 +1317,8 @@ func close_current_modal() -> void:
 			if encyclopedia_ui != null:
 				encyclopedia_ui.close()
 		"catch_reward":
+			if _block_pending_catch_reward_close_attempt():
+				return
 			_hide_catch_reward_popup()
 		_:
 			_hide_modal_roots_except("")
@@ -6105,6 +6122,31 @@ func _show_toast(message: String, success: bool = true) -> void:
 	if popup_manager != null:
 		popup_manager.show_toast(message, success)
 
+func _should_show_first_run_hints() -> bool:
+	return BuildConfig.IS_BETA_BUILD and PlayerData.total_fish_caught <= 0
+
+func _show_first_run_hint(stage: String) -> void:
+	if not _first_run_hints_active:
+		return
+	if _first_run_hints_shown.has(stage):
+		return
+	if not FIRST_RUN_HINT_TEXTS.has(stage):
+		return
+
+	_first_run_hints_shown[stage] = true
+	result_label.text = str(FIRST_RUN_HINT_TEXTS[stage])
+
+func _block_pending_catch_reward_close_attempt() -> bool:
+	if _current_modal_name != "catch_reward":
+		return false
+	if _pending_reward_catch.is_empty():
+		return false
+
+	_bring_catch_reward_to_front()
+	result_label.text = "Сначала заберите улов"
+	_show_toast("Сначала заберите улов", false)
+	return true
+
 func _play_shop_card_feedback(item_id: String, success: bool) -> void:
 	shop_ui._play_shop_card_feedback(item_id, success)
 
@@ -6347,6 +6389,7 @@ func _on_waterbody_select_button_pressed() -> void:
 	SaveManager.save_game()
 	_update_ui()
 	_on_waterbody_close_button_pressed()
+	call_deferred("_show_first_run_hint", "cast")
 
 func _on_waterbody_close_button_pressed() -> void:
 	_arm_modal_tap_guard()
@@ -6424,6 +6467,7 @@ func _on_spot_selected(index: int) -> void:
 
 	SaveManager.save_game()
 	_update_ui()
+	_show_first_run_hint("cast")
 
 func _on_fish_button_pressed(cast_power: float = MIN_CAST_POWER, cast_hold_time: float = 0.0) -> void:
 	if _is_catch_reward_open():
@@ -6495,6 +6539,7 @@ func _on_fish_button_pressed(cast_power: float = MIN_CAST_POWER, cast_hold_time:
 	if fishing_presence_ui != null:
 		fishing_presence_ui.start_cast_visual(float(cast_depth_context.get("cast_power", cast_power)))
 	_update_ui()
+	_show_first_run_hint("wait_bite")
 
 
 func _on_stop_fishing_button_pressed() -> void:
@@ -6916,6 +6961,7 @@ func _on_catch_keep_button_pressed() -> void:
 
 	SaveManager.save_game()
 	_return_to_idle_after_result()
+	_show_first_run_hint("sell_fish")
 
 # Gameplay flow completion intentionally stays in Main for now.
 func _on_catch_release_button_pressed() -> void:
@@ -7218,6 +7264,7 @@ func _on_bite_started(bite_data: Dictionary) -> void:
 	if fishing_presence_ui != null and fishing_presence_ui.has_method("play_bite_signal"):
 		fishing_presence_ui.play_bite_signal(bite_data)
 	_update_ui()
+	_show_first_run_hint("hook")
 
 func _on_bite_window_updated(bite_data: Dictionary) -> void:
 	if _fishing_ui_state != FishingUiState.WAITING:
