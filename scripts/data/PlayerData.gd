@@ -45,6 +45,7 @@ const TACKLE_CATALOG := {
 		"category": "rod",
 		"rarity": "common",
 		"price": 0,
+		"image_path": "res://assets/ui/shop/rods/simple_pole_rod_4m.png",
 		"description": "Стартовое маховое удилище. Подходит для небольшой рыбы у берега.",
 		"stats": {
 			"length_m": 4.0,
@@ -67,6 +68,7 @@ const TACKLE_CATALOG := {
 		"category": "rod",
 		"rarity": "uncommon",
 		"price": 220,
+		"image_path": "res://assets/ui/shop/rods/shore_pole_rod_5m.png",
 		"description": "Более длинное и упругое удилище. Лучше держит среднюю рыбу.",
 		"stats": {
 			"length_m": 5.0,
@@ -89,6 +91,7 @@ const TACKLE_CATALOG := {
 		"category": "rod",
 		"rarity": "rare",
 		"price": 540,
+		"image_path": "res://assets/ui/shop/rods/reinforced_pole_rod_6m.png",
 		"description": "Жёсткий бланк для крупной рыбы. Даёт больше контроля при вываживании.",
 		"stats": {
 			"length_m": 6.0,
@@ -920,6 +923,7 @@ const TACKLE_CATALOG := {
 		"category": "line",
 		"rarity": "common",
 		"price": 55,
+		"image_path": "res://assets/ui/shop/lines/mono_1_2kg.png",
 		"description": "Тонкая леска для осторожной небольшой рыбы.",
 		"stats": {
 			"max_load_kg": 1.2,
@@ -1263,6 +1267,7 @@ const TACKLE_CATALOG := {
 		"rarity": "common",
 		"price": 12,
 		"level_required": 1,
+		"image_path": "res://assets/ui/shop/leaders/nylon_leader_10cm_0_5kg.png",
 		"description": "Очень тонкий короткий поводок для уклейки, мелкой плотвы и быстрой поклёвки. Контроль выше, но осторожная рыба чаще замечает короткую подачу.",
 		"stats": {
 			"leader_type": "nylon",
@@ -1290,6 +1295,7 @@ const TACKLE_CATALOG := {
 		"rarity": "common",
 		"price": 16,
 		"level_required": 1,
+		"image_path": "res://assets/ui/shop/leaders/nylon_leader_15cm_1kg.png",
 		"description": "Короткий недорогой поводок для активной мелкой рыбы. Даёт хороший контроль при вываживании.",
 		"stats": {
 			"leader_type": "nylon",
@@ -1485,6 +1491,7 @@ const TACKLE_CATALOG := {
 		"rarity": "rare",
 		"price": 104,
 		"level_required": 4,
+		"image_path": "res://assets/ui/shop/leaders/fluoro_leader_50cm_3kg.png",
 		"description": "Длинный деликатный поводок для самой осторожной мирной рыбы. Хорошо маскирует снасть, но хуже контролируется на вываживании.",
 		"stats": {
 			"leader_type": "fluorocarbon",
@@ -2532,6 +2539,7 @@ const TACKLE_CATALOG := {
 		"category": "hook",
 		"rarity": "common",
 		"price": 24,
+		"image_path": "res://assets/ui/shop/hooks/small_hook_12.png",
 		"description": "Малый крючок для плотвы, краснопёрки и карася.",
 		"stats": {
 			"hook_size": 12,
@@ -3447,7 +3455,7 @@ const ADDITIONAL_BAIT_CATALOG := {
 		"category": "bait",
 		"rarity": "rare",
 		"price": 86,
-		"image_path": "",
+		"image_path": "res://assets/ui/shop/baits/small_live_bait.png",
 		"description": "Подвижная живая насадка для щуки, судака и крупного окуня.",
 		"stats": {
 			"bait_type": "worm",
@@ -3461,7 +3469,7 @@ const ADDITIONAL_BAIT_CATALOG := {
 		"category": "bait",
 		"rarity": "rare",
 		"price": 82,
-		"image_path": "",
+		"image_path": "res://assets/ui/shop/baits/frog_bait.png",
 		"description": "Крупная животная насадка для хищной рыбы и сома.",
 		"stats": {
 			"bait_type": "worm",
@@ -3475,7 +3483,7 @@ const ADDITIONAL_BAIT_CATALOG := {
 		"category": "bait",
 		"rarity": "uncommon",
 		"price": 46,
-		"image_path": "",
+		"image_path": "res://assets/ui/shop/baits/shrimp.png",
 		"description": "Пахучая белковая насадка для окуня, судака и донной рыбы.",
 		"stats": {
 			"bait_type": "maggot",
@@ -3489,7 +3497,7 @@ const ADDITIONAL_BAIT_CATALOG := {
 		"category": "bait",
 		"rarity": "uncommon",
 		"price": 36,
-		"image_path": "",
+		"image_path": "res://assets/ui/shop/baits/snail.png",
 		"description": "Донная насадка для линя, леща, карася и осторожной рыбы у травы.",
 		"stats": {
 			"bait_type": "maggot",
@@ -3503,7 +3511,7 @@ const ADDITIONAL_BAIT_CATALOG := {
 		"category": "bait",
 		"rarity": "rare",
 		"price": 74,
-		"image_path": "",
+		"image_path": "res://assets/ui/shop/baits/boilie_simple.png",
 		"description": "Плотная ароматная насадка для будущей карповой ловли и крупной мирной рыбы.",
 		"stats": {
 			"bait_type": "dough",
