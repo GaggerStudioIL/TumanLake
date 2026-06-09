@@ -557,9 +557,8 @@ func _refresh_after_application_resumed() -> void:
 	if inventory_panel != null and inventory_panel.visible:
 		_update_inventory_ui()
 	if quick_tackle_panel != null:
-		quick_tackle_panel.visible = false
-		if quick_tackle_panel.has_method("hide_popup"):
-			quick_tackle_panel.call("hide_popup")
+		if quick_tackle_panel.has_method("refresh"):
+			quick_tackle_panel.call("refresh")
 	_refresh_current_tackle_hud()
 
 func _input(event: InputEvent) -> void:
@@ -1183,7 +1182,9 @@ func _ensure_current_tackle_hud_nodes() -> void:
 		current_tackle_button = Button.new()
 		current_tackle_button.name = "CurrentTackleHudButton"
 		current_tackle_button.focus_mode = Control.FOCUS_NONE
-		current_tackle_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		current_tackle_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		current_tackle_button.visible = false
+		current_tackle_button.disabled = true
 		current_tackle_button.clip_text = true
 		current_tackle_button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		add_child(current_tackle_button)
@@ -2918,10 +2919,7 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 
 	quick_actions_container.visible = false
 	if quick_tackle_panel != null:
-		quick_tackle_panel.visible = false
-		quick_tackle_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		if quick_tackle_panel.has_method("hide_popup"):
-			quick_tackle_panel.call("hide_popup")
+		_reparent_node(quick_tackle_panel, ui_canvas_layer)
 
 	if player_xp_hud != null:
 		player_xp_hud.visible = false
@@ -3004,6 +3002,8 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	_set_primary_fishing_button_icon(fish_button, _get_primary_fishing_action_icon(), primary_icon_size)
 	_set_action_button_icon(tackle_button, "hud_tackle", 19.0)
 	_refresh_fish_button_presentation()
+	if quick_tackle_panel != null and quick_tackle_panel.has_method("layout"):
+		quick_tackle_panel.call("layout", cast_rect, ui_scale)
 
 	bottom_nav_panel.visible = true
 	var nav_rect := _scale_rect(Rect2(38.0, 150.0, LEFT_NAV_WIDTH, LEFT_NAV_HEIGHT), screen_size)
@@ -3371,30 +3371,13 @@ func _layout_main_hud_v2_right_stack(screen_size: Vector2, ui_scale: float, cast
 		_set_button_icon(encyclopedia_button, "encyclopedia", compact_size.x * 0.48)
 
 	if current_tackle_button != null:
-		var tackle_size := Vector2(clampf(190.0 * ui_scale, 168.0, 224.0), clampf(58.0 * ui_scale, 52.0, 66.0))
-		var fish_center_y: float = clampf(
-			292.0 * sy,
-			margin_y + menu_button_size.y + gap + tackle_size.y + gap + cast_button_size.y * 0.5,
-			screen_size.y - clampf(128.0 * sy, 112.0, 150.0) - cast_button_size.y * 0.5
-		)
-		var fish_center_x: float = screen_size.x - margin_x - max(tackle_size.x, cast_button_size.x) * 0.5
-		var cast_rect := Rect2(Vector2(fish_center_x, fish_center_y) - cast_button_size * 0.5, cast_button_size)
-		var tackle_pos := Vector2(screen_size.x - margin_x - tackle_size.x, cast_rect.position.y - tackle_size.y - gap)
-		tackle_pos.y = max(tackle_pos.y, margin_y + menu_button_size.y + gap)
-
-		_anchor_control(current_tackle_button, 0.0, 0.0, 0.0, 0.0, tackle_pos.x, tackle_pos.y, tackle_pos.x + tackle_size.x, tackle_pos.y + tackle_size.y)
-		current_tackle_button.custom_minimum_size = tackle_size
-		current_tackle_button.size = tackle_size
-		current_tackle_button.z_index = 260
-		current_tackle_button.visible = not is_modal_open
-		current_tackle_button.disabled = false
-		current_tackle_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		current_tackle_button.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
-		current_tackle_button.add_theme_font_size_override("font_size", int(clampf(12.0 * ui_scale, 11.0, 14.0)))
-		current_tackle_button.add_theme_constant_override("h_separation", int(clampf(8.0 * ui_scale, 6.0, 10.0)))
-		_apply_button_style(current_tackle_button, STYLE_SECONDARY_BUTTON)
-		_set_action_button_icon(current_tackle_button, "rod", clampf(24.0 * ui_scale, 20.0, 28.0))
-		_refresh_current_tackle_hud()
+		current_tackle_button.text = ""
+		current_tackle_button.tooltip_text = ""
+		current_tackle_button.visible = false
+		current_tackle_button.disabled = true
+		current_tackle_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if current_tackle_popup != null:
+		current_tackle_popup.visible = false
 
 
 func _refresh_side_menu_button_state(button: Button, active: bool) -> void:
@@ -3511,9 +3494,11 @@ func _refresh_fish_button_presentation() -> void:
 	_apply_primary_fishing_action_style(fish_button, target_size)
 	fish_button.add_theme_font_size_override("font_size", int(clampf(min(target_size.x, target_size.y) * 0.135, 14.0, 18.0)))
 	fish_button.clip_text = true
-	fish_button.text = _get_primary_fishing_action_label()
-	fish_button.tooltip_text = fish_button.text
-	fish_button.icon = null
+	var action_label := _get_primary_fishing_action_label()
+	fish_button.text = ""
+	fish_button.tooltip_text = action_label
+	var icon_size: float = clamp(min(target_size.x, target_size.y) * 0.72, 58.0, 86.0)
+	_set_primary_fishing_button_icon(fish_button, _get_primary_fishing_action_icon(), icon_size)
 	fish_button.alignment = HORIZONTAL_ALIGNMENT_CENTER
 	fish_button.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
 	fish_button.add_theme_constant_override("h_separation", 0)
@@ -5850,9 +5835,8 @@ func _update_ui() -> void:
 	fishing_hud_ui._update_ui()
 	_update_player_xp_hud()
 	if quick_tackle_panel != null:
-		quick_tackle_panel.visible = false
-		if quick_tackle_panel.has_method("hide_popup"):
-			quick_tackle_panel.call("hide_popup")
+		if quick_tackle_panel.has_method("refresh"):
+			quick_tackle_panel.call("refresh")
 	_refresh_current_tackle_hud()
 	_refresh_stop_fishing_button_presentation()
 
@@ -7200,11 +7184,12 @@ func _refresh_current_tackle_hud() -> void:
 	if current_tackle_button == null:
 		return
 
-	current_tackle_button.text = _get_current_tackle_button_text()
-	current_tackle_button.tooltip_text = "Тап: текущая снасть\nДолгий тап: сборка снасти"
-	current_tackle_button.visible = not is_modal_open
-	current_tackle_button.disabled = false
-	current_tackle_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	current_tackle_button.text = ""
+	current_tackle_button.tooltip_text = ""
+	current_tackle_button.visible = false
+	current_tackle_button.disabled = true
+	current_tackle_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hide_current_tackle_popup()
 
 func _get_current_tackle_button_text() -> String:
 	var tackle_type := "Снасть"

@@ -1,6 +1,6 @@
 extends Control
 
-const DEFAULT_CATEGORY_ORDER := ["line", "leader", "float", "hook", "bait", "tackle"]
+const DEFAULT_CATEGORY_ORDER := ["line", "leader", "hook", "bait"]
 const CATEGORY_TITLES := {
 	"line": "Леска",
 	"leader": "Поводок",
@@ -28,6 +28,12 @@ const CATEGORY_ICONS := {
 	"tackle": "res://assets/ui/icons/quick_tackle/fishing_tackle.png"
 }
 const QUICK_SLOT_COUNT := 3
+const RADIAL_SLOT_OFFSETS := {
+	"line": Vector2(-1.0, -1.0),
+	"leader": Vector2(1.0, -1.0),
+	"hook": Vector2(-1.0, 1.0),
+	"bait": Vector2(1.0, 1.0)
+}
 
 var main
 var _buttons: Dictionary = {}
@@ -47,7 +53,7 @@ var _current_category_order: Array = []
 
 func setup(main_ref) -> void:
 	main = main_ref
-	mouse_filter = Control.MOUSE_FILTER_PASS
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	z_index = 266
 	_ensure_nodes()
 	refresh()
@@ -57,41 +63,69 @@ func layout(rect: Rect2, ui_scale: float) -> void:
 	_ui_scale = clamp(ui_scale, 0.82, 1.24)
 	_ensure_nodes()
 	_ensure_popup_overlay_parent()
-	position = rect.position
-	size = rect.size
-	custom_minimum_size = rect.size
-	visible = true
-	z_index = 266
-
-	_button_edge = clamp(rect.size.y - 8.0 * _ui_scale, 88.0, 98.0)
 	var category_order: Array = _get_category_order()
-	var category_count: int = maxi(category_order.size(), 1)
-	var gap: float = 8.0 * _ui_scale
-	if category_count > 1:
-		gap = max((rect.size.x - _button_edge * float(category_count)) / float(category_count - 1), 8.0 * _ui_scale)
-	var total_width: float = _button_edge * float(category_count) + gap * float(maxi(category_count - 1, 0))
-	var start_x: float = max((rect.size.x - total_width) * 0.5, 0.0)
-	var y: float = max((rect.size.y - _button_edge) * 0.5, 0.0)
+	var should_show := _should_show_radial_hud()
+	visible = should_show
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	z_index = 266
+	if not should_show:
+		hide_popup()
+		return
+
+	_button_edge = clamp(rect.size.x * 0.39, 46.0 * _ui_scale, 56.0 * _ui_scale)
+	var viewport_size := get_viewport_rect().size
+	var center := rect.position + rect.size * 0.5
+	var radius: float = clamp(rect.size.x * 0.76, _button_edge * 1.45, _button_edge * 1.82)
+	var margin: float = max(8.0 * _ui_scale, 6.0)
+	var min_pos := Vector2(INF, INF)
+	var max_pos := Vector2(-INF, -INF)
+	var slot_centers: Dictionary = {}
+
+	for category_value in category_order:
+		var category := str(category_value)
+		var offset_value = RADIAL_SLOT_OFFSETS.get(category, Vector2.ZERO)
+		var offset: Vector2 = offset_value if offset_value is Vector2 else Vector2.ZERO
+		if offset == Vector2.ZERO:
+			continue
+		var slot_center := center + offset.normalized() * radius
+		slot_center.x = clamp(slot_center.x, margin + _button_edge * 0.5, viewport_size.x - margin - _button_edge * 0.5)
+		slot_center.y = clamp(slot_center.y, margin + _button_edge * 0.5, viewport_size.y - margin - _button_edge * 0.5)
+		slot_centers[category] = slot_center
+		min_pos.x = min(min_pos.x, slot_center.x - _button_edge * 0.5)
+		min_pos.y = min(min_pos.y, slot_center.y - _button_edge * 0.5)
+		max_pos.x = max(max_pos.x, slot_center.x + _button_edge * 0.5)
+		max_pos.y = max(max_pos.y, slot_center.y + _button_edge * 0.5)
+
+	if slot_centers.is_empty():
+		visible = false
+		hide_popup()
+		return
+
+	position = min_pos
+	size = max_pos - min_pos
+	custom_minimum_size = size
 
 	for key in _buttons.keys():
 		var stale_button := _buttons.get(key) as Button
 		if stale_button != null:
 			stale_button.visible = category_order.has(str(key))
 
-	for i in category_order.size():
-		var category := str(category_order[i])
+	for category_value in category_order:
+		var category := str(category_value)
 		var button := _buttons.get(category) as Button
 		if button == null:
 			continue
-		button.position = Vector2(start_x + float(i) * (_button_edge + gap), y)
+		var slot_center: Vector2 = slot_centers.get(category, center)
+		button.position = slot_center - position - Vector2(_button_edge, _button_edge) * 0.5
 		button.size = Vector2(_button_edge, _button_edge)
 		button.custom_minimum_size = button.size
 		button.pivot_offset = button.size * 0.5
-		_apply_slot_button_style(button, _is_slot_equipped(category), false)
+		_apply_slot_button_style(button, _get_slot_visual_state(category))
 		var icon := _button_icons.get(category) as TextureRect
 		if icon != null:
-			icon.position = Vector2.ZERO
-			icon.size = button.size
+			var inset: float = _button_edge * 0.18
+			icon.position = Vector2(inset, inset)
+			icon.size = button.size - Vector2(inset * 2.0, inset * 2.0)
 
 	_layout_popup()
 	refresh()
@@ -99,7 +133,15 @@ func layout(rect: Rect2, ui_scale: float) -> void:
 
 func refresh() -> void:
 	_ensure_nodes()
+	var should_show := _should_show_radial_hud()
+	visible = should_show
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if not should_show:
+		hide_popup()
+		return
+
 	var category_order: Array = _get_category_order()
+	var can_change := _can_change_tackle()
 	for key in _buttons.keys():
 		var stale_button := _buttons.get(key) as Button
 		if stale_button != null:
@@ -110,13 +152,14 @@ func refresh() -> void:
 		var equipped := _is_slot_equipped(key)
 		var button := _buttons.get(key) as Button
 		if button != null:
-			button.disabled = false
+			button.disabled = not can_change
 			button.tooltip_text = _get_button_tooltip(key)
-			button.modulate = Color.WHITE
-			_apply_slot_button_style(button, equipped, false)
+			button.modulate = Color.WHITE if can_change else Color(0.76, 0.82, 0.80, 0.62)
+			_apply_slot_button_style(button, _get_slot_visual_state(key))
 		var icon := _button_icons.get(key) as TextureRect
 		if icon != null:
-			icon.modulate = Color(1.0, 1.0, 1.0, 1.0) if equipped or key == "tackle" else Color(0.78, 0.84, 0.82, 0.78)
+			icon.texture = _get_current_slot_texture(key)
+			icon.modulate = Color(1.0, 1.0, 1.0, 0.98) if equipped else Color(1.0, 0.78, 0.72, 0.94)
 
 	if _popup_panel != null and _popup_panel.visible and _popup_category != "" and not category_order.has(_popup_category):
 		hide_popup()
@@ -211,23 +254,26 @@ func _ensure_nodes() -> void:
 
 func _get_category_order() -> Array:
 	var order: Array = []
+	var supported_slots: Dictionary = {}
 	if PlayerData != null and PlayerData.has_method("get_tackle_schema_slots"):
 		var slot_schemas: Array = PlayerData.get_tackle_schema_slots()
 		for slot_schema in slot_schemas:
 			if typeof(slot_schema) != TYPE_DICTIONARY:
 				continue
 			var slot_id := str((slot_schema as Dictionary).get("id", ""))
-			if slot_id == "" or slot_id == "rod" or slot_id == "bait_2":
-				continue
-			if PlayerData.has_method("is_tackle_slot_locked") and bool(PlayerData.call("is_tackle_slot_locked", slot_id)):
-				continue
-			if not order.has(slot_id):
-				order.append(slot_id)
+			if slot_id != "":
+				supported_slots[slot_id] = true
+
+	for slot_id_value in DEFAULT_CATEGORY_ORDER:
+		var slot_id := str(slot_id_value)
+		if not supported_slots.is_empty() and not supported_slots.has(slot_id):
+			continue
+		if PlayerData != null and PlayerData.has_method("is_tackle_slot_locked") and bool(PlayerData.call("is_tackle_slot_locked", slot_id)):
+			continue
+		order.append(slot_id)
 
 	if order.is_empty():
 		order = DEFAULT_CATEGORY_ORDER.duplicate()
-	elif not order.has("tackle"):
-		order.append("tackle")
 
 	_current_category_order = order.duplicate()
 	return order
@@ -277,7 +323,7 @@ func _ensure_popup_overlay_parent() -> void:
 
 func _on_main_button_down(category: String) -> void:
 	var button := _buttons.get(category) as Button
-	if button == null:
+	if button == null or button.disabled:
 		return
 	button.pivot_offset = button.size * 0.5
 	button.scale = Vector2.ONE * 1.08
@@ -292,26 +338,21 @@ func _on_main_button_up(category: String) -> void:
 
 func _on_category_pressed(category: String) -> void:
 	_on_main_button_up(category)
-	if category == "tackle":
-		hide_popup()
-		if main != null and main.has_method("open_full_tackle_from_quick_panel"):
-			main.open_full_tackle_from_quick_panel()
-		return
-
 	if not _can_change_tackle():
 		_show_toast("Снасть можно менять только перед забросом.", false)
 		return
 
-	if _popup_category == category and _popup_panel != null and _popup_panel.visible and _popup_mode == "quick":
+	if _popup_category == category and _popup_panel != null and _popup_panel.visible and _popup_mode == "picker":
 		hide_popup()
 		return
 
 	_popup_category = category
-	_popup_mode = "quick"
+	_popup_mode = "picker"
 	_popup_target_slot = -1
 	_rebuild_popup(category)
-	_popup_panel.visible = true
-	_layout_popup()
+	if _popup_item_count > 0:
+		_popup_panel.visible = true
+		_layout_popup()
 
 
 func _on_remove_pressed(category: String, item_id: String, slot_index: int = -1) -> void:
@@ -548,8 +589,6 @@ func _layout_popup() -> void:
 
 
 func _is_slot_equipped(category: String) -> bool:
-	if category == "tackle":
-		return true
 	var component = PlayerData.current_tackle.get(category, {})
 	return typeof(component) == TYPE_DICTIONARY and str(component.get("id", "")) != ""
 
@@ -761,16 +800,109 @@ func _is_point_inside_quick_ui(point: Vector2) -> bool:
 	return false
 
 
-func _apply_slot_button_style(button: Button, _equipped: bool, _pressed: bool) -> void:
-	var transparent_style := _make_round_style(Color.TRANSPARENT, Color.TRANSPARENT, _button_edge * 0.5, 0, Color.TRANSPARENT)
-	button.add_theme_stylebox_override("normal", transparent_style)
-	button.add_theme_stylebox_override("hover", transparent_style)
-	button.add_theme_stylebox_override("pressed", transparent_style)
-	button.add_theme_stylebox_override("disabled", transparent_style)
+func _should_show_radial_hud() -> bool:
+	if main != null:
+		var modal_value = main.get("is_modal_open")
+		if modal_value is bool and bool(modal_value):
+			return false
+		if main.has_method("_is_menu_overlay_open") and bool(main.call("_is_menu_overlay_open")):
+			return false
+	return true
+
+
+func _get_slot_visual_state(category: String) -> String:
+	if not _can_change_tackle():
+		return "disabled"
+	if _is_slot_problem(category):
+		return "warning"
+	return "normal"
+
+
+func _is_slot_problem(category: String) -> bool:
+	if PlayerData == null:
+		return true
+	var component_value = PlayerData.current_tackle.get(category, {})
+	if typeof(component_value) != TYPE_DICTIONARY:
+		return true
+	var component: Dictionary = component_value
+	var item_id := str(component.get("id", ""))
+	if item_id == "":
+		return true
+	var owned_item: Dictionary = {}
+	if PlayerData.has_method("get_owned_item"):
+		owned_item = PlayerData.get_owned_item(item_id)
+	if owned_item.is_empty():
+		return true
+	if int(owned_item.get("quantity", 0)) <= 0:
+		return true
+	if category == "bait" and PlayerData.has_method("get_current_bait_quantity"):
+		if int(PlayerData.call("get_current_bait_quantity", category)) <= 0:
+			return true
+	if PlayerData.has_method("get_equip_block_reason") and str(PlayerData.call("get_equip_block_reason", owned_item, category)) != "":
+		return true
+	return false
+
+
+func _get_current_slot_texture(category: String) -> Texture2D:
+	if PlayerData != null:
+		var component_value = PlayerData.current_tackle.get(category, {})
+		if typeof(component_value) == TYPE_DICTIONARY:
+			var component: Dictionary = component_value
+			var item_id := str(component.get("id", ""))
+			if item_id != "":
+				var owned_item: Dictionary = {}
+				if PlayerData.has_method("get_owned_item"):
+					owned_item = PlayerData.get_owned_item(item_id)
+				if not owned_item.is_empty():
+					var owned_texture := _get_item_texture(owned_item, category)
+					if owned_texture != null:
+						return owned_texture
+				var component_texture := _get_item_texture(component, category)
+				if component_texture != null:
+					return component_texture
+	return _get_category_texture(category)
+
+
+func _apply_slot_button_style(button: Button, state: String = "normal") -> void:
+	var radius: float = _button_edge * 0.5
+	var fill := Color(0.026, 0.045, 0.044, 0.84)
+	var border := Color(0.62, 0.96, 0.78, 0.58)
+	var hover_fill := Color(0.044, 0.076, 0.068, 0.92)
+	var hover_border := Color(0.80, 1.0, 0.88, 0.82)
+	var pressed_fill := Color(0.056, 0.112, 0.078, 0.98)
+	var pressed_border := Color(0.92, 1.0, 0.74, 0.96)
+	var disabled_fill := Color(0.034, 0.044, 0.044, 0.42)
+	var disabled_border := Color(0.52, 0.66, 0.60, 0.22)
+	var shadow := Color(0.0, 0.0, 0.0, 0.28)
+	var border_width := 2
+
+	match state:
+		"warning":
+			fill = Color(0.13, 0.045, 0.038, 0.88)
+			border = Color(1.0, 0.35, 0.26, 0.90)
+			hover_fill = Color(0.19, 0.060, 0.046, 0.96)
+			hover_border = Color(1.0, 0.62, 0.48, 1.0)
+			pressed_fill = Color(0.28, 0.074, 0.052, 1.0)
+			pressed_border = Color(1.0, 0.82, 0.58, 1.0)
+			border_width = 3
+		"disabled":
+			fill = disabled_fill
+			border = disabled_border
+			hover_fill = disabled_fill
+			hover_border = disabled_border
+			pressed_fill = disabled_fill
+			pressed_border = disabled_border
+			shadow = Color.TRANSPARENT
+
+	button.add_theme_stylebox_override("normal", _make_round_style(fill, border, radius, border_width, shadow))
+	button.add_theme_stylebox_override("hover", _make_round_style(hover_fill, hover_border, radius, border_width, shadow))
+	button.add_theme_stylebox_override("pressed", _make_round_style(pressed_fill, pressed_border, radius, border_width, Color.TRANSPARENT))
+	button.add_theme_stylebox_override("disabled", _make_round_style(disabled_fill, disabled_border, radius, border_width, Color.TRANSPARENT))
 	button.add_theme_color_override("icon_normal_color", Color(0.94, 1.0, 0.96, 0.94))
 	button.add_theme_color_override("icon_hover_color", Color(1.0, 1.0, 0.92, 1.0))
 	button.add_theme_color_override("icon_pressed_color", Color(0.86, 1.0, 0.74, 1.0))
-	button.add_theme_constant_override("icon_max_width", int(_button_edge))
+	button.add_theme_color_override("icon_disabled_color", Color(0.62, 0.70, 0.68, 0.56))
+	button.add_theme_constant_override("icon_max_width", int(_button_edge * 0.68))
 
 
 func _apply_remove_button_style(button: Button) -> void:
