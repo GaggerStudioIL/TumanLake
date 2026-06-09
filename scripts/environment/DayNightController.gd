@@ -55,6 +55,8 @@ const OLD_OAK_PIER_VISUAL_PROFILE := {
 	"mist_enabled": false,
 	"sky_rect": [0.05, 0.04, 0.90, 0.52],
 	"horizon_y": 0.56,
+	"sun_glow_center": Vector2(0.62, 0.26),
+	"sun_reflection_area": [0.28, 0.56, 0.48, 0.24],
 	"sun_path_start": Vector2(0.12, 0.59),
 	"sun_path_end": Vector2(0.90, 0.58),
 	"moon_path_start": Vector2(0.18, 0.58),
@@ -77,6 +79,8 @@ const QUIET_WATER_PIER_VISUAL_PROFILE := {
 	"mist_enabled": false,
 	"sky_rect": [0.05, 0.05, 0.90, 0.53],
 	"horizon_y": 0.58,
+	"sun_glow_center": Vector2(0.58, 0.24),
+	"sun_reflection_area": [0.32, 0.58, 0.42, 0.24],
 	"sun_path_start": Vector2(0.10, 0.61),
 	"sun_path_end": Vector2(0.90, 0.60),
 	"moon_path_start": Vector2(0.16, 0.60),
@@ -100,6 +104,8 @@ const MORNING_PIER_VISUAL_PROFILE := {
 	"mist_enabled": false,
 	"sky_rect": [0.04, 0.04, 0.92, 0.56],
 	"horizon_y": 0.60,
+	"sun_glow_center": Vector2(0.54, 0.22),
+	"sun_reflection_area": [0.34, 0.60, 0.38, 0.25],
 	"sun_path_start": Vector2(0.08, 0.63),
 	"sun_path_end": Vector2(0.92, 0.62),
 	"moon_path_start": Vector2(0.14, 0.61),
@@ -123,6 +129,8 @@ const OLD_BOAT_PIER_VISUAL_PROFILE := {
 	"mist_enabled": false,
 	"sky_rect": [0.05, 0.05, 0.90, 0.52],
 	"horizon_y": 0.57,
+	"sun_glow_center": Vector2(0.54, 0.24),
+	"sun_reflection_area": [0.31, 0.57, 0.42, 0.24],
 	"sun_path_start": Vector2(0.10, 0.60),
 	"sun_path_end": Vector2(0.88, 0.59),
 	"moon_path_start": Vector2(0.16, 0.58),
@@ -149,6 +157,8 @@ const DEEP_PIER_VISUAL_PROFILE := {
 	"mist_enabled": false,
 	"sky_rect": [0.06, 0.04, 0.86, 0.48],
 	"horizon_y": 0.52,
+	"sun_glow_center": Vector2(0.52, 0.22),
+	"sun_reflection_area": [0.30, 0.52, 0.44, 0.26],
 	"sun_path_start": Vector2(0.14, 0.55),
 	"sun_path_end": Vector2(0.84, 0.53),
 	"moon_path_start": Vector2(0.20, 0.53),
@@ -172,6 +182,8 @@ const COLD_WATER_VISUAL_PROFILE := {
 	"mist_enabled": false,
 	"sky_rect": [0.05, 0.04, 0.90, 0.52],
 	"horizon_y": 0.56,
+	"sun_glow_center": Vector2(0.52, 0.24),
+	"sun_reflection_area": [0.30, 0.56, 0.44, 0.24],
 	"sun_path_start": Vector2(0.10, 0.59),
 	"sun_path_end": Vector2(0.88, 0.58),
 	"moon_path_start": Vector2(0.16, 0.58),
@@ -195,6 +207,8 @@ const DARK_HOLE_VISUAL_PROFILE := {
 	"mist_enabled": false,
 	"sky_rect": [0.07, 0.04, 0.84, 0.50],
 	"horizon_y": 0.54,
+	"sun_glow_center": Vector2(0.52, 0.23),
+	"sun_reflection_area": [0.31, 0.54, 0.40, 0.24],
 	"sun_path_start": Vector2(0.14, 0.57),
 	"sun_path_end": Vector2(0.84, 0.56),
 	"moon_path_start": Vector2(0.20, 0.55),
@@ -217,6 +231,8 @@ const MIST_PIER_VISUAL_PROFILE := {
 	"mist_enabled": false,
 	"sky_rect": [0.08, 0.05, 0.84, 0.52],
 	"horizon_y": 0.57,
+	"sun_glow_center": Vector2(0.52, 0.25),
+	"sun_reflection_area": [0.32, 0.57, 0.38, 0.22],
 	"sun_path_start": Vector2(0.16, 0.60),
 	"sun_path_end": Vector2(0.84, 0.59),
 	"moon_path_start": Vector2(0.22, 0.58),
@@ -239,6 +255,8 @@ const REEDS_PIER_VISUAL_PROFILE := {
 	"mist_enabled": false,
 	"sky_rect": [0.05, 0.04, 0.90, 0.52],
 	"horizon_y": 0.56,
+	"sun_glow_center": Vector2(0.50, 0.20),
+	"sun_reflection_area": [0.28, 0.56, 0.48, 0.23],
 	"sun_path_start": Vector2(0.10, 0.59),
 	"sun_path_end": Vector2(0.90, 0.58),
 	"moon_path_start": Vector2(0.16, 0.57),
@@ -270,6 +288,8 @@ const GREEN_DUCKWEED_VISUAL_PROFILE := {
 	"mist_enabled": false,
 	"sky_rect": [0.34, 0.04, 0.62, 0.41],
 	"horizon_y": 0.45,
+	"sun_glow_center": Vector2(0.66, 0.18),
+	"sun_reflection_area": [0.38, 0.45, 0.42, 0.26],
 	"sun_path_start": Vector2(0.38, 0.48),
 	"sun_path_end": Vector2(0.98, 0.47),
 	"moon_path_start": Vector2(0.36, 0.47),
@@ -290,6 +310,8 @@ const FROG_BACKWATER_VISUAL_PROFILE := {
 	"mist_enabled": false,
 	"sky_rect": [0.06, 0.04, 0.86, 0.50],
 	"horizon_y": 0.54,
+	"sun_glow_center": Vector2(0.55, 0.23),
+	"sun_reflection_area": [0.30, 0.54, 0.42, 0.24],
 	"sun_path_start": Vector2(0.12, 0.57),
 	"sun_path_end": Vector2(0.84, 0.56),
 	"moon_path_start": Vector2(0.18, 0.55),
@@ -339,8 +361,11 @@ const CELESTIAL_HORIZON_FADE_RATIO := 0.065
 const CELESTIAL_HORIZON_CLAMP_MARGIN_RATIO := 0.012
 const SUN_NOON_SKY_RATIO := 0.13
 const MOON_NOON_SKY_RATIO := 0.20
+const SUN_ATMOSPHERE_GLOW_Z := 1
 const SKY_DEBUG_RECT_Z := 18
 const HORIZON_DEBUG_LINE_Z := 19
+const SUN_REFLECTION_DEBUG_RECT_Z := 18
+const SUN_GLOW_DEBUG_MARKER_Z := 20
 
 var _time_manager: Node
 var _viewport_size: Vector2 = Vector2.ZERO
@@ -348,6 +373,7 @@ var _environment_root: Node2D
 var _sky_layer: TextureRect
 var _celestial_layer: Node2D
 var _sun_sprite: Sprite2D
+var _sun_atmosphere_glow_layer: ColorRect
 var _moon_sprite: Sprite2D
 var _stars_layer: Node2D
 var _mountains_layer: TextureRect
@@ -360,6 +386,11 @@ var _sun_water_reflection_layer: ColorRect
 var _foreground_grass_layer: TextureRect
 var _sky_debug_rect: Panel
 var _horizon_debug_line: ColorRect
+var _sun_reflection_debug_rect: Panel
+var _sun_glow_debug_marker: ColorRect
+var _last_sun_glow_center: Vector2 = Vector2.ZERO
+var _last_sun_reflection_area: Rect2 = Rect2()
+var _has_sun_debug_geometry := false
 var _last_debug_phase := ""
 var _last_debug_viewport := Vector2.ZERO
 var _warned_missing_visual_paths := {}
@@ -387,6 +418,7 @@ func layout_environment(screen_size: Vector2) -> void:
 
 	for rect in [
 		_sky_layer,
+		_sun_atmosphere_glow_layer,
 		_mountains_layer,
 		_forest_layer,
 		_water_layer,
@@ -432,22 +464,13 @@ func update_day_night_visuals(_time_state: Dictionary = {}) -> void:
 func update_sun_position(minutes: float) -> void:
 	if not show_dynamic_sun:
 		_sun_sprite.visible = false
-		_update_sun_water_reflection({}, Vector2.ZERO, 0.0, 0.0)
+		_has_sun_debug_geometry = false
+		_update_sun_atmosphere_glow({}, Vector2.ZERO, 0.0, 0.0, 0.0)
+		_update_sun_water_reflection({}, Vector2.ZERO, 0.0, 0.0, 0.0)
 		return
 
 	var sun_t: float = clampf((minutes - DAWN_START) / maxf(NIGHT_START - DAWN_START, 1.0), 0.0, 1.0)
 	var sun_alpha: float = _fade_between(minutes, DAWN_START, DAWN_START + 105.0) * (1.0 - _fade_between(minutes, NIGHT_START - 120.0, NIGHT_START))
-	var disk_visibility: float = _sample_time_value(minutes, [
-		[DAWN_START, 0.0],
-		[390.0, 0.18],
-		[450.0, 0.76],
-		[570.0, 0.90],
-		[960.0, 0.92],
-		[1110.0, 0.82],
-		[1170.0, 0.58],
-		[NIGHT_START, 0.20],
-		[MINUTES_PER_DAY, 0.0]
-	])
 	var sun_warmth: float = _sample_time_value(minutes, [
 		[DAWN_START, 0.72],
 		[390.0, 0.68],
@@ -469,28 +492,19 @@ func update_sun_position(minutes: float) -> void:
 	var target_size: float = profile_sun_size * screen_scale
 	var position_data: Dictionary = _get_celestial_position_data(sun_t, profile_sun_arc_height, false, visual_profile, target_size)
 	var position: Vector2 = position_data["position"] as Vector2
+	var sky_rect: Rect2 = position_data["sky_rect"] as Rect2
+	var horizon_y: float = float(position_data.get("horizon_y", _get_sky_horizon_y(visual_profile)))
 	var horizon_alpha: float = float(position_data.get("horizon_alpha", 1.0))
-	var final_sun_alpha: float = clampf(sun_alpha * disk_visibility * horizon_alpha * profile_sun_alpha_boost, 0.0, 1.0)
-	var sun_color := Color(1.10, lerpf(1.04, 0.82, sun_warmth), lerpf(0.92, 0.54, sun_warmth), 1.0)
-	var halo_color := Color(1.0, lerpf(0.92, 0.70, sun_warmth), lerpf(0.66, 0.36, sun_warmth), 1.0)
-	var material := _sun_sprite.material as ShaderMaterial
-	if material != null:
-		material.set_shader_parameter("light_color", sun_color)
-		material.set_shader_parameter("halo_color", halo_color)
-		material.set_shader_parameter("texture_mix", 0.0)
-		material.set_shader_parameter("halo_strength", lerpf(1.06, 1.26, sun_warmth) * profile_sun_halo_boost)
-		material.set_shader_parameter("ray_strength", lerpf(0.18, 0.28, sun_warmth) * profile_sun_halo_boost)
+	var sun_intensity: float = clampf(sun_alpha * horizon_alpha * profile_sun_alpha_boost, 0.0, 1.0)
+	var sun_height_factor: float = _get_sun_height_factor(position, sky_rect, horizon_y)
+	var glow_center: Vector2 = _get_sun_glow_center(visual_profile, position, sky_rect, horizon_y)
 
 	_sun_sprite.position = position
 	_sun_sprite.scale = _get_sprite_uniform_scale(_sun_sprite, target_size)
-	_sun_sprite.visible = final_sun_alpha > 0.01
-	_sun_sprite.modulate = Color(
-		1.0,
-		1.0,
-		1.0,
-		final_sun_alpha
-	)
-	_update_sun_water_reflection(visual_profile, position, final_sun_alpha, sun_warmth)
+	_sun_sprite.visible = false
+	_sun_sprite.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	_update_sun_atmosphere_glow(visual_profile, glow_center, sun_intensity, sun_warmth, profile_sun_halo_boost)
+	_update_sun_water_reflection(visual_profile, glow_center, sun_intensity, sun_warmth, sun_height_factor)
 
 func update_moon_position(minutes: float) -> void:
 	var night_length: float = MINUTES_PER_DAY - NIGHT_START + DAWN_START
@@ -511,22 +525,84 @@ func update_moon_position(minutes: float) -> void:
 	_moon_sprite.visible = moon_alpha * horizon_alpha > 0.01
 	_moon_sprite.modulate = Color(0.80, 0.90, 1.0, moon_alpha * horizon_alpha * 0.92)
 
-func _update_sun_water_reflection(profile: Dictionary, sun_position: Vector2, sun_alpha: float, sun_warmth: float) -> void:
+func _update_sun_atmosphere_glow(profile: Dictionary, glow_center: Vector2, sun_alpha: float, sun_warmth: float, halo_boost: float) -> void:
+	if _sun_atmosphere_glow_layer == null:
+		return
+	if _viewport_size == Vector2.ZERO:
+		_viewport_size = get_viewport_rect().size
+
+	var sky_rect: Rect2 = _get_sky_rect(profile)
+	var horizon_y: float = _get_sky_horizon_y(profile)
+	var sky_min := Vector2(
+		clampf(sky_rect.position.x / maxf(_viewport_size.x, 1.0), 0.0, 1.0),
+		clampf(sky_rect.position.y / maxf(_viewport_size.y, 1.0), 0.0, 1.0)
+	)
+	var sky_max := Vector2(
+		clampf(sky_rect.end.x / maxf(_viewport_size.x, 1.0), 0.0, 1.0),
+		clampf(sky_rect.end.y / maxf(_viewport_size.y, 1.0), 0.0, 1.0)
+	)
+	var glow_uv := Vector2(
+		clampf(glow_center.x / maxf(_viewport_size.x, 1.0), 0.0, 1.0),
+		clampf(glow_center.y / maxf(_viewport_size.y, 1.0), 0.0, 1.0)
+	)
+	var warm_boost: float = lerpf(0.78, 1.12, sun_warmth)
+	var strength: float = clampf(
+		sun_alpha * _get_profile_float(profile, "sun_glow_strength", 0.72) * halo_boost * warm_boost,
+		0.0,
+		1.0
+	)
+	_sun_atmosphere_glow_layer.visible = strength > 0.006
+	_sun_atmosphere_glow_layer.color = Color.WHITE
+	var material := _sun_atmosphere_glow_layer.material as ShaderMaterial
+	if material == null:
+		return
+	material.set_shader_parameter("glow_uv", glow_uv)
+	material.set_shader_parameter("sky_min", sky_min)
+	material.set_shader_parameter("sky_max", sky_max)
+	material.set_shader_parameter("horizon_y", clampf(horizon_y / maxf(_viewport_size.y, 1.0), 0.0, 1.0))
+	material.set_shader_parameter("strength", strength)
+	material.set_shader_parameter("warmth", sun_warmth)
+	material.set_shader_parameter("radius", _get_profile_float(profile, "sun_glow_radius", 0.42))
+	material.set_shader_parameter("tint_color", Color(1.0, lerpf(0.86, 0.70, sun_warmth), lerpf(0.52, 0.28, sun_warmth), 1.0))
+
+func _update_sun_water_reflection(profile: Dictionary, glow_center: Vector2, sun_alpha: float, sun_warmth: float, sun_height_factor: float) -> void:
 	if _sun_water_reflection_layer == null:
 		return
-	var reflection_strength: float = clampf(sun_alpha * _get_profile_float(profile, "sun_reflection_alpha", 0.18), 0.0, 0.30)
+	if _viewport_size == Vector2.ZERO:
+		_viewport_size = get_viewport_rect().size
+	var horizon_y: float = _get_sky_horizon_y(profile)
+	var reflection_area: Rect2 = _get_sun_reflection_area(profile, glow_center, horizon_y)
+	_last_sun_glow_center = glow_center
+	_last_sun_reflection_area = reflection_area
+	_has_sun_debug_geometry = sun_alpha > 0.001
+	var low_sun_factor: float = 1.0 - clampf((sun_height_factor - 0.16) / 0.62, 0.0, 1.0)
+	var height_strength: float = lerpf(0.18, 1.0, low_sun_factor)
+	var reflection_strength: float = clampf(
+		sun_alpha * _get_profile_float(profile, "sun_reflection_alpha", 0.18) * height_strength,
+		0.0,
+		0.26
+	)
 	_sun_water_reflection_layer.visible = reflection_strength > 0.006
 	_sun_water_reflection_layer.color = Color.WHITE
 	var material := _sun_water_reflection_layer.material as ShaderMaterial
 	if material == null:
 		return
-	var horizon_ratio: float = _get_sky_horizon_y_ratio(profile)
 	var sun_uv := Vector2(
-		clampf(sun_position.x / maxf(_viewport_size.x, 1.0), 0.0, 1.0),
-		clampf(sun_position.y / maxf(_viewport_size.y, 1.0), 0.0, 1.0)
+		clampf(glow_center.x / maxf(_viewport_size.x, 1.0), 0.0, 1.0),
+		clampf(glow_center.y / maxf(_viewport_size.y, 1.0), 0.0, 1.0)
+	)
+	var reflection_min := Vector2(
+		clampf(reflection_area.position.x / maxf(_viewport_size.x, 1.0), 0.0, 1.0),
+		clampf(reflection_area.position.y / maxf(_viewport_size.y, 1.0), 0.0, 1.0)
+	)
+	var reflection_max := Vector2(
+		clampf(reflection_area.end.x / maxf(_viewport_size.x, 1.0), 0.0, 1.0),
+		clampf(reflection_area.end.y / maxf(_viewport_size.y, 1.0), 0.0, 1.0)
 	)
 	material.set_shader_parameter("sun_uv", sun_uv)
-	material.set_shader_parameter("horizon_y", horizon_ratio)
+	material.set_shader_parameter("horizon_y", clampf(horizon_y / maxf(_viewport_size.y, 1.0), 0.0, 1.0))
+	material.set_shader_parameter("reflection_min", reflection_min)
+	material.set_shader_parameter("reflection_max", reflection_max)
 	material.set_shader_parameter("strength", reflection_strength)
 	material.set_shader_parameter("lane_width", _get_profile_float(profile, "sun_reflection_width", 0.115))
 	material.set_shader_parameter("tint_color", Color(1.0, lerpf(0.78, 0.96, 1.0 - sun_warmth), lerpf(0.40, 0.74, 1.0 - sun_warmth), 1.0))
@@ -742,6 +818,84 @@ func _get_celestial_position_data(
 		"horizon_y": horizon_y
 	}
 
+func _get_sun_height_factor(sun_position: Vector2, sky_rect: Rect2, profile_horizon_y: float) -> float:
+	var top_y: float = sky_rect.position.y
+	var sky_height: float = maxf(profile_horizon_y - top_y, 1.0)
+	return clampf((profile_horizon_y - sun_position.y) / sky_height, 0.0, 1.0)
+
+func _get_sun_glow_center(profile: Dictionary, sun_position: Vector2, sky_rect: Rect2, profile_horizon_y: float) -> Vector2:
+	var bottom_limit: float = maxf(sky_rect.position.y, profile_horizon_y - maxf(_viewport_size.y * 0.045, 4.0))
+	var fallback := Vector2(
+		clampf(sun_position.x, sky_rect.position.x, sky_rect.end.x),
+		clampf(sun_position.y, sky_rect.position.y, bottom_limit)
+	)
+	var center: Vector2 = _get_profile_point(profile, "sun_glow_center", fallback)
+	center.x = clampf(center.x, sky_rect.position.x, sky_rect.end.x)
+	center.y = clampf(center.y, sky_rect.position.y, bottom_limit)
+	return center
+
+func _get_sun_reflection_area(profile: Dictionary, glow_center: Vector2, profile_horizon_y: float) -> Rect2:
+	var fallback_width: float = _viewport_size.x * 0.44
+	var fallback_height: float = maxf(_viewport_size.y * 0.22, (_viewport_size.y - profile_horizon_y) * 0.44)
+	var fallback_x: float = clampf(glow_center.x - fallback_width * 0.5, 0.0, maxf(_viewport_size.x - fallback_width, 0.0))
+	var fallback := Rect2(
+		Vector2(fallback_x, profile_horizon_y),
+		Vector2(fallback_width, fallback_height)
+	)
+	var rect: Rect2 = _get_profile_rect(profile, "sun_reflection_area", fallback)
+	rect.position.x = clampf(rect.position.x, 0.0, maxf(_viewport_size.x - 1.0, 0.0))
+	rect.position.y = clampf(maxf(rect.position.y, profile_horizon_y), 0.0, maxf(_viewport_size.y - 1.0, 0.0))
+	rect.size.x = clampf(rect.size.x, _viewport_size.x * 0.08, _viewport_size.x - rect.position.x)
+	rect.size.y = clampf(rect.size.y, _viewport_size.y * 0.05, _viewport_size.y - rect.position.y)
+	return rect
+
+func _get_profile_point(profile: Dictionary, key: String, fallback: Vector2) -> Vector2:
+	if not profile.has(key):
+		_warn_missing_sun_profile_value(profile, key)
+		return fallback
+
+	var raw_value: Variant = profile.get(key)
+	if raw_value is Vector2:
+		return _scale_sky_point(raw_value as Vector2)
+	if raw_value is Array:
+		var raw_array := raw_value as Array
+		if raw_array.size() >= 2:
+			return _scale_sky_point(Vector2(float(raw_array[0]), float(raw_array[1])))
+
+	_warn_missing_sun_profile_value(profile, key)
+	return fallback
+
+func _get_profile_rect(profile: Dictionary, key: String, fallback: Rect2) -> Rect2:
+	if not profile.has(key):
+		_warn_missing_sun_profile_value(profile, key)
+		return fallback
+
+	var raw_value: Variant = profile.get(key)
+	if raw_value is Rect2:
+		return _scale_sky_rect(raw_value as Rect2)
+	if raw_value is Array:
+		var raw_array := raw_value as Array
+		if raw_array.size() >= 4:
+			return _scale_sky_rect(Rect2(
+				Vector2(float(raw_array[0]), float(raw_array[1])),
+				Vector2(float(raw_array[2]), float(raw_array[3]))
+			))
+
+	_warn_missing_sun_profile_value(profile, key)
+	return fallback
+
+func _warn_missing_sun_profile_value(profile: Dictionary, key: String) -> void:
+	if not BuildConfig.ENABLE_VERBOSE_LOGS:
+		return
+
+	var profile_key := str(profile.get("profile_key", "default"))
+	var warning_key := "sun_profile|%s|%s" % [profile_key, key]
+	if _warned_missing_visual_paths.has(warning_key):
+		return
+
+	_warned_missing_visual_paths[warning_key] = true
+	push_warning("Missing sun visual profile value for %s: %s. Using fallback." % [profile_key, key])
+
 func _get_celestial_horizon_visibility(raw_y: float, profile_horizon_y: float, target_size: float) -> float:
 	var fade_distance: float = maxf(_viewport_size.y * CELESTIAL_HORIZON_FADE_RATIO, target_size * 0.85)
 	var fade_start: float = profile_horizon_y - maxf(target_size * 0.32, _viewport_size.y * CELESTIAL_HORIZON_CLAMP_MARGIN_RATIO)
@@ -873,6 +1027,7 @@ func _ensure_nodes() -> void:
 	)
 
 	_sky_layer = _ensure_texture_layer(_sky_layer, "SkyLayer", sky_path, 0)
+	_sun_atmosphere_glow_layer = _ensure_color_layer(_sun_atmosphere_glow_layer, "SunAtmosphereGlowLayer", SUN_ATMOSPHERE_GLOW_Z)
 
 	if _celestial_layer == null:
 		_celestial_layer = Node2D.new()
@@ -916,6 +1071,8 @@ func _ensure_nodes() -> void:
 		_sunset_tint_overlay.material = _make_sunset_tint_material()
 	if _night_tint_overlay.material == null:
 		_night_tint_overlay.material = _make_night_tint_material()
+	if _sun_atmosphere_glow_layer.material == null:
+		_sun_atmosphere_glow_layer.material = _make_sun_atmosphere_glow_material()
 	if _sun_water_reflection_layer.material == null:
 		_sun_water_reflection_layer.material = _make_sun_water_reflection_material()
 
@@ -1116,6 +1273,26 @@ func _ensure_sky_debug_nodes() -> void:
 		_horizon_debug_line.z_as_relative = true
 		_horizon_debug_line.z_index = HORIZON_DEBUG_LINE_Z
 		_environment_root.add_child(_horizon_debug_line)
+	if _sun_reflection_debug_rect == null:
+		_sun_reflection_debug_rect = Panel.new()
+		_sun_reflection_debug_rect.name = "SunReflectionDebugRect"
+		_sun_reflection_debug_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_sun_reflection_debug_rect.z_as_relative = true
+		_sun_reflection_debug_rect.z_index = SUN_REFLECTION_DEBUG_RECT_Z
+		var reflection_style := StyleBoxFlat.new()
+		reflection_style.bg_color = Color(0.20, 1.0, 0.54, 0.05)
+		reflection_style.border_color = Color(0.28, 1.0, 0.62, 0.48)
+		reflection_style.set_border_width_all(2)
+		_sun_reflection_debug_rect.add_theme_stylebox_override("panel", reflection_style)
+		_environment_root.add_child(_sun_reflection_debug_rect)
+	if _sun_glow_debug_marker == null:
+		_sun_glow_debug_marker = ColorRect.new()
+		_sun_glow_debug_marker.name = "SunGlowDebugMarker"
+		_sun_glow_debug_marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_sun_glow_debug_marker.color = Color(1.0, 0.48, 0.16, 0.86)
+		_sun_glow_debug_marker.z_as_relative = true
+		_sun_glow_debug_marker.z_index = SUN_GLOW_DEBUG_MARKER_Z
+		_environment_root.add_child(_sun_glow_debug_marker)
 
 func _update_sky_debug_overlay(profile: Dictionary) -> void:
 	if not _is_sky_debug_enabled():
@@ -1123,6 +1300,10 @@ func _update_sky_debug_overlay(profile: Dictionary) -> void:
 			_sky_debug_rect.visible = false
 		if _horizon_debug_line != null:
 			_horizon_debug_line.visible = false
+		if _sun_reflection_debug_rect != null:
+			_sun_reflection_debug_rect.visible = false
+		if _sun_glow_debug_marker != null:
+			_sun_glow_debug_marker.visible = false
 		return
 	if _viewport_size == Vector2.ZERO:
 		_viewport_size = get_viewport_rect().size
@@ -1137,6 +1318,18 @@ func _update_sky_debug_overlay(profile: Dictionary) -> void:
 	_horizon_debug_line.position = Vector2(0.0, horizon_y)
 	_horizon_debug_line.size = Vector2(_viewport_size.x, maxf(2.0, _viewport_size.y * 0.003))
 	_horizon_debug_line.visible = true
+	var fallback_glow_center := Vector2(sky_rect.position.x + sky_rect.size.x * 0.5, sky_rect.position.y + sky_rect.size.y * 0.42)
+	var glow_center := _last_sun_glow_center if _has_sun_debug_geometry else _get_sun_glow_center(profile, fallback_glow_center, sky_rect, horizon_y)
+	var reflection_area := _last_sun_reflection_area if _has_sun_debug_geometry else _get_sun_reflection_area(profile, glow_center, horizon_y)
+	if _sun_reflection_debug_rect != null:
+		_sun_reflection_debug_rect.position = reflection_area.position
+		_sun_reflection_debug_rect.size = reflection_area.size
+		_sun_reflection_debug_rect.visible = true
+	if _sun_glow_debug_marker != null:
+		var marker_size: float = maxf(8.0, _viewport_size.y * 0.018)
+		_sun_glow_debug_marker.position = glow_center - Vector2(marker_size, marker_size) * 0.5
+		_sun_glow_debug_marker.size = Vector2(marker_size, marker_size)
+		_sun_glow_debug_marker.visible = true
 
 func _move_water_under_spot_layers() -> void:
 	if _environment_root == null or _sky_layer == null or _water_layer == null:
@@ -1182,6 +1375,56 @@ func _set_layer_material(layer: CanvasItem, material_key: String, material: Mate
 	layer.material = material
 	layer.set_meta("environment_material_key", material_key)
 
+func _make_sun_atmosphere_glow_material() -> ShaderMaterial:
+	var shader := Shader.new()
+	shader.code = """
+		shader_type canvas_item;
+		render_mode blend_add, unshaded;
+
+		uniform vec2 glow_uv = vec2(0.52, 0.28);
+		uniform vec2 sky_min = vec2(0.05, 0.04);
+		uniform vec2 sky_max = vec2(0.95, 0.56);
+		uniform float horizon_y = 0.56;
+		uniform float strength = 0.0;
+		uniform float warmth = 0.45;
+		uniform float radius = 0.42;
+		uniform vec4 tint_color : source_color = vec4(1.0, 0.78, 0.42, 1.0);
+
+		float rect_mask(vec2 uv, vec2 rect_min, vec2 rect_max, float softness) {
+			float left = smoothstep(rect_min.x, rect_min.x + softness, uv.x);
+			float right = 1.0 - smoothstep(rect_max.x - softness, rect_max.x, uv.x);
+			float top = smoothstep(rect_min.y, rect_min.y + softness, uv.y);
+			float bottom = 1.0 - smoothstep(rect_max.y - softness, rect_max.y, uv.y);
+			return clamp(left * right * top * bottom, 0.0, 1.0);
+		}
+
+		void fragment() {
+			float sky_bottom = min(sky_max.y, horizon_y);
+			vec2 clamped_sky_max = vec2(sky_max.x, sky_bottom);
+			float sky_mask = rect_mask(UV, sky_min, clamped_sky_max, 0.035);
+			float above_horizon = 1.0 - smoothstep(horizon_y - 0.030, horizon_y + 0.025, UV.y);
+			float aspect = SCREEN_PIXEL_SIZE.y / max(SCREEN_PIXEL_SIZE.x, 0.00001);
+			vec2 to_glow = vec2((UV.x - glow_uv.x) * aspect * 0.72, (UV.y - glow_uv.y) * 1.05);
+			float dist = length(to_glow);
+			float safe_radius = max(radius, 0.12);
+			float broad_haze = 1.0 - smoothstep(safe_radius * 0.18, safe_radius * 1.38, dist);
+			float upper_wash = 1.0 - smoothstep(safe_radius * 0.22, safe_radius * 1.86, dist);
+			float dissolved_center = (1.0 - smoothstep(0.0, safe_radius * 0.34, dist)) * 0.08;
+			float horizon_band_x = 1.0 - smoothstep(safe_radius * 0.24, safe_radius * 1.48, abs(UV.x - glow_uv.x));
+			float horizon_band_y = 1.0 - smoothstep(0.0, 0.18, abs(UV.y - horizon_y));
+			float horizon_band = horizon_band_x * horizon_band_y;
+			float warm_haze = broad_haze * 0.34 + upper_wash * 0.24 + horizon_band * 0.36 + dissolved_center;
+			vec3 day_color = vec3(1.0, 0.91, 0.68);
+			vec3 sunset_color = tint_color.rgb;
+			vec3 color = mix(day_color, sunset_color, clamp(warmth, 0.0, 1.0));
+			float alpha = clamp(warm_haze * sky_mask * above_horizon * strength, 0.0, 0.42);
+			COLOR = vec4(color, alpha);
+		}
+	"""
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	return material
+
 func _make_sun_disc_material() -> ShaderMaterial:
 	var shader := Shader.new()
 	shader.code = """
@@ -1223,24 +1466,39 @@ func _make_sun_water_reflection_material() -> ShaderMaterial:
 	var shader := Shader.new()
 	shader.code = """
 		shader_type canvas_item;
-		render_mode blend_add;
+		render_mode blend_add, unshaded;
 
 		uniform vec2 sun_uv = vec2(0.5, 0.18);
 		uniform float horizon_y = 0.56;
+		uniform vec2 reflection_min = vec2(0.30, 0.56);
+		uniform vec2 reflection_max = vec2(0.72, 0.80);
 		uniform float strength = 0.0;
 		uniform float lane_width = 0.115;
 		uniform vec4 tint_color : source_color = vec4(1.0, 0.88, 0.58, 1.0);
 
+		float rect_mask(vec2 uv, vec2 rect_min, vec2 rect_max, float softness) {
+			float left = smoothstep(rect_min.x, rect_min.x + softness, uv.x);
+			float right = 1.0 - smoothstep(rect_max.x - softness, rect_max.x, uv.x);
+			float top = smoothstep(rect_min.y, rect_min.y + softness, uv.y);
+			float bottom = 1.0 - smoothstep(rect_max.y - softness, rect_max.y, uv.y);
+			return clamp(left * right * top * bottom, 0.0, 1.0);
+		}
+
 		void fragment() {
-			float water_mask = smoothstep(horizon_y - 0.010, horizon_y + 0.055, UV.y);
-			float depth_fade = 1.0 - smoothstep(horizon_y + 0.02, 1.05, UV.y) * 0.55;
+			vec2 safe_min = vec2(reflection_min.x, max(reflection_min.y, horizon_y));
+			vec2 safe_max = max(reflection_max, safe_min + vec2(0.02, 0.02));
+			float area_mask = rect_mask(UV, safe_min, safe_max, 0.030);
+			float water_mask = smoothstep(horizon_y - 0.006, horizon_y + 0.045, UV.y) * area_mask;
+			float area_t = clamp((UV.y - safe_min.y) / max(safe_max.y - safe_min.y, 0.001), 0.0, 1.0);
+			float depth_fade = 1.0 - smoothstep(0.60, 1.0, area_t) * 0.68;
 			float x_offset = abs(UV.x - sun_uv.x);
-			float widening = lane_width * mix(0.46, 1.24, clamp((UV.y - horizon_y) / max(1.0 - horizon_y, 0.001), 0.0, 1.0));
-			float lane = 1.0 - smoothstep(0.0, widening, x_offset);
-			float soft_lane = 1.0 - smoothstep(widening * 0.34, widening * 2.4, x_offset);
-			float shimmer = 0.72 + 0.28 * sin(UV.y * 210.0 + UV.x * 66.0);
-			float horizon_glow = 1.0 - smoothstep(0.0, 0.13, abs(UV.y - horizon_y));
-			float alpha = clamp((lane * 0.34 + soft_lane * 0.20 + horizon_glow * 0.22) * water_mask * depth_fade * shimmer * strength, 0.0, 0.24);
+			float widening = lane_width * mix(0.36, 1.10, area_t);
+			float lane = 1.0 - smoothstep(widening * 0.10, widening, x_offset);
+			float soft_lane = 1.0 - smoothstep(widening * 0.18, widening * 2.3, x_offset);
+			float shimmer = 0.72 + 0.18 * sin(UV.y * 168.0 + UV.x * 56.0) + 0.10 * sin(UV.y * 92.0 - UV.x * 34.0);
+			float vertical_lane = (lane * 0.28 + soft_lane * 0.24) * depth_fade;
+			float horizon_wash = (1.0 - smoothstep(0.0, 0.12, abs(UV.y - horizon_y))) * (1.0 - smoothstep(widening * 0.3, widening * 2.1, x_offset)) * 0.16;
+			float alpha = clamp((vertical_lane + horizon_wash) * water_mask * shimmer * strength, 0.0, 0.20);
 			COLOR = vec4(tint_color.rgb, alpha);
 		}
 	"""
