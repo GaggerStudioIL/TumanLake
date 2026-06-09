@@ -118,12 +118,12 @@ Project -> Export
 Команда:
 
 ```bash
-Godot_v4.6.2-stable_win64_console.exe --display-driver windows --rendering-driver opengl3 --path . --export-debug Android TumanLake_0.1.0_beta2_debug.apk
+Godot_v4.6.2-stable_win64_console.exe --display-driver windows --rendering-driver opengl3 --path . --export-debug Android build/TumanLake_0.1.0-beta.2_2026-06-09.apk
 ```
 
 Результат:
 
-- APK собран: `TumanLake_0.1.0_beta2_debug.apk`.
+- APK собран: `build/TumanLake_0.1.0-beta.2_2026-06-09.apk`.
 - Размер: `324298967` bytes.
 - Godot export дошёл до `Signing debug APK` и `Verifying APK` без ошибки.
 - Android preset обновлён на `version/name="0.1.0-beta.2"` и `version/code=102`.

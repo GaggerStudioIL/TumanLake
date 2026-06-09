@@ -2,8 +2,8 @@
 
 Дата: 2026-06-09
 Версия: v0.1.0-beta.2
-Commit: 3663b56 (`docs: add zbt readiness audit`) - build/preflight commit before this docs-only report
-APK: `TumanLake_0.1.0_beta2_debug.apk`
+Commit: 4ad5961 (`docs: add beta preflight report`) - game/content commit before canonical APK path fix
+APK: `build/TumanLake_0.1.0-beta.2_2026-06-09.apk`
 
 ## Result
 
@@ -22,9 +22,9 @@ CONDITIONAL PASS
 
 APK details:
 
-- Path: `C:\Games\TumanLake\TumanLake_0.1.0_beta2_debug.apk`
+- Path: `C:\Games\TumanLake\build\TumanLake_0.1.0-beta.2_2026-06-09.apk`
 - Size: `324298967` bytes
-- SHA-256: `18306421F964ABA5E69E7122E3FBF4DAD6EB06B90B8A1E94CD04D5C26AC34BA7`
+- SHA-256: `39B13FF3CDC7FA1EDBEB7D36F65859B905B7D26D9799A5C1CA31CECB4DF1F51D`
 - Package: `com.tumanlake.game`
 - Label: `Tuman Lake`
 - Native code: `arm64-v8a`

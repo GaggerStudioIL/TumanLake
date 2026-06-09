@@ -9,7 +9,7 @@ Follow-up к `docs/beta_audit_report_2026_06_09.md`. Цель прохода —
 ## Fixed
 
 - Синхронизирована версия beta.2: `GameVersion.BUILD_DATE`, README, changelog и Android export preset.
-- Android APK переименован в `TumanLake_0.1.0_beta2_debug.apk`; Android `version/name` больше не использует старую Alpha-строку.
+- Android APK export path приведён к `build/TumanLake_0.1.0-beta.2_2026-06-09.apk`; Android `version/name` больше не использует старую Alpha-строку.
 - Добавлен `docs/TESTER_GUIDE.md` с обязательными сценариями ЗБТ и форматом баг-репорта.
 - Help screen обновлён под текущий beta flow: магазин/Рыбная гавань через карту, садок как просмотр улова, продажа через Рыбную гавань.
 - HUD текущей снасти больше не обещает список готовых снастей: тап показывает текущую снасть, долгий тап открывает сборку.
@@ -32,7 +32,7 @@ Follow-up к `docs/beta_audit_report_2026_06_09.md`. Цель прохода —
 
 - Godot smoke: exit code `0`, без SCRIPT ERROR.
 - Android export: success.
-- Output: `TumanLake_0.1.0_beta2_debug.apk`.
+- Output: `build/TumanLake_0.1.0-beta.2_2026-06-09.apk`.
 - Size: `324298967` bytes.
 - Export log: `Signing debug APK` и `Verifying APK` пройдены.
 

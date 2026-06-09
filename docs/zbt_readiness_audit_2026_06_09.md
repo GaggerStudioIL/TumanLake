@@ -19,7 +19,7 @@
 - `master` синхронизирован с `origin/master`; рабочее дерево перед отчётом было чистым.
 - Версия в `scripts/core/GameVersion.gd`: `0.1.0-beta.2`, дата `2026-06-09`.
 - Beta flags в `scripts/core/BuildConfig.gd`: `IS_BETA_BUILD=true`, debug/verbose/spinning отключены.
-- Android export preset указывает `TumanLake_0.1.0_beta2_debug.apk`, `version/name="0.1.0-beta.2"`, `version/code=102`.
+- Android export preset указывает `build/TumanLake_0.1.0-beta.2_2026-06-09.apk`, `version/name="0.1.0-beta.2"`, `version/code=102`.
 - Godot smoke: `Godot_v4.6.2... --display-driver windows --rendering-driver opengl3 --path . --quit-after 2` завершился с exit code `0`, без `SCRIPT ERROR`.
 
 ## A) Что уже работает
