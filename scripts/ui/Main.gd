@@ -3369,6 +3369,9 @@ func _layout_main_hud_v2_right_stack(screen_size: Vector2, ui_scale: float, cast
 		encyclopedia_button.z_index = 260
 		_apply_button_style(encyclopedia_button, STYLE_SECONDARY_BUTTON)
 		_set_button_icon(encyclopedia_button, "encyclopedia", compact_size.x * 0.48)
+		encyclopedia_button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		encyclopedia_button.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
+		encyclopedia_button.add_theme_constant_override("h_separation", 0)
 
 	if current_tackle_button != null:
 		current_tackle_button.text = ""
