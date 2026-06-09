@@ -370,7 +370,7 @@ func _show_fish_details(fish_index: int) -> void:
 	footer.add_theme_constant_override("separation", 10)
 	box.add_child(footer)
 	var hint := Label.new()
-	hint.text = "Садок теперь только для просмотра. Продажа улова доступна в гавани."
+	hint.text = "Садок теперь только для просмотра. Продажа улова доступна в Рыбной гавани."
 	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.add_theme_font_size_override("font_size", 12)

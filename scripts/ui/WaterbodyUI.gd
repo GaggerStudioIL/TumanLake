@@ -92,6 +92,8 @@ func _ensure_waterbody_ui_nodes() -> void:
 	visual_map_ui.call("setup", main)
 	visual_map_ui.connect("spot_selected", Callable(self, "_on_visual_spot_selected"))
 	visual_map_ui.connect("global_requested", Callable(self, "_show_global_map"))
+	visual_map_ui.connect("shop_requested", Callable(self, "_on_visual_shop_requested"))
+	visual_map_ui.connect("harbor_requested", Callable(self, "_on_visual_harbor_requested"))
 	visual_map_ui.connect("close_requested", Callable(self, "_on_visual_close_requested"))
 
 func _create_legacy_nodes() -> void:
@@ -303,6 +305,24 @@ func _on_visual_spot_selected(waterbody_id: String, spot_id: String) -> void:
 
 func _on_visual_close_requested() -> void:
 	main._on_waterbody_close_button_pressed()
+
+func _on_visual_shop_requested() -> void:
+	_open_screen_from_map("shop")
+
+func _on_visual_harbor_requested() -> void:
+	_open_screen_from_map("harbor")
+
+func _open_screen_from_map(screen_id: String) -> void:
+	if main == null:
+		return
+	if main.has_method("_open_screen_via_navigation") and main._open_screen_via_navigation(screen_id):
+		return
+	if main.has_method("close_game_panels_before_opening_new_one"):
+		main.close_game_panels_before_opening_new_one(screen_id)
+	if screen_id == "shop" and main.has_method("_open_shop"):
+		main._open_shop()
+	elif screen_id == "harbor" and main.has_method("_open_harbor"):
+		main._open_harbor()
 
 func _get_selected_waterbody() -> Dictionary:
 	for waterbody in main._visible_waterbodies:

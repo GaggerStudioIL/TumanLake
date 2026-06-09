@@ -1,0 +1,358 @@
+{
+  "image": "tuman_lake_ui_kit_v1_4096.png",
+  "size": [
+    4096,
+    4096
+  ],
+  "style": "Tuman Lake dark glass green accent",
+  "assets": {
+    "window_large": {
+      "x": 96,
+      "y": 96,
+      "w": 1320,
+      "h": 540
+    },
+    "window_medium": {
+      "x": 1520,
+      "y": 96,
+      "w": 760,
+      "h": 540
+    },
+    "popup_window": {
+      "x": 2380,
+      "y": 96,
+      "w": 520,
+      "h": 540
+    },
+    "details_panel": {
+      "x": 3000,
+      "y": 96,
+      "w": 760,
+      "h": 920
+    },
+    "content_panel_wide": {
+      "x": 96,
+      "y": 740,
+      "w": 1850,
+      "h": 720
+    },
+    "filter_sort_panel": {
+      "x": 2050,
+      "y": 740,
+      "w": 820,
+      "h": 160
+    },
+    "btn_primary_normal": {
+      "x": 96,
+      "y": 1570,
+      "w": 360,
+      "h": 88
+    },
+    "btn_primary_hover": {
+      "x": 96,
+      "y": 1694,
+      "w": 360,
+      "h": 88
+    },
+    "btn_primary_pressed": {
+      "x": 96,
+      "y": 1818,
+      "w": 360,
+      "h": 88
+    },
+    "btn_secondary_normal": {
+      "x": 526,
+      "y": 1570,
+      "w": 360,
+      "h": 88
+    },
+    "btn_secondary_hover": {
+      "x": 526,
+      "y": 1694,
+      "w": 360,
+      "h": 88
+    },
+    "btn_secondary_pressed": {
+      "x": 526,
+      "y": 1818,
+      "w": 360,
+      "h": 88
+    },
+    "btn_danger_normal": {
+      "x": 956,
+      "y": 1570,
+      "w": 360,
+      "h": 88
+    },
+    "btn_danger_hover": {
+      "x": 956,
+      "y": 1694,
+      "w": 360,
+      "h": 88
+    },
+    "btn_danger_pressed": {
+      "x": 956,
+      "y": 1818,
+      "w": 360,
+      "h": 88
+    },
+    "btn_disabled": {
+      "x": 1386,
+      "y": 1570,
+      "w": 360,
+      "h": 88
+    },
+    "tab_active": {
+      "x": 96,
+      "y": 2050,
+      "w": 330,
+      "h": 86
+    },
+    "tab_hover": {
+      "x": 482,
+      "y": 2050,
+      "w": 330,
+      "h": 86
+    },
+    "tab_inactive": {
+      "x": 868,
+      "y": 2050,
+      "w": 330,
+      "h": 86
+    },
+    "tab_long_active": {
+      "x": 96,
+      "y": 2176,
+      "w": 520,
+      "h": 86
+    },
+    "tab_long_inactive": {
+      "x": 660,
+      "y": 2176,
+      "w": 520,
+      "h": 86
+    },
+    "slot_normal": {
+      "x": 96,
+      "y": 2320,
+      "w": 220,
+      "h": 220
+    },
+    "slot_hover": {
+      "x": 376,
+      "y": 2320,
+      "w": 220,
+      "h": 220
+    },
+    "slot_selected": {
+      "x": 656,
+      "y": 2320,
+      "w": 220,
+      "h": 220
+    },
+    "slot_empty_locked": {
+      "x": 936,
+      "y": 2320,
+      "w": 220,
+      "h": 220
+    },
+    "fish_slot_normal": {
+      "x": 1216,
+      "y": 2320,
+      "w": 300,
+      "h": 220
+    },
+    "fish_slot_selected": {
+      "x": 1570,
+      "y": 2320,
+      "w": 300,
+      "h": 220
+    },
+    "preview_panel_wide": {
+      "x": 2050,
+      "y": 1060,
+      "w": 760,
+      "h": 260
+    },
+    "description_panel": {
+      "x": 2050,
+      "y": 1380,
+      "w": 760,
+      "h": 260
+    },
+    "small_input_panel": {
+      "x": 2050,
+      "y": 1700,
+      "w": 500,
+      "h": 78
+    },
+    "dropdown_panel": {
+      "x": 2600,
+      "y": 1700,
+      "w": 500,
+      "h": 78
+    },
+    "badge_equipped": {
+      "x": 96,
+      "y": 2600,
+      "w": 160,
+      "h": 54
+    },
+    "badge_count": {
+      "x": 296,
+      "y": 2600,
+      "w": 82,
+      "h": 54
+    },
+    "badge_new": {
+      "x": 418,
+      "y": 2600,
+      "w": 118,
+      "h": 54
+    },
+    "badge_rare_frame": {
+      "x": 96,
+      "y": 2696,
+      "w": 190,
+      "h": 58
+    },
+    "badge_epic_frame": {
+      "x": 326,
+      "y": 2696,
+      "w": 190,
+      "h": 58
+    },
+    "badge_legendary_frame": {
+      "x": 556,
+      "y": 2696,
+      "w": 190,
+      "h": 58
+    },
+    "page_normal": {
+      "x": 96,
+      "y": 2800,
+      "w": 82,
+      "h": 82
+    },
+    "page_active": {
+      "x": 214,
+      "y": 2800,
+      "w": 82,
+      "h": 82
+    },
+    "square_button_normal": {
+      "x": 332,
+      "y": 2800,
+      "w": 82,
+      "h": 82
+    },
+    "square_button_hover": {
+      "x": 450,
+      "y": 2800,
+      "w": 82,
+      "h": 82
+    },
+    "square_button_primary": {
+      "x": 568,
+      "y": 2800,
+      "w": 82,
+      "h": 82
+    },
+    "btn_close": {
+      "x": 686,
+      "y": 2800,
+      "w": 82,
+      "h": 82
+    },
+    "scroll_track_vertical": {
+      "x": 910,
+      "y": 2800,
+      "w": 44,
+      "h": 320
+    },
+    "scroll_handle_vertical": {
+      "x": 980,
+      "y": 2800,
+      "w": 44,
+      "h": 120
+    },
+    "scroll_track_horizontal": {
+      "x": 1060,
+      "y": 2800,
+      "w": 520,
+      "h": 44
+    },
+    "scroll_handle_horizontal": {
+      "x": 1060,
+      "y": 2870,
+      "w": 180,
+      "h": 44
+    },
+    "separator_solid": {
+      "x": 96,
+      "y": 3230,
+      "w": 650,
+      "h": 30
+    },
+    "separator_dotted": {
+      "x": 96,
+      "y": 3300,
+      "w": 650,
+      "h": 30
+    },
+    "separator_green_glow": {
+      "x": 96,
+      "y": 3370,
+      "w": 650,
+      "h": 30
+    },
+    "texture_glass_noise": {
+      "x": 96,
+      "y": 3440,
+      "w": 300,
+      "h": 300
+    },
+    "texture_dark_panel": {
+      "x": 456,
+      "y": 3440,
+      "w": 300,
+      "h": 300
+    },
+    "texture_subtle_grid": {
+      "x": 816,
+      "y": 3440,
+      "w": 300,
+      "h": 300
+    },
+    "texture_soft_vignette": {
+      "x": 1176,
+      "y": 3440,
+      "w": 300,
+      "h": 300
+    },
+    "hud_pill": {
+      "x": 2050,
+      "y": 1960,
+      "w": 260,
+      "h": 72
+    },
+    "hud_icon_button": {
+      "x": 2360,
+      "y": 1960,
+      "w": 86,
+      "h": 86
+    },
+    "hud_icon_button_active": {
+      "x": 2490,
+      "y": 1960,
+      "w": 86,
+      "h": 86
+    },
+    "chat_bar_collapsed": {
+      "x": 2050,
+      "y": 2100,
+      "w": 900,
+      "h": 82
+    }
+  }
+}

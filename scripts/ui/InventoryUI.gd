@@ -1,11 +1,24 @@
 # Handles the inventory window: categories, item list, and item details.
 extends RefCounted
 
+const TumanLakeUIKitScript := preload("res://scripts/ui/components/TumanLakeUIKit.gd")
+
 var main
 var theme
 const INVENTORY_ITEMS_PER_PAGE := 24
 const INVENTORY_DETAILS_COMPACT_HEIGHT := 360.0
 const INVENTORY_DETAILS_TINY_HEIGHT := 300.0
+const INVENTORY_FILTERS := [
+	["all", "Все"],
+	["equipped", "Надето"],
+	["unequipped", "Не надето"]
+]
+const INVENTORY_SORTS := [
+	["type", "По типу"],
+	["name", "По названию"],
+	["status", "По статусу"],
+	["quantity", "По количеству"]
+]
 const INVENTORY_FALLBACK_ICON_PATHS := {
 	"rod": "res://assets/ui/sprites/icons/rod.png",
 	"line": "res://assets/ui/sprites/icons/line.png",
@@ -46,6 +59,25 @@ var _details_action_margin: MarginContainer
 var _details_body_scroll: ScrollContainer
 var _details_body_label: RichTextLabel
 var _details_action_row: HBoxContainer
+var _window_panel: Panel
+var _tab_scroll: ScrollContainer
+var _tab_row: HBoxContainer
+var _toolbar_panel: Control
+var _filter_row: HBoxContainer
+var _filter_buttons: Dictionary = {}
+var _sort_label: Label
+var _sort_option: OptionButton
+var _grid_area: Panel
+var _footer_panel: Panel
+var _footer_margin: MarginContainer
+var _footer_row: HBoxContainer
+var _footer_summary_label: Label
+var _footer_pager_row: HBoxContainer
+var _footer_filter_button: Button
+var _page_buttons: Array = []
+var _inventory_filter := "all"
+var _inventory_sort := "type"
+var _inventory_total_item_count := 0
 
 enum FishingUiState {
 	IDLE,
@@ -58,6 +90,7 @@ enum FishingUiState {
 func setup(main_ref) -> void:
 	main = main_ref
 	theme = main.ui_theme
+	_ensure_inventory_window_template_nodes()
 	_ensure_inventory_action_nodes()
 	_ensure_inventory_pager_nodes()
 	_ensure_inventory_tile_nodes()
@@ -92,6 +125,173 @@ func refresh() -> void:
 func is_open() -> bool:
 	return main != null and main.inventory_panel != null and main.inventory_panel.visible
 
+func _ensure_inventory_window_template_nodes() -> void:
+	if main == null or main.inventory_panel == null:
+		return
+
+	if main.inventory_backdrop != null:
+		main.inventory_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+		if main.inventory_backdrop is ColorRect:
+			main.inventory_backdrop.color = Color(0.0, 0.0, 0.0, 0.72)
+
+	main.inventory_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	main.inventory_panel.color = Color.TRANSPARENT
+	main.inventory_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+
+	if _window_panel == null or not is_instance_valid(_window_panel):
+		_window_panel = Panel.new()
+		_window_panel.name = "InventoryUIKitWindow"
+		_window_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		_window_panel.clip_contents = true
+		main.inventory_panel.add_child(_window_panel)
+	TumanLakeUIKitScript.apply_window(_window_panel)
+
+	_move_control_to_parent(main.inventory_title_label, _window_panel)
+	_move_control_to_parent(main.inventory_close_button, _window_panel)
+	main.inventory_title_label.text = "Инвентарь"
+	main.inventory_title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	main.inventory_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	main.inventory_title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	main.inventory_title_label.add_theme_color_override("font_color", TumanLakeUIKitScript.TEXT_PRIMARY)
+	main.inventory_title_label.add_theme_font_size_override("font_size", 24)
+	main.inventory_close_button.focus_mode = Control.FOCUS_NONE
+	main.inventory_close_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	TumanLakeUIKitScript.apply_close_button(main.inventory_close_button)
+
+	if _tab_scroll == null or not is_instance_valid(_tab_scroll):
+		_tab_scroll = ScrollContainer.new()
+		_tab_scroll.name = "InventoryTabScroll"
+		_tab_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+		_tab_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		_tab_scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+		_tab_scroll.clip_contents = true
+		_window_panel.add_child(_tab_scroll)
+	if _tab_row == null or not is_instance_valid(_tab_row):
+		_tab_row = HBoxContainer.new()
+		_tab_row.name = "InventoryTabRow"
+		_tab_row.mouse_filter = Control.MOUSE_FILTER_PASS
+		_tab_scroll.add_child(_tab_row)
+
+	for item in _get_inventory_category_button_pairs():
+		var button: Button = item[0]
+		if button == null:
+			continue
+		_move_control_to_parent(button, _tab_row)
+		button.focus_mode = Control.FOCUS_NONE
+		button.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	if _toolbar_panel == null or not is_instance_valid(_toolbar_panel) or not (_toolbar_panel is Panel):
+		if _toolbar_panel != null and is_instance_valid(_toolbar_panel):
+			var old_toolbar := _toolbar_panel
+			if old_toolbar.get_parent() != null:
+				old_toolbar.get_parent().remove_child(old_toolbar)
+			old_toolbar.queue_free()
+		_toolbar_panel = Panel.new()
+		_toolbar_panel.name = "InventoryToolbar"
+		_toolbar_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		_window_panel.add_child(_toolbar_panel)
+	TumanLakeUIKitScript.apply_panel(_toolbar_panel as Panel, "filter_sort_panel", Vector4(20.0, 20.0, 20.0, 20.0))
+	if _filter_row == null or not is_instance_valid(_filter_row) or _filter_row.get_parent() != _toolbar_panel:
+		if _filter_row != null and is_instance_valid(_filter_row) and _filter_row.get_parent() != null:
+			_filter_row.get_parent().remove_child(_filter_row)
+		_filter_row = HBoxContainer.new()
+		_filter_row.name = "InventoryFilterRow"
+		_filter_row.mouse_filter = Control.MOUSE_FILTER_PASS
+		_toolbar_panel.add_child(_filter_row)
+
+	for filter_def in INVENTORY_FILTERS:
+		var filter_id := str(filter_def[0])
+		var filter_title := str(filter_def[1])
+		var button: Button = _filter_buttons.get(filter_id, null)
+		if button == null or not is_instance_valid(button):
+			button = Button.new()
+			button.name = "InventoryFilter%sButton" % filter_id.capitalize()
+			button.focus_mode = Control.FOCUS_NONE
+			button.mouse_filter = Control.MOUSE_FILTER_STOP
+			button.pressed.connect(_set_inventory_filter.bind(filter_id))
+			_filter_buttons[filter_id] = button
+			_filter_row.add_child(button)
+		button.text = filter_title
+		_move_control_to_parent(button, _filter_row)
+
+	if _sort_label == null or not is_instance_valid(_sort_label):
+		_sort_label = Label.new()
+		_sort_label.name = "InventorySortLabel"
+		_sort_label.text = "Сортировка"
+		_sort_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_sort_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		_sort_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_toolbar_panel.add_child(_sort_label)
+	_move_control_to_parent(_sort_label, _toolbar_panel)
+	_sort_label.add_theme_color_override("font_color", TumanLakeUIKitScript.TEXT_SECONDARY)
+
+	if _sort_option == null or not is_instance_valid(_sort_option):
+		_sort_option = OptionButton.new()
+		_sort_option.name = "InventorySortOption"
+		_sort_option.focus_mode = Control.FOCUS_NONE
+		_sort_option.mouse_filter = Control.MOUSE_FILTER_STOP
+		_sort_option.item_selected.connect(_on_inventory_sort_selected)
+		_toolbar_panel.add_child(_sort_option)
+	_move_control_to_parent(_sort_option, _toolbar_panel)
+	_rebuild_sort_options()
+	TumanLakeUIKitScript.apply_sort_option(_sort_option)
+
+	if _grid_area == null or not is_instance_valid(_grid_area):
+		_grid_area = Panel.new()
+		_grid_area.name = "InventoryGridArea"
+		_grid_area.mouse_filter = Control.MOUSE_FILTER_STOP
+		_grid_area.clip_contents = true
+		_window_panel.add_child(_grid_area)
+	TumanLakeUIKitScript.apply_panel(_grid_area, "content_panel_wide", Vector4(24.0, 24.0, 24.0, 24.0))
+
+	if _footer_panel == null or not is_instance_valid(_footer_panel):
+		_footer_panel = Panel.new()
+		_footer_panel.name = "InventoryFooterPanel"
+		_footer_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		_window_panel.add_child(_footer_panel)
+	TumanLakeUIKitScript.apply_panel(_footer_panel, "filter_sort_panel", Vector4(20.0, 20.0, 20.0, 20.0))
+
+	if _footer_margin == null or not is_instance_valid(_footer_margin):
+		_footer_margin = MarginContainer.new()
+		_footer_margin.name = "InventoryFooterMargin"
+		_footer_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_footer_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_footer_panel.add_child(_footer_margin)
+	if _footer_row == null or not is_instance_valid(_footer_row):
+		_footer_row = HBoxContainer.new()
+		_footer_row.name = "InventoryFooterRow"
+		_footer_row.mouse_filter = Control.MOUSE_FILTER_PASS
+		_footer_margin.add_child(_footer_row)
+	if _footer_pager_row == null or not is_instance_valid(_footer_pager_row):
+		_footer_pager_row = HBoxContainer.new()
+		_footer_pager_row.name = "InventoryFooterPager"
+		_footer_pager_row.mouse_filter = Control.MOUSE_FILTER_PASS
+		_footer_row.add_child(_footer_pager_row)
+	if _footer_summary_label == null or not is_instance_valid(_footer_summary_label):
+		_footer_summary_label = Label.new()
+		_footer_summary_label.name = "InventoryFooterSummary"
+		_footer_summary_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_footer_summary_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_footer_summary_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_footer_row.add_child(_footer_summary_label)
+	_footer_summary_label.add_theme_color_override("font_color", TumanLakeUIKitScript.TEXT_SECONDARY)
+	_footer_summary_label.add_theme_font_size_override("font_size", 12)
+	if _footer_filter_button == null or not is_instance_valid(_footer_filter_button):
+		_footer_filter_button = Button.new()
+		_footer_filter_button.name = "InventoryFooterFilterButton"
+		_footer_filter_button.text = "Фильтры"
+		_footer_filter_button.focus_mode = Control.FOCUS_NONE
+		_footer_filter_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		_footer_filter_button.pressed.connect(_on_inventory_footer_filter_pressed)
+		_footer_row.add_child(_footer_filter_button)
+	_move_control_to_parent(_footer_filter_button, _footer_row)
+	TumanLakeUIKitScript.apply_action_button(_footer_filter_button, "secondary")
+
+	for legacy_control in [main.inventory_details_card, main.inventory_tackle_card, main.inventory_item_list, main.inventory_details_label, main.inventory_tackle_label]:
+		if legacy_control != null:
+			legacy_control.visible = false
+
+
 func _ensure_inventory_action_nodes() -> void:
 	if main == null or main.inventory_panel == null:
 		return
@@ -118,6 +318,7 @@ func _ensure_inventory_action_nodes() -> void:
 func _ensure_inventory_tile_nodes() -> void:
 	if main == null or main.inventory_panel == null:
 		return
+	_ensure_inventory_window_template_nodes()
 
 	if main.inventory_tiles_scroll == null or not is_instance_valid(main.inventory_tiles_scroll):
 		main.inventory_tiles_scroll = ScrollContainer.new()
@@ -126,15 +327,22 @@ func _ensure_inventory_tile_nodes() -> void:
 		main.inventory_tiles_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		main.inventory_tiles_scroll.mouse_filter = Control.MOUSE_FILTER_STOP
 		main.inventory_tiles_scroll.set_anchors_preset(Control.PRESET_TOP_LEFT)
-		main.inventory_panel.add_child(main.inventory_tiles_scroll)
+		_grid_area.add_child(main.inventory_tiles_scroll)
 		if not main.inventory_tiles_scroll.gui_input.is_connected(_on_inventory_tiles_scroll_gui_input):
 			main.inventory_tiles_scroll.gui_input.connect(_on_inventory_tiles_scroll_gui_input)
+	_move_control_to_parent(main.inventory_tiles_scroll, _grid_area)
 
-	if main.inventory_tiles_container == null or not is_instance_valid(main.inventory_tiles_container):
-		main.inventory_tiles_container = Control.new()
+	if main.inventory_tiles_container == null or not is_instance_valid(main.inventory_tiles_container) or not (main.inventory_tiles_container is GridContainer):
+		if main.inventory_tiles_container != null and is_instance_valid(main.inventory_tiles_container):
+			var old_container: Control = main.inventory_tiles_container
+			if old_container.get_parent() != null:
+				old_container.get_parent().remove_child(old_container)
+			old_container.queue_free()
+		main.inventory_tiles_container = GridContainer.new()
 		main.inventory_tiles_container.name = "InventoryTilesContainer"
-		main.inventory_tiles_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		main.inventory_tiles_container.mouse_filter = Control.MOUSE_FILTER_PASS
 		main.inventory_tiles_scroll.add_child(main.inventory_tiles_container)
+	(main.inventory_tiles_container as GridContainer).columns = TumanLakeUIKitScript.MIN_GRID_COLUMNS
 
 	if main.inventory_empty_label == null or not is_instance_valid(main.inventory_empty_label):
 		main.inventory_empty_label = Label.new()
@@ -145,12 +353,14 @@ func _ensure_inventory_tile_nodes() -> void:
 		main.inventory_empty_label.add_theme_color_override("font_color", Color(0.80, 0.92, 0.84, 0.78))
 		main.inventory_empty_label.add_theme_font_size_override("font_size", 18)
 		main.inventory_empty_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		main.inventory_panel.add_child(main.inventory_empty_label)
+		_grid_area.add_child(main.inventory_empty_label)
+	_move_control_to_parent(main.inventory_empty_label, _grid_area)
 
 
 func _ensure_inventory_detail_popup_nodes() -> void:
 	if main == null or main.inventory_panel == null:
 		return
+	_ensure_inventory_window_template_nodes()
 
 	if _details_panel == null or not is_instance_valid(_details_panel):
 		_details_panel = Panel.new()
@@ -160,8 +370,9 @@ func _ensure_inventory_detail_popup_nodes() -> void:
 		_details_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		_details_panel.z_index = main.inventory_panel.z_index + 30
 		_details_panel.visible = false
-		main.inventory_panel.add_child(_details_panel)
+		_window_panel.add_child(_details_panel)
 		_apply_inventory_details_panel_style()
+	_move_control_to_parent(_details_panel, _window_panel)
 
 	if _details_title_label == null or not is_instance_valid(_details_title_label):
 		_details_title_label = Label.new()
@@ -183,7 +394,7 @@ func _ensure_inventory_detail_popup_nodes() -> void:
 		_details_close_button.mouse_filter = Control.MOUSE_FILTER_STOP
 		_details_close_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		_details_close_button.z_index = main.inventory_panel.z_index + 24
-		main.inventory_panel.add_child(_details_close_button)
+		_details_panel.add_child(_details_close_button)
 		_details_close_button.pressed.connect(_on_inventory_detail_close_pressed)
 
 	_move_control_to_parent(_details_close_button, _details_panel)
@@ -344,7 +555,8 @@ func _ensure_inventory_details_container_nodes() -> void:
 	_details_close_button.text = "X"
 	_details_close_button.custom_minimum_size = Vector2(42.0, 34.0)
 	_details_close_button.size_flags_horizontal = Control.SIZE_SHRINK_END
-	theme.apply_close_button_style(_details_close_button)
+	_details_close_button.visible = false
+	TumanLakeUIKitScript.apply_close_button(_details_close_button)
 
 	if _details_empty_label == null or not is_instance_valid(_details_empty_label):
 		_details_empty_label = RichTextLabel.new()
@@ -402,6 +614,7 @@ func _ensure_inventory_details_container_nodes() -> void:
 		_details_preview_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		_details_preview_row.add_theme_constant_override("separation", 12)
 		_details_meta_margin.add_child(_details_preview_row)
+	_details_preview_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_move_control_to_parent(_details_icon_slot, _details_preview_row)
 	_details_icon_slot.custom_minimum_size = Vector2(92.0, 92.0)
 	_details_icon_slot.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -420,10 +633,12 @@ func _ensure_inventory_details_container_nodes() -> void:
 		_details_meta_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		_details_meta_column.add_theme_constant_override("separation", 8)
 		_details_preview_row.add_child(_details_meta_column)
-	_move_control_to_parent(_details_category_label, _details_meta_column)
+	_move_control_to_parent(_details_category_label, _details_content_box)
 	_move_control_to_parent(_details_status_label, _details_meta_column)
-	_details_category_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_details_category_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	_details_status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_details_meta_column.visible = false
+	_details_status_label.visible = false
 
 	_move_control_to_parent(_details_body_panel, _details_content_box)
 	_details_body_panel.custom_minimum_size = Vector2(0.0, 128.0)
@@ -508,9 +723,9 @@ func _ensure_inventory_details_container_nodes() -> void:
 	_move_control_to_parent(_details_action_row, _details_action_margin)
 	_details_action_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_details_action_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_move_control_to_parent(_details_header_row, _details_content_box)
 
 	var ordered_nodes: Array = [
-		_details_header_row,
 		_details_empty_label,
 		_details_content_scroll,
 		_details_action_panel
@@ -522,6 +737,8 @@ func _ensure_inventory_details_container_nodes() -> void:
 
 	var ordered_content_nodes: Array = [
 		_details_meta_panel,
+		_details_header_row,
+		_details_category_label,
 		_details_body_panel,
 		_details_description_panel
 	]
@@ -534,37 +751,23 @@ func _ensure_inventory_details_container_nodes() -> void:
 func _apply_inventory_details_panel_style() -> void:
 	if _details_panel == null or not is_instance_valid(_details_panel):
 		return
-	var style: StyleBoxFlat = theme.make_style(
-		Color(0.002, 0.012, 0.014, 0.995),
-		Color(0.70, 1.0, 0.88, 0.82),
-		14,
-		18,
-		Color(0.0, 0.0, 0.0, 0.66)
-	)
-	style.set_border_width_all(2)
-	style.content_margin_left = 14.0
-	style.content_margin_top = 14.0
-	style.content_margin_right = 14.0
-	style.content_margin_bottom = 14.0
-	_details_panel.add_theme_stylebox_override("panel", style)
+	TumanLakeUIKitScript.apply_details_panel(_details_panel)
 
 
 func _apply_inventory_details_section_style(panel: Panel, bg_color: Color, border_color: Color) -> void:
 	if panel == null or not is_instance_valid(panel):
 		return
-	var style: StyleBoxFlat = theme.make_style(
-		bg_color,
-		border_color,
-		10,
-		4,
-		Color(0.0, 0.0, 0.0, 0.26)
-	)
-	style.set_border_width_all(1)
-	style.content_margin_left = 12.0
-	style.content_margin_top = 10.0
-	style.content_margin_right = 12.0
-	style.content_margin_bottom = 10.0
-	panel.add_theme_stylebox_override("panel", style)
+	match panel.name:
+		"DetailsMetaPanel":
+			TumanLakeUIKitScript.apply_preview_panel(panel)
+		"DetailsDescriptionPanel":
+			TumanLakeUIKitScript.apply_description_panel(panel)
+		"DetailsActionPanel":
+			panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+		"DetailsBodyPanel":
+			panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+		_:
+			TumanLakeUIKitScript.apply_description_panel(panel)
 
 
 func _set_detail_margin(margin: MarginContainer, left: int, top: int, right: int, bottom: int) -> void:
@@ -587,7 +790,10 @@ func _move_control_to_parent(control: Control, parent: Control) -> void:
 
 
 func _update_inventory_ui() -> void:
+	_ensure_inventory_window_template_nodes()
 	_ensure_inventory_tile_nodes()
+	_ensure_inventory_detail_popup_nodes()
+	_layout_inventory_window_template_nodes()
 	_layout_inventory_tile_nodes()
 	main._visible_inventory_items = _get_visible_inventory_items()
 	main.inventory_title_label.text = "Инвентарь"
@@ -601,49 +807,164 @@ func _update_inventory_ui() -> void:
 	var selected_item = _get_selected_inventory_item()
 	_update_inventory_details_popup(selected_item)
 	_refresh_inventory_category_buttons()
+	_refresh_inventory_filter_buttons()
+	_update_inventory_footer()
+
+
+func _layout_inventory_window_template_nodes() -> void:
+	if main == null or main.inventory_panel == null:
+		return
+	_ensure_inventory_window_template_nodes()
+	var viewport_size: Vector2 = main.get_viewport_rect().size
+	TumanLakeUIKitScript.apply_full_rect(main.inventory_panel, viewport_size)
+	main.inventory_panel.color = Color.TRANSPARENT
+	main.inventory_panel.z_index = main.MENU_PANEL_Z
+	if main.inventory_backdrop != null:
+		TumanLakeUIKitScript.apply_full_rect(main.inventory_backdrop, viewport_size)
+		if main.inventory_backdrop is ColorRect:
+			main.inventory_backdrop.color = Color(0.0, 0.0, 0.0, 0.72)
+		main.inventory_backdrop.z_index = main.MENU_BACKDROP_Z
+
+	var window_rect: Rect2 = TumanLakeUIKitScript.get_window_rect(viewport_size)
+	_window_panel.position = window_rect.position
+	_window_panel.size = window_rect.size
+	_window_panel.z_index = main.MENU_PANEL_Z + 1
+	TumanLakeUIKitScript.apply_window(_window_panel)
+
+	var metrics: Dictionary = TumanLakeUIKitScript.get_metrics(window_rect.size)
+	var layout: Dictionary = _get_inventory_content_layout(window_rect.size)
+	var gap: float = metrics.get("gap", 10.0)
+	var scale: float = metrics.get("scale", 1.0)
+	var sx: float = metrics.get("x_scale", 1.0)
+	var sy: float = metrics.get("y_scale", 1.0)
+
+	var header_pos: Vector2 = layout.get("header_pos", Vector2(16.0, 8.0))
+	var header_size: Vector2 = layout.get("header_size", Vector2(window_rect.size.x - 32.0, 38.0))
+	main.inventory_title_label.position = header_pos
+	main.inventory_title_label.size = header_size
+	main.inventory_title_label.z_index = _window_panel.z_index + 1
+	main.inventory_title_label.add_theme_font_size_override("font_size", int(clampf(26.0 * scale, 18.0, 28.0)))
+	main.inventory_title_label.add_theme_color_override("font_color", TumanLakeUIKitScript.TEXT_PRIMARY)
+	var close_pos: Vector2 = layout.get("close_pos", Vector2(window_rect.size.x - 48.0, 10.0))
+	var close_size_vec: Vector2 = layout.get("close_size", Vector2(40.0, 40.0))
+	var close_dim := clampf(minf(close_size_vec.x, close_size_vec.y), 28.0, 42.0)
+	main.inventory_close_button.position = close_pos
+	main.inventory_close_button.size = Vector2(close_dim, close_dim)
+	main.inventory_close_button.custom_minimum_size = main.inventory_close_button.size
+	main.inventory_close_button.z_index = _window_panel.z_index + 2
+	TumanLakeUIKitScript.apply_close_button(main.inventory_close_button)
+
+	var tab_pos: Vector2 = layout.get("tab_pos", Vector2(18.0, 54.0))
+	var tab_size: Vector2 = layout.get("tab_size", Vector2(header_size.x, 42.0))
+	_tab_scroll.position = tab_pos
+	_tab_scroll.size = tab_size
+	_tab_scroll.z_index = _window_panel.z_index + 1
+	_tab_row.position = Vector2.ZERO
+	_tab_row.add_theme_constant_override("separation", int(maxf(gap * 0.45, 3.0)))
+	var tab_button_width: float = metrics.get("tab_button_width", 104.0)
+	var tab_button_height: float = metrics.get("tab_button_height", 36.0)
+	var tab_min_width := 0.0
+	for pair in _get_inventory_category_button_pairs():
+		var button: Button = pair[0]
+		var title := str(pair[2])
+		button.text = title
+		button.custom_minimum_size = Vector2(tab_button_width, tab_button_height)
+		button.size = button.custom_minimum_size
+		TumanLakeUIKitScript.apply_tab_button(button, str(pair[1]) == main._inventory_category, int(clampf(12.0 * scale, 9.0, 13.0)))
+		tab_min_width += tab_button_width
+	tab_min_width += maxf(float(_get_inventory_category_button_pairs().size() - 1), 0.0) * maxf(gap * 0.45, 3.0)
+	_tab_row.custom_minimum_size = Vector2(maxf(tab_min_width, tab_size.x), tab_size.y)
+	_tab_row.size = Vector2(maxf(tab_min_width, tab_size.x), tab_size.y)
+
+	var toolbar_pos: Vector2 = layout.get("toolbar_pos", Vector2(16.0, 112.0))
+	var toolbar_size: Vector2 = layout.get("toolbar_size", Vector2(header_size.x, 36.0))
+	_toolbar_panel.position = toolbar_pos
+	_toolbar_panel.size = toolbar_size
+	TumanLakeUIKitScript.apply_panel(_toolbar_panel as Panel, "filter_sort_panel", Vector4(20.0, 20.0, 20.0, 20.0))
+	_filter_row.position = Vector2.ZERO
+	_filter_row.size = Vector2(toolbar_size.x * 0.62, toolbar_size.y)
+	_filter_row.add_theme_constant_override("separation", int(maxf(gap * 0.75, 5.0)))
+	var chip_width: float = metrics.get("chip_width", 78.0)
+	var chip_height: float = metrics.get("chip_height", 30.0)
+	for filter_id in _filter_buttons.keys():
+		var filter_button: Button = _filter_buttons[filter_id]
+		filter_button.custom_minimum_size = Vector2(chip_width, chip_height)
+		filter_button.size = filter_button.custom_minimum_size
+		TumanLakeUIKitScript.apply_filter_button(filter_button, str(filter_id) == _inventory_filter, int(clampf(11.0 * scale, 9.0, 12.0)))
+	_sort_label.visible = false
+	_sort_option.size = Vector2(clampf(230.0 * sx, 148.0, 230.0), chip_height)
+	_sort_option.position = Vector2(toolbar_size.x - _sort_option.size.x - 10.0 * sx, (toolbar_size.y - chip_height) * 0.5)
+	TumanLakeUIKitScript.apply_sort_option(_sort_option, int(clampf(11.0 * scale, 9.0, 12.0)))
+
+	var grid_pos: Vector2 = layout.get("grid_pos", Vector2(16.0, 172.0))
+	var grid_size: Vector2 = layout.get("grid_size", Vector2(560.0, 300.0))
+	_grid_area.position = grid_pos
+	_grid_area.size = grid_size
+	_grid_area.z_index = _window_panel.z_index + 1
+	TumanLakeUIKitScript.apply_panel(_grid_area, "content_panel_wide", Vector4(24.0, 24.0, 24.0, 24.0))
+
+	var details_pos: Vector2 = layout.get("details_pos", Vector2(grid_pos.x + grid_size.x + gap, grid_pos.y))
+	var details_size: Vector2 = layout.get("details_size", Vector2(260.0, grid_size.y))
+	if _details_panel != null and is_instance_valid(_details_panel):
+		_details_panel.position = details_pos
+		_details_panel.size = details_size
+		_details_panel.custom_minimum_size = details_size
+		_details_panel.z_index = _window_panel.z_index + 1
+		TumanLakeUIKitScript.apply_details_panel(_details_panel)
+
+	var footer_pos: Vector2 = layout.get("footer_pos", Vector2(16.0, window_rect.size.y - 58.0))
+	var footer_size: Vector2 = layout.get("footer_size", Vector2(header_size.x, 34.0))
+	_footer_panel.position = footer_pos
+	_footer_panel.size = footer_size
+	_footer_panel.z_index = _window_panel.z_index + 1
+	TumanLakeUIKitScript.apply_panel(_footer_panel, "filter_sort_panel", Vector4(20.0, 20.0, 20.0, 20.0))
+	_footer_margin.visible = false
+	_move_control_to_parent(_footer_summary_label, _footer_panel)
+	_move_control_to_parent(_footer_pager_row, _footer_panel)
+	_move_control_to_parent(_footer_filter_button, _footer_panel)
+	var footer_inner_y := 3.0 * sy
+	var footer_inner_h := maxf(footer_size.y - 6.0 * sy, 22.0)
+	_footer_summary_label.position = Vector2(18.0 * sx, 0.0)
+	_footer_summary_label.size = Vector2(300.0 * sx, footer_size.y)
+	_footer_summary_label.add_theme_font_size_override("font_size", int(clampf(12.0 * scale, 10.0, 12.0)))
+	var footer_button_size := Vector2(clampf(178.0 * sx, 112.0, 178.0), footer_inner_h)
+	_footer_filter_button.position = Vector2(footer_size.x - footer_button_size.x - 18.0 * sx, footer_inner_y)
+	_footer_filter_button.size = footer_button_size
+	_footer_filter_button.custom_minimum_size = footer_button_size
+	TumanLakeUIKitScript.apply_action_button(_footer_filter_button, "secondary", int(clampf(12.0 * scale, 10.0, 12.0)))
+	var pager_size := Vector2(clampf(360.0 * sx, 220.0, 360.0), footer_inner_h)
+	_footer_pager_row.position = Vector2((footer_size.x - pager_size.x) * 0.5, footer_inner_y)
+	_footer_pager_row.size = pager_size
+	_footer_pager_row.custom_minimum_size = pager_size
+	_footer_pager_row.add_theme_constant_override("separation", int(maxf(6.0 * scale, 4.0)))
 
 
 func _get_inventory_content_layout(panel_size: Vector2) -> Dictionary:
-	var is_compact := panel_size.y <= 620.0
-	var inventory_padding := 20.0 if is_compact else 28.0
-	var inventory_body_y := 104.0 if is_compact else 116.0
-	var close_button_height := 48.0
-	var inventory_action_y: float = panel_size.y - inventory_padding - close_button_height
-	var gap := 14.0 if is_compact else 18.0
-	var content_width: float = maxf(panel_size.x - inventory_padding * 2.0, 360.0)
-	var body_height: float = maxf(inventory_action_y - inventory_body_y - 16.0, 1.0)
-	var min_grid_width := 260.0
-	var available_details_width: float = maxf(content_width - min_grid_width - gap, 240.0)
-	var min_details_width: float = minf(300.0, available_details_width)
-	var max_details_width: float = maxf(min_details_width, minf(520.0, content_width * 0.42))
-	var details_width: float = clampf(content_width * 0.35, min_details_width, max_details_width)
-	if content_width - details_width - gap < min_grid_width:
-		details_width = maxf(content_width - min_grid_width - gap, 260.0)
-	var grid_width: float = maxf(content_width - details_width - gap, min_grid_width)
-	return {
-		"grid_pos": Vector2(inventory_padding, inventory_body_y),
-		"grid_size": Vector2(grid_width, body_height),
-		"details_pos": Vector2(inventory_padding + grid_width + gap, inventory_body_y),
-		"details_size": Vector2(details_width, body_height)
-	}
+	var window_size := panel_size
+	if _window_panel != null and is_instance_valid(_window_panel) and _window_panel.size.x > 1.0 and _window_panel.size.y > 1.0:
+		window_size = _window_panel.size
+	return TumanLakeUIKitScript.get_inventory_content_layout(window_size)
 
 
 func _layout_inventory_tile_nodes() -> void:
 	var layout: Dictionary = _get_inventory_content_layout(main.inventory_panel.size)
-	var grid_pos: Vector2 = layout.get("grid_pos", Vector2.ZERO)
 	var grid_size: Vector2 = layout.get("grid_size", Vector2(240.0, 180.0))
+	var metrics: Dictionary = TumanLakeUIKitScript.get_metrics(_window_panel.size if _window_panel != null and is_instance_valid(_window_panel) else main.inventory_panel.size)
+	var inset := maxf(10.0 * float(metrics.get("scale", 1.0)), 6.0)
+	var scroll_size := Vector2(maxf(grid_size.x - inset * 2.0, 120.0), maxf(grid_size.y - inset * 2.0, 80.0))
 
-	main.inventory_tiles_scroll.position = grid_pos
-	main.inventory_tiles_scroll.size = grid_size
+	main.inventory_tiles_scroll.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	main.inventory_tiles_scroll.position = Vector2(inset, inset)
+	main.inventory_tiles_scroll.size = scroll_size
 	main.inventory_tiles_scroll.z_index = main.inventory_panel.z_index + 3
 	main.inventory_tiles_scroll.visible = true
 
 	main.inventory_tiles_container.position = Vector2.ZERO
-	main.inventory_tiles_container.size = main.inventory_tiles_scroll.size
-	main.inventory_tiles_container.custom_minimum_size = main.inventory_tiles_scroll.size
+	main.inventory_tiles_container.size = Vector2(scroll_size.x, 0.0)
+	main.inventory_tiles_container.custom_minimum_size = Vector2(scroll_size.x, 0.0)
 
-	main.inventory_empty_label.position = main.inventory_tiles_scroll.position
-	main.inventory_empty_label.size = main.inventory_tiles_scroll.size
+	main.inventory_empty_label.position = Vector2(inset, inset)
+	main.inventory_empty_label.size = scroll_size
 	main.inventory_empty_label.z_index = main.inventory_panel.z_index + 4
 
 
@@ -654,6 +975,11 @@ func _hide_inventory_pager() -> void:
 		main.inventory_next_page_button.visible = false
 	if main.inventory_page_label != null:
 		main.inventory_page_label.visible = false
+	if _footer_pager_row != null and is_instance_valid(_footer_pager_row):
+		_footer_pager_row.visible = false
+	for page_button in _page_buttons:
+		if page_button != null and is_instance_valid(page_button):
+			page_button.visible = false
 
 
 func _rebuild_inventory_tiles() -> void:
@@ -664,35 +990,45 @@ func _rebuild_inventory_tiles() -> void:
 	var items: Array = main._visible_inventory_items
 	main.inventory_empty_label.visible = items.is_empty()
 	if items.is_empty():
-		main.inventory_tiles_container.custom_minimum_size = main.inventory_tiles_scroll.size
+		main.inventory_tiles_container.custom_minimum_size = Vector2(main.inventory_tiles_scroll.size.x, main.inventory_tiles_scroll.size.y)
+		_update_inventory_pager(1, 0)
 		return
 
-	var gap := 14.0
-	var viewport_width: float = max(main.inventory_tiles_scroll.size.x, 240.0)
-	var min_card_width := 172.0
-	var max_columns := 8
-	var columns: int = clampi(int(floor((viewport_width + gap) / (min_card_width + gap))), 2, max_columns)
-	var card_width: float = floor((viewport_width - gap * float(columns - 1)) / float(columns))
-	var card_height := 176.0
+	var page_count: int = maxi(1, ceili(float(items.size()) / float(INVENTORY_ITEMS_PER_PAGE)))
+	main._inventory_page = clampi(main._inventory_page, 0, page_count - 1)
+	var start_index: int = main._inventory_page * INVENTORY_ITEMS_PER_PAGE
+	var end_index: int = mini(start_index + INVENTORY_ITEMS_PER_PAGE, items.size())
+	var page_items: Array = []
+	for i in range(start_index, end_index):
+		page_items.append(items[i])
 
-	for i in items.size():
-		var item: Dictionary = items[i]
-		var column := i % columns
-		var row := int(i / columns)
-		var pos := Vector2(float(column) * (card_width + gap), float(row) * (card_height + gap))
-		var card := _create_inventory_tile_card(item, Vector2(card_width, card_height))
-		card.position = pos
+	var metrics: Dictionary = TumanLakeUIKitScript.get_metrics(_window_panel.size if _window_panel != null and is_instance_valid(_window_panel) else main.inventory_panel.size)
+	var gap: float = maxf(8.0 * float(metrics.get("scale", 1.0)), 6.0)
+	var viewport_width: float = max(main.inventory_tiles_scroll.size.x, 240.0)
+	var columns: int = TumanLakeUIKitScript.get_grid_columns(viewport_width)
+	var card_size: Vector2 = TumanLakeUIKitScript.get_grid_card_size(viewport_width, columns, gap)
+	var grid := main.inventory_tiles_container as GridContainer
+	grid.columns = columns
+	grid.add_theme_constant_override("h_separation", int(gap))
+	grid.add_theme_constant_override("v_separation", int(gap))
+	grid.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+
+	for item_value in page_items:
+		var item: Dictionary = item_value
+		var card := _create_inventory_tile_card(item, card_size)
 		main.inventory_tiles_container.add_child(card)
 
-	var rows := ceili(float(items.size()) / float(columns))
-	var content_height: float = max(float(rows) * card_height + float(maxi(rows - 1, 0)) * gap, main.inventory_tiles_scroll.size.y)
+	var rows := ceili(float(page_items.size()) / float(columns))
+	var content_height: float = max(float(rows) * card_size.y + float(maxi(rows - 1, 0)) * gap, main.inventory_tiles_scroll.size.y)
 	main.inventory_tiles_container.size = Vector2(viewport_width, content_height)
 	main.inventory_tiles_container.custom_minimum_size = main.inventory_tiles_container.size
+	_update_inventory_pager(page_count, items.size())
 
 
 func _create_inventory_tile_card(item: Dictionary, card_size: Vector2) -> Button:
 	var item_id := str(item.get("id", ""))
 	var selected: bool = item_id == str(main._selected_inventory_item_id)
+	var equipped := _is_inventory_item_equipped(item)
 	var card := Button.new()
 	card.name = "InventoryTile_%s" % item_id
 	card.text = ""
@@ -700,16 +1036,19 @@ func _create_inventory_tile_card(item: Dictionary, card_size: Vector2) -> Button
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	card.size = card_size
 	card.custom_minimum_size = card_size
+	card.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	card.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	card.z_index = main.inventory_panel.z_index + 4
 	card.pressed.connect(_on_inventory_tile_pressed.bind(item_id))
-	_apply_inventory_tile_button_style(card, item, selected)
+	TumanLakeUIKitScript.apply_item_card(card, selected, 9)
 
+	var image_size := clampf(card_size.y * 0.38, 32.0, 42.0)
 	var image_slot := Panel.new()
 	image_slot.name = "ImageSlot"
 	image_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	image_slot.position = Vector2((card_size.x - 92.0) * 0.5, 14.0)
-	image_slot.size = Vector2(92.0, 92.0)
-	image_slot.add_theme_stylebox_override("panel", theme.get_inventory_slot_style(selected, _get_item_rarity(item)))
+	image_slot.position = Vector2((card_size.x - image_size) * 0.5, 7.0)
+	image_slot.size = Vector2(image_size, image_size)
+	TumanLakeUIKitScript.apply_panel(image_slot, "slot_normal", Vector4(18.0, 18.0, 18.0, 18.0))
 	card.add_child(image_slot)
 
 	var image := TextureRect.new()
@@ -718,64 +1057,68 @@ func _create_inventory_tile_card(item: Dictionary, card_size: Vector2) -> Button
 	image.texture = _get_item_texture(item)
 	image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	image.position = Vector2(8.0, 8.0)
-	image.size = Vector2(76.0, 76.0)
+	image.position = Vector2(6.0, 6.0)
+	image.size = Vector2(maxf(image_size - 12.0, 1.0), maxf(image_size - 12.0, 1.0))
 	image_slot.add_child(image)
 
 	var title := Label.new()
 	title.name = "Title"
-	title.text = _shorten_tile_text(_get_item_display_name(item), 30)
+	title.text = _shorten_tile_text(_get_item_display_name(item), 22)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title.clip_text = true
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	title.position = Vector2(12.0, 112.0)
-	title.size = Vector2(card_size.x - 24.0, 36.0)
-	title.add_theme_font_size_override("font_size", 12)
+	title.position = Vector2(8.0, image_slot.position.y + image_slot.size.y + 4.0)
+	title.size = Vector2(card_size.x - 16.0, maxf(card_size.y - image_slot.position.y - image_slot.size.y - 30.0, 22.0))
+	title.add_theme_font_size_override("font_size", 9)
 	title.add_theme_color_override("font_color", Color(0.88, 0.97, 0.88, 0.98) if not _is_inventory_tile_dimmed(item) else Color(0.64, 0.70, 0.68, 0.88))
 	card.add_child(title)
 
-	var subtitle := Label.new()
-	subtitle.name = "Subtitle"
-	subtitle.text = _get_inventory_item_tile_subtitle(item)
-	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	subtitle.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	subtitle.clip_text = true
-	subtitle.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	subtitle.position = Vector2(12.0, 146.0)
-	subtitle.size = Vector2(card_size.x - 24.0, 22.0)
-	subtitle.add_theme_font_size_override("font_size", 11)
-	subtitle.add_theme_color_override("font_color", Color(0.74, 0.92, 0.78, 0.96) if not _is_inventory_tile_dimmed(item) else Color(0.55, 0.61, 0.59, 0.88))
-	card.add_child(subtitle)
+	var type_label := Label.new()
+	type_label.name = "Type"
+	type_label.text = _get_inventory_category_title(str(item.get("category", "misc")))
+	type_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	type_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	type_label.clip_text = true
+	type_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	type_label.position = Vector2(8.0, card_size.y - 20.0)
+	type_label.size = Vector2(card_size.x - 16.0, 14.0)
+	type_label.add_theme_font_size_override("font_size", 8)
+	type_label.add_theme_color_override("font_color", Color(0.66, 0.82, 0.72, 0.90) if not _is_inventory_tile_dimmed(item) else Color(0.52, 0.58, 0.56, 0.86))
+	card.add_child(type_label)
 
-	if _is_inventory_item_equipped(item):
+	var quantity_text := _get_inventory_item_quantity_text(item)
+	if quantity_text != "":
+		var quantity := Label.new()
+		quantity.name = "Quantity"
+		quantity.text = quantity_text
+		quantity.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		quantity.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		quantity.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		quantity.position = Vector2(6.0, 6.0)
+		quantity.size = Vector2(32.0, 16.0)
+		TumanLakeUIKitScript.apply_badge_label(quantity, "badge_count", 8)
+		quantity.add_theme_color_override("font_color", Color(0.88, 0.96, 0.86, 1.0))
+		card.add_child(quantity)
+
+	if equipped:
 		var badge := Label.new()
 		badge.name = "EquippedBadge"
 		badge.text = "Надето"
 		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		badge.position = Vector2(card_size.x - 76.0, 10.0)
-		badge.size = Vector2(62.0, 22.0)
-		badge.add_theme_font_size_override("font_size", 9)
-		badge.add_theme_color_override("font_color", Color(0.89, 1.0, 0.78, 1.0))
+		badge.position = Vector2(card_size.x - 54.0, 6.0)
+		badge.size = Vector2(48.0, 16.0)
+		TumanLakeUIKitScript.apply_badge_label(badge, "badge_equipped", 7)
 		card.add_child(badge)
 
 	return card
 
 
 func _apply_inventory_tile_button_style(card: Button, item: Dictionary, selected: bool) -> void:
-	var normal := _get_inventory_tile_style(item, selected, "normal")
-	var hover := _get_inventory_tile_style(item, selected, "hover")
-	var pressed := _get_inventory_tile_style(item, selected, "pressed")
-	card.add_theme_stylebox_override("normal", normal)
-	card.add_theme_stylebox_override("hover", hover)
-	card.add_theme_stylebox_override("pressed", pressed)
-	card.add_theme_stylebox_override("focus", pressed)
-	card.add_theme_color_override("font_color", Color.TRANSPARENT)
-	card.add_theme_color_override("font_hover_color", Color.TRANSPARENT)
-	card.add_theme_color_override("font_pressed_color", Color.TRANSPARENT)
+	TumanLakeUIKitScript.apply_item_card(card, selected, 10)
 
 
 func _get_inventory_tile_style(item: Dictionary, selected: bool, state: String) -> StyleBoxFlat:
@@ -831,7 +1174,7 @@ func _update_inventory_details_popup(selected_item: Dictionary) -> void:
 	if _details_panel != null:
 		_details_panel.visible = true
 	if _details_close_button != null:
-		_details_close_button.visible = has_selection
+		_details_close_button.visible = false
 
 	if not has_selection:
 		_position_inventory_details_popup(false)
@@ -847,12 +1190,12 @@ func _update_inventory_details_popup(selected_item: Dictionary) -> void:
 	var can_discard := _can_discard_item(selected_item)
 
 	var action_buttons: Array = []
+	if is_equippable:
+		action_buttons.append(main.inventory_equip_button)
 	if can_repair and main.inventory_repair_button != null:
 		action_buttons.append(main.inventory_repair_button)
 	if can_discard and main.inventory_discard_button != null:
 		action_buttons.append(main.inventory_discard_button)
-	if is_equippable:
-		action_buttons.append(main.inventory_equip_button)
 
 	_position_inventory_details_popup(action_buttons.size() > 0)
 	main.inventory_details_label.text = ""
@@ -861,7 +1204,7 @@ func _update_inventory_details_popup(selected_item: Dictionary) -> void:
 	main.inventory_equip_button.disabled = not can_equip or is_equipped or main._fishing_ui_state != FishingUiState.IDLE
 	if main.inventory_repair_button != null:
 		main.inventory_repair_button.disabled = not can_repair
-		main.inventory_repair_button.text = "Починить"
+		main.inventory_repair_button.text = "Ремонт"
 	if main.inventory_discard_button != null:
 		main.inventory_discard_button.disabled = not can_discard
 		main.inventory_discard_button.text = "Выбросить"
@@ -873,7 +1216,7 @@ func _update_inventory_details_popup(selected_item: Dictionary) -> void:
 	elif block_reason != "":
 		main.inventory_equip_button.text = "Недоступно"
 	else:
-		main.inventory_equip_button.text = "Экипировать"
+		main.inventory_equip_button.text = "Надеть"
 
 	_layout_inventory_detail_actions(action_buttons)
 
@@ -882,11 +1225,13 @@ func _show_inventory_details_empty_state() -> void:
 	if _details_panel == null or not is_instance_valid(_details_panel):
 		return
 
-	_details_title_label.text = "Подробности"
+	_details_title_label.text = ""
 	_details_empty_label.visible = true
-	_details_empty_label.text = "[center][font_size=22][b]Выберите предмет[/b][/font_size]\n\n[color=#b8d7c5]Здесь появится информация о выбранном предмете.[/color][/center]"
+	_details_empty_label.text = "[center][font_size=22][b]Выберите предмет[/b][/font_size]\n\n[color=#b8d7c5]Информация появится здесь[/color][/center]"
 	if _details_content_scroll != null:
 		_details_content_scroll.visible = false
+	if _details_header_row != null:
+		_details_header_row.visible = true
 	_details_meta_panel.visible = false
 	_details_body_panel.visible = false
 	_details_description_panel.visible = false
@@ -905,19 +1250,23 @@ func _update_inventory_details_content(item: Dictionary) -> void:
 	_details_empty_label.visible = false
 	if _details_content_scroll != null:
 		_details_content_scroll.visible = true
+	if _details_header_row != null:
+		_details_header_row.visible = true
 	_details_meta_panel.visible = true
 	_details_body_panel.visible = true
 	_details_description_panel.visible = true
 	_details_title_label.text = _get_item_display_name(item)
 	_details_icon.texture = _get_item_texture(item)
-	_details_icon_slot.add_theme_stylebox_override("panel", theme.get_inventory_slot_style(false, _get_item_rarity(item)))
-	_details_category_label.text = "Категория: %s" % _get_inventory_category_title(category)
+	_details_icon_slot.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	_details_category_label.text = _get_inventory_category_title(category)
+	_details_category_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_details_category_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_details_status_label.text = status_text
 	if status_text.find("Слом") >= 0 or status_text.find("законч") >= 0:
 		_details_status_label.add_theme_color_override("font_color", Color(1.0, 0.55, 0.34, 1.0))
 	else:
 		_details_status_label.add_theme_color_override("font_color", Color(0.68, 0.96, 0.72, 1.0))
-	_details_body_label.text = _get_inventory_item_details_body_text(item)
+	_details_body_label.text = _get_inventory_item_parameters_text(item, status_text)
 	var description := _get_item_description(item).strip_edges()
 	if description == "":
 		description = "Описание пока не добавлено."
@@ -939,6 +1288,38 @@ func _get_inventory_item_status_summary(item: Dictionary) -> String:
 	if quantity > 1:
 		return "Количество: %d" % quantity
 	return "Готово к использованию"
+
+
+func _get_inventory_item_parameters_text(item: Dictionary, status_text: String) -> String:
+	var category := str(item.get("category", "misc"))
+	var quantity := int(item.get("quantity", 1))
+	var stats: Dictionary = item.get("stats", {}) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
+	var rows: Array = []
+	_append_parameter_row(rows, "Тип", _get_inventory_category_title(category))
+	_append_parameter_row(rows, "Количество", str(quantity))
+
+	if category == "fish":
+		_append_parameter_row(rows, "Вес", UIFormatters.format_weight_kg(float(stats.get("weight", 0.0))))
+		_append_parameter_row(rows, "Цена", UIFormatters.format_money(float(stats.get("sell_price", stats.get("price", 0)))))
+	elif ["rod", "line", "leader", "hook"].has(category):
+		_append_parameter_row(rows, "Состояние", _get_item_condition_title(item))
+		_append_parameter_row(rows, "Износ", "%d%%" % _get_item_wear_percent(item))
+
+	var equip_status := "Надето" if _is_inventory_item_equipped(item) else "Не надето"
+	if not _is_equippable_inventory_item(item):
+		equip_status = status_text
+	_append_parameter_row(rows, "Статус", equip_status)
+	return "\n".join(rows)
+
+
+func _append_parameter_row(rows: Array, title: String, value: String) -> void:
+	var clean_value := value.strip_edges()
+	if clean_value == "":
+		return
+	rows.append("[color=#7fa996]%s[/color]  [color=#eef8ef]%s[/color]" % [
+		_escape_details_bbcode(title),
+		_escape_details_bbcode(clean_value)
+	])
 
 
 func _get_inventory_item_details_body_text(item: Dictionary) -> String:
@@ -1005,29 +1386,24 @@ func _position_inventory_details_popup(has_actions: bool) -> void:
 	var layout: Dictionary = _get_inventory_content_layout(main.inventory_panel.size)
 	var panel_pos: Vector2 = layout.get("details_pos", Vector2.ZERO)
 	var panel_size: Vector2 = layout.get("details_size", Vector2(320.0, 260.0))
-	var compact := panel_size.y <= INVENTORY_DETAILS_COMPACT_HEIGHT
-	var tiny := panel_size.y <= INVENTORY_DETAILS_TINY_HEIGHT
-	var outer_padding := 10 if compact else 14
-	var section_padding := 8 if compact else 10
-	var root_separation := 6 if compact else 10
-	var header_height := 34.0 if compact else 40.0
-	var meta_height := 72.0 if compact else 116.0
-	var description_height := 48.0 if tiny else (56.0 if compact else 112.0)
-	var action_height := 48.0 if tiny else (52.0 if compact else 76.0)
-	var visible_gap_count := 4 if has_actions else 3
-	var fixed_height := float(outer_padding * 2) + header_height + meta_height + description_height
-	if has_actions:
-		fixed_height += action_height
-	fixed_height += float(visible_gap_count * root_separation)
-	var body_height := clampf(panel_size.y * 0.24, 128.0, 210.0)
-	if compact:
-		body_height = clampf(panel_size.y - fixed_height, 56.0, 98.0)
-	var icon_size := 58.0 if tiny else (64.0 if compact else 92.0)
-	var icon_inset := 5.0 if compact else 8.0
-	var title_font_size := 17 if compact else 20
-	var meta_font_size := 11 if compact else 13
-	var body_font_size := 12 if compact else 13
-	var body_bold_font_size := 13 if compact else 14
+	var compact := panel_size.y <= 420.0
+	var outer_padding := 10
+	var section_padding := 6
+	var root_separation := 5
+	var header_height := 32.0
+	var meta_height := 90.0 if compact else 104.0
+	var category_height := 22.0
+	var description_height := 70.0 if compact else 84.0
+	var action_height := 42.0 if has_actions else 0.0
+	var visible_gap_count := 5 if has_actions else 4
+	var fixed_height := float(outer_padding * 2) + header_height + meta_height + category_height + description_height + action_height + float(visible_gap_count * root_separation)
+	var body_height := clampf(panel_size.y - fixed_height, 68.0, 102.0)
+	var icon_size := 62.0 if compact else 74.0
+	var icon_inset := 6.0
+	var title_font_size := 17 if compact else 19
+	var meta_font_size := 10 if compact else 11
+	var body_font_size := 11 if compact else 12
+	var body_bold_font_size := 12 if compact else 13
 
 	_details_panel.position = panel_pos
 	_details_panel.size = panel_size
@@ -1063,13 +1439,13 @@ func _position_inventory_details_popup(has_actions: bool) -> void:
 		_details_header_row.custom_minimum_size = Vector2(0.0, header_height)
 		_details_header_row.add_theme_constant_override("separation", root_separation)
 	_details_title_label.z_index = main.inventory_panel.z_index + 31
-	_details_title_label.custom_minimum_size = Vector2(maxf(label_width - 52.0, 80.0), header_height)
+	_details_title_label.custom_minimum_size = Vector2(label_width, header_height)
 	_details_title_label.add_theme_font_size_override("font_size", title_font_size)
 
 	if _details_close_button != null:
 		_details_close_button.z_index = main.inventory_panel.z_index + 32
 		_details_close_button.custom_minimum_size = Vector2(36.0 if compact else 42.0, 30.0 if compact else 34.0)
-		theme.apply_close_button_style(_details_close_button)
+		TumanLakeUIKitScript.apply_close_button(_details_close_button)
 
 	_details_meta_panel.z_index = main.inventory_panel.z_index + 31
 	_details_meta_panel.custom_minimum_size = Vector2(0.0, meta_height)
@@ -1086,10 +1462,12 @@ func _position_inventory_details_popup(has_actions: bool) -> void:
 	_details_icon.offset_top = icon_inset
 	_details_icon.offset_right = -icon_inset
 	_details_icon.offset_bottom = -icon_inset
-	_details_category_label.custom_minimum_size = Vector2(label_width, 24.0 if compact else 32.0)
+	_details_category_label.custom_minimum_size = Vector2(minf(label_width, 156.0), category_height)
 	_details_category_label.add_theme_font_size_override("font_size", meta_font_size)
+	TumanLakeUIKitScript.apply_chip_label(_details_category_label, meta_font_size)
 	_details_status_label.custom_minimum_size = Vector2(label_width, 28.0 if compact else 42.0)
 	_details_status_label.add_theme_font_size_override("font_size", meta_font_size)
+	_details_status_label.visible = false
 
 	_details_body_panel.z_index = main.inventory_panel.z_index + 31
 	_details_body_panel.custom_minimum_size = Vector2(0.0, body_height)
@@ -1129,10 +1507,10 @@ func _layout_inventory_detail_actions(action_buttons: Array) -> void:
 	if _details_action_row == null or not is_instance_valid(_details_action_row):
 		return
 
-	var compact := _details_panel != null and is_instance_valid(_details_panel) and _details_panel.size.y <= INVENTORY_DETAILS_COMPACT_HEIGHT
-	var button_height := 40.0 if compact else 56.0
-	var button_width := 64.0 if compact else 92.0
-	var button_font_size := 13 if compact else 16
+	var compact := _details_panel != null and is_instance_valid(_details_panel) and _details_panel.size.y <= 420.0
+	var button_height := 30.0 if compact else 36.0
+	var button_width := 62.0 if compact else 86.0
+	var button_font_size := 10 if compact else 12
 
 	_details_action_row.visible = not action_buttons.is_empty()
 	for button in [main.inventory_repair_button, main.inventory_discard_button, main.inventory_equip_button]:
@@ -1150,14 +1528,17 @@ func _layout_inventory_detail_actions(action_buttons: Array) -> void:
 		button.visible = true
 		button.z_index = main.inventory_panel.z_index + 33
 		if button == main.inventory_equip_button:
-			theme.apply_primary_button_style(button)
+			TumanLakeUIKitScript.apply_action_button(button, "primary", button_font_size)
+		elif button == main.inventory_discard_button:
+			TumanLakeUIKitScript.apply_action_button(button, "danger", button_font_size)
 		else:
-			theme.apply_secondary_button_style(button)
+			TumanLakeUIKitScript.apply_action_button(button, "secondary", button_font_size)
 
 
 func _ensure_inventory_pager_nodes() -> void:
 	if main == null or main.inventory_panel == null:
 		return
+	_ensure_inventory_window_template_nodes()
 
 	if main.inventory_prev_page_button == null:
 		main.inventory_prev_page_button = Button.new()
@@ -1167,8 +1548,9 @@ func _ensure_inventory_pager_nodes() -> void:
 		main.inventory_prev_page_button.mouse_filter = Control.MOUSE_FILTER_STOP
 		main.inventory_prev_page_button.z_index = 2
 		main.inventory_prev_page_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
-		main.inventory_panel.add_child(main.inventory_prev_page_button)
+		_footer_pager_row.add_child(main.inventory_prev_page_button)
 		main.inventory_prev_page_button.pressed.connect(_on_inventory_prev_page_pressed)
+	_move_control_to_parent(main.inventory_prev_page_button, _footer_pager_row)
 
 	if main.inventory_next_page_button == null:
 		main.inventory_next_page_button = Button.new()
@@ -1178,8 +1560,9 @@ func _ensure_inventory_pager_nodes() -> void:
 		main.inventory_next_page_button.mouse_filter = Control.MOUSE_FILTER_STOP
 		main.inventory_next_page_button.z_index = 2
 		main.inventory_next_page_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
-		main.inventory_panel.add_child(main.inventory_next_page_button)
+		_footer_pager_row.add_child(main.inventory_next_page_button)
 		main.inventory_next_page_button.pressed.connect(_on_inventory_next_page_pressed)
+	_move_control_to_parent(main.inventory_next_page_button, _footer_pager_row)
 
 	if main.inventory_page_label == null:
 		main.inventory_page_label = Label.new()
@@ -1189,41 +1572,147 @@ func _ensure_inventory_pager_nodes() -> void:
 		main.inventory_page_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		main.inventory_page_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		main.inventory_panel.add_child(main.inventory_page_label)
+	main.inventory_page_label.visible = false
 
 
 func _update_inventory_pager(page_count: int, total_count: int) -> void:
 	_ensure_inventory_pager_nodes()
-	if main.inventory_prev_page_button == null or main.inventory_next_page_button == null or main.inventory_page_label == null:
+	if main.inventory_prev_page_button == null or main.inventory_next_page_button == null or _footer_pager_row == null:
 		return
 
-	var has_pages := total_count > INVENTORY_ITEMS_PER_PAGE
+	var has_pages := page_count > 1 and total_count > INVENTORY_ITEMS_PER_PAGE
+	_footer_pager_row.visible = has_pages
 	main.inventory_prev_page_button.visible = has_pages
 	main.inventory_next_page_button.visible = has_pages
-	main.inventory_page_label.visible = has_pages
+	if main.inventory_page_label != null:
+		main.inventory_page_label.visible = false
+
+	for button in _page_buttons:
+		if button != null and is_instance_valid(button):
+			button.visible = false
+
+	if not has_pages:
+		return
+
+	var metrics: Dictionary = TumanLakeUIKitScript.get_metrics(_window_panel.size if _window_panel != null and is_instance_valid(_window_panel) else main.inventory_panel.size)
+	var scale: float = metrics.get("scale", 1.0)
+	var page_button_size := Vector2(clampf(26.0 * scale, 22.0, 28.0), clampf(26.0 * scale, 22.0, 28.0))
+	_footer_pager_row.add_theme_constant_override("separation", int(maxf(5.0 * scale, 4.0)))
 	main.inventory_prev_page_button.disabled = main._inventory_page <= 0
 	main.inventory_next_page_button.disabled = main._inventory_page >= page_count - 1
-	main.inventory_page_label.text = "%d / %d" % [main._inventory_page + 1, page_count]
+	main.inventory_prev_page_button.custom_minimum_size = page_button_size
+	main.inventory_next_page_button.custom_minimum_size = page_button_size
+	TumanLakeUIKitScript.apply_square_button(main.inventory_prev_page_button, int(clampf(16.0 * scale, 12.0, 16.0)))
+	TumanLakeUIKitScript.apply_square_button(main.inventory_next_page_button, int(clampf(16.0 * scale, 12.0, 16.0)))
+
+	var entries := _get_inventory_pager_entries(page_count)
+	while _page_buttons.size() < entries.size():
+		var page_button := Button.new()
+		page_button.name = "InventoryPageNumberButton%d" % _page_buttons.size()
+		page_button.focus_mode = Control.FOCUS_NONE
+		page_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		page_button.pressed.connect(_on_inventory_page_button_pressed.bind(page_button))
+		_page_buttons.append(page_button)
+		_footer_pager_row.add_child(page_button)
+
+	_move_control_to_parent(main.inventory_prev_page_button, _footer_pager_row)
+	for i in entries.size():
+		var page_button: Button = _page_buttons[i]
+		_move_control_to_parent(page_button, _footer_pager_row)
+		var page_index := int(entries[i])
+		var is_ellipsis := page_index < 0
+		page_button.visible = true
+		page_button.disabled = is_ellipsis
+		page_button.text = "..." if is_ellipsis else str(page_index + 1)
+		page_button.set_meta("page_index", page_index)
+		page_button.custom_minimum_size = page_button_size
+		TumanLakeUIKitScript.apply_pager_button(page_button, page_index == main._inventory_page, int(clampf(13.0 * scale, 10.0, 13.0)))
+	_move_control_to_parent(main.inventory_next_page_button, _footer_pager_row)
+	_footer_pager_row.move_child(main.inventory_prev_page_button, 0)
+	for i in entries.size():
+		_footer_pager_row.move_child(_page_buttons[i], i + 1)
+	_footer_pager_row.move_child(main.inventory_next_page_button, entries.size() + 1)
+
+	var child_count := 2 + entries.size()
+	var row_width := float(child_count) * page_button_size.x + float(maxi(child_count - 1, 0)) * maxf(5.0 * scale, 4.0)
+	_footer_pager_row.custom_minimum_size = Vector2(row_width, page_button_size.y)
+	_footer_pager_row.size = Vector2(row_width, page_button_size.y)
+	if _footer_panel != null and is_instance_valid(_footer_panel):
+		_footer_pager_row.position = Vector2((_footer_panel.size.x - row_width) * 0.5, (_footer_panel.size.y - page_button_size.y) * 0.5)
+
+
+func _get_inventory_pager_entries(page_count: int) -> Array:
+	var entries: Array = []
+	if page_count <= 5:
+		for i in page_count:
+			entries.append(i)
+		return entries
+
+	var current := clampi(main._inventory_page, 0, page_count - 1)
+	entries.append(0)
+	if current > 2:
+		entries.append(-1)
+
+	var start := maxi(1, current - 1)
+	var end := mini(page_count - 2, current + 1)
+	for i in range(start, end + 1):
+		entries.append(i)
+
+	if current < page_count - 3:
+		entries.append(-1)
+	entries.append(page_count - 1)
+	return entries
+
+
+func _on_inventory_page_button_pressed(button: Button) -> void:
+	if button == null or not is_instance_valid(button):
+		return
+	var page_index := int(button.get_meta("page_index", -1))
+	if page_index < 0 or page_index == main._inventory_page:
+		return
+	main._inventory_page = page_index
+	main._selected_inventory_item_id = ""
+	_update_inventory_ui()
 
 
 func _refresh_inventory_category_buttons() -> void:
-	if main.category_lines_button != null:
-		main.category_lines_button.text = "Лески/пов."
-
-	var category_buttons: Array = [
-		[main.category_all_button, "all"],
-		[main.category_rods_button, "rod"],
-		[main.category_lines_button, "line"],
-		[main.category_floats_button, "float"],
-		[main.category_hooks_button, "hook"],
-		[main.category_baits_button, "bait"],
-		[main.category_fish_button, "fish"],
-		[main.category_misc_button, "misc"]
-	]
-
-	for item in category_buttons:
+	var metrics: Dictionary = TumanLakeUIKitScript.get_metrics(_window_panel.size if _window_panel != null and is_instance_valid(_window_panel) else main.inventory_panel.size)
+	var font_size := int(clampf(12.0 * float(metrics.get("scale", 1.0)), 9.0, 13.0))
+	for item in _get_inventory_category_button_pairs():
 		var button: Button = item[0]
 		var category: String = item[1]
-		theme.apply_tab_button_style(button, category == main._inventory_category)
+		button.text = str(item[2])
+		TumanLakeUIKitScript.apply_tab_button(button, category == main._inventory_category, font_size)
+
+
+func _refresh_inventory_filter_buttons() -> void:
+	var metrics: Dictionary = TumanLakeUIKitScript.get_metrics(_window_panel.size if _window_panel != null and is_instance_valid(_window_panel) else main.inventory_panel.size)
+	var font_size := int(clampf(11.0 * float(metrics.get("scale", 1.0)), 9.0, 12.0))
+	for filter_id in _filter_buttons.keys():
+		var button: Button = _filter_buttons[filter_id]
+		TumanLakeUIKitScript.apply_filter_button(button, str(filter_id) == _inventory_filter, font_size)
+
+
+func _update_inventory_footer() -> void:
+	if _footer_summary_label == null or not is_instance_valid(_footer_summary_label):
+		return
+	var filtered_total: int = main._visible_inventory_items.size()
+	var start_index: int = clampi(main._inventory_page * INVENTORY_ITEMS_PER_PAGE, 0, filtered_total)
+	var shown_count: int = mini(INVENTORY_ITEMS_PER_PAGE, maxi(filtered_total - start_index, 0))
+	_footer_summary_label.text = "Показано %d из %d предметов" % [shown_count, _inventory_total_item_count]
+
+
+func _get_inventory_category_button_pairs() -> Array:
+	return [
+		[main.category_all_button, "all", "Все"],
+		[main.category_rods_button, "rod", "Удилища"],
+		[main.category_lines_button, "line", "Лески/пов."],
+		[main.category_floats_button, "float", "Поплавки"],
+		[main.category_hooks_button, "hook", "Крючки"],
+		[main.category_baits_button, "bait", "Наживки"],
+		[main.category_fish_button, "fish", "Рыба"],
+		[main.category_misc_button, "misc", "Разное"]
+	]
 
 
 func _get_visible_inventory_items() -> Array:
@@ -1264,7 +1753,13 @@ func _get_visible_inventory_items() -> Array:
 				}
 			})
 
-	return items
+	_inventory_total_item_count = items.size()
+	var visible_items: Array = []
+	for item in items:
+		if typeof(item) == TYPE_DICTIONARY and _passes_inventory_filter(item):
+			visible_items.append(item)
+	_sort_inventory_items(visible_items)
+	return visible_items
 
 func _should_show_keepnet_fish_in_inventory() -> bool:
 	return false
@@ -1274,6 +1769,44 @@ func _should_show_inventory_item(item: Dictionary) -> bool:
 	if ["bait", "consumable", "groundbait"].has(category) and int(item.get("quantity", 0)) <= 0:
 		return false
 	return true
+
+
+func _passes_inventory_filter(item: Dictionary) -> bool:
+	match _inventory_filter:
+		"equipped":
+			return _is_inventory_item_equipped(item)
+		"unequipped":
+			return not _is_inventory_item_equipped(item)
+		_:
+			return true
+
+
+func _sort_inventory_items(items: Array) -> void:
+	items.sort_custom(_compare_inventory_items)
+
+
+func _compare_inventory_items(a, b) -> bool:
+	var item_a: Dictionary = a if typeof(a) == TYPE_DICTIONARY else {}
+	var item_b: Dictionary = b if typeof(b) == TYPE_DICTIONARY else {}
+	var primary_a: Variant = _get_inventory_sort_key(item_a)
+	var primary_b: Variant = _get_inventory_sort_key(item_b)
+	if primary_a == primary_b:
+		return _get_item_display_name(item_a).to_lower() < _get_item_display_name(item_b).to_lower()
+	if _inventory_sort == "quantity":
+		return int(item_a.get("quantity", 1)) > int(item_b.get("quantity", 1))
+	return primary_a < primary_b
+
+
+func _get_inventory_sort_key(item: Dictionary):
+	match _inventory_sort:
+		"name":
+			return _get_item_display_name(item).to_lower()
+		"status":
+			return _get_inventory_item_card_status(item).to_lower()
+		"quantity":
+			return int(item.get("quantity", 1))
+		_:
+			return "%s:%s" % [str(item.get("category", "misc")), _get_item_display_name(item).to_lower()]
 
 func _is_equippable_inventory_item(item: Dictionary) -> bool:
 	var category := str(item.get("category", ""))
@@ -1329,41 +1862,30 @@ func _get_inventory_item_tile_text(item: Dictionary) -> String:
 
 
 func _get_inventory_item_tile_subtitle(item: Dictionary) -> String:
+	return _get_inventory_item_card_status(item)
+
+
+func _get_inventory_item_card_status(item: Dictionary) -> String:
 	var category := str(item.get("category", "misc"))
-	var quantity := int(item.get("quantity", 1))
-	var stats: Dictionary = item.get("stats", {}) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
-
-	if _is_inventory_item_equipped(item):
-		return "Надето"
-
 	if category == "fish":
-		return UIFormatters.format_weight_kg(float(stats.get("weight", 0.0)))
+		return "Садок"
 
 	if ["rod", "line", "leader", "hook"].has(category):
 		var status := PlayerData.get_item_condition_title(item)
 		if status != "Исправна":
 			return status
 
-	if category == "leader":
-		var length_cm := int(stats.get("length_cm", 0))
-		var test_kg := float(stats.get("max_load_kg", stats.get("max_load", stats.get("strength", 0.0))))
-		if length_cm > 0 and test_kg > 0.0:
-			return "%d см / %s" % [length_cm, _format_kg_short(test_kg)]
-
-	if category == "line":
-		var line_test := float(stats.get("max_load_kg", stats.get("max_load", stats.get("strength", 0.0))))
-		if line_test > 0.0:
-			return _format_kg_short(line_test)
-
-	if category == "float":
-		var sensitivity := float(stats.get("sensitivity", 0.0))
-		if sensitivity > 0.0:
-			return "Чувст. %d%%" % roundi(sensitivity * 100.0)
-
-	if category == "bait" or quantity > 1:
-		return "x%d" % quantity
+	if category == "bait" and int(item.get("quantity", 0)) <= 0:
+		return "Закончилась"
 
 	return _get_inventory_category_title(category)
+
+
+func _get_inventory_item_quantity_text(item: Dictionary) -> String:
+	var quantity := int(item.get("quantity", 1))
+	if quantity > 1:
+		return "x%d" % quantity
+	return ""
 
 
 func _shorten_tile_text(value: String, max_chars: int) -> String:
@@ -1970,8 +2492,42 @@ func _set_inventory_category(category: String) -> void:
 	_update_inventory_ui()
 
 
+func _set_inventory_filter(filter_id: String) -> void:
+	_inventory_filter = filter_id
+	main._inventory_page = 0
+	main._selected_inventory_item_id = ""
+	_update_inventory_ui()
+
+
+func _on_inventory_sort_selected(index: int) -> void:
+	if index < 0 or index >= INVENTORY_SORTS.size():
+		return
+	_inventory_sort = str(INVENTORY_SORTS[index][0])
+	main._inventory_page = 0
+	main._selected_inventory_item_id = ""
+	_update_inventory_ui()
+
+
+func _on_inventory_footer_filter_pressed() -> void:
+	_set_inventory_filter("all")
+
+
+func _rebuild_sort_options() -> void:
+	if _sort_option == null or not is_instance_valid(_sort_option):
+		return
+	_sort_option.clear()
+	var selected_index := 0
+	for i in INVENTORY_SORTS.size():
+		var sort_id := str(INVENTORY_SORTS[i][0])
+		_sort_option.add_item("Сортировка: %s" % str(INVENTORY_SORTS[i][1]))
+		_sort_option.set_item_metadata(i, sort_id)
+		if sort_id == _inventory_sort:
+			selected_index = i
+	_sort_option.select(selected_index)
+
+
 func _on_inventory_item_selected(index: int) -> void:
-	var item_index: int = main._inventory_page * INVENTORY_ITEMS_PER_PAGE + index
+	var item_index: int = index
 	if item_index < 0 or item_index >= main._visible_inventory_items.size():
 		main._selected_inventory_item_id = ""
 	else:

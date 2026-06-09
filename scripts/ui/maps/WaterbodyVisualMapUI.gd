@@ -2,6 +2,8 @@ extends Control
 
 signal spot_selected(waterbody_id: String, spot_id: String)
 signal global_requested
+signal shop_requested
+signal harbor_requested
 signal close_requested
 
 const MapSpotMarkerScript := preload("res://scripts/ui/maps/MapSpotMarker.gd")
@@ -18,6 +20,8 @@ var marker_layer: Control
 var title_label: Label
 var placeholder_label: Label
 var waterbodies_button: Button
+var shop_button: Button
+var harbor_button: Button
 var close_button: Button
 var spot_info_panel
 
@@ -50,12 +54,24 @@ func layout_map() -> void:
 	placeholder_label.size = Vector2(420.0, 68.0)
 
 	var top_margin: float = maxf(12.0, view_size.y * 0.024)
+	var top_button_y: float = top_margin + 2.0
+	var top_button_height: float = clampf(view_size.y * 0.070, 34.0, 40.0)
+	var top_button_gap: float = clampf(view_size.x * 0.008, 7.0, 10.0)
+	var edge_margin: float = maxf(18.0, view_size.x * 0.018)
+	var back_button_width: float = clampf(view_size.x * 0.142, 126.0, 150.0)
+	var menu_button_width: float = clampf(view_size.x * 0.112, 96.0, 124.0)
+	var close_button_width: float = clampf(view_size.x * 0.098, 86.0, 104.0)
+
 	title_label.position = Vector2.ZERO
 	title_label.size = Vector2.ZERO
-	waterbodies_button.position = Vector2(18.0, top_margin + 2.0)
-	waterbodies_button.size = Vector2(136.0, 38.0)
-	close_button.position = Vector2(view_size.x - 112.0, top_margin + 2.0)
-	close_button.size = Vector2(94.0, 38.0)
+	waterbodies_button.position = Vector2(edge_margin, top_button_y)
+	waterbodies_button.size = Vector2(back_button_width, top_button_height)
+	close_button.position = Vector2(view_size.x - edge_margin - close_button_width, top_button_y)
+	close_button.size = Vector2(close_button_width, top_button_height)
+	harbor_button.position = Vector2(close_button.position.x - top_button_gap - menu_button_width, top_button_y)
+	harbor_button.size = Vector2(menu_button_width, top_button_height)
+	shop_button.position = Vector2(harbor_button.position.x - top_button_gap - menu_button_width, top_button_y)
+	shop_button.size = Vector2(menu_button_width, top_button_height)
 
 	var marker_size: float = clampf(view_size.y * 0.078, 38.0, 50.0)
 	var info_size: float = clampf(view_size.y * 0.044, 22.0, 28.0)
@@ -119,11 +135,25 @@ func _ensure_nodes() -> void:
 
 	waterbodies_button = Button.new()
 	waterbodies_button.name = "BackToWaterbodiesButton"
-	waterbodies_button.text = "Водоёмы"
+	# TODO: Rename to "Карта мира" / "Мир" when the global map becomes a broader hub.
 	waterbodies_button.text = "К водоёмам"
 	waterbodies_button.focus_mode = Control.FOCUS_NONE
 	waterbodies_button.pressed.connect(func(): global_requested.emit())
 	add_child(waterbodies_button)
+
+	shop_button = Button.new()
+	shop_button.name = "WaterbodyMapShopButton"
+	shop_button.text = "Магазин"
+	shop_button.focus_mode = Control.FOCUS_NONE
+	shop_button.pressed.connect(func(): shop_requested.emit())
+	add_child(shop_button)
+
+	harbor_button = Button.new()
+	harbor_button.name = "WaterbodyMapHarborButton"
+	harbor_button.text = "Гавань"
+	harbor_button.focus_mode = Control.FOCUS_NONE
+	harbor_button.pressed.connect(func(): harbor_requested.emit())
+	add_child(harbor_button)
 
 	close_button = Button.new()
 	close_button.name = "CloseWaterbodyMapButton"
@@ -139,6 +169,8 @@ func _ensure_nodes() -> void:
 	spot_info_panel.connect("select_requested", Callable(self, "_on_info_select_requested"))
 
 	_apply_small_button_style(waterbodies_button)
+	_apply_small_button_style(shop_button)
+	_apply_small_button_style(harbor_button)
 	_apply_small_button_style(close_button)
 
 func _apply_map_texture() -> void:

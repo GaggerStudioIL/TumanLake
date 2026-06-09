@@ -113,7 +113,28 @@ Project -> Export
 - Напомнить тестерам, что основной beta-водоём — Озеро Агамим.
 - Попросить прикладывать скриншот системного меню с версией при баг-репорте.
 
-## 9. Blocker для отправки
+## 9. 2026-06-09 beta.2 debug export smoke
+
+Команда:
+
+```bash
+Godot_v4.6.2-stable_win64_console.exe --display-driver windows --rendering-driver opengl3 --path . --export-debug Android TumanLake_0.1.0_beta2_debug.apk
+```
+
+Результат:
+
+- APK собран: `TumanLake_0.1.0_beta2_debug.apk`.
+- Размер: `324298967` bytes.
+- Godot export дошёл до `Signing debug APK` и `Verifying APK` без ошибки.
+- Android preset обновлён на `version/name="0.1.0-beta.2"` и `version/code=102`.
+- `export_filter="all_resources"` оставлен включённым; UI Kit v1 ресурсы попали в APK как импортированные Godot resources.
+- Установка на устройство и save/load на устройстве ещё требуют ручной проверки.
+
+Примечание:
+
+- Первый export внутри sandbox упал из-за недоступных путей Godot/AppData и Android SDK/editor templates; повтор вне sandbox успешно собрал APK.
+
+## 10. Blocker для отправки
 
 Не отправлять билд, если:
 

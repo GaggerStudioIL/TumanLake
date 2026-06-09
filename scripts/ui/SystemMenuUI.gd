@@ -1,4 +1,4 @@
-# Top-right system menu for profile, fish atlas, and settings.
+# Top-right system menu for profile, settings, and help.
 extends RefCounted
 
 const WeatherUIHelperScript := preload("res://scripts/ui/helpers/WeatherUIHelper.gd")
@@ -134,7 +134,9 @@ func layout(screen_size: Vector2) -> void:
 	build_version_label.add_theme_font_size_override("font_size", int(clampf(10.0 * ui_scale, 10.0, 12.0)))
 	build_version_label.add_theme_color_override("font_color", Color(0.66, 0.76, 0.72, 0.82))
 
-	for item in [profile_item, atlas_item, forecast_item, settings_item, bug_report_item]:
+	for item in [profile_item, settings_item, bug_report_item]:
+		if item == null:
+			continue
 		item.custom_minimum_size = Vector2(menu_items_box.size.x, item_height)
 		item.add_theme_font_size_override("font_size", int(clampf(16.0 * ui_scale, 15.0, 19.0)))
 		item.add_theme_constant_override("icon_max_width", icon_size)
@@ -414,16 +416,12 @@ func _ensure_menu_nodes() -> void:
 	atlas_item = _create_menu_item("Атлас рыб", "encyclopedia")
 	forecast_item = _create_menu_item("Прогноз погоды", "weather")
 	settings_item = _create_menu_item("Настройки", "settings")
-	bug_report_item = _create_menu_item("Сообщить о баге", "bug_report")
+	bug_report_item = _create_menu_item("Помощь", "settings")
 	menu_items_box.add_child(profile_item)
-	menu_items_box.add_child(atlas_item)
-	menu_items_box.add_child(forecast_item)
 	menu_items_box.add_child(settings_item)
 	menu_items_box.add_child(bug_report_item)
 
 	profile_item.pressed.connect(_on_profile_pressed)
-	atlas_item.pressed.connect(_on_atlas_pressed)
-	forecast_item.pressed.connect(_on_forecast_pressed)
 	settings_item.pressed.connect(_on_settings_pressed)
 	bug_report_item.pressed.connect(_on_bug_report_pressed)
 
@@ -672,7 +670,7 @@ func _ensure_bug_report_nodes() -> void:
 
 	bug_report_title = Label.new()
 	bug_report_title.name = "BugReportTitle"
-	bug_report_title.text = "Как сообщить о баге"
+	bug_report_title.text = "Помощь"
 	bug_report_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	bug_report_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	bug_report_title.add_theme_color_override("font_color", Color(0.92, 1.0, 0.96, 1.0))
@@ -739,6 +737,8 @@ func _create_menu_item(text: String, icon_name: String) -> Button:
 func _on_menu_button_pressed() -> void:
 	if _is_disabled:
 		return
+	if main != null and main.has_method("_hide_current_tackle_popup"):
+		main._hide_current_tackle_popup()
 	if is_menu_open():
 		close_menu()
 	else:
@@ -1098,14 +1098,19 @@ func _refresh_bug_report_text() -> void:
 
 
 func _get_bug_report_text() -> String:
-	return "Чтобы мы быстро нашли и исправили ошибку, пришлите:\n\n" \
-		+ "1. Что вы делали перед багом.\n" \
-		+ "2. Что должно было произойти.\n" \
-		+ "3. Что произошло на самом деле.\n" \
-		+ "4. Можно ли повторить баг.\n" \
-		+ "5. Скриншот или видео, если возможно.\n" \
-		+ "6. Версию билда.\n" \
-		+ "7. Устройство и разрешение экрана.\n\n" \
+	return "Главный экран:\n\n" \
+		+ "1. Слева: инвентарь и карта водоёмов.\n" \
+		+ "2. Справа: энциклопедия рыб, меню, текущая снасть и кнопка ловли.\n" \
+		+ "3. Тап по текущей снасти показывает текущую сборку.\n" \
+		+ "4. Долгий тап по текущей снасти открывает сборку снасти.\n" \
+		+ "5. Магазин и Рыбная гавань открываются через карту водоёма.\n" \
+		+ "6. Садок показывает пойманную рыбу; продажа улова доступна в Рыбной гавани.\n" \
+		+ "7. Ловля: заброс -> поклёвка -> подсечка -> вываживание -> садок.\n\n" \
+		+ "Баг-репорт:\n" \
+		+ "- что нажали;\n" \
+		+ "- что ожидали;\n" \
+		+ "- что произошло;\n" \
+		+ "- скриншот, устройство и версия билда.\n\n" \
 		+ "Версия билда:\n%s" % _get_build_version_label()
 
 
@@ -1115,7 +1120,7 @@ func _get_build_version_label() -> String:
 		version_node = main.get_node_or_null("/root/GameVersion")
 	if version_node != null and version_node.has_method("get_version_label"):
 		return str(version_node.call("get_version_label"))
-	return "v0.1.0-beta.1"
+	return "v0.1.0-beta.2"
 
 
 func _clear_children(node: Node) -> void:

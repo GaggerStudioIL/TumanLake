@@ -342,9 +342,7 @@ func _on_remove_pressed(category: String, item_id: String, slot_index: int = -1)
 
 func _open_owned_picker(category: String, slot_index: int) -> void:
 	if not _can_change_tackle():
-		return
-	if not _can_change_tackle():
-		_show_toast("РЎРЅР°СЃС‚СЊ РјРѕР¶РЅРѕ РјРµРЅСЏС‚СЊ С‚РѕР»СЊРєРѕ РїРµСЂРµРґ Р·Р°Р±СЂРѕСЃРѕРј.", false)
+		_show_toast("Снасть можно менять только перед забросом.", false)
 		return
 
 	_popup_category = category

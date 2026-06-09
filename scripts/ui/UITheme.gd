@@ -78,6 +78,9 @@ const GREEN := Color(0.32, 0.58, 0.18, 0.96)
 const GREEN_HOVER := Color(0.40, 0.68, 0.22, 1.0)
 const GREEN_PRESSED := Color(0.23, 0.43, 0.15, 1.0)
 const GREEN_SOFT := Color(0.45, 0.78, 0.24, 0.28)
+const DANGER := Color(0.42, 0.085, 0.070, 0.95)
+const DANGER_HOVER := Color(0.56, 0.110, 0.090, 1.0)
+const DANGER_PRESSED := Color(0.30, 0.060, 0.052, 1.0)
 const TEXT_PRIMARY := Color(0.94, 0.98, 0.92, 1.0)
 const TEXT_BODY := Color(0.76, 0.84, 0.80, 0.96)
 const TEXT_MUTED := Color(0.56, 0.64, 0.62, 0.92)
@@ -144,6 +147,74 @@ func get_hud_badge_style(active := false) -> StyleBoxFlat:
 func get_popup_window_style() -> StyleBoxFlat:
 	return _clone_style(POPUP_STYLE) as StyleBoxFlat
 
+func get_window_v1_style() -> StyleBoxFlat:
+	var style := make_style(Color(0.012, 0.024, 0.026, 0.92), Color(0.70, 0.88, 0.76, 0.38), 8, 12, Color(0.0, 0.0, 0.0, 0.42))
+	style.content_margin_left = 0.0
+	style.content_margin_top = 0.0
+	style.content_margin_right = 0.0
+	style.content_margin_bottom = 0.0
+	return style
+
+func get_window_v1_section_style(variant: String = "default") -> StyleBoxFlat:
+	var bg := Color(0.020, 0.034, 0.036, 0.62)
+	var border := Color(0.62, 0.80, 0.74, 0.18)
+	var shadow := Color(0.0, 0.0, 0.0, 0.16)
+	if variant == "details":
+		bg = Color(0.014, 0.028, 0.030, 0.78)
+		border = Color(0.64, 0.86, 0.72, 0.34)
+		shadow = Color(0.0, 0.0, 0.0, 0.24)
+	elif variant == "footer":
+		bg = Color(0.018, 0.030, 0.030, 0.66)
+		border = Color(0.58, 0.78, 0.68, 0.20)
+	var style := make_style(bg, border, 7, 5, shadow)
+	style.content_margin_left = 10.0
+	style.content_margin_top = 7.0
+	style.content_margin_right = 10.0
+	style.content_margin_bottom = 7.0
+	return style
+
+func get_item_card_v1_style(active := false, equipped := false, dimmed := false, rarity := "common") -> StyleBoxFlat:
+	var style := get_shop_row_style(rarity)
+	style.set_corner_radius_all(7)
+	style.content_margin_left = 8.0
+	style.content_margin_top = 8.0
+	style.content_margin_right = 8.0
+	style.content_margin_bottom = 8.0
+	style.shadow_size = 4
+	if active:
+		style.bg_color = Color(0.058, 0.118, 0.074, 0.82)
+		style.border_color = Color(0.70, 1.0, 0.62, 0.58)
+		style.shadow_color = Color(0.20, 0.72, 0.24, 0.18)
+		style.shadow_size = 7
+	elif equipped:
+		style.bg_color = Color(0.048, 0.094, 0.066, 0.74)
+		style.border_color = Color(0.58, 0.92, 0.56, 0.38)
+	elif dimmed:
+		style.bg_color = Color(0.034, 0.040, 0.040, 0.64)
+		style.border_color = Color(0.58, 0.62, 0.60, 0.14)
+	return style
+
+func get_item_image_slot_v1_style(active := false, rarity := "common") -> StyleBoxFlat:
+	var style := get_inventory_slot_style(active, rarity)
+	style.set_corner_radius_all(6)
+	style.shadow_size = 3
+	style.content_margin_left = 0.0
+	style.content_margin_top = 0.0
+	style.content_margin_right = 0.0
+	style.content_margin_bottom = 0.0
+	return style
+
+func get_status_badge_v1_style(variant: String = "equipped") -> StyleBoxFlat:
+	var bg := Color(0.08, 0.26, 0.10, 0.94)
+	var border := Color(0.62, 1.0, 0.52, 0.48)
+	if variant == "danger":
+		bg = Color(0.35, 0.060, 0.052, 0.92)
+		border = Color(1.0, 0.42, 0.35, 0.42)
+	elif variant == "muted":
+		bg = Color(0.050, 0.060, 0.060, 0.82)
+		border = Color(0.58, 0.66, 0.62, 0.18)
+	return make_style(bg, border, 5, 0, Color(0.0, 0.0, 0.0, 0.14))
+
 func get_shop_row_style(rarity := "common") -> StyleBoxFlat:
 	var style := _clone_style(SHOP_ROW_STYLE) as StyleBoxFlat
 	if rarity != "common":
@@ -197,6 +268,28 @@ func get_button_style(kind: String = "secondary", state: String = "normal") -> S
 				bg = Color(0.09, 0.15, 0.12, 0.56)
 				border = Color(0.55, 0.62, 0.58, 0.16)
 				shadow = Color(0.0, 0.0, 0.0, 0.10)
+		"danger":
+			bg = DANGER
+			border = Color(1.0, 0.42, 0.35, 0.42)
+			shadow = Color(0.75, 0.10, 0.06, 0.18)
+			radius = 9
+			shadow_size = 6
+			if state == "hover":
+				bg = DANGER_HOVER
+				border = Color(1.0, 0.50, 0.42, 0.58)
+			elif state == "pressed":
+				bg = DANGER_PRESSED
+				shadow_size = 3
+			elif state == "disabled":
+				bg = Color(0.070, 0.050, 0.050, 0.52)
+				border = Color(0.56, 0.44, 0.42, 0.14)
+				shadow = Color(0.0, 0.0, 0.0, 0.08)
+		"disabled":
+			bg = Color(0.045, 0.055, 0.056, 0.42)
+			border = Color(0.58, 0.64, 0.62, 0.12)
+			shadow = Color(0.0, 0.0, 0.0, 0.10)
+			radius = 8
+			shadow_size = 2
 		"nav_active":
 			bg = Color(0.16, 0.30, 0.19, 0.88)
 			border = Color(0.70, 1.0, 0.72, 0.42)
@@ -537,6 +630,59 @@ func apply_popup_window_style(control) -> void:
 	elif control is ColorRect:
 		control.color = GLASS_BG_STRONG
 
+func apply_window_v1_style(control) -> void:
+	if control is Panel:
+		control.add_theme_stylebox_override("panel", get_window_v1_style())
+	elif control is ColorRect:
+		control.color = Color(0.012, 0.024, 0.026, 0.92)
+
+func apply_window_v1_section_style(control, variant: String = "default") -> void:
+	if control is Panel:
+		control.add_theme_stylebox_override("panel", get_window_v1_section_style(variant))
+	elif control is ColorRect:
+		control.color = Color(0.020, 0.034, 0.036, 0.62)
+
+func apply_item_card_v1_style(control, active := false, equipped := false, dimmed := false, rarity := "common") -> void:
+	if control is Button:
+		var button := control as Button
+		button.add_theme_stylebox_override("normal", get_item_card_v1_style(active, equipped, dimmed, rarity))
+		button.add_theme_stylebox_override("hover", _brighten_card_style(get_item_card_v1_style(active, equipped, dimmed, rarity)))
+		button.add_theme_stylebox_override("pressed", _press_card_style(get_item_card_v1_style(active, equipped, dimmed, rarity)))
+		button.add_theme_stylebox_override("focus", get_item_card_v1_style(true, equipped, dimmed, rarity))
+		button.add_theme_color_override("font_color", Color.TRANSPARENT)
+		button.add_theme_color_override("font_hover_color", Color.TRANSPARENT)
+		button.add_theme_color_override("font_pressed_color", Color.TRANSPARENT)
+	elif control is Panel:
+		control.add_theme_stylebox_override("panel", get_item_card_v1_style(active, equipped, dimmed, rarity))
+
+func apply_item_image_slot_v1_style(control, active := false, rarity := "common") -> void:
+	if control is Panel:
+		control.add_theme_stylebox_override("panel", get_item_image_slot_v1_style(active, rarity))
+
+func apply_status_badge_v1_style(label: Label, variant: String = "equipped") -> void:
+	if label == null:
+		return
+	label.add_theme_stylebox_override("normal", get_status_badge_v1_style(variant))
+	label.add_theme_font_size_override("font_size", 9)
+	label.add_theme_color_override("font_color", TEXT_PRIMARY)
+
+func apply_button_variant_style(button: Button, variant: String = "secondary") -> void:
+	match variant:
+		"primary":
+			apply_primary_button_style(button)
+		"danger":
+			_apply_button(button, "danger", 44.0, 14)
+		"disabled":
+			_apply_button(button, "disabled", 44.0, 14)
+		_:
+			apply_secondary_button_style(button)
+
+func apply_filter_button_style(button: Button, active := false) -> void:
+	_apply_button(button, "tab_active" if active else "tab", 30.0, 12)
+
+func apply_sort_option_style(button: Button) -> void:
+	_apply_button(button, "secondary", 30.0, 12)
+
 func apply_primary_button_style(button: Button) -> void:
 	_apply_button(button, "primary", 56.0, 16)
 
@@ -683,6 +829,27 @@ func _tune_button_style(style: StyleBox, kind: String) -> StyleBox:
 	flat_style.content_margin_bottom = top_margin
 	flat_style.shadow_size = min(flat_style.shadow_size, 7)
 	return flat_style
+
+func _brighten_card_style(style: StyleBoxFlat) -> StyleBoxFlat:
+	style.bg_color = Color(
+		minf(style.bg_color.r + 0.022, 1.0),
+		minf(style.bg_color.g + 0.030, 1.0),
+		minf(style.bg_color.b + 0.022, 1.0),
+		style.bg_color.a
+	)
+	style.border_color = Color(0.82, 0.98, 0.84, maxf(style.border_color.a, 0.38))
+	style.shadow_size = max(style.shadow_size, 5)
+	return style
+
+func _press_card_style(style: StyleBoxFlat) -> StyleBoxFlat:
+	style.bg_color = Color(
+		maxf(style.bg_color.r - 0.014, 0.0),
+		maxf(style.bg_color.g - 0.012, 0.0),
+		maxf(style.bg_color.b - 0.014, 0.0),
+		style.bg_color.a
+	)
+	style.shadow_size = 2
+	return style
 
 func _get_rarity_slot_resource(rarity: String) -> StyleBoxFlat:
 	match rarity:

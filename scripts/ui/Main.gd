@@ -59,6 +59,7 @@ const ROD_ANCHOR_POS := Vector2(610.0, 562.0)
 const ROD_TARGET_POS := Vector2(480.0, 210.0)
 const CAST_CONTROL_CENTER_BASE := Vector2(720.0, 280.0)
 const CAST_CHARGE_TIME := 1.5
+const CURRENT_TACKLE_LONG_PRESS_MSEC := 560
 const MIN_CAST_POWER := 0.05
 const MAX_CAST_POWER := 1.0
 const MIN_SHORE_DEPTH := 0.16
@@ -359,6 +360,9 @@ var quick_actions_container: VBoxContainer
 var bottom_nav_container: VBoxContainer
 var encyclopedia_button: Button
 var harbor_button: Button
+var current_tackle_button: Button
+var current_tackle_popup: Panel
+var current_tackle_popup_box: VBoxContainer
 var environment_layer: Node2D
 var environment_sprites: Dictionary = {}
 var day_night_controller: Node2D
@@ -440,6 +444,8 @@ var _cast_charge_power := MIN_CAST_POWER
 var _cast_release_action_guard_msec := 0
 var _fish_button_action_guard_msec := 0
 var _fish_button_pointer_action_active := false
+var _current_tackle_press_started_msec := 0
+var _current_tackle_long_press_triggered := false
 var _modal_tap_guard_until_msec := 0
 var _use_cast_png_button := false
 var _use_pull_png_button := false
@@ -534,6 +540,7 @@ func _process(delta: float) -> void:
 	_update_modal_tap_guard()
 	_update_time_hud()
 	_update_depth_hud_visibility_watchdog(delta)
+	_update_current_tackle_hold()
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_RESUMED:
@@ -549,8 +556,11 @@ func _refresh_after_application_resumed() -> void:
 		fish_harbor_ui.refresh()
 	if inventory_panel != null and inventory_panel.visible:
 		_update_inventory_ui()
-	if quick_tackle_panel != null and quick_tackle_panel.has_method("refresh"):
-		quick_tackle_panel.call("refresh")
+	if quick_tackle_panel != null:
+		quick_tackle_panel.visible = false
+		if quick_tackle_panel.has_method("hide_popup"):
+			quick_tackle_panel.call("hide_popup")
+	_refresh_current_tackle_hud()
 
 func _input(event: InputEvent) -> void:
 	if is_modal_open or _is_modal_tap_guard_active():
@@ -651,6 +661,8 @@ func _setup_ui_controllers() -> void:
 	harbor_button.text = "Гавань"
 	harbor_button.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(harbor_button)
+
+	_ensure_current_tackle_hud_nodes()
 
 	main_hud_controller.setup(self, self)
 	popup_manager.setup(self)
@@ -1114,6 +1126,8 @@ func _ensure_ui_canvas_layer() -> void:
 		map_button,
 		profile_button,
 		encyclopedia_button,
+		current_tackle_button,
+		current_tackle_popup,
 		feed_button,
 		bait_button,
 		quick_tackle_panel,
@@ -1149,6 +1163,7 @@ func _ensure_ui_canvas_layer() -> void:
 	_move_modal_roots_to_layer()
 	_refresh_modal_input_blocker()
 	_ensure_tuman_fm_hud()
+	_ensure_current_tackle_hud_nodes()
 
 
 func _ensure_tuman_fm_hud() -> void:
@@ -1159,6 +1174,39 @@ func _ensure_tuman_fm_hud() -> void:
 		_reparent_node(tuman_fm_hud, ui_canvas_layer)
 	if tuman_fm_hud.has_method("setup"):
 		tuman_fm_hud.call("setup", self)
+	tuman_fm_hud.visible = false
+
+func _ensure_current_tackle_hud_nodes() -> void:
+	var parent: Node = ui_canvas_layer if ui_canvas_layer != null else self
+
+	if current_tackle_button == null:
+		current_tackle_button = Button.new()
+		current_tackle_button.name = "CurrentTackleHudButton"
+		current_tackle_button.focus_mode = Control.FOCUS_NONE
+		current_tackle_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		current_tackle_button.clip_text = true
+		current_tackle_button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		add_child(current_tackle_button)
+	if current_tackle_button.get_parent() != parent:
+		_reparent_node(current_tackle_button, parent)
+
+	if current_tackle_popup == null:
+		current_tackle_popup = Panel.new()
+		current_tackle_popup.name = "CurrentTacklePopup"
+		current_tackle_popup.visible = false
+		current_tackle_popup.mouse_filter = Control.MOUSE_FILTER_STOP
+		parent.add_child(current_tackle_popup)
+	elif current_tackle_popup.get_parent() != parent:
+		_reparent_node(current_tackle_popup, parent)
+
+	if current_tackle_popup_box == null:
+		current_tackle_popup_box = VBoxContainer.new()
+		current_tackle_popup_box.name = "CurrentTacklePopupBox"
+		current_tackle_popup_box.mouse_filter = Control.MOUSE_FILTER_PASS
+		current_tackle_popup_box.add_theme_constant_override("separation", 6)
+		current_tackle_popup.add_child(current_tackle_popup_box)
+	elif current_tackle_popup_box.get_parent() != current_tackle_popup:
+		_reparent_node(current_tackle_popup_box, current_tackle_popup)
 
 func _ensure_fish_harbor_ui() -> void:
 	_ensure_modal_layer()
@@ -1520,18 +1568,25 @@ func _ensure_mobile_ui_containers() -> void:
 		basket_button.disabled = true
 		basket_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	for node in [inventory_button, shop_button, harbor_button, map_button]:
+	for node in [inventory_button, map_button]:
 		_reparent_node(node, bottom_nav_container)
 	bottom_nav_container.move_child(inventory_button, 0)
-	bottom_nav_container.move_child(shop_button, 1)
-	bottom_nav_container.move_child(harbor_button, 2)
-	bottom_nav_container.move_child(map_button, 3)
+	bottom_nav_container.move_child(map_button, 1)
 
-	for node in [encyclopedia_button, profile_button]:
+	for node in [shop_button, harbor_button]:
 		if node != null:
 			_reparent_node(node, ui_canvas_layer)
 			node.visible = false
 			node.disabled = true
+
+	for node in [encyclopedia_button, profile_button, current_tackle_button]:
+		if node != null:
+			_reparent_node(node, ui_canvas_layer)
+			node.visible = false
+			node.disabled = true
+	if current_tackle_popup != null:
+		_reparent_node(current_tackle_popup, ui_canvas_layer)
+		current_tackle_popup.visible = false
 
 func _ensure_top_hud_groups() -> void:
 	top_hud_money_group = _ensure_top_hud_group(top_hud_money_group, "MoneyGroup")
@@ -2021,30 +2076,30 @@ func _make_primary_action_circle_style(
 
 func _apply_primary_fishing_action_style(button: Button, target_size: Vector2) -> void:
 	var radius := roundi(max(target_size.x, target_size.y) * 0.5)
-	var normal_bg := Color(1.0, 1.0, 1.0, 0.045)
-	var hover_bg := Color(1.0, 1.0, 1.0, 0.095)
-	var pressed_bg := Color(1.0, 1.0, 1.0, 0.155)
-	var border := Color(1.0, 1.0, 1.0, 0.74)
-	var shadow := Color(0.0, 0.0, 0.0, 0.24)
+	var normal_bg := Color(0.045, 0.090, 0.070, 0.74)
+	var hover_bg := Color(0.065, 0.135, 0.095, 0.88)
+	var pressed_bg := Color(0.082, 0.188, 0.112, 0.94)
+	var border := Color(0.66, 1.0, 0.68, 0.50)
+	var shadow := Color(0.12, 0.50, 0.22, 0.16)
 
 	if _fishing_ui_state == FishingUiState.WAITING:
-		normal_bg = Color(1.0, 1.0, 1.0, 0.055)
-		hover_bg = Color(1.0, 1.0, 1.0, 0.115)
-		pressed_bg = Color(1.0, 1.0, 1.0, 0.175)
-		border = Color(1.0, 1.0, 1.0, 0.84)
-		shadow = Color(0.0, 0.0, 0.0, 0.28)
+		normal_bg = Color(0.050, 0.108, 0.078, 0.78)
+		hover_bg = Color(0.074, 0.152, 0.102, 0.90)
+		pressed_bg = Color(0.092, 0.200, 0.118, 0.96)
+		border = Color(0.70, 1.0, 0.70, 0.58)
+		shadow = Color(0.14, 0.56, 0.24, 0.18)
 	elif _fishing_ui_state == FishingUiState.FIGHTING:
-		normal_bg = Color(1.0, 1.0, 1.0, 0.060)
-		hover_bg = Color(1.0, 1.0, 1.0, 0.125)
-		pressed_bg = Color(1.0, 1.0, 1.0, 0.190)
-		border = Color(1.0, 1.0, 1.0, 0.88)
-		shadow = Color(0.0, 0.0, 0.0, 0.30)
+		normal_bg = Color(0.065, 0.132, 0.084, 0.84)
+		hover_bg = Color(0.088, 0.178, 0.108, 0.94)
+		pressed_bg = Color(0.110, 0.230, 0.128, 1.0)
+		border = Color(0.76, 1.0, 0.70, 0.66)
+		shadow = Color(0.18, 0.64, 0.24, 0.20)
 	elif _fishing_ui_state == FishingUiState.CAUGHT or _fishing_ui_state == FishingUiState.FAILED:
-		normal_bg = Color(1.0, 1.0, 1.0, 0.055)
-		hover_bg = Color(1.0, 1.0, 1.0, 0.110)
-		pressed_bg = Color(1.0, 1.0, 1.0, 0.170)
-		border = Color(1.0, 1.0, 1.0, 0.80)
-		shadow = Color(0.0, 0.0, 0.0, 0.26)
+		normal_bg = Color(0.052, 0.104, 0.080, 0.80)
+		hover_bg = Color(0.074, 0.148, 0.104, 0.92)
+		pressed_bg = Color(0.092, 0.200, 0.118, 0.98)
+		border = Color(0.70, 1.0, 0.70, 0.56)
+		shadow = Color(0.14, 0.54, 0.24, 0.18)
 
 	button.custom_minimum_size = target_size
 	button.size = target_size
@@ -2709,16 +2764,14 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	_ensure_keepnet_hud_button()
 	_ensure_player_xp_hud()
 	_ensure_hud_icons()
+	_ensure_current_tackle_hud_nodes()
 
 	var sx: float = screen_size.x / BASE_SCREEN_SIZE.x
 	var sy: float = screen_size.y / BASE_SCREEN_SIZE.y
 	var ui_scale: float = min(sx, sy)
-	var chip_gap: float = 10.0 * ui_scale
 	var top_height: float = HUD_HEIGHT * sy
 	var cast_button_edge: float = clamp(126.0 * ui_scale, 104.0, 136.0)
 	var cast_button_size := Vector2(cast_button_edge, cast_button_edge)
-	var quick_button_width: float = 112.0 * sx
-	var quick_button_height: float = 38.0 * sy
 	_water_surface_y = WATER_SURFACE_Y * sy
 	_water_zone_top = _water_surface_y - 12.0 * sy
 	_water_zone_bottom = _water_surface_y + 12.0 * sy
@@ -2853,24 +2906,26 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	spot_option_button.size_flags_horizontal = Control.SIZE_SHRINK_END
 	spot_option_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
-	action_panel.visible = true
+	action_panel.visible = false
 	var action_panel_rect := _scale_rect(Rect2(150.0, 424.0, 660.0, 104.0), screen_size)
 	_anchor_control(action_panel, 0.0, 0.0, 0.0, 0.0, action_panel_rect.position.x, action_panel_rect.position.y, action_panel_rect.end.x, action_panel_rect.end.y)
 	action_panel.z_index = 100
+	action_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	action_panel.add_theme_stylebox_override(
 		"panel",
 		_make_panel_style(Color.TRANSPARENT, Color.TRANSPARENT, 0, 0, Color.TRANSPARENT)
 	)
 
 	quick_actions_container.visible = false
-	if quick_tackle_panel != null and quick_tackle_panel.has_method("layout"):
-		quick_tackle_panel.call("layout", action_panel_rect, ui_scale)
+	if quick_tackle_panel != null:
+		quick_tackle_panel.visible = false
+		quick_tackle_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if quick_tackle_panel.has_method("hide_popup"):
+			quick_tackle_panel.call("hide_popup")
 
 	if player_xp_hud != null:
-		var xp_hud_height: float = clamp(16.0 * ui_scale, 14.0, 20.0)
-		_anchor_control(player_xp_hud, 0.0, 0.0, 0.0, 0.0, 0.0, screen_size.y - xp_hud_height, screen_size.x, screen_size.y)
-		player_xp_hud.z_index = 270
-		_update_player_xp_hud(false)
+		player_xp_hud.visible = false
+		player_xp_hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	var cast_center := _scale_point(CAST_CONTROL_CENTER_BASE, screen_size)
 	var cast_margin: float = 8.0 * ui_scale
@@ -2971,23 +3026,27 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 		_set_button_icon(nav_buttons[i], nav_icons[i], 12.0)
 
 	nav_fish_button.visible = false
-	var side_menu_buttons: Array = [inventory_button, shop_button, harbor_button, map_button]
-	var side_menu_labels: Array = ["Инвентарь", "Магазин", "Гавань", "Карта"]
-	var side_menu_icons: Array = ["inventory", "shop", "harbor", "map"]
+	var side_menu_buttons: Array = [inventory_button, map_button]
+	var side_menu_labels: Array = ["Инвентарь", "Карта"]
+	var side_menu_icons: Array = ["inventory", "map"]
 	var side_menu_button_size := _scale_size(Vector2(LEFT_NAV_WIDTH, 48.0), screen_size)
 	for i in side_menu_buttons.size():
 		_layout_side_menu_button(side_menu_buttons[i], side_menu_labels[i], side_menu_icons[i], side_menu_button_size, false)
+	for node in [shop_button, harbor_button]:
+		node.visible = false
+		node.disabled = true
+		node.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	basket_button.visible = false
 	basket_button.disabled = true
 	basket_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	map_button.disabled = false
-	harbor_button.disabled = false
-	encyclopedia_button.visible = false
+	encyclopedia_button.visible = true
 	profile_button.visible = false
-	encyclopedia_button.disabled = true
+	encyclopedia_button.disabled = false
 	profile_button.disabled = true
+	_layout_main_hud_v2_right_stack(screen_size, ui_scale, cast_button_size)
 
 	var water_anchor := _scale_point(FLOAT_DEFAULT_POS, screen_size)
 	_float_base_center = water_anchor
@@ -3285,6 +3344,59 @@ func _layout_side_menu_button(button: Button, label: String, icon_name: String, 
 
 	_refresh_side_menu_button_state(button, active)
 
+func _layout_main_hud_v2_right_stack(screen_size: Vector2, ui_scale: float, cast_button_size: Vector2) -> void:
+	var sx: float = screen_size.x / BASE_SCREEN_SIZE.x
+	var sy: float = screen_size.y / BASE_SCREEN_SIZE.y
+	var margin_x: float = clampf(24.0 * sx, 18.0, 30.0)
+	var margin_y: float = clampf(18.0 * sy, 14.0, 24.0)
+	var gap: float = clampf(8.0 * ui_scale, 7.0, 10.0)
+	var menu_button_size := Vector2(
+		clampf(62.0 * ui_scale, 56.0, 68.0),
+		clampf(54.0 * ui_scale, 48.0, 58.0)
+	)
+	var compact_size := Vector2(menu_button_size.y, menu_button_size.y)
+
+	if encyclopedia_button != null:
+		var encyclopedia_pos := Vector2(screen_size.x - margin_x - menu_button_size.x - gap - compact_size.x, margin_y)
+		_anchor_control(encyclopedia_button, 0.0, 0.0, 0.0, 0.0, encyclopedia_pos.x, encyclopedia_pos.y, encyclopedia_pos.x + compact_size.x, encyclopedia_pos.y + compact_size.y)
+		encyclopedia_button.text = ""
+		encyclopedia_button.tooltip_text = "Энциклопедия рыб"
+		encyclopedia_button.visible = true
+		encyclopedia_button.disabled = false
+		encyclopedia_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		encyclopedia_button.custom_minimum_size = compact_size
+		encyclopedia_button.size = compact_size
+		encyclopedia_button.z_index = 260
+		_apply_button_style(encyclopedia_button, STYLE_SECONDARY_BUTTON)
+		_set_button_icon(encyclopedia_button, "encyclopedia", compact_size.x * 0.48)
+
+	if current_tackle_button != null:
+		var tackle_size := Vector2(clampf(190.0 * ui_scale, 168.0, 224.0), clampf(58.0 * ui_scale, 52.0, 66.0))
+		var fish_center_y: float = clampf(
+			292.0 * sy,
+			margin_y + menu_button_size.y + gap + tackle_size.y + gap + cast_button_size.y * 0.5,
+			screen_size.y - clampf(128.0 * sy, 112.0, 150.0) - cast_button_size.y * 0.5
+		)
+		var fish_center_x: float = screen_size.x - margin_x - max(tackle_size.x, cast_button_size.x) * 0.5
+		var cast_rect := Rect2(Vector2(fish_center_x, fish_center_y) - cast_button_size * 0.5, cast_button_size)
+		var tackle_pos := Vector2(screen_size.x - margin_x - tackle_size.x, cast_rect.position.y - tackle_size.y - gap)
+		tackle_pos.y = max(tackle_pos.y, margin_y + menu_button_size.y + gap)
+
+		_anchor_control(current_tackle_button, 0.0, 0.0, 0.0, 0.0, tackle_pos.x, tackle_pos.y, tackle_pos.x + tackle_size.x, tackle_pos.y + tackle_size.y)
+		current_tackle_button.custom_minimum_size = tackle_size
+		current_tackle_button.size = tackle_size
+		current_tackle_button.z_index = 260
+		current_tackle_button.visible = not is_modal_open
+		current_tackle_button.disabled = false
+		current_tackle_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		current_tackle_button.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
+		current_tackle_button.add_theme_font_size_override("font_size", int(clampf(12.0 * ui_scale, 11.0, 14.0)))
+		current_tackle_button.add_theme_constant_override("h_separation", int(clampf(8.0 * ui_scale, 6.0, 10.0)))
+		_apply_button_style(current_tackle_button, STYLE_SECONDARY_BUTTON)
+		_set_action_button_icon(current_tackle_button, "rod", clampf(24.0 * ui_scale, 20.0, 28.0))
+		_refresh_current_tackle_hud()
+
+
 func _refresh_side_menu_button_state(button: Button, active: bool) -> void:
 	if button == null or ui_theme == null:
 		return
@@ -3363,6 +3475,19 @@ func _get_primary_fishing_action_icon() -> String:
 		_:
 			return "hud_cast"
 
+func _get_primary_fishing_action_label() -> String:
+	match _fishing_ui_state:
+		FishingUiState.WAITING:
+			if bool(FishingManager.get("use_new_bite_system")) and _presence_bite_timer > 0.0 and not _is_reel_tackle_mode():
+				return "Подсечь"
+			return "Ждать"
+		FishingUiState.FIGHTING:
+			return "Борьба"
+		FishingUiState.CAUGHT, FishingUiState.FAILED:
+			return "Вытянуть"
+		_:
+			return "Заброс"
+
 func _refresh_fish_button_presentation() -> void:
 	if fish_button == null or ui_theme == null:
 		return
@@ -3384,13 +3509,18 @@ func _refresh_fish_button_presentation() -> void:
 		cast_button_visual.visible = false
 	_cast_button_hovered = false
 	_apply_primary_fishing_action_style(fish_button, target_size)
-	fish_button.add_theme_font_size_override("font_size", 12)
+	fish_button.add_theme_font_size_override("font_size", int(clampf(min(target_size.x, target_size.y) * 0.135, 14.0, 18.0)))
 	fish_button.clip_text = true
-	if not fish_button.text.is_empty():
-		fish_button.tooltip_text = fish_button.text
-	fish_button.text = ""
-	var icon_size: float = clamp(min(target_size.x, target_size.y) * 0.88, 88.0, 110.0)
-	_set_primary_fishing_button_icon(fish_button, _get_primary_fishing_action_icon(), icon_size)
+	fish_button.text = _get_primary_fishing_action_label()
+	fish_button.tooltip_text = fish_button.text
+	fish_button.icon = null
+	fish_button.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	fish_button.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
+	fish_button.add_theme_constant_override("h_separation", 0)
+	fish_button.add_theme_color_override("font_color", Color(0.90, 1.0, 0.92, 1.0))
+	fish_button.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 0.94, 1.0))
+	fish_button.add_theme_color_override("font_pressed_color", Color(0.78, 1.0, 0.82, 1.0))
+	fish_button.add_theme_color_override("font_disabled_color", Color(0.62, 0.70, 0.68, 0.62))
 	_apply_primary_action_press_scale()
 	_refresh_stop_fishing_button_presentation()
 	_refresh_depth_hud_controls()
@@ -4587,23 +4717,10 @@ func _setup_layout() -> void:
 	_apply_button_style(tackle_button, STYLE_SECONDARY_BUTTON)
 
 	var nav_buttons: Array = [
-		nav_fish_button,
 		inventory_button,
-		shop_button,
-		harbor_button,
 		map_button
 	]
-	var nav_texts: Array = [
-		"○ Ловить",
-		"□ Инв.",
-		"◇ Снасти",
-		"$ Магазин",
-		"△ Продать",
-		"⌖ Карта",
-		"◎ Профиль"
-	]
-	nav_texts = ["Ловля", "Инвентарь", "Магазин", "Атлас", "Карта", "Профиль"]
-	nav_texts = ["Ловля", "Инвентарь", "Магазин", "Гавань", "Карта"]
+	var nav_texts: Array = ["Инвентарь", "Карта"]
 	var nav_gap := 6.0
 	var nav_x := bottom_nav_panel.position.x + 10.0
 	var nav_y := bottom_nav_y + 3.0
@@ -4617,11 +4734,15 @@ func _setup_layout() -> void:
 		nav_button.add_theme_font_size_override("font_size", 11)
 		_apply_button_style(nav_button, STYLE_BOTTOM_NAV_ACTIVE if i == 0 else STYLE_BOTTOM_NAV_BUTTON)
 
-	harbor_button.disabled = false
+	nav_fish_button.visible = false
+	for node in [shop_button, harbor_button]:
+		node.visible = false
+		node.disabled = true
+		node.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	map_button.disabled = false
-	encyclopedia_button.visible = false
+	encyclopedia_button.visible = true
 	profile_button.visible = false
-	encyclopedia_button.disabled = true
+	encyclopedia_button.disabled = false
 	profile_button.disabled = true
 
 	timer_label.position = left_hud_panel.position + Vector2(12.0, 10.0)
@@ -4723,8 +4844,8 @@ func _setup_layout() -> void:
 	_layout_water_animation_layer(screen_size)
 	if system_menu_ui != null and system_menu_ui.has_method("layout"):
 		system_menu_ui.layout(screen_size)
-	if tuman_fm_hud != null and tuman_fm_hud.has_method("layout"):
-		tuman_fm_hud.call("layout", screen_size)
+	if tuman_fm_hud != null:
+		tuman_fm_hud.visible = false
 
 	for primary_label in [title_label, money_label, level_label, fight_title_label, tension_label, progress_label, basket_title_label, shop_title_label, tackle_title_label]:
 		_apply_label_style(primary_label, true)
@@ -5656,6 +5777,10 @@ func _connect_signals() -> void:
 	shop_button.pressed.connect(_on_shop_button_pressed)
 	harbor_button.pressed.connect(_on_harbor_button_pressed)
 	encyclopedia_button.pressed.connect(_on_encyclopedia_button_pressed)
+	if current_tackle_button != null:
+		current_tackle_button.pressed.connect(_on_current_tackle_button_pressed)
+		current_tackle_button.button_down.connect(_on_current_tackle_button_down)
+		current_tackle_button.button_up.connect(_on_current_tackle_button_up)
 	map_button.pressed.connect(_on_map_button_pressed)
 	profile_button.pressed.connect(_on_profile_button_pressed)
 	bait_button.pressed.connect(_on_bait_button_pressed)
@@ -5724,8 +5849,11 @@ func _connect_signals() -> void:
 func _update_ui() -> void:
 	fishing_hud_ui._update_ui()
 	_update_player_xp_hud()
-	if quick_tackle_panel != null and quick_tackle_panel.has_method("refresh"):
-		quick_tackle_panel.call("refresh")
+	if quick_tackle_panel != null:
+		quick_tackle_panel.visible = false
+		if quick_tackle_panel.has_method("hide_popup"):
+			quick_tackle_panel.call("hide_popup")
+	_refresh_current_tackle_hud()
 	_refresh_stop_fishing_button_presentation()
 
 
@@ -7013,6 +7141,7 @@ func _close_profile_and_encyclopedia(reset_nav: bool = false) -> void:
 
 
 func _prepare_for_menu_open(menu_name: String) -> void:
+	_hide_current_tackle_popup()
 	if quick_tackle_panel != null and quick_tackle_panel.has_method("hide_popup"):
 		quick_tackle_panel.call("hide_popup")
 	if popup_manager != null and popup_manager.has_method("prepare_for_menu_open"):
@@ -7066,6 +7195,157 @@ func refresh_after_quick_tackle_change() -> void:
 		_update_tackle_ui()
 	if inventory_panel != null and inventory_panel.visible:
 		_update_inventory_ui()
+
+func _refresh_current_tackle_hud() -> void:
+	if current_tackle_button == null:
+		return
+
+	current_tackle_button.text = _get_current_tackle_button_text()
+	current_tackle_button.tooltip_text = "Тап: текущая снасть\nДолгий тап: сборка снасти"
+	current_tackle_button.visible = not is_modal_open
+	current_tackle_button.disabled = false
+	current_tackle_button.mouse_filter = Control.MOUSE_FILTER_STOP
+
+func _get_current_tackle_button_text() -> String:
+	var tackle_type := "Снасть"
+	if PlayerData != null and PlayerData.has_method("get_current_tackle_type_title"):
+		tackle_type = str(PlayerData.get_current_tackle_type_title())
+	var rod_name := _get_current_tackle_slot_name("rod")
+	if rod_name == "":
+		return "%s\nНе выбрана" % tackle_type
+	return "%s\n%s" % [tackle_type, _trim_ui_text(rod_name, 20)]
+
+func _get_current_tackle_slot_name(slot_id: String) -> String:
+	if PlayerData == null:
+		return ""
+	var component: Dictionary = {}
+	if PlayerData.has_method("get_current_tackle_slot"):
+		var value = PlayerData.get_current_tackle_slot(slot_id)
+		if value is Dictionary:
+			component = value
+	elif PlayerData.current_tackle is Dictionary:
+		var raw = PlayerData.current_tackle.get(slot_id, {})
+		if raw is Dictionary:
+			component = raw
+	return str(component.get("display_name_ru", component.get("name", ""))).strip_edges()
+
+func _trim_ui_text(text: String, max_chars: int) -> String:
+	if text.length() <= max_chars:
+		return text
+	return text.substr(0, max(max_chars - 1, 1)) + "…"
+
+func _update_current_tackle_hold() -> void:
+	if current_tackle_button == null:
+		return
+	if _current_tackle_press_started_msec <= 0 or _current_tackle_long_press_triggered:
+		return
+	if Time.get_ticks_msec() - _current_tackle_press_started_msec < CURRENT_TACKLE_LONG_PRESS_MSEC:
+		return
+	_current_tackle_long_press_triggered = true
+	_hide_current_tackle_popup()
+	open_full_tackle_from_quick_panel()
+
+func _on_current_tackle_button_down() -> void:
+	_current_tackle_press_started_msec = Time.get_ticks_msec()
+	_current_tackle_long_press_triggered = false
+
+func _on_current_tackle_button_up() -> void:
+	_current_tackle_press_started_msec = 0
+
+func _on_current_tackle_button_pressed() -> void:
+	if _current_tackle_long_press_triggered:
+		_current_tackle_long_press_triggered = false
+		return
+	if _should_ignore_base_ui_press():
+		return
+	if current_tackle_popup != null and current_tackle_popup.visible:
+		_hide_current_tackle_popup()
+	else:
+		_show_current_tackle_popup()
+
+func _show_current_tackle_popup() -> void:
+	if current_tackle_button == null:
+		return
+	_ensure_current_tackle_hud_nodes()
+	if current_tackle_popup == null or current_tackle_popup_box == null:
+		return
+
+	for child in current_tackle_popup_box.get_children():
+		current_tackle_popup_box.remove_child(child)
+		child.queue_free()
+
+	var title_label := Label.new()
+	title_label.text = "Текущая снасть"
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title_label.add_theme_font_size_override("font_size", 13)
+	title_label.add_theme_color_override("font_color", Color(0.92, 1.0, 0.94, 1.0))
+	current_tackle_popup_box.add_child(title_label)
+
+	# TODO: Add saved rig presets when the beta scope includes multiple ready tackle builds.
+	var edit_button := _create_current_tackle_popup_button("Редактировать", true)
+	edit_button.tooltip_text = "Открыть сборку снасти"
+	edit_button.pressed.connect(_on_current_tackle_edit_pressed)
+	current_tackle_popup_box.add_child(edit_button)
+
+	var close_button := _create_current_tackle_popup_button("Закрыть", false)
+	close_button.tooltip_text = _get_current_tackle_popup_tooltip()
+	close_button.pressed.connect(_hide_current_tackle_popup)
+	current_tackle_popup_box.add_child(close_button)
+
+	var popup_size := _get_current_tackle_popup_size()
+	var popup_pos := current_tackle_button.global_position + Vector2(current_tackle_button.size.x - popup_size.x, current_tackle_button.size.y + 8.0)
+	var viewport_size := get_viewport_rect().size
+	popup_pos.x = clamp(popup_pos.x, 10.0, max(10.0, viewport_size.x - popup_size.x - 10.0))
+	popup_pos.y = clamp(popup_pos.y, 10.0, max(10.0, viewport_size.y - popup_size.y - 10.0))
+
+	current_tackle_popup.position = popup_pos
+	current_tackle_popup.size = popup_size
+	current_tackle_popup.custom_minimum_size = popup_size
+	current_tackle_popup.z_index = 330
+	if ui_theme != null:
+		ui_theme.apply_popup_window_style(current_tackle_popup)
+
+	current_tackle_popup_box.set_anchors_preset(Control.PRESET_FULL_RECT)
+	current_tackle_popup_box.offset_left = 10.0
+	current_tackle_popup_box.offset_top = 10.0
+	current_tackle_popup_box.offset_right = -10.0
+	current_tackle_popup_box.offset_bottom = -10.0
+	current_tackle_popup.visible = true
+
+func _hide_current_tackle_popup() -> void:
+	if current_tackle_popup != null:
+		current_tackle_popup.hide()
+
+func _get_current_tackle_popup_size() -> Vector2:
+	var scale_value := clampf(min(get_viewport_rect().size.x / BASE_SCREEN_SIZE.x, get_viewport_rect().size.y / BASE_SCREEN_SIZE.y), 0.86, 1.18)
+	return Vector2(clamp(214.0 * scale_value, 190.0, 250.0), clamp(150.0 * scale_value, 136.0, 176.0))
+
+func _get_current_tackle_popup_tooltip() -> String:
+	if PlayerData != null and PlayerData.has_method("get_tackle_text"):
+		return str(PlayerData.get_tackle_text())
+	return _get_current_tackle_button_text()
+
+func _create_current_tackle_popup_button(text: String, primary := false) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.focus_mode = Control.FOCUS_NONE
+	button.mouse_filter = Control.MOUSE_FILTER_STOP
+	button.clip_text = true
+	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	button.custom_minimum_size = Vector2(0.0, 46.0)
+	button.add_theme_font_size_override("font_size", 13)
+	_apply_button_style(button, STYLE_PRIMARY_BUTTON if primary else STYLE_SECONDARY_BUTTON)
+	return button
+
+func _on_current_tackle_current_pressed() -> void:
+	_hide_current_tackle_popup()
+	_show_toast("Текущая снасть выбрана", true)
+
+func _on_current_tackle_edit_pressed() -> void:
+	_hide_current_tackle_popup()
+	open_full_tackle_from_quick_panel()
 
 func open_full_tackle_from_quick_panel() -> void:
 	if _should_ignore_base_ui_press():
@@ -7134,6 +7414,7 @@ func _open_encyclopedia() -> void:
 	if _should_ignore_base_ui_press():
 		return
 
+	_hide_current_tackle_popup()
 	if profile_ui != null:
 		profile_ui.close(false)
 	if fish_harbor_ui != null:
@@ -7163,28 +7444,12 @@ func _open_profile() -> void:
 	if _should_ignore_base_ui_press():
 		return
 
+	_hide_current_tackle_popup()
 	if encyclopedia_ui != null:
 		encyclopedia_ui.close(false)
 	if fish_harbor_ui != null:
 		fish_harbor_ui.visible = false
 	profile_ui.open()
-	return
-	if _is_catch_reward_open():
-		return
-
-	basket_panel.visible = false
-	basket_backdrop.visible = false
-	inventory_panel.visible = false
-	inventory_backdrop.visible = false
-	tackle_panel.visible = false
-	tackle_backdrop.visible = false
-	waterbody_panel.visible = false
-	waterbody_backdrop.visible = false
-	shop_panel.visible = false
-	shop_backdrop.visible = false
-	_active_nav_tab = "profile"
-	_refresh_bottom_nav_styles()
-	_show_toast("Профиль пока недоступен.", false)
 
 
 func _open_settings() -> void:

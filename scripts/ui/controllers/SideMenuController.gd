@@ -20,8 +20,6 @@ func build_menu(parent: Control) -> void:
 	if parent == null:
 		return
 	_reparent_button(_get_button("inventory"), parent)
-	_reparent_button(_get_button("shop"), parent)
-	_reparent_button(_get_button("harbor"), parent)
 	_reparent_button(_get_button("map"), parent)
 	refresh()
 
@@ -40,9 +38,9 @@ func refresh() -> void:
 	if main == null:
 		return
 	_refresh_button("inventory", "inventory")
-	_refresh_button("shop", "shop")
-	_refresh_button("harbor", "harbor")
 	_refresh_button("map", "map")
+	_hide_button(_get_button("shop"))
+	_hide_button(_get_button("harbor"))
 	if main.basket_button != null:
 		main.basket_button.visible = false
 		main.basket_button.disabled = true
@@ -53,8 +51,6 @@ func refresh() -> void:
 
 func _connect_menu_signals() -> void:
 	_connect_button("inventory")
-	_connect_button("shop")
-	_connect_button("harbor")
 	_connect_button("map")
 
 
@@ -81,6 +77,13 @@ func _refresh_button(id: String, legacy_id: String) -> void:
 func _reparent_button(button: Button, parent: Control) -> void:
 	if button != null and button.get_parent() != parent and main != null and main.has_method("_reparent_node"):
 		main._reparent_node(button, parent)
+
+func _hide_button(button: Button) -> void:
+	if button == null:
+		return
+	button.visible = false
+	button.disabled = true
+	button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
 func _get_button(id: String) -> Button:

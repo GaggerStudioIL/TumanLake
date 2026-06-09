@@ -15,6 +15,7 @@ var _details_buy_button: Button
 var _details_close_button: Button
 var _shop_money_row: HBoxContainer
 var _details_item_id := ""
+var _shop_card_trimmed_texture_cache: Dictionary = {}
 signal buy_requested(item_id: String)
 
 const SHOP_SCROLL_BOTTOM_PADDING := 72.0
@@ -258,7 +259,9 @@ func _is_beta_consumable_shop_hidden() -> bool:
 	return BuildConfig.IS_BETA_BUILD
 
 func open() -> void:
-	if main._is_catch_reward_open() or main.shop_button.disabled:
+	if main._is_catch_reward_open():
+		return
+	if main.shop_button != null and main.shop_button.visible and main.shop_button.disabled:
 		return
 	if main._shop_category == SHOP_CATEGORY_TACKLE:
 		main._shop_category = SHOP_CATEGORY_ROD
@@ -1109,7 +1112,7 @@ func _populate_leader_shop_card(card: Panel, item: Dictionary, card_size: Vector
 	buy_button.pressed.connect(_on_shop_buy_pressed.bind(item_id))
 	card.add_child(buy_button)
 
-func _add_compact_shop_texture(parent: Control, texture: Texture2D, slot_rect: Rect2) -> void:
+func _add_compact_shop_texture(parent: Control, texture: Texture2D, slot_rect: Rect2, trim_transparent_margins := false, fill_scale := 1.0) -> void:
 	var slot := Control.new()
 	slot.name = "ShopCompactImageSlot"
 	slot.position = slot_rect.position
@@ -1118,18 +1121,81 @@ func _add_compact_shop_texture(parent: Control, texture: Texture2D, slot_rect: R
 	slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(slot)
 
-	var texture_size := texture.get_size()
+	var display_texture := _get_trimmed_shop_card_texture(texture) if trim_transparent_margins else texture
+	var texture_size := display_texture.get_size()
 	if texture_size.x <= 0.0 or texture_size.y <= 0.0:
 		return
 
 	var sprite := Sprite2D.new()
 	sprite.name = "ShopCompactImage"
-	sprite.texture = texture
+	sprite.texture = display_texture
 	sprite.centered = true
 	sprite.position = slot_rect.size * 0.5
-	sprite.scale = Vector2.ONE * minf(slot_rect.size.x / texture_size.x, slot_rect.size.y / texture_size.y)
+	sprite.scale = Vector2.ONE * minf(slot_rect.size.x / texture_size.x, slot_rect.size.y / texture_size.y) * clampf(fill_scale, 0.1, 1.5)
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	slot.add_child(sprite)
+
+func _get_trimmed_shop_card_texture(texture: Texture2D) -> Texture2D:
+	if texture == null:
+		return texture
+
+	var cache_key := str(texture.get_instance_id())
+	if _shop_card_trimmed_texture_cache.has(cache_key):
+		return _shop_card_trimmed_texture_cache[cache_key]
+
+	var image := texture.get_image()
+	if image == null or image.is_empty():
+		_shop_card_trimmed_texture_cache[cache_key] = texture
+		return texture
+
+	var width := image.get_width()
+	var height := image.get_height()
+	if width <= 0 or height <= 0:
+		_shop_card_trimmed_texture_cache[cache_key] = texture
+		return texture
+
+	var sample_step: int = maxi(1, int(float(maxi(width, height)) / 256.0))
+	var min_x := width
+	var min_y := height
+	var max_x := -1
+	var max_y := -1
+
+	for y in range(0, height, sample_step):
+		for x in range(0, width, sample_step):
+			if image.get_pixel(x, y).a <= 0.04:
+				continue
+			min_x = mini(min_x, x)
+			min_y = mini(min_y, y)
+			max_x = maxi(max_x, x)
+			max_y = maxi(max_y, y)
+
+	if max_x < min_x or max_y < min_y:
+		_shop_card_trimmed_texture_cache[cache_key] = texture
+		return texture
+
+	var visible_width := max_x - min_x + 1
+	var visible_height := max_y - min_y + 1
+	if visible_width >= int(float(width) * 0.92) and visible_height >= int(float(height) * 0.92):
+		_shop_card_trimmed_texture_cache[cache_key] = texture
+		return texture
+
+	var padding := maxi(4, int(float(maxi(visible_width, visible_height)) * 0.045))
+	var region_x := maxi(min_x - padding, 0)
+	var region_y := maxi(min_y - padding, 0)
+	var region_right := mini(max_x + padding, width - 1)
+	var region_bottom := mini(max_y + padding, height - 1)
+	var region := Rect2(
+		float(region_x),
+		float(region_y),
+		float(region_right - region_x + 1),
+		float(region_bottom - region_y + 1)
+	)
+
+	var atlas_texture := AtlasTexture.new()
+	atlas_texture.atlas = texture
+	atlas_texture.region = region
+	_shop_card_trimmed_texture_cache[cache_key] = atlas_texture
+	return atlas_texture
 
 
 func _populate_bait_shop_card(card: Panel, item: Dictionary, card_size: Vector2, texture: Texture2D, rarity_color: Color) -> void:
@@ -1153,16 +1219,13 @@ func _populate_bait_shop_card(card: Panel, item: Dictionary, card_size: Vector2,
 	card.add_child(image_area)
 
 	if texture != null:
-		var image := TextureRect.new()
-		image.name = "BaitCardImage"
-		image.texture = texture
-		image.position = Vector2.ZERO
-		image.size = image_area.size
-		image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		image.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		image.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		image_area.add_child(image)
+		_add_compact_shop_texture(
+			image_area,
+			texture,
+			Rect2(Vector2.ZERO, image_area.size),
+			true,
+			0.88
+		)
 	else:
 		var icon_label := Label.new()
 		icon_label.text = str(item.get("icon", "?"))
