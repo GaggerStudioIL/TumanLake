@@ -1556,9 +1556,16 @@ func _ensure_mobile_ui_containers() -> void:
 
 	for node in [feed_button, bait_button, tackle_button]:
 		_reparent_node(node, quick_actions_container)
+		node.visible = false
+		node.disabled = true
+		node.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	quick_actions_container.move_child(feed_button, 0)
 	quick_actions_container.move_child(bait_button, 1)
 	quick_actions_container.move_child(tackle_button, 2)
+	quick_actions_container.visible = false
+	quick_actions_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	action_panel.visible = false
+	action_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	if nav_fish_button.get_parent() == bottom_nav_container:
 		_reparent_node(nav_fish_button, ui_canvas_layer)
@@ -1570,9 +1577,14 @@ func _ensure_mobile_ui_containers() -> void:
 		basket_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	for node in [inventory_button, map_button]:
-		_reparent_node(node, bottom_nav_container)
-	bottom_nav_container.move_child(inventory_button, 0)
-	bottom_nav_container.move_child(map_button, 1)
+		_reparent_node(node, ui_canvas_layer)
+		node.visible = false
+		node.disabled = true
+		node.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bottom_nav_panel.visible = false
+	bottom_nav_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bottom_nav_container.visible = false
+	bottom_nav_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	for node in [shop_button, harbor_button]:
 		if node != null:
@@ -3005,15 +3017,16 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	if quick_tackle_panel != null and quick_tackle_panel.has_method("layout"):
 		quick_tackle_panel.call("layout", cast_rect, ui_scale)
 
-	bottom_nav_panel.visible = true
+	bottom_nav_panel.visible = false
 	var nav_rect := _scale_rect(Rect2(38.0, 150.0, LEFT_NAV_WIDTH, LEFT_NAV_HEIGHT), screen_size)
 	_anchor_control(bottom_nav_panel, 0.0, 0.0, 0.0, 0.0, nav_rect.position.x, nav_rect.position.y, nav_rect.end.x, nav_rect.end.y)
 	bottom_nav_panel.z_index = 100
-	bottom_nav_panel.mouse_filter = Control.MOUSE_FILTER_PASS
+	bottom_nav_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bottom_nav_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 
 	_anchor_control(bottom_nav_container, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0)
-	bottom_nav_container.mouse_filter = Control.MOUSE_FILTER_PASS
+	bottom_nav_container.visible = false
+	bottom_nav_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bottom_nav_container.add_theme_constant_override("separation", int(9.0 * ui_scale))
 
 	var nav_buttons: Array = [nav_fish_button, inventory_button, shop_button, harbor_button, map_button]
@@ -3355,6 +3368,33 @@ func _layout_main_hud_v2_right_stack(screen_size: Vector2, ui_scale: float, cast
 		clampf(54.0 * ui_scale, 48.0, 58.0)
 	)
 	var compact_size := Vector2(menu_button_size.y, menu_button_size.y)
+	var top_hud_buttons: Array = [
+		{"button": encyclopedia_button, "icon": "encyclopedia", "tooltip": "Энциклопедия рыб"},
+		{"button": map_button, "icon": "map", "tooltip": "Карта"},
+		{"button": inventory_button, "icon": "inventory", "tooltip": "Инвентарь"}
+	]
+	var top_right_edge: float = screen_size.x - margin_x - menu_button_size.x - gap
+	for button_value in top_hud_buttons:
+		var button_info: Dictionary = button_value
+		var button := button_info.get("button") as Button
+		if button == null:
+			continue
+		var button_pos := Vector2(top_right_edge - compact_size.x, margin_y)
+		_anchor_control(button, 0.0, 0.0, 0.0, 0.0, button_pos.x, button_pos.y, button_pos.x + compact_size.x, button_pos.y + compact_size.y)
+		button.text = ""
+		button.tooltip_text = str(button_info.get("tooltip", ""))
+		button.visible = not is_modal_open
+		button.disabled = is_modal_open
+		button.mouse_filter = Control.MOUSE_FILTER_STOP if not is_modal_open else Control.MOUSE_FILTER_IGNORE
+		button.custom_minimum_size = compact_size
+		button.size = compact_size
+		button.z_index = 260
+		_apply_button_style(button, STYLE_SECONDARY_BUTTON)
+		_set_button_icon(button, str(button_info.get("icon", "")), compact_size.x * 0.48)
+		button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		button.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
+		button.add_theme_constant_override("h_separation", 0)
+		top_right_edge = button_pos.x - gap
 
 	if encyclopedia_button != null:
 		var encyclopedia_pos := Vector2(screen_size.x - margin_x - menu_button_size.x - gap - compact_size.x, margin_y)
