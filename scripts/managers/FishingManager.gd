@@ -168,6 +168,7 @@ const FAILURE_FISH_ESCAPED_LOW_TENSION := "FISH_ESCAPED_LOW_TENSION"
 const FAILURE_FISH_ESCAPED_HIGH_TENSION := "FISH_ESCAPED_HIGH_TENSION"
 const FAILURE_FISH_ESCAPED_HOOK := "FISH_ESCAPED_HOOK"
 const FAILURE_FISH_TOO_STRONG := "FISH_TOO_STRONG"
+const FAILURE_CONDITION_CRITICAL := "CONDITION_CRITICAL"
 const FAILURE_UNKNOWN := "UNKNOWN"
 const WeatherUIHelperScript := preload("res://scripts/ui/helpers/WeatherUIHelper.gd")
 const SHOW_WEATHER_BITE_DEBUG := false
@@ -186,6 +187,27 @@ func get_bite_candidates(spot_id: String) -> Array:
 	_tackle_stats = previous_tackle_stats
 	return candidates
 
+func _get_condition_manager() -> Node:
+	return get_node_or_null("/root/PlayerConditionManager")
+
+func _get_condition_fishing_modifiers() -> Dictionary:
+	var condition_manager := _get_condition_manager()
+	if condition_manager != null and condition_manager.has_method("get_fishing_modifiers"):
+		var raw_modifiers = condition_manager.call("get_fishing_modifiers")
+		if raw_modifiers is Dictionary:
+			return (raw_modifiers as Dictionary).duplicate(true)
+	return {
+		"condition_quality": 1.0,
+		"bite_chance_multiplier": 1.0,
+		"bite_window_multiplier": 1.0,
+		"reeling_difficulty_multiplier": 1.0,
+		"escape_risk_multiplier": 1.0,
+		"tension_fail_time_multiplier": 1.0,
+		"false_nudge_chance_multiplier": 1.0,
+		"error_chance_multiplier": 1.0,
+		"reaction_multiplier": 1.0
+	}
+
 func start_fishing(spot_id: String) -> void:
 	if is_fishing:
 		return
@@ -201,6 +223,22 @@ func start_fishing(spot_id: String) -> void:
 			"Точка клёва не найдена.",
 			"Выберите доступную точку ловли на карте.",
 			{"severity": "low", "spot_id": spot_id}
+		)
+		return
+
+	var condition_manager := _get_condition_manager()
+	if condition_manager != null and condition_manager.has_method("can_start_fishing") and not bool(condition_manager.call("can_start_fishing")):
+		var block_message := ""
+		if condition_manager.has_method("get_fishing_block_message"):
+			block_message = str(condition_manager.call("get_fishing_block_message"))
+		if block_message == "":
+			block_message = "Вы слишком плохо себя чувствуете. Нужно уйти с водоёма и восстановиться."
+		_emit_fishing_failure(
+			FAILURE_CONDITION_CRITICAL,
+			"Плохое самочувствие",
+			block_message,
+			"Отдохните в лагере или восстановитесь перед ловлей.",
+			{"severity": "high", "spot_id": spot_id, "condition_state": condition_manager.call("get_condition_state") if condition_manager.has_method("get_condition_state") else {}}
 		)
 		return
 
@@ -261,6 +299,8 @@ func start_fishing(spot_id: String) -> void:
 	var weather_bite_multiplier: float = float(weather_modifiers.get("bite_chance", 1.0))
 	var wind_effects := _get_wind_effects(spot)
 	weather_bite_multiplier *= float(wind_effects.get("bite_chance_multiplier", 1.0))
+	var condition_modifiers := _get_condition_fishing_modifiers()
+	weather_bite_multiplier *= float(condition_modifiers.get("bite_chance_multiplier", 1.0))
 
 	if use_new_bite_system:
 		_start_waiting_for_active_bite(spot, spot_id, available_fish, spot_depth_modifier)
@@ -303,7 +343,8 @@ func start_fishing(spot_id: String) -> void:
 				"time_activity_modifier": time_activity_modifier,
 				"weather_type": weather_type,
 				"weather_bite_multiplier": weather_bite_multiplier,
-				"wind_effects": wind_effects
+				"wind_effects": wind_effects,
+				"condition_modifiers": condition_modifiers
 			}
 		)
 		return
@@ -392,6 +433,21 @@ func try_hook() -> void:
 			"elapsed": elapsed,
 			"perfect_end": perfect_end,
 			"message": "Поздно!"
+		})
+		return
+
+	var condition_modifiers := _get_condition_fishing_modifiers()
+	var raw_condition_modifiers = _pending_bite_data.get("condition_modifiers", {})
+	if raw_condition_modifiers is Dictionary:
+		condition_modifiers = (raw_condition_modifiers as Dictionary).duplicate(true)
+	var error_multiplier := clampf(float(condition_modifiers.get("error_chance_multiplier", 1.0)), 1.0, 1.75)
+	var condition_error_chance := clampf((error_multiplier - 1.0) * 0.18, 0.0, 0.14)
+	if condition_error_chance > 0.0 and randf() < condition_error_chance:
+		_fail_hook("condition_mistake", {
+			"elapsed": elapsed,
+			"perfect_start": perfect_start,
+			"perfect_end": perfect_end,
+			"message": "Подсечка сорвалась из-за плохого самочувствия."
 		})
 		return
 
@@ -599,7 +655,13 @@ func _update_false_nudge(delta: float) -> void:
 
 	_false_nudge_timer = randf_range(FALSE_NUDGE_MIN_DELAY, FALSE_NUDGE_MAX_DELAY)
 	var wind_effects: Dictionary = _get_wind_effects(_active_spot)
-	var false_nudge_chance: float = clamp(FALSE_NUDGE_CHANCE + float(wind_effects.get("false_bite_chance", 0.0)), 0.06, 0.72)
+	var condition_modifiers := _get_condition_fishing_modifiers()
+	var false_nudge_chance: float = clamp(
+		(FALSE_NUDGE_CHANCE + float(wind_effects.get("false_bite_chance", 0.0)))
+			* clampf(float(condition_modifiers.get("false_nudge_chance_multiplier", 1.0)), 1.0, 1.75),
+		0.06,
+		0.82
+	)
 	if randf() > false_nudge_chance:
 		return
 
@@ -696,6 +758,7 @@ func _get_active_bite_balance_data() -> Dictionary:
 	var weather_modifiers := _get_weather_bite_modifiers(weather_type)
 	var weather_bite_multiplier: float = float(weather_modifiers.get("bite_chance", 1.0))
 	var wind_effects := _get_wind_effects(_active_spot)
+	var condition_modifiers := _get_condition_fishing_modifiers()
 	var bite_chance: float = clamp(
 		(
 			0.085
@@ -704,7 +767,7 @@ func _get_active_bite_balance_data() -> Dictionary:
 			+ bait_bonus * 0.09
 			+ float(_tackle_stats.get("hook_success_bonus", 0.0)) * 0.06
 			- float(_tackle_stats.get("visibility_penalty", 0.0)) * 0.08
-		) * spot_bite_modifier * clamp(time_activity_modifier, 0.42, 1.38) * weather_bite_multiplier * float(wind_effects.get("bite_chance_multiplier", 1.0)),
+		) * spot_bite_modifier * clamp(time_activity_modifier, 0.42, 1.38) * weather_bite_multiplier * float(wind_effects.get("bite_chance_multiplier", 1.0)) * float(condition_modifiers.get("bite_chance_multiplier", 1.0)),
 		0.04,
 		0.22
 	)
@@ -726,7 +789,8 @@ func _get_active_bite_balance_data() -> Dictionary:
 		"weather_type": weather_type,
 		"weather_bite_multiplier": weather_bite_multiplier,
 		"weather_modifiers": weather_modifiers,
-		"wind_effects": wind_effects
+		"wind_effects": wind_effects,
+		"condition_modifiers": condition_modifiers
 	}
 
 
@@ -810,11 +874,16 @@ func _build_bite_window_data(fish_id: String, catch_data: Dictionary, balance_da
 	var visibility_rating: float = clamp(float(_tackle_stats.get("float_bite_visibility_rating", 0.85)), 0.0, 1.0)
 	var hook_timing_bonus: float = clamp(float(_tackle_stats.get("hook_timing_bonus", 0.0)), 0.0, 0.20)
 	var bite_visibility_multiplier: float = clamp(float(wind_effects.get("bite_visibility_multiplier", 1.0)), 0.70, 1.06)
+	var condition_modifiers := _get_condition_fishing_modifiers()
+	var raw_condition_modifiers = balance_data.get("condition_modifiers", {})
+	if raw_condition_modifiers is Dictionary:
+		condition_modifiers = (raw_condition_modifiers as Dictionary).duplicate(true)
 	window += (sensitivity_rating - 0.70) * 0.14
 	window += (visibility_rating - 0.75) * 0.08
 	window *= 1.0 + hook_timing_bonus
+	window *= clampf(float(condition_modifiers.get("bite_window_multiplier", 1.0)), 0.55, 1.0)
 	window -= effective_wind_penalty * 0.12
-	window = clamp(window - size_ratio * 0.12, 1.15, 1.8)
+	window = clamp(window - size_ratio * 0.12, 0.85, 1.8)
 	var perfect_start: float = window * 0.25
 	var perfect_end: float = window * 0.75
 	var timing_padding: float = clamp((sensitivity_rating - 0.55) * 0.08 + hook_timing_bonus * 0.10 - effective_wind_penalty * 0.03, -0.04, 0.10)
@@ -832,7 +901,8 @@ func _build_bite_window_data(fish_id: String, catch_data: Dictionary, balance_da
 		"rarity": rarity,
 		"behavior": behavior,
 		"weight": weight,
-		"wind_effects": wind_effects
+		"wind_effects": wind_effects,
+		"condition_modifiers": condition_modifiers
 	}
 
 
@@ -1867,6 +1937,18 @@ func _start_reeling(catch_data: Dictionary) -> void:
 		0.75,
 		3.65
 	)
+	var condition_modifiers := _get_condition_fishing_modifiers()
+	_difficulty = clamp(
+		_difficulty * clampf(float(condition_modifiers.get("reeling_difficulty_multiplier", 1.0)), 1.0, 1.65),
+		0.75,
+		4.20
+	)
+	_escape_risk = clamp(
+		_escape_risk * clampf(float(condition_modifiers.get("escape_risk_multiplier", 1.0)), 1.0, 1.85),
+		0.05,
+		0.92
+	)
+	_current_catch["condition_modifiers"] = condition_modifiers
 	_catch_progress = 0.0
 	_control_value = 0.0
 	_fish_force = 0.0
@@ -1906,8 +1988,9 @@ func _start_reeling(catch_data: Dictionary) -> void:
 
 	var break_safety: float = line_break_resistance * line_durability * clamp(rod_strength, 0.7, 1.35)
 	var escape_safety: float = (1.0 / max(float(_tackle_stats.get("fish_escape_modifier", 1.0)), 0.2)) + float(_tackle_stats.get("hook_success_bonus", 0.0))
-	_high_fail_limit = clamp((1.30 * break_safety) / (_difficulty * float(tuning["danger"]) * (1.0 + overload_penalty * 0.45)), 0.42, 1.55)
-	_low_fail_limit = clamp((1.52 * escape_safety) / (_difficulty * float(tuning["danger"]) * (1.0 + _escape_risk)), 0.52, 1.85)
+	var condition_fail_time_multiplier := clampf(float(condition_modifiers.get("tension_fail_time_multiplier", 1.0)), 0.58, 1.0)
+	_high_fail_limit = clamp((1.30 * break_safety) / (_difficulty * float(tuning["danger"]) * (1.0 + overload_penalty * 0.45)) * condition_fail_time_multiplier, 0.42, 1.55)
+	_low_fail_limit = clamp((1.52 * escape_safety) / (_difficulty * float(tuning["danger"]) * (1.0 + _escape_risk)) * condition_fail_time_multiplier, 0.52, 1.85)
 	_target_progress_time = _get_target_fight_duration(catch_data, fish, tuning, rod_strength)
 	_initialize_reel_mode(catch_data)
 

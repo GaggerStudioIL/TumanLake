@@ -19,6 +19,10 @@ func save_game() -> void:
 		"current_xp": PlayerData.current_xp,
 		"xp": PlayerData.current_xp,
 		"xp_to_next_level": PlayerData.xp_to_next_level,
+		"health": PlayerData.health,
+		"body_temperature": PlayerData.body_temperature,
+		"hunger": PlayerData.hunger,
+		"condition": PlayerData.get_condition_save_data() if PlayerData.has_method("get_condition_save_data") else {},
 		"claimed_level_rewards": PlayerData.get_claimed_level_rewards_save_data() if PlayerData.has_method("get_claimed_level_rewards_save_data") else {},
 		"skill_points": PlayerData.skill_points,
 		"total_skill_points_earned": PlayerData.total_skill_points_earned,
@@ -47,6 +51,8 @@ func save_game() -> void:
 		"owned_items": PlayerData.owned_items,
 		"current_tackle": PlayerData.current_tackle,
 		"recent_tackle_items": PlayerData.get_recent_tackle_items_save_data(),
+		"equipped_clothing": PlayerData.get_equipped_clothing_save_data() if PlayerData.has_method("get_equipped_clothing_save_data") else {},
+		"starter_survival_kit_granted": PlayerData.starter_survival_kit_granted,
 		"inventory": InventoryManager.inventory,
 		"max_items": InventoryManager.max_items,
 		"economy": _get_economy_save_data(),
@@ -78,6 +84,9 @@ func load_game() -> void:
 		var time_manager := _get_time_manager()
 		if time_manager != null and time_manager.has_method("initialize_new_game_time"):
 			time_manager.call("initialize_new_game_time", false)
+		if PlayerData.has_method("initialize_new_player_survival_state"):
+			PlayerData.call("initialize_new_player_survival_state")
+		save_game()
 		return
 
 	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
@@ -110,6 +119,10 @@ func load_game() -> void:
 		int(save_data.get("level", 1)),
 		int(save_data.get("current_xp", save_data.get("xp", 0)))
 	)
+	var missing_condition_state := not (save_data as Dictionary).has("condition") and not (save_data as Dictionary).has("health")
+	var repaired_condition_state := false
+	if PlayerData.has_method("set_condition_from_save"):
+		repaired_condition_state = bool(PlayerData.set_condition_from_save(save_data.get("condition", save_data)))
 	var missing_level_rewards := not (save_data as Dictionary).has("claimed_level_rewards")
 	if PlayerData.has_method("set_claimed_level_rewards"):
 		PlayerData.set_claimed_level_rewards(save_data.get("claimed_level_rewards", {}), missing_level_rewards)
@@ -128,6 +141,15 @@ func load_game() -> void:
 	PlayerData.upgrades = save_data.get("upgrades", [])
 	PlayerData.set_fishing_depth(float(save_data.get("fishing_depth", PlayerData.fishing_depth)))
 	PlayerData.set_owned_items(save_data.get("owned_items", []))
+	var missing_survival_state := not (save_data as Dictionary).has("starter_survival_kit_granted") or not (save_data as Dictionary).has("equipped_clothing")
+	var migrated_survival_state := false
+	if PlayerData.has_method("migrate_survival_state"):
+		migrated_survival_state = bool(PlayerData.call(
+			"migrate_survival_state",
+			save_data.get("equipped_clothing", {}),
+			save_data.get("starter_survival_kit_granted", false),
+			(save_data as Dictionary).has("starter_survival_kit_granted")
+		))
 	PlayerData.set_current_tackle(save_data.get("current_tackle", {}))
 	PlayerData.set_recent_tackle_items(save_data.get("recent_tackle_items", {}))
 
@@ -161,7 +183,7 @@ func load_game() -> void:
 
 	if BuildConfig.ENABLE_VERBOSE_LOGS:
 		print("Game loaded")
-	if should_save_after_time_load or migrated_freshness or migrated_save or removed_zero_value_fish or missing_recent_tackle_items or missing_ranked_skill_state or missing_level_rewards or repaired_location:
+	if should_save_after_time_load or migrated_freshness or migrated_save or removed_zero_value_fish or missing_recent_tackle_items or missing_ranked_skill_state or missing_level_rewards or missing_condition_state or repaired_condition_state or repaired_location or missing_survival_state or migrated_survival_state:
 		save_game()
 
 func delete_save() -> void:

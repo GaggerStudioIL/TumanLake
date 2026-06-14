@@ -36,6 +36,314 @@ const WORM_BAIT_PRICE_OVERRIDES := {
 	"cherv_leningradskiy": 5.6,
 	"vipolzok": 5.8
 }
+const SURVIVAL_ITEM_CATEGORIES := {
+	"food": true,
+	"drink": true,
+	"clothing": true,
+	"shelter": true
+}
+const CLOTHING_SLOTS := {
+	"torso": "Верх",
+	"legs": "Низ",
+	"shoes": "Обувь",
+	"head": "Голова",
+	"outerwear": "Куртка"
+}
+const STARTER_CLOTHING_ITEM_IDS := ["basic_tshirt", "basic_pants", "basic_sneakers"]
+const STARTER_SUPPLY_ITEMS := [
+	{"id": "food_bread", "quantity": 2},
+	{"id": "sandwich", "quantity": 2},
+	{"id": "canned_food", "quantity": 2},
+	{"id": "water_bottle", "quantity": 2},
+	{"id": "hot_tea", "quantity": 1}
+]
+const SURVIVAL_ITEM_CATALOG := {
+	"food_bread": {
+		"id": "food_bread",
+		"name": "Хлеб",
+		"display_name_ru": "Хлеб",
+		"type": "food",
+		"category": "food",
+		"shop_category": "food",
+		"rarity": "common",
+		"price": 4,
+		"image_path": "res://assets/ui/shop/survival/food/bread.png",
+		"description": "Простая еда для быстрого перекуса.",
+		"description_ru": "Простая еда для быстрого перекуса.",
+		"stats": {"hunger_restore": 15.0}
+	},
+	"sandwich": {
+		"id": "sandwich",
+		"name": "Бутерброд",
+		"display_name_ru": "Бутерброд",
+		"type": "food",
+		"category": "food",
+		"shop_category": "food",
+		"rarity": "common",
+		"price": 9,
+		"image_path": "res://assets/ui/shop/survival/food/sandwich.png",
+		"description": "Сытный перекус перед рыбалкой.",
+		"description_ru": "Сытный перекус перед рыбалкой.",
+		"stats": {"hunger_restore": 25.0}
+	},
+	"canned_food": {
+		"id": "canned_food",
+		"name": "Консервы",
+		"display_name_ru": "Консервы",
+		"type": "food",
+		"category": "food",
+		"shop_category": "food",
+		"rarity": "common",
+		"price": 14,
+		"image_path": "res://assets/ui/shop/survival/food/canned_food.png",
+		"description": "Надёжная еда для долгой вылазки.",
+		"description_ru": "Надёжная еда для долгой вылазки.",
+		"stats": {"hunger_restore": 35.0}
+	},
+	"chocolate_bar": {
+		"id": "chocolate_bar",
+		"name": "Шоколадный батончик",
+		"display_name_ru": "Шоколадный батончик",
+		"type": "food",
+		"category": "food",
+		"shop_category": "food",
+		"rarity": "common",
+		"price": 8,
+		"description": "Быстрый заряд сил и концентрации.",
+		"description_ru": "Быстрый заряд сил и концентрации.",
+		"stats": {"hunger_restore": 12.0, "condition_bonus": 0.06, "bonus_minutes": 90.0}
+	},
+	"camp_meal": {
+		"id": "camp_meal",
+		"name": "Походный обед",
+		"display_name_ru": "Походный обед",
+		"type": "food",
+		"category": "food",
+		"shop_category": "food",
+		"rarity": "uncommon",
+		"price": 28,
+		"description": "Плотная еда, которая помогает прийти в себя.",
+		"description_ru": "Плотная еда, которая помогает прийти в себя.",
+		"stats": {"hunger_restore": 50.0, "health_restore": 5.0}
+	},
+	"water_bottle": {
+		"id": "water_bottle",
+		"name": "Бутылка воды",
+		"display_name_ru": "Бутылка воды",
+		"type": "drink",
+		"category": "drink",
+		"shop_category": "food",
+		"rarity": "common",
+		"price": 5,
+		"image_path": "res://assets/ui/shop/survival/drinks/water_bottle.png",
+		"description": "Помогает освежиться в жару.",
+		"description_ru": "Помогает освежиться в жару.",
+		"stats": {"temperature_delta_hot": -0.18}
+	},
+	"hot_tea": {
+		"id": "hot_tea",
+		"name": "Горячий чай",
+		"display_name_ru": "Горячий чай",
+		"type": "drink",
+		"category": "drink",
+		"shop_category": "food",
+		"rarity": "common",
+		"price": 7,
+		"image_path": "res://assets/ui/shop/survival/drinks/hot_tea.png",
+		"description": "Согревает в холодную погоду.",
+		"description_ru": "Согревает в холодную погоду.",
+		"stats": {"temperature_delta_cold": 0.25}
+	},
+	"coffee": {
+		"id": "coffee",
+		"name": "Кофе",
+		"display_name_ru": "Кофе",
+		"type": "drink",
+		"category": "drink",
+		"shop_category": "food",
+		"rarity": "common",
+		"price": 9,
+		"image_path": "res://assets/ui/shop/survival/drinks/coffee.png",
+		"description": "Слегка согревает и помогает сосредоточиться.",
+		"description_ru": "Слегка согревает и помогает сосредоточиться.",
+		"stats": {"temperature_delta_cold": 0.12, "condition_bonus": 0.05, "bonus_minutes": 90.0}
+	},
+	"cold_drink": {
+		"id": "cold_drink",
+		"name": "Холодный напиток",
+		"display_name_ru": "Холодный напиток",
+		"type": "drink",
+		"category": "drink",
+		"shop_category": "food",
+		"rarity": "common",
+		"price": 9,
+		"description": "Быстро охлаждает в жаркий день.",
+		"description_ru": "Быстро охлаждает в жаркий день.",
+		"stats": {"temperature_delta_hot": -0.36}
+	},
+	"basic_tshirt": {
+		"id": "basic_tshirt",
+		"name": "Базовая футболка",
+		"display_name_ru": "Базовая футболка",
+		"type": "clothing",
+		"category": "clothing",
+		"shop_category": "clothing",
+		"rarity": "common",
+		"price": 5,
+		"image_path": "res://assets/ui/shop/survival/clothing/basic_tshirt.png",
+		"description": "Стартовая лёгкая одежда.",
+		"description_ru": "Стартовая лёгкая одежда.",
+		"stats": {"clothing_slot": "torso", "cold_protection": 0.08, "heat_protection": 0.08, "warmth": 0.05}
+	},
+	"basic_pants": {
+		"id": "basic_pants",
+		"name": "Базовые штаны",
+		"display_name_ru": "Базовые штаны",
+		"type": "clothing",
+		"category": "clothing",
+		"shop_category": "clothing",
+		"rarity": "common",
+		"price": 6,
+		"image_path": "res://assets/ui/shop/survival/clothing/basic_pants.png",
+		"description": "Обычные штаны для первой рыбалки.",
+		"description_ru": "Обычные штаны для первой рыбалки.",
+		"stats": {"clothing_slot": "legs", "cold_protection": 0.10, "wind_protection": 0.04, "warmth": 0.07}
+	},
+	"basic_sneakers": {
+		"id": "basic_sneakers",
+		"name": "Базовые кеды",
+		"display_name_ru": "Базовые кеды",
+		"type": "clothing",
+		"category": "clothing",
+		"shop_category": "clothing",
+		"rarity": "common",
+		"price": 6,
+		"image_path": "res://assets/ui/shop/survival/clothing/basic_sneakers.png",
+		"description": "Простая обувь без защиты от воды.",
+		"description_ru": "Простая обувь без защиты от воды.",
+		"stats": {"clothing_slot": "shoes", "cold_protection": 0.05, "wind_protection": 0.02, "warmth": 0.03}
+	},
+	"light_jacket": {
+		"id": "light_jacket",
+		"name": "Лёгкая куртка",
+		"display_name_ru": "Лёгкая куртка",
+		"type": "clothing",
+		"category": "clothing",
+		"shop_category": "clothing",
+		"rarity": "common",
+		"price": 36,
+		"description": "Защищает от ветра и прохлады.",
+		"description_ru": "Защищает от ветра и прохлады.",
+		"stats": {"clothing_slot": "outerwear", "cold_protection": 0.30, "wind_protection": 0.34, "rain_protection": 0.08, "warmth": 0.24}
+	},
+	"warm_jacket": {
+		"id": "warm_jacket",
+		"name": "Тёплая куртка",
+		"display_name_ru": "Тёплая куртка",
+		"type": "clothing",
+		"category": "clothing",
+		"shop_category": "clothing",
+		"rarity": "uncommon",
+		"price": 78,
+		"image_path": "res://assets/ui/shop/survival/clothing/warm_jacket.png",
+		"description": "Хорошо держит тепло в холодные часы.",
+		"description_ru": "Хорошо держит тепло в холодные часы.",
+		"stats": {"clothing_slot": "outerwear", "cold_protection": 0.58, "wind_protection": 0.42, "rain_protection": 0.12, "warmth": 0.48, "heat_penalty": 0.12}
+	},
+	"raincoat": {
+		"id": "raincoat",
+		"name": "Дождевик",
+		"display_name_ru": "Дождевик",
+		"type": "clothing",
+		"category": "clothing",
+		"shop_category": "clothing",
+		"rarity": "common",
+		"price": 44,
+		"description": "Защищает от дождя и сырости.",
+		"description_ru": "Защищает от дождя и сырости.",
+		"stats": {"clothing_slot": "outerwear", "cold_protection": 0.18, "wind_protection": 0.20, "rain_protection": 0.62, "warmth": 0.12}
+	},
+	"cap": {
+		"id": "cap",
+		"name": "Кепка",
+		"display_name_ru": "Кепка",
+		"type": "clothing",
+		"category": "clothing",
+		"shop_category": "clothing",
+		"rarity": "common",
+		"price": 14,
+		"image_path": "res://assets/ui/shop/survival/clothing/cap.png",
+		"description": "Немного помогает на солнце.",
+		"description_ru": "Немного помогает на солнце.",
+		"stats": {"clothing_slot": "head", "heat_protection": 0.18}
+	},
+	"warm_hat": {
+		"id": "warm_hat",
+		"name": "Тёплая шапка",
+		"display_name_ru": "Тёплая шапка",
+		"type": "clothing",
+		"category": "clothing",
+		"shop_category": "clothing",
+		"rarity": "common",
+		"price": 18,
+		"description": "Сохраняет тепло ночью и утром.",
+		"description_ru": "Сохраняет тепло ночью и утром.",
+		"stats": {"clothing_slot": "head", "cold_protection": 0.24, "wind_protection": 0.10, "warmth": 0.20, "heat_penalty": 0.04}
+	},
+	"rubber_boots": {
+		"id": "rubber_boots",
+		"name": "Резиновые сапоги",
+		"display_name_ru": "Резиновые сапоги",
+		"type": "clothing",
+		"category": "clothing",
+		"shop_category": "clothing",
+		"rarity": "common",
+		"price": 32,
+		"description": "Держат ноги сухими у берега.",
+		"description_ru": "Держат ноги сухими у берега.",
+		"stats": {"clothing_slot": "shoes", "cold_protection": 0.16, "rain_protection": 0.38, "warmth": 0.12}
+	},
+	"simple_tent": {
+		"id": "simple_tent",
+		"name": "Простая палатка",
+		"display_name_ru": "Простая палатка",
+		"type": "shelter",
+		"category": "shelter",
+		"shop_category": "clothing",
+		"rarity": "common",
+		"price": 90,
+		"image_path": "res://assets/ui/shop/survival/shelters/simple_tent.png",
+		"description": "Позволяет отдохнуть и стабилизировать состояние.",
+		"description_ru": "Позволяет отдохнуть и стабилизировать состояние.",
+		"stats": {"rest_minutes": 90.0, "health_restore": 16.0, "hunger_cost": 8.0, "normalize_temperature": true}
+	},
+	"warm_tent": {
+		"id": "warm_tent",
+		"name": "Тёплая палатка",
+		"display_name_ru": "Тёплая палатка",
+		"type": "shelter",
+		"category": "shelter",
+		"shop_category": "clothing",
+		"rarity": "uncommon",
+		"price": 150,
+		"description": "Лучше восстанавливает тепло и самочувствие.",
+		"description_ru": "Лучше восстанавливает тепло и самочувствие.",
+		"stats": {"rest_minutes": 120.0, "health_restore": 24.0, "hunger_cost": 10.0, "normalize_temperature": true}
+	},
+	"rain_shelter": {
+		"id": "rain_shelter",
+		"name": "Навес от дождя",
+		"display_name_ru": "Навес от дождя",
+		"type": "shelter",
+		"category": "shelter",
+		"shop_category": "clothing",
+		"rarity": "common",
+		"price": 72,
+		"description": "Укрывает от дождя и ветра.",
+		"description_ru": "Укрывает от дождя и ветра.",
+		"stats": {"rest_minutes": 60.0, "health_restore": 8.0, "hunger_cost": 5.0, "normalize_temperature": true}
+	}
+}
 const LEVEL_UP_REWARDS := {
 	2: {
 		"silver": 25,
@@ -3729,6 +4037,11 @@ var fishing_depth: float = 0.8
 var owned_items: Array = get_default_owned_items()
 var current_tackle: Dictionary = get_default_tackle()
 var recent_tackle_items: Dictionary = get_default_recent_tackle_items()
+var equipped_clothing: Dictionary = get_default_equipped_clothing()
+var starter_survival_kit_granted := false
+var health: float = 100.0
+var body_temperature: float = 36.6
+var hunger: float = 100.0
 var total_fish_caught := 0
 var total_fish_weight: float = 0.0
 var daily_catch_day: int = 1
@@ -3742,6 +4055,326 @@ var trophy_catches := []
 var personal_records := {}
 var rescue_kit_claims_total := 0
 var rescue_kit_last_claim_day := -1
+
+func ensure_condition_defaults() -> bool:
+	var previous_health := float(health)
+	var previous_temperature := float(body_temperature)
+	var previous_hunger := float(hunger)
+	if previous_health <= 0.0:
+		health = 40.0
+	else:
+		health = clampf(previous_health, 0.0, 100.0)
+	body_temperature = clampf(previous_temperature, 30.0, 42.0)
+	hunger = clampf(previous_hunger, 0.0, 100.0)
+	return (
+		abs(previous_health - float(health)) > 0.001
+		or abs(previous_temperature - float(body_temperature)) > 0.001
+		or abs(previous_hunger - float(hunger)) > 0.001
+	)
+
+func get_condition_save_data() -> Dictionary:
+	ensure_condition_defaults()
+	return {
+		"health": health,
+		"body_temperature": body_temperature,
+		"hunger": hunger
+	}
+
+func get_default_equipped_clothing() -> Dictionary:
+	return {
+		"torso": "basic_tshirt",
+		"legs": "basic_pants",
+		"shoes": "basic_sneakers",
+		"head": "",
+		"outerwear": ""
+	}
+
+func get_survival_catalog_item(item_id: String) -> Dictionary:
+	if not SURVIVAL_ITEM_CATALOG.has(item_id):
+		return {}
+	return _normalize_survival_catalog_item(SURVIVAL_ITEM_CATALOG[item_id])
+
+func get_survival_catalog_items(category_filter: String = "all") -> Array:
+	var items: Array = []
+	for item_id in SURVIVAL_ITEM_CATALOG.keys():
+		var item := get_survival_catalog_item(str(item_id))
+		if item.is_empty():
+			continue
+		var category := str(item.get("category", "misc"))
+		var shop_category := str(item.get("shop_category", category))
+		if (
+			category_filter == "all"
+			or category == category_filter
+			or shop_category == category_filter
+			or (category_filter == "food" and ["food", "drink"].has(category))
+			or (category_filter == "clothing" and ["clothing", "shelter"].has(category))
+		):
+			items.append(item)
+	items.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var order := {"food": 0, "drink": 1, "clothing": 2, "shelter": 3}
+		var category_a := str(a.get("category", "misc"))
+		var category_b := str(b.get("category", "misc"))
+		var order_a := int(order.get(category_a, 9))
+		var order_b := int(order.get(category_b, 9))
+		if order_a == order_b:
+			return float(a.get("price", 0.0)) < float(b.get("price", 0.0))
+		return order_a < order_b
+	)
+	return items
+
+func get_survival_shop_items(shop_category: String) -> Array:
+	var items: Array = []
+	for item in get_survival_catalog_items("all"):
+		if str(item.get("shop_category", "")) != shop_category:
+			continue
+		if STARTER_CLOTHING_ITEM_IDS.has(str(item.get("id", ""))):
+			continue
+		var shop_item: Dictionary = item.duplicate(true)
+		shop_item["quantity"] = 1
+		shop_item["icon"] = _get_item_icon(str(shop_item.get("category", "misc")))
+		items.append(shop_item)
+	return items
+
+func _normalize_survival_catalog_item(raw_item: Dictionary) -> Dictionary:
+	var item := raw_item.duplicate(true)
+	var category := str(item.get("category", item.get("type", "misc")))
+	item["id"] = str(item.get("id", ""))
+	item["name"] = str(item.get("name", item.get("display_name_ru", "-")))
+	item["display_name_ru"] = str(item.get("display_name_ru", item.get("name", "-")))
+	item["type"] = str(item.get("type", category))
+	item["category"] = category
+	item["shop_category"] = str(item.get("shop_category", category))
+	item["rarity"] = str(item.get("rarity", "common"))
+	item["price"] = float(item.get("price", 0.0))
+	item["image_path"] = str(item.get("image_path", ""))
+	item["description"] = str(item.get("description", ""))
+	item["description_ru"] = str(item.get("description_ru", item.get("description", "")))
+	var stats: Dictionary = item.get("stats", {}).duplicate(true) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
+	item["stats"] = stats
+	return item
+
+func _is_survival_item_category(category: String) -> bool:
+	return SURVIVAL_ITEM_CATEGORIES.has(category)
+
+func is_survival_inventory_item(item: Dictionary) -> bool:
+	var category := str(item.get("category", item.get("type", "")))
+	return _is_survival_item_category(category)
+
+func _make_owned_survival_item(item_id: String, quantity: int = 1) -> Dictionary:
+	var item := get_survival_catalog_item(item_id)
+	if item.is_empty():
+		return {}
+	item["quantity"] = max(quantity, 1)
+	return _normalize_owned_item(item)
+
+func initialize_new_player_survival_state() -> void:
+	equipped_clothing = get_default_equipped_clothing()
+	_grant_starter_survival_items(true)
+	starter_survival_kit_granted = true
+
+func migrate_survival_state(saved_equipped_clothing, saved_starter_kit_granted, had_starter_flag: bool) -> bool:
+	var changed := false
+	set_equipped_clothing_from_save(saved_equipped_clothing)
+
+	for item_id in STARTER_CLOTHING_ITEM_IDS:
+		if _get_owned_item_quantity(str(item_id)) <= 0:
+			var clothing_item := _make_owned_survival_item(str(item_id), 1)
+			if not clothing_item.is_empty():
+				add_owned_item(clothing_item, 1)
+				changed = true
+		var starter_item := get_survival_catalog_item(str(item_id))
+		var slot := _get_clothing_slot(starter_item)
+		if slot != "" and str(equipped_clothing.get(slot, "")) == "":
+			equipped_clothing[slot] = str(item_id)
+			changed = true
+
+	if had_starter_flag:
+		starter_survival_kit_granted = bool(saved_starter_kit_granted)
+	else:
+		if not _has_any_starter_supply_item():
+			_grant_starter_survival_items(true)
+		starter_survival_kit_granted = true
+		changed = true
+
+	return changed
+
+func _grant_starter_survival_items(include_supplies: bool) -> void:
+	for item_id in STARTER_CLOTHING_ITEM_IDS:
+		if _get_owned_item_quantity(str(item_id)) <= 0:
+			var clothing_item := _make_owned_survival_item(str(item_id), 1)
+			if not clothing_item.is_empty():
+				add_owned_item(clothing_item, 1)
+	if include_supplies:
+		for supply in STARTER_SUPPLY_ITEMS:
+			var supply_id := str(supply.get("id", ""))
+			var quantity: int = maxi(int(supply.get("quantity", 1)), 1)
+			var supply_item := _make_owned_survival_item(supply_id, quantity)
+			if not supply_item.is_empty():
+				add_owned_item(supply_item, quantity)
+
+func _has_any_starter_supply_item() -> bool:
+	for supply in STARTER_SUPPLY_ITEMS:
+		if _get_owned_item_quantity(str(supply.get("id", ""))) > 0:
+			return true
+	return false
+
+func get_equipped_clothing_save_data() -> Dictionary:
+	return equipped_clothing.duplicate(true)
+
+func set_equipped_clothing_from_save(saved_data) -> void:
+	var defaults := get_default_equipped_clothing()
+	equipped_clothing = defaults.duplicate(true)
+	if typeof(saved_data) != TYPE_DICTIONARY:
+		return
+	for slot in defaults.keys():
+		var item_id := str((saved_data as Dictionary).get(slot, ""))
+		if item_id == "":
+			equipped_clothing[slot] = ""
+			continue
+		var item := get_owned_item(item_id)
+		if item.is_empty():
+			continue
+		if str(item.get("category", "")) != "clothing":
+			continue
+		var item_slot := _get_clothing_slot(item)
+		if item_slot == slot:
+			equipped_clothing[slot] = item_id
+
+func get_clothing_slot_title(slot: String) -> String:
+	return str(CLOTHING_SLOTS.get(slot, slot))
+
+func _get_clothing_slot(item: Dictionary) -> String:
+	var stats: Dictionary = item.get("stats", {}) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
+	return str(stats.get("clothing_slot", item.get("clothing_slot", "")))
+
+func is_clothing_item_equipped(item_id: String) -> bool:
+	for slot in equipped_clothing.keys():
+		if str(equipped_clothing.get(slot, "")) == item_id:
+			return true
+	return false
+
+func equip_clothing_item(item_id: String) -> Dictionary:
+	var item := get_owned_item(item_id)
+	if item.is_empty() or str(item.get("category", "")) != "clothing":
+		return {"success": false, "message": "Этот предмет нельзя надеть."}
+	var slot := _get_clothing_slot(item)
+	if slot == "":
+		return {"success": false, "message": "У предмета не задан слот одежды."}
+	equipped_clothing[slot] = item_id
+	return {
+		"success": true,
+		"message": "Надето: %s" % str(item.get("display_name_ru", item.get("name", "-"))),
+		"slot": slot
+	}
+
+func unequip_clothing_item(item_id: String) -> Dictionary:
+	for slot in equipped_clothing.keys():
+		if str(equipped_clothing.get(slot, "")) != item_id:
+			continue
+		equipped_clothing[slot] = ""
+		return {"success": true, "message": "Снято: %s" % str(get_owned_item(item_id).get("display_name_ru", get_owned_item(item_id).get("name", "-"))), "slot": slot}
+	return {"success": false, "message": "Этот предмет не надет."}
+
+func get_clothing_protection() -> Dictionary:
+	var totals := {
+		"cold_protection": 0.0,
+		"wind_protection": 0.0,
+		"rain_protection": 0.0,
+		"heat_protection": 0.0,
+		"warmth": 0.0,
+		"heat_penalty": 0.0
+	}
+	for slot in equipped_clothing.keys():
+		var item_id := str(equipped_clothing.get(slot, ""))
+		if item_id == "":
+			continue
+		var item := get_owned_item(item_id)
+		if item.is_empty():
+			continue
+		var stats: Dictionary = item.get("stats", {}) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
+		for key in totals.keys():
+			totals[key] = float(totals[key]) + float(stats.get(key, 0.0))
+	for key in totals.keys():
+		totals[key] = clampf(float(totals[key]), 0.0, 1.5)
+	return totals
+
+func use_survival_item(item_id: String) -> Dictionary:
+	var item := get_owned_item(item_id)
+	if item.is_empty():
+		return {"success": false, "message": "Предмет не найден."}
+	var category := str(item.get("category", ""))
+	if category == "clothing":
+		if is_clothing_item_equipped(item_id):
+			return unequip_clothing_item(item_id)
+		return equip_clothing_item(item_id)
+	if category == "food" or category == "drink":
+		if int(item.get("quantity", 0)) <= 0:
+			return {"success": false, "message": "Предмет закончился."}
+		var condition_manager := get_node_or_null("/root/PlayerConditionManager")
+		var result := {"success": false, "message": "Сейчас нельзя использовать этот предмет."}
+		if condition_manager != null and condition_manager.has_method("apply_consumable_item"):
+			result = condition_manager.call("apply_consumable_item", item)
+		if bool(result.get("success", false)):
+			_change_owned_item_quantity(item_id, -1)
+		return result
+	if category == "shelter":
+		var condition_manager := get_node_or_null("/root/PlayerConditionManager")
+		if condition_manager != null and condition_manager.has_method("use_shelter_item"):
+			return condition_manager.call("use_shelter_item", item)
+		return {"success": false, "message": "Сейчас нельзя отдохнуть."}
+	return {"success": false, "message": "Для этого предмета нет действия."}
+
+func get_survival_item_effect_lines(item: Dictionary) -> Array:
+	var lines: Array = []
+	if item.is_empty():
+		return lines
+	var category := str(item.get("category", ""))
+	var stats: Dictionary = item.get("stats", {}) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
+	if category == "food" or category == "drink":
+		if stats.has("hunger_restore"):
+			lines.append("Сытость +%d" % roundi(float(stats.get("hunger_restore", 0.0))))
+		if stats.has("health_restore"):
+			lines.append("Самочувствие +%d" % roundi(float(stats.get("health_restore", 0.0))))
+		if stats.has("temperature_delta_cold"):
+			lines.append("Согревает в холод")
+		if stats.has("temperature_delta_hot"):
+			lines.append("Охлаждает в жару")
+		if stats.has("condition_bonus"):
+			lines.append("Временная концентрация +%d%%" % roundi(float(stats.get("condition_bonus", 0.0)) * 100.0))
+	elif category == "clothing":
+		var slot := _get_clothing_slot(item)
+		if slot != "":
+			lines.append("Слот: %s" % get_clothing_slot_title(slot))
+		if float(stats.get("cold_protection", 0.0)) > 0.0:
+			lines.append("Защита от холода +%d%%" % roundi(float(stats.get("cold_protection", 0.0)) * 100.0))
+		if float(stats.get("wind_protection", 0.0)) > 0.0:
+			lines.append("Защита от ветра +%d%%" % roundi(float(stats.get("wind_protection", 0.0)) * 100.0))
+		if float(stats.get("rain_protection", 0.0)) > 0.0:
+			lines.append("Защита от дождя +%d%%" % roundi(float(stats.get("rain_protection", 0.0)) * 100.0))
+		if float(stats.get("heat_protection", 0.0)) > 0.0:
+			lines.append("Защита от жары +%d%%" % roundi(float(stats.get("heat_protection", 0.0)) * 100.0))
+	elif category == "shelter":
+		lines.append("Отдых: %d мин." % roundi(float(stats.get("rest_minutes", 60.0))))
+		if float(stats.get("health_restore", 0.0)) > 0.0:
+			lines.append("Самочувствие +%d" % roundi(float(stats.get("health_restore", 0.0))))
+		if bool(stats.get("normalize_temperature", false)):
+			lines.append("Температура к норме")
+	return lines
+
+func set_condition_from_save(data) -> bool:
+	var source: Dictionary = {}
+	if data is Dictionary:
+		source = (data as Dictionary).duplicate(true)
+	health = float(source.get("health", 100.0))
+	body_temperature = float(source.get("body_temperature", 36.6))
+	hunger = float(source.get("hunger", 100.0))
+	return ensure_condition_defaults()
+
+func restore_condition_beta_safe() -> void:
+	body_temperature = 36.6
+	health = maxf(float(health), 65.0)
+	hunger = maxf(float(hunger), 45.0)
+	ensure_condition_defaults()
 
 func format_money_amount(value: float) -> String:
 	var rounded_value: float = round(value * 100.0) / 100.0
@@ -4725,6 +5358,8 @@ func _make_owned_catalog_item(item_id: String, quantity: int = 1) -> Dictionary:
 	var item := get_tackle_catalog_item(item_id)
 
 	if item.is_empty():
+		item = get_survival_catalog_item(item_id)
+	if item.is_empty():
 		return {}
 
 	item["quantity"] = max(quantity, 1)
@@ -4748,6 +5383,14 @@ func _get_item_icon(item_type: String) -> String:
 			return "U"
 		"bait":
 			return "B"
+		"food":
+			return "E"
+		"drink":
+			return "D"
+		"clothing":
+			return "O"
+		"shelter":
+			return "T"
 		_:
 			return "?"
 
@@ -5154,9 +5797,20 @@ func _get_default_rod_handling_bonus(length_m: float, rod_class: String) -> floa
 func _normalize_owned_item(item: Dictionary) -> Dictionary:
 	var original_item_id := str(item.get("id", ""))
 	var item_id := _resolve_tackle_item_id(original_item_id)
-	var catalog_item := get_tackle_catalog_item(item_id)
+	var requested_category := str(item.get("category", item.get("type", "")))
+	var survival_catalog_item := get_survival_catalog_item(original_item_id)
+	var prefer_survival_catalog := (
+		not survival_catalog_item.is_empty()
+		and (_is_survival_item_category(requested_category) or get_tackle_catalog_item(item_id).is_empty())
+	)
+	var catalog_item := survival_catalog_item if prefer_survival_catalog else get_tackle_catalog_item(item_id)
+	if prefer_survival_catalog:
+		item_id = original_item_id
 	var item_type := str(item.get("type", item.get("category", catalog_item.get("type", catalog_item.get("category", "misc")))))
 	var category := str(item.get("category", catalog_item.get("category", item_type)))
+	if prefer_survival_catalog:
+		item_type = str(catalog_item.get("type", item_type))
+		category = str(catalog_item.get("category", category))
 	var catalog_stats: Dictionary = {}
 	var catalog_raw_stats = catalog_item.get("stats", {})
 	if typeof(catalog_raw_stats) == TYPE_DICTIONARY:
@@ -5165,8 +5819,12 @@ func _normalize_owned_item(item: Dictionary) -> Dictionary:
 	var stats: Dictionary = catalog_stats.duplicate(true)
 	if typeof(raw_stats) == TYPE_DICTIONARY:
 		stats.merge(raw_stats, true)
-	stats = _normalize_equipment_stats(stats, category, item_id)
-	var use_catalog_identity := original_item_id != item_id and not catalog_item.is_empty()
+	if not _is_survival_item_category(category):
+		stats = _normalize_equipment_stats(stats, category, item_id)
+	var use_catalog_identity := (
+		not catalog_item.is_empty()
+		and (original_item_id != item_id or prefer_survival_catalog or not item.has("name"))
+	)
 
 	return {
 		"id": item_id,
@@ -5483,7 +6141,12 @@ func get_owned_items_for_category(category_filter: String) -> Array:
 	for item in owned_items:
 		if _is_beta_hidden_tackle_item(item):
 			continue
-		if str(item.get("category", "misc")) == category_filter:
+		var item_category := str(item.get("category", "misc"))
+		if category_filter == "food" and ["food", "drink"].has(item_category):
+			items.append(item)
+		elif category_filter == "clothing" and ["clothing", "shelter"].has(item_category):
+			items.append(item)
+		elif item_category == category_filter:
 			items.append(item)
 
 	return items

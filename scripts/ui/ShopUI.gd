@@ -22,14 +22,25 @@ const SHOP_SCROLL_BOTTOM_PADDING := 72.0
 const SHOP_LINE_IMAGE_SIZE := Vector2(75.0, 75.0)
 const SHOP_CATEGORY_BAIT := "bait"
 const SHOP_CATEGORY_CONSUMABLE := "consumable"
+const SHOP_CATEGORY_FOOD := "food"
+const SHOP_CATEGORY_CLOTHING := "clothing"
 const SHOP_CATEGORY_TACKLE := "tackle"
 const SHOP_CATEGORY_ROD := "rod"
 const SHOP_CATEGORY_LINE := "line"
 const SHOP_CATEGORY_LEADER := "leader"
 const SHOP_CATEGORY_HOOK := "hook"
 const SHOP_CATEGORY_FLOAT := "float"
+const SHOP_TAB_ICON_BAIT: Texture2D = preload("res://assets/ui/shop/baits/cherv.png")
+const SHOP_TAB_ICON_FOOD: Texture2D = preload("res://assets/ui/shop/survival/food/bread.png")
+const SHOP_TAB_ICON_CLOTHING: Texture2D = preload("res://assets/ui/shop/survival/clothing/basic_tshirt.png")
+const SHOP_TAB_ICON_LINE: Texture2D = preload("res://assets/ui/shop/lines/basiclinenylon2_5kg.png")
+const SHOP_TAB_ICON_LEADER: Texture2D = preload("res://assets/ui/shop/leaders/nylon_leader_15cm_1kg.png")
+const SHOP_TAB_ICON_HOOK: Texture2D = preload("res://assets/ui/shop/hooks/riverstart_basic_hook_12.png")
+const SHOP_TAB_ICON_FLOAT: Texture2D = preload("res://assets/ui/tackle/floats/float_drop.png")
 const SHOP_CATEGORIES := [
 	SHOP_CATEGORY_BAIT,
+	SHOP_CATEGORY_FOOD,
+	SHOP_CATEGORY_CLOTHING,
 	SHOP_CATEGORY_CONSUMABLE,
 	SHOP_CATEGORY_ROD,
 	SHOP_CATEGORY_LINE,
@@ -213,9 +224,9 @@ func _set_shop_price_row(
 	label.text = _format_shop_money_amount(value)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT if align_end else HORIZONTAL_ALIGNMENT_LEFT
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.clip_text = true
-	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	label.custom_minimum_size = Vector2(maxf(row_size.x - icon_size.x - 5.0, 18.0), row_size.y)
+	label.clip_text = align_end
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL if align_end else Control.SIZE_SHRINK_BEGIN
+	label.custom_minimum_size = Vector2(maxf(row_size.x - icon_size.x - 5.0, 18.0), row_size.y) if align_end else Vector2(0.0, row_size.y)
 	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", text_color)
 
@@ -285,6 +296,8 @@ func close() -> void:
 	main.shop_backdrop.visible = false
 	_hide_shop_details()
 	main.close_modal("shop")
+	if main.has_method("_restore_map_after_screen_close") and main._restore_map_after_screen_close("shop"):
+		return
 	main._active_nav_tab = "fish"
 	main._refresh_bottom_nav_styles()
 
@@ -304,6 +317,8 @@ func _get_shop_items_for_category(category: String) -> Array:
 		return _get_tackle_shop_items_for_type(category)
 	if category == SHOP_CATEGORY_BAIT:
 		return _get_bait_shop_items()
+	if category == SHOP_CATEGORY_FOOD or category == SHOP_CATEGORY_CLOTHING:
+		return PlayerData.get_survival_shop_items(category)
 	if category == SHOP_CATEGORY_CONSUMABLE and _is_beta_consumable_shop_hidden():
 		return []
 
@@ -384,6 +399,8 @@ func _get_shop_inventory_item(shop_item: Dictionary) -> Dictionary:
 		"quantity": int(shop_item.get("quantity", 1)),
 		"image_path": str(shop_item.get("image_path", "")),
 		"description": str(shop_item.get("description", "")),
+		"display_name_ru": str(shop_item.get("display_name_ru", shop_item.get("name", "-"))),
+		"description_ru": str(shop_item.get("description_ru", shop_item.get("description", ""))),
 		"stats": stats
 	}
 
@@ -421,8 +438,13 @@ func _ensure_shop_ui_nodes() -> void:
 
 	main.shop_consumable_category_button = Button.new()
 	main.shop_consumable_category_button.name = "ShopConsumableCategoryButton"
-	main.shop_consumable_category_button.text = "Расходники"
+	main.shop_consumable_category_button.text = "Еда"
 	main.shop_panel.add_child(main.shop_consumable_category_button)
+
+	main.shop_clothing_category_button = Button.new()
+	main.shop_clothing_category_button.name = "ShopClothingCategoryButton"
+	main.shop_clothing_category_button.text = "Одежда"
+	main.shop_panel.add_child(main.shop_clothing_category_button)
 
 	main.shop_tackle_category_button = Button.new()
 	main.shop_tackle_category_button.name = "ShopTackleCategoryButton"
@@ -703,18 +725,66 @@ func _update_shop_ui() -> void:
 	var hide_consumables := _is_beta_consumable_shop_hidden()
 	if hide_consumables and main._shop_category == SHOP_CATEGORY_CONSUMABLE:
 		main._shop_category = SHOP_CATEGORY_BAIT
-	main.shop_consumable_category_button.visible = not hide_consumables
-	main.shop_consumable_category_button.disabled = hide_consumables
+	main.shop_consumable_category_button.visible = true
+	main.shop_consumable_category_button.disabled = false
+	if main.shop_clothing_category_button != null:
+		main.shop_clothing_category_button.visible = true
+		main.shop_clothing_category_button.disabled = false
 	theme.apply_tab_button_style(main.shop_bait_category_button, main._shop_category == SHOP_CATEGORY_BAIT)
-	theme.apply_tab_button_style(main.shop_consumable_category_button, main._shop_category == SHOP_CATEGORY_CONSUMABLE)
+	theme.apply_tab_button_style(main.shop_consumable_category_button, main._shop_category == SHOP_CATEGORY_FOOD)
+	if main.shop_clothing_category_button != null:
+		theme.apply_tab_button_style(main.shop_clothing_category_button, main._shop_category == SHOP_CATEGORY_CLOTHING)
 	theme.apply_tab_button_style(main.shop_tackle_category_button, main._shop_category == SHOP_CATEGORY_ROD)
 	theme.apply_tab_button_style(main.shop_line_category_button, main._shop_category == SHOP_CATEGORY_LINE)
 	theme.apply_tab_button_style(main.shop_leader_category_button, main._shop_category == SHOP_CATEGORY_LEADER)
 	theme.apply_tab_button_style(main.shop_hook_category_button, main._shop_category == SHOP_CATEGORY_HOOK)
 	theme.apply_tab_button_style(main.shop_float_category_button, main._shop_category == SHOP_CATEGORY_FLOAT)
+	_apply_shop_category_tab_icon(main.shop_bait_category_button, SHOP_CATEGORY_BAIT)
+	_apply_shop_category_tab_icon(main.shop_consumable_category_button, SHOP_CATEGORY_FOOD)
+	if main.shop_clothing_category_button != null:
+		_apply_shop_category_tab_icon(main.shop_clothing_category_button, SHOP_CATEGORY_CLOTHING)
+	_apply_shop_category_tab_icon(main.shop_tackle_category_button, SHOP_CATEGORY_ROD)
+	_apply_shop_category_tab_icon(main.shop_line_category_button, SHOP_CATEGORY_LINE)
+	_apply_shop_category_tab_icon(main.shop_leader_category_button, SHOP_CATEGORY_LEADER)
+	_apply_shop_category_tab_icon(main.shop_hook_category_button, SHOP_CATEGORY_HOOK)
+	_apply_shop_category_tab_icon(main.shop_float_category_button, SHOP_CATEGORY_FLOAT, 10)
 	_hide_shop_pager()
 	_rebuild_shop_cards()
 	_layout_shop_details_nodes()
+
+
+func _apply_shop_category_tab_icon(button: Button, category: String, font_size: int = 11) -> void:
+	if button == null:
+		return
+	button.icon = _get_shop_category_tab_icon(category)
+	button.expand_icon = false
+	button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
+	button.add_theme_constant_override("icon_max_width", 22)
+	button.add_theme_constant_override("h_separation", 8)
+	button.add_theme_font_size_override("font_size", font_size)
+
+
+func _get_shop_category_tab_icon(category: String) -> Texture2D:
+	match category:
+		SHOP_CATEGORY_BAIT:
+			return SHOP_TAB_ICON_BAIT
+		SHOP_CATEGORY_FOOD:
+			return SHOP_TAB_ICON_FOOD
+		SHOP_CATEGORY_CLOTHING:
+			return SHOP_TAB_ICON_CLOTHING
+		SHOP_CATEGORY_ROD:
+			return theme.get_icon("rod") if theme != null else null
+		SHOP_CATEGORY_LINE:
+			return SHOP_TAB_ICON_LINE
+		SHOP_CATEGORY_LEADER:
+			return SHOP_TAB_ICON_LEADER
+		SHOP_CATEGORY_HOOK:
+			return SHOP_TAB_ICON_HOOK
+		SHOP_CATEGORY_FLOAT:
+			return SHOP_TAB_ICON_FLOAT
+		_:
+			return null
 
 
 func _update_shop_money_display() -> void:
@@ -829,23 +899,32 @@ func _create_shop_card(item: Dictionary, card_size: Vector2) -> Panel:
 	if true:
 		var compact_has_texture := card_texture != null
 		var is_line_item := category == SHOP_CATEGORY_LINE
-		var compact_icon_size := 64.0 if compact_has_texture and is_line_item else (40.0 if compact_has_texture else 30.0)
+		var is_survival_item := ["food", "drink", "clothing", "shelter"].has(category)
+		var compact_icon_size := 64.0 if compact_has_texture and is_line_item else (56.0 if compact_has_texture and is_survival_item else (40.0 if compact_has_texture else 30.0))
 		var compact_icon_y := (card_size.y - compact_icon_size) * 0.5
-		var compact_content_x := 92.0 if compact_has_texture and is_line_item else (68.0 if compact_has_texture else 50.0)
+		var compact_content_x := 92.0 if compact_has_texture and is_line_item else (84.0 if compact_has_texture and is_survival_item else (68.0 if compact_has_texture else 50.0))
 		var compact_buy_width := 58.0
 		var compact_buy_height := 28.0
 		var compact_details_width := 86.0
-		var compact_details_gap := 6.0
+		var compact_details_gap := 10.0
+		var compact_action_font_size := 10 if card_size.x < 440.0 else 11
 		var is_rod_item := str(item.get("category", item.get("type", "misc"))) == SHOP_CATEGORY_ROD
+		var is_details_item := is_rod_item or is_survival_item
 		var compact_buy_x := card_size.x - compact_buy_width - 12.0
 		var compact_action_x := compact_buy_x
-		if is_rod_item:
+		if is_details_item:
 			compact_action_x = compact_buy_x - compact_details_gap - compact_details_width
 		var compact_text_y := maxf(7.0, (card_size.y - 43.0) * 0.5)
 		var compact_text_width: float = maxf(compact_action_x - compact_content_x - 18.0, 140.0)
 
 		if compact_has_texture:
-			_add_compact_shop_texture(card, card_texture, Rect2(Vector2(14.0, compact_icon_y), Vector2(compact_icon_size, compact_icon_size)))
+			_add_compact_shop_texture(
+				card,
+				card_texture,
+				Rect2(Vector2(14.0, compact_icon_y), Vector2(compact_icon_size, compact_icon_size)),
+				is_survival_item,
+				0.92 if is_survival_item else 1.0
+			)
 		else:
 			var compact_icon_label = Label.new()
 			compact_icon_label.text = str(item.get("icon", "?"))
@@ -909,12 +988,13 @@ func _create_shop_card(item: Dictionary, card_size: Vector2) -> Panel:
 		compact_owned_label.add_theme_color_override("font_color", Color(0.62, 0.76, 0.68, 0.78))
 		card.add_child(compact_owned_label)
 
-		if is_rod_item:
+		if is_details_item:
 			var compact_details_button = Button.new()
 			compact_details_button.text = "Подробнее"
 			compact_details_button.position = Vector2(compact_action_x, (card_size.y - compact_buy_height) * 0.5)
 			compact_details_button.size = Vector2(compact_details_width, compact_buy_height)
 			_apply_shop_details_button_style(compact_details_button)
+			compact_details_button.add_theme_font_size_override("font_size", compact_action_font_size)
 			compact_details_button.pressed.connect(_show_shop_details.bind(item_id))
 			card.add_child(compact_details_button)
 
@@ -923,6 +1003,7 @@ func _create_shop_card(item: Dictionary, card_size: Vector2) -> Panel:
 		compact_buy_button.position = Vector2(compact_buy_x, (card_size.y - compact_buy_height) * 0.5)
 		compact_buy_button.size = Vector2(compact_buy_width, compact_buy_height)
 		_apply_shop_buy_button_style(compact_buy_button)
+		compact_buy_button.add_theme_font_size_override("font_size", compact_action_font_size)
 		compact_buy_button.pressed.connect(_on_shop_buy_pressed.bind(item_id))
 		card.add_child(compact_buy_button)
 		return card
@@ -1282,17 +1363,18 @@ func _populate_bait_shop_card(card: Panel, item: Dictionary, card_size: Vector2,
 	owned_label.add_theme_color_override("font_color", Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.92))
 	info_area.add_child(owned_label)
 
-	var action_gap := 8.0
+	var action_gap := 10.0
 	var action_height := 28.0
 	var action_y: float = info_area.size.y - action_height - 6.0
 	var action_width: float = maxf((info_area.size.x - info_padding * 2.0 - action_gap) * 0.5, 54.0)
+	var action_font_size := 9 if action_width < 72.0 else 10
 	var details_button := Button.new()
 	details_button.name = "BaitCardDetailsButton"
 	details_button.text = "Подробнее"
 	details_button.position = Vector2(info_padding, action_y)
 	details_button.size = Vector2(action_width, action_height)
 	_apply_shop_details_button_style(details_button)
-	details_button.add_theme_font_size_override("font_size", 10)
+	details_button.add_theme_font_size_override("font_size", action_font_size)
 	details_button.pressed.connect(_show_shop_details.bind(item_id))
 	info_area.add_child(details_button)
 
@@ -1302,7 +1384,7 @@ func _populate_bait_shop_card(card: Panel, item: Dictionary, card_size: Vector2,
 	buy_button.position = Vector2(info_area.size.x - info_padding - action_width, action_y)
 	buy_button.size = Vector2(action_width, action_height)
 	_apply_shop_buy_button_style(buy_button)
-	buy_button.add_theme_font_size_override("font_size", 10)
+	buy_button.add_theme_font_size_override("font_size", action_font_size)
 	buy_button.pressed.connect(_on_shop_buy_pressed.bind(item_id))
 	info_area.add_child(buy_button)
 
@@ -1369,9 +1451,10 @@ func _populate_rod_image_card(card: Panel, item: Dictionary, card_size: Vector2,
 
 	var info_padding := 8.0
 	var actions_height := 28.0
-	var action_gap := 8.0
+	var action_gap := 10.0
 	var buy_width := 68.0
 	var details_width := 94.0
+	var action_font_size := 10 if info_area.size.x < 330.0 else 11
 	var actions_y := maxf(21.0, info_area_height - 6.0 - actions_height)
 	var buy_x := info_area.size.x - info_padding - buy_width
 	var details_x := buy_x - action_gap - details_width
@@ -1415,7 +1498,7 @@ func _populate_rod_image_card(card: Panel, item: Dictionary, card_size: Vector2,
 	details_button.position = Vector2(details_x, actions_y)
 	details_button.size = Vector2(details_width, actions_height)
 	_apply_shop_details_button_style(details_button)
-	details_button.add_theme_font_size_override("font_size", 11)
+	details_button.add_theme_font_size_override("font_size", action_font_size)
 	details_button.pressed.connect(_show_shop_details.bind(item_id))
 	info_area.add_child(details_button)
 
@@ -1425,7 +1508,7 @@ func _populate_rod_image_card(card: Panel, item: Dictionary, card_size: Vector2,
 	buy_button.position = Vector2(buy_x, actions_y)
 	buy_button.size = Vector2(buy_width, actions_height)
 	_apply_shop_buy_button_style(buy_button)
-	buy_button.add_theme_font_size_override("font_size", 11)
+	buy_button.add_theme_font_size_override("font_size", action_font_size)
 	buy_button.pressed.connect(_on_shop_buy_pressed.bind(item_id))
 	info_area.add_child(buy_button)
 
@@ -1692,6 +1775,12 @@ func _get_shop_details_stats_text(item: Dictionary) -> String:
 			return _get_leader_details_stats_text(item)
 		"float":
 			return _get_float_details_stats_text(item)
+		"food", "drink", "clothing", "shelter":
+			var lines: Array = []
+			if PlayerData.has_method("get_survival_item_effect_lines"):
+				lines = PlayerData.get_survival_item_effect_lines(item)
+			lines.append("Цена: %s" % _format_shop_money_amount(float(item.get("price", 0.0))))
+			return "\n".join(lines)
 		_:
 			return "%s\nЦена: %s" % [
 				_get_shop_key_stat_text(item),
@@ -1850,6 +1939,12 @@ func _get_shop_key_stat_text(item: Dictionary) -> String:
 				roundi(float(stats.get("fish_attraction", 0.0)) * 100.0),
 				int(item.get("quantity", 1))
 			]
+		"food", "drink", "clothing", "shelter":
+			if PlayerData.has_method("get_survival_item_effect_lines"):
+				var lines: Array = PlayerData.get_survival_item_effect_lines(item)
+				if not lines.is_empty():
+					return str(lines[0])
+			return _get_item_display_name(item)
 		_:
 			if stats.has("bite_bonus"):
 				return "Бонус клёва +%d%%" % roundi(float(stats.get("bite_bonus", 0.0)) * 100.0)

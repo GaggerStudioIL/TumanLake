@@ -113,12 +113,12 @@ func _layout_children() -> void:
 	var edge: float = min(size.x, size.y)
 	pivot_offset = size * 0.5
 	_apply_press_scale()
-	var icon_size := Vector2(edge * 0.47, edge * 0.47)
-	icon_rect.position = Vector2((size.x - icon_size.x) * 0.5, edge * 0.22)
+	var icon_size := Vector2(edge * 0.62, edge * 0.62)
+	icon_rect.position = Vector2((size.x - icon_size.x) * 0.5, edge * 0.13)
 	icon_rect.size = icon_size
 	icon_rect.modulate = Color(0.88, 1.0, 0.86, 0.98 if not disabled else 0.58)
 
-	count_label.position = Vector2(edge * 0.12, edge * 0.62)
+	count_label.position = Vector2(edge * 0.12, edge * 0.70)
 	count_label.size = Vector2(edge * 0.76, edge * 0.20)
 
 

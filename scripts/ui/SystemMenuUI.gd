@@ -79,8 +79,8 @@ func layout(screen_size: Vector2) -> void:
 	var margin_x: float = clampf(24.0 * sx, 18.0, 30.0)
 	var margin_y: float = clampf(18.0 * sy, 14.0, 24.0)
 	var button_size := Vector2(
-		clampf(BUTTON_BASE_SIZE.x * ui_scale, 56.0, 68.0),
-		clampf(BUTTON_BASE_SIZE.y * ui_scale, 48.0, 58.0)
+		clampf(BUTTON_BASE_SIZE.x * ui_scale, 56.0, 76.0),
+		clampf(BUTTON_BASE_SIZE.y * ui_scale, 48.0, 66.0)
 	)
 	var panel_width: float = clampf(PANEL_BASE_WIDTH * ui_scale, 220.0, 266.0)
 	var item_height: float = clampf(ITEM_BASE_HEIGHT * ui_scale, 50.0, 58.0)
@@ -114,7 +114,7 @@ func layout(screen_size: Vector2) -> void:
 	menu_button.position = Vector2(button_x, button_y)
 	menu_button.size = button_size
 	menu_button.custom_minimum_size = button_size
-	menu_button.add_theme_font_size_override("font_size", int(28.0 * ui_scale))
+	menu_button.add_theme_font_size_override("font_size", int(clampf(31.0 * ui_scale, 29.0, 38.0)))
 	_apply_menu_button_style()
 
 	_menu_open_position = Vector2(screen_size.x - margin_x - panel_width, button_y + button_size.y + 8.0 * ui_scale)
@@ -739,6 +739,8 @@ func _on_menu_button_pressed() -> void:
 		return
 	if main != null and main.has_method("_hide_current_tackle_popup"):
 		main._hide_current_tackle_popup()
+	if main != null and main.has_method("_close_quick_tackle_radial"):
+		main._close_quick_tackle_radial(false)
 	if is_menu_open():
 		close_menu()
 	else:

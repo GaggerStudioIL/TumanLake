@@ -24,10 +24,10 @@ func is_buyer_unlocked(buyer_id: String) -> bool:
 	var supplier: Dictionary = _get_supplier(buyer_id)
 	if supplier.is_empty():
 		return false
-	var required_reputation := int(supplier.get("min_reputation", 0))
-	if required_reputation <= 0:
+	var required_total_reputation := _get_required_total_reputation(buyer_id, supplier)
+	if required_total_reputation <= 0:
 		return true
-	return _get_reputation(buyer_id) >= required_reputation
+	return _get_total_reputation() >= required_total_reputation
 
 
 func can_buyer_accept_fish(buyer_id: String, fish_instance: Dictionary) -> bool:
@@ -44,10 +44,15 @@ func get_buyer_lock_reason(buyer_id: String) -> String:
 		return "Неизвестный покупатель"
 	if is_buyer_unlocked(buyer_id):
 		return "Открыт"
-	var unlock_text := str(supplier.get("unlock_text", ""))
-	if not unlock_text.is_empty():
-		return unlock_text
-	return "Откроется при репутации %d" % int(supplier.get("min_reputation", 0))
+	var supplier_manager := _supplier_manager()
+	if supplier_manager != null and supplier_manager.has_method("get_supplier_lock_reason"):
+		return str(supplier_manager.call("get_supplier_lock_reason", buyer_id))
+	var required_total_reputation := _get_required_total_reputation(buyer_id, supplier)
+	return "Откроется при общей репутации %d.\nОбщая репутация: %d / %d." % [
+		required_total_reputation,
+		_get_total_reputation(),
+		required_total_reputation
+	]
 
 
 func get_buyer_rejection_reason(buyer_id: String, fish_instance: Dictionary) -> String:
@@ -163,6 +168,20 @@ func _get_reputation(buyer_id: String) -> int:
 	if reputation_system != null and reputation_system.has_method("get_reputation"):
 		return int(reputation_system.call("get_reputation", buyer_id))
 	return 0
+
+
+func _get_total_reputation() -> int:
+	var reputation_system := get_node_or_null("/root/ReputationSystem")
+	if reputation_system != null and reputation_system.has_method("get_total_reputation"):
+		return int(reputation_system.call("get_total_reputation"))
+	return 0
+
+
+func _get_required_total_reputation(buyer_id: String, supplier: Dictionary) -> int:
+	var supplier_manager := _supplier_manager()
+	if supplier_manager != null and supplier_manager.has_method("get_required_total_reputation"):
+		return int(supplier_manager.call("get_required_total_reputation", buyer_id))
+	return int(supplier.get("unlock_total_reputation", supplier.get("min_reputation", 0)))
 
 
 func _supplier_manager() -> Node:

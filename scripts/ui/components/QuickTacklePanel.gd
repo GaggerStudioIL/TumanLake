@@ -1,6 +1,6 @@
 extends Control
 
-const DEFAULT_CATEGORY_ORDER := ["line", "leader", "hook", "bait"]
+const DEFAULT_CATEGORY_ORDER := ["line", "leader", "hook", "float", "bait", "full_tackle"]
 const CATEGORY_TITLES := {
 	"line": "Леска",
 	"leader": "Поводок",
@@ -25,19 +25,31 @@ const CATEGORY_ICONS := {
 	"feeder_rig": "res://assets/ui/icons/quick_tackle/fishing_tackle.png",
 	"hook_or_lure": "res://assets/ui/icons/quick_tackle/hooks_button.png",
 	"sinker_or_rig": "res://assets/ui/icons/quick_tackle/fishing_tackle.png",
-	"tackle": "res://assets/ui/icons/quick_tackle/fishing_tackle.png"
+	"tackle": "res://assets/ui/icons/quick_tackle/fishing_tackle.png",
+	"full_tackle": "res://assets/ui/icons/quick_tackle/fishing_tackle.png"
 }
 const QUICK_SLOT_COUNT := 3
 const RADIAL_SLOT_OFFSETS := {
-	"line": Vector2(-1.0, -1.0),
-	"leader": Vector2(1.0, -1.0),
-	"hook": Vector2(-1.0, 1.0),
-	"bait": Vector2(1.0, 1.0)
+	"line": Vector2(-0.92, -0.88),
+	"leader": Vector2(0.06, -1.16),
+	"hook": Vector2(-0.96, 0.44),
+	"float": Vector2(0.92, -0.64),
+	"bait": Vector2(0.88, 0.62),
+	"full_tackle": Vector2(-0.10, 1.14)
 }
+const RADIAL_STATE_CLOSED := "closed"
+const RADIAL_STATE_OPENING := "opening"
+const RADIAL_STATE_OPEN := "open"
+const RADIAL_STATE_CLOSING := "closing"
+const RADIAL_STATE_DISABLED := "disabled"
+const RADIAL_ANIMATION_SECONDS := 0.18
 
 var main
+var is_tackle_radial_open := false
 var _buttons: Dictionary = {}
 var _button_icons: Dictionary = {}
+var _toggle_button: Button
+var _toggle_icon: TextureRect
 var _popup_panel: Panel
 var _popup_scroll: ScrollContainer
 var _popup_row: VBoxContainer
@@ -46,15 +58,22 @@ var _popup_mode := "quick"
 var _popup_target_slot := -1
 var _popup_item_count := 0
 var _button_edge := 44.0
+var _toggle_edge := 42.0
 var _ui_scale := 1.0
 var _texture_cache: Dictionary = {}
 var _current_category_order: Array = []
+var _radial_state := RADIAL_STATE_CLOSED
+var _radial_tween: Tween
+var _collapsed_button_position := Vector2.ZERO
+var _slot_target_positions: Dictionary = {}
+var _has_layout := false
 
 
 func setup(main_ref) -> void:
 	main = main_ref
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	z_index = 266
+	set_process_input(true)
 	_ensure_nodes()
 	refresh()
 
@@ -69,17 +88,32 @@ func layout(rect: Rect2, ui_scale: float) -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	z_index = 266
 	if not should_show:
-		hide_popup()
+		_set_disabled_state()
 		return
+	if _radial_state == RADIAL_STATE_DISABLED:
+		_radial_state = RADIAL_STATE_CLOSED
+		is_tackle_radial_open = false
 
 	_button_edge = clamp(rect.size.x * 0.39, 46.0 * _ui_scale, 56.0 * _ui_scale)
+	_toggle_edge = clamp(rect.size.x * 0.34, 42.0 * _ui_scale, 50.0 * _ui_scale)
 	var viewport_size := get_viewport_rect().size
 	var center := rect.position + rect.size * 0.5
-	var radius: float = clamp(rect.size.x * 0.76, _button_edge * 1.45, _button_edge * 1.82)
+	var radius: float = clamp(rect.size.x * 0.78, _button_edge * 1.50, _button_edge * 1.92)
 	var margin: float = max(8.0 * _ui_scale, 6.0)
 	var min_pos := Vector2(INF, INF)
 	var max_pos := Vector2(-INF, -INF)
 	var slot_centers: Dictionary = {}
+	var toggle_center := center + Vector2(rect.size.x * 0.72, -rect.size.y * 0.08)
+	toggle_center.x = clamp(toggle_center.x, margin + _toggle_edge * 0.5, viewport_size.x - margin - _toggle_edge * 0.5)
+	toggle_center.y = clamp(toggle_center.y, margin + _toggle_edge * 0.5, viewport_size.y - margin - _toggle_edge * 0.5)
+	min_pos.x = min(min_pos.x, toggle_center.x - _toggle_edge * 0.5)
+	min_pos.y = min(min_pos.y, toggle_center.y - _toggle_edge * 0.5)
+	max_pos.x = max(max_pos.x, toggle_center.x + _toggle_edge * 0.5)
+	max_pos.y = max(max_pos.y, toggle_center.y + _toggle_edge * 0.5)
+	min_pos.x = min(min_pos.x, center.x - _button_edge * 0.5)
+	min_pos.y = min(min_pos.y, center.y - _button_edge * 0.5)
+	max_pos.x = max(max_pos.x, center.x + _button_edge * 0.5)
+	max_pos.y = max(max_pos.y, center.y + _button_edge * 0.5)
 
 	for category_value in category_order:
 		var category := str(category_value)
@@ -104,11 +138,15 @@ func layout(rect: Rect2, ui_scale: float) -> void:
 	position = min_pos
 	size = max_pos - min_pos
 	custom_minimum_size = size
+	_has_layout = true
+	_collapsed_button_position = center - position - Vector2(_button_edge, _button_edge) * 0.5
+	_slot_target_positions.clear()
+	_layout_toggle_button(toggle_center - position)
 
 	for key in _buttons.keys():
 		var stale_button := _buttons.get(key) as Button
 		if stale_button != null:
-			stale_button.visible = category_order.has(str(key))
+			stale_button.visible = _is_radial_visible() and category_order.has(str(key))
 
 	for category_value in category_order:
 		var category := str(category_value)
@@ -116,10 +154,20 @@ func layout(rect: Rect2, ui_scale: float) -> void:
 		if button == null:
 			continue
 		var slot_center: Vector2 = slot_centers.get(category, center)
-		button.position = slot_center - position - Vector2(_button_edge, _button_edge) * 0.5
+		var target_position := slot_center - position - Vector2(_button_edge, _button_edge) * 0.5
+		_slot_target_positions[category] = target_position
+		if _radial_state == RADIAL_STATE_OPEN:
+			button.position = target_position
+			button.scale = Vector2.ONE
+			button.modulate = Color(1.0, 1.0, 1.0, 1.0)
+		elif _radial_state == RADIAL_STATE_CLOSED:
+			button.position = _collapsed_button_position
+			button.scale = Vector2.ONE * 0.2
+			button.modulate = Color(1.0, 1.0, 1.0, 0.0)
 		button.size = Vector2(_button_edge, _button_edge)
 		button.custom_minimum_size = button.size
 		button.pivot_offset = button.size * 0.5
+		button.mouse_filter = Control.MOUSE_FILTER_STOP if _is_radial_visible() else Control.MOUSE_FILTER_IGNORE
 		_apply_slot_button_style(button, _get_slot_visual_state(category))
 		var icon := _button_icons.get(category) as TextureRect
 		if icon != null:
@@ -133,19 +181,27 @@ func layout(rect: Rect2, ui_scale: float) -> void:
 
 func refresh() -> void:
 	_ensure_nodes()
+	if not _has_layout:
+		visible = false
+		return
 	var should_show := _should_show_radial_hud()
 	visible = should_show
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if not should_show:
-		hide_popup()
+		_set_disabled_state()
 		return
+	if _radial_state == RADIAL_STATE_DISABLED:
+		_radial_state = RADIAL_STATE_CLOSED
+		is_tackle_radial_open = false
 
 	var category_order: Array = _get_category_order()
 	var can_change := _can_change_tackle()
+	_refresh_toggle_button(can_change)
 	for key in _buttons.keys():
 		var stale_button := _buttons.get(key) as Button
 		if stale_button != null:
-			stale_button.visible = category_order.has(str(key))
+			stale_button.visible = _is_radial_visible() and category_order.has(str(key))
+			stale_button.mouse_filter = Control.MOUSE_FILTER_STOP if stale_button.visible else Control.MOUSE_FILTER_IGNORE
 
 	for category in category_order:
 		var key := str(category)
@@ -177,8 +233,51 @@ func hide_popup() -> void:
 		_popup_panel.visible = false
 
 
+func toggle_radial_menu() -> void:
+	if is_tackle_radial_open or _radial_state == RADIAL_STATE_OPENING:
+		close_radial_menu()
+	else:
+		open_radial_menu()
+
+
+func open_radial_menu() -> void:
+	if not _should_show_radial_hud() or not _can_change_tackle():
+		close_radial_menu(false)
+		return
+	if not _has_layout:
+		return
+	if _radial_state == RADIAL_STATE_OPEN or _radial_state == RADIAL_STATE_OPENING:
+		return
+	is_tackle_radial_open = true
+	_radial_state = RADIAL_STATE_OPENING
+	_animate_radial_buttons(true)
+
+
+func close_radial_menu(animated: bool = true) -> void:
+	hide_popup()
+	if _radial_state == RADIAL_STATE_CLOSED or _radial_state == RADIAL_STATE_DISABLED:
+		is_tackle_radial_open = false
+		_hide_radial_buttons()
+		return
+	is_tackle_radial_open = false
+	if not animated:
+		_radial_state = RADIAL_STATE_CLOSED
+		_hide_radial_buttons()
+		return
+	_radial_state = RADIAL_STATE_CLOSING
+	_animate_radial_buttons(false)
+
+
+func hide_radial_menu(animated: bool = true) -> void:
+	close_radial_menu(animated)
+
+
+func get_radial_state() -> String:
+	return _radial_state
+
+
 func _input(event: InputEvent) -> void:
-	if _popup_panel == null or not _popup_panel.visible:
+	if not _is_radial_visible() and (_popup_panel == null or not _popup_panel.visible):
 		return
 	if not (event is InputEventMouseButton or event is InputEventScreenTouch):
 		return
@@ -195,10 +294,30 @@ func _input(event: InputEvent) -> void:
 		point = touch_event.position
 
 	if pressed and not _is_point_inside_quick_ui(point):
-		hide_popup()
+		close_radial_menu()
 
 
 func _ensure_nodes() -> void:
+	if _toggle_button == null:
+		_toggle_button = Button.new()
+		_toggle_button.name = "QuickTackleToggleButton"
+		_toggle_button.text = ""
+		_toggle_button.tooltip_text = ""
+		_toggle_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		_toggle_button.focus_mode = Control.FOCUS_NONE
+		_toggle_button.visible = false
+		_toggle_button.add_theme_constant_override("h_separation", 0)
+		_toggle_button.pressed.connect(_on_toggle_pressed)
+		add_child(_toggle_button)
+
+		_toggle_icon = TextureRect.new()
+		_toggle_icon.name = "Icon"
+		_toggle_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_toggle_icon.texture = _get_category_texture("full_tackle")
+		_toggle_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		_toggle_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		_toggle_button.add_child(_toggle_icon)
+
 	var category_order: Array = _get_category_order()
 	for category in category_order:
 		var key := str(category)
@@ -252,6 +371,109 @@ func _ensure_nodes() -> void:
 		_popup_scroll.add_child(_popup_row)
 
 
+func _layout_toggle_button(local_center: Vector2) -> void:
+	if _toggle_button == null:
+		return
+	var toggle_size := Vector2(_toggle_edge, _toggle_edge)
+	_toggle_button.position = local_center - toggle_size * 0.5
+	_toggle_button.size = toggle_size
+	_toggle_button.custom_minimum_size = toggle_size
+	_toggle_button.pivot_offset = toggle_size * 0.5
+	_toggle_button.z_index = 2
+	_apply_toggle_button_style()
+	if _toggle_icon != null:
+		var inset: float = _toggle_edge * 0.20
+		_toggle_icon.position = Vector2(inset, inset)
+		_toggle_icon.size = toggle_size - Vector2(inset * 2.0, inset * 2.0)
+		_toggle_icon.texture = _get_category_texture("full_tackle")
+	_refresh_toggle_button(_can_change_tackle())
+
+
+func _refresh_toggle_button(can_change: bool) -> void:
+	if _toggle_button == null:
+		return
+	_toggle_button.visible = _should_show_radial_hud()
+	_toggle_button.disabled = not can_change
+	_toggle_button.mouse_filter = Control.MOUSE_FILTER_STOP if _toggle_button.visible and can_change else Control.MOUSE_FILTER_IGNORE
+	_toggle_button.modulate = Color.WHITE if can_change else Color(0.76, 0.82, 0.80, 0.62)
+	if _toggle_icon != null:
+		_toggle_icon.modulate = Color(1.0, 1.0, 1.0, 0.98 if can_change else 0.56)
+
+
+func _on_toggle_pressed() -> void:
+	toggle_radial_menu()
+
+
+func _is_radial_visible() -> bool:
+	return _radial_state == RADIAL_STATE_OPEN or _radial_state == RADIAL_STATE_OPENING or _radial_state == RADIAL_STATE_CLOSING
+
+
+func _hide_radial_buttons() -> void:
+	for button_value in _buttons.values():
+		var button := button_value as Button
+		if button == null:
+			continue
+		button.visible = false
+		button.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		button.scale = Vector2.ONE * 0.2
+		button.modulate = Color(1.0, 1.0, 1.0, 0.0)
+		button.position = _collapsed_button_position
+
+
+func _set_disabled_state() -> void:
+	if is_instance_valid(_radial_tween):
+		_radial_tween.kill()
+	hide_popup()
+	is_tackle_radial_open = false
+	_radial_state = RADIAL_STATE_DISABLED
+	_hide_radial_buttons()
+	if _toggle_button != null:
+		_toggle_button.visible = false
+		_toggle_button.disabled = true
+		_toggle_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	visible = false
+
+
+func _animate_radial_buttons(opening: bool) -> void:
+	if is_instance_valid(_radial_tween):
+		_radial_tween.kill()
+	var category_order: Array = _get_category_order()
+	var can_change := _can_change_tackle()
+	var start_alpha := 0.0 if opening else 1.0
+	var end_alpha := 1.0 if opening else 0.0
+	var start_scale := Vector2.ONE * (0.2 if opening else 1.0)
+	var end_scale := Vector2.ONE * (1.0 if opening else 0.2)
+	_radial_tween = create_tween()
+	_radial_tween.set_parallel(true)
+	for category_value in category_order:
+		var category := str(category_value)
+		var button := _buttons.get(category) as Button
+		if button == null:
+			continue
+		var target_position: Vector2 = _slot_target_positions.get(category, _collapsed_button_position)
+		button.visible = true
+		button.disabled = not can_change
+		button.mouse_filter = Control.MOUSE_FILTER_STOP if can_change else Control.MOUSE_FILTER_IGNORE
+		button.pivot_offset = button.size * 0.5
+		if opening:
+			button.position = _collapsed_button_position
+			button.scale = start_scale
+			button.modulate = Color(1.0, 1.0, 1.0, start_alpha)
+		_radial_tween.tween_property(button, "position", target_position if opening else _collapsed_button_position, RADIAL_ANIMATION_SECONDS).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT if opening else Tween.EASE_IN)
+		_radial_tween.tween_property(button, "scale", end_scale, RADIAL_ANIMATION_SECONDS).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT if opening else Tween.EASE_IN)
+		_radial_tween.tween_property(button, "modulate:a", end_alpha, RADIAL_ANIMATION_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT if opening else Tween.EASE_IN)
+	_radial_tween.finished.connect(func() -> void:
+		if opening:
+			_radial_state = RADIAL_STATE_OPEN
+			is_tackle_radial_open = true
+			refresh()
+		else:
+			_radial_state = RADIAL_STATE_CLOSED
+			is_tackle_radial_open = false
+			_hide_radial_buttons()
+	)
+
+
 func _get_category_order() -> Array:
 	var order: Array = []
 	var supported_slots: Dictionary = {}
@@ -266,6 +488,9 @@ func _get_category_order() -> Array:
 
 	for slot_id_value in DEFAULT_CATEGORY_ORDER:
 		var slot_id := str(slot_id_value)
+		if slot_id == "full_tackle":
+			order.append(slot_id)
+			continue
 		if not supported_slots.is_empty() and not supported_slots.has(slot_id):
 			continue
 		if PlayerData != null and PlayerData.has_method("is_tackle_slot_locked") and bool(PlayerData.call("is_tackle_slot_locked", slot_id)):
@@ -280,7 +505,7 @@ func _get_category_order() -> Array:
 
 
 func _get_allowed_item_categories(category: String) -> Array:
-	if category == "tackle":
+	if category == "tackle" or category == "full_tackle":
 		return []
 	if PlayerData != null and PlayerData.has_method("get_tackle_slot_item_categories"):
 		var configured = PlayerData.call("get_tackle_slot_item_categories", category)
@@ -341,6 +566,12 @@ func _on_category_pressed(category: String) -> void:
 	if not _can_change_tackle():
 		_show_toast("Снасть можно менять только перед забросом.", false)
 		return
+	if category == "full_tackle":
+		hide_popup()
+		close_radial_menu(false)
+		if main != null and main.has_method("open_full_tackle_from_quick_panel"):
+			main.open_full_tackle_from_quick_panel()
+		return
 
 	if _popup_category == category and _popup_panel != null and _popup_panel.visible and _popup_mode == "picker":
 		hide_popup()
@@ -371,6 +602,7 @@ func _on_remove_pressed(category: String, item_id: String, slot_index: int = -1)
 		PlayerData.clear_current_tackle_slot(category)
 	_save_game()
 	_refresh_main_ui()
+	refresh()
 	_show_toast("Снято со снасти." if was_equipped else "Убрано из последних.", true)
 
 	_popup_category = category
@@ -430,6 +662,7 @@ func _equip_quick_item(category: String, item_id: String, slot_index: int = -1) 
 			hide_popup()
 		_save_game()
 		_refresh_main_ui()
+		refresh()
 		if keep_popup_open:
 			_rebuild_popup(category)
 			_popup_panel.visible = true
@@ -589,6 +822,8 @@ func _layout_popup() -> void:
 
 
 func _is_slot_equipped(category: String) -> bool:
+	if category == "full_tackle":
+		return true
 	var component = PlayerData.current_tackle.get(category, {})
 	return typeof(component) == TYPE_DICTIONARY and str(component.get("id", "")) != ""
 
@@ -718,7 +953,7 @@ func _save_game() -> void:
 
 
 func _get_button_tooltip(category: String) -> String:
-	if category == "tackle":
+	if category == "tackle" or category == "full_tackle":
 		return "Полная сборка снасти"
 	var equipped: Variant = PlayerData.current_tackle.get(category, {})
 	var title := _get_category_title(category)
@@ -793,8 +1028,12 @@ func _load_texture(path: String) -> Texture2D:
 
 
 func _is_point_inside_quick_ui(point: Vector2) -> bool:
-	if get_global_rect().has_point(point):
+	if _toggle_button != null and _toggle_button.visible and _toggle_button.get_global_rect().has_point(point):
 		return true
+	for button_value in _buttons.values():
+		var button := button_value as Button
+		if button != null and button.visible and button.get_global_rect().has_point(point):
+			return true
 	if _popup_panel != null and _popup_panel.visible and _popup_panel.get_global_rect().has_point(point):
 		return true
 	return false
@@ -807,18 +1046,22 @@ func _should_show_radial_hud() -> bool:
 			return false
 		if main.has_method("_is_menu_overlay_open") and bool(main.call("_is_menu_overlay_open")):
 			return false
-	return true
+	return _can_change_tackle()
 
 
 func _get_slot_visual_state(category: String) -> String:
 	if not _can_change_tackle():
 		return "disabled"
+	if category == "full_tackle":
+		return "normal"
 	if _is_slot_problem(category):
 		return "warning"
 	return "normal"
 
 
 func _is_slot_problem(category: String) -> bool:
+	if category == "full_tackle":
+		return false
 	if PlayerData == null:
 		return true
 	var component_value = PlayerData.current_tackle.get(category, {})
@@ -844,6 +1087,8 @@ func _is_slot_problem(category: String) -> bool:
 
 
 func _get_current_slot_texture(category: String) -> Texture2D:
+	if category == "full_tackle":
+		return _get_category_texture(category)
 	if PlayerData != null:
 		var component_value = PlayerData.current_tackle.get(category, {})
 		if typeof(component_value) == TYPE_DICTIONARY:
@@ -903,6 +1148,30 @@ func _apply_slot_button_style(button: Button, state: String = "normal") -> void:
 	button.add_theme_color_override("icon_pressed_color", Color(0.86, 1.0, 0.74, 1.0))
 	button.add_theme_color_override("icon_disabled_color", Color(0.62, 0.70, 0.68, 0.56))
 	button.add_theme_constant_override("icon_max_width", int(_button_edge * 0.68))
+
+
+func _apply_toggle_button_style() -> void:
+	if _toggle_button == null:
+		return
+	var radius: float = _toggle_edge * 0.5
+	var fill := Color(0.026, 0.045, 0.044, 0.88)
+	var border := Color(0.70, 1.0, 0.82, 0.62)
+	var hover_fill := Color(0.046, 0.080, 0.070, 0.94)
+	var hover_border := Color(0.86, 1.0, 0.90, 0.86)
+	var pressed_fill := Color(0.060, 0.118, 0.084, 1.0)
+	var pressed_border := Color(0.96, 1.0, 0.76, 0.96)
+	var disabled_fill := Color(0.034, 0.044, 0.044, 0.42)
+	var disabled_border := Color(0.52, 0.66, 0.60, 0.22)
+	_toggle_button.add_theme_stylebox_override("normal", _make_round_style(fill, border, radius, 2, Color(0.0, 0.0, 0.0, 0.28)))
+	_toggle_button.add_theme_stylebox_override("hover", _make_round_style(hover_fill, hover_border, radius, 2, Color(0.0, 0.0, 0.0, 0.24)))
+	_toggle_button.add_theme_stylebox_override("pressed", _make_round_style(pressed_fill, pressed_border, radius, 2, Color.TRANSPARENT))
+	_toggle_button.add_theme_stylebox_override("disabled", _make_round_style(disabled_fill, disabled_border, radius, 2, Color.TRANSPARENT))
+	_toggle_button.add_theme_color_override("font_color", Color.TRANSPARENT)
+	_toggle_button.add_theme_color_override("font_hover_color", Color.TRANSPARENT)
+	_toggle_button.add_theme_color_override("font_pressed_color", Color.TRANSPARENT)
+	_toggle_button.add_theme_color_override("font_disabled_color", Color.TRANSPARENT)
+	_toggle_button.add_theme_constant_override("h_separation", 0)
+	_toggle_button.add_theme_constant_override("icon_max_width", 0)
 
 
 func _apply_remove_button_style(button: Button) -> void:

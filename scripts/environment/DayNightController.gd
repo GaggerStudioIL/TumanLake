@@ -57,12 +57,14 @@ const OLD_OAK_PIER_VISUAL_PROFILE := {
 	"horizon_y": 0.56,
 	"sun_glow_center": Vector2(0.62, 0.26),
 	"sun_reflection_area": [0.28, 0.56, 0.48, 0.24],
-	"sun_path_start": Vector2(0.12, 0.59),
-	"sun_path_end": Vector2(0.90, 0.58),
-	"moon_path_start": Vector2(0.18, 0.58),
-	"moon_path_end": Vector2(0.84, 0.57),
-	"sun_arc_height": 0.30,
-	"moon_arc_height": 0.24
+	"sun_path_start": Vector2(0.18, 0.40),
+	"sun_path_end": Vector2(0.82, 0.36),
+	"moon_path_start": Vector2(0.24, 0.39),
+	"moon_path_end": Vector2(0.80, 0.36),
+	"sun_arc_height": 0.34,
+	"moon_arc_height": 0.32,
+	"sun_peak_y": 0.13,
+	"moon_peak_y": 0.14
 }
 const QUIET_WATER_PIER_VISUAL_PROFILE := {
 	"profile_key": "quiet_water_pier",
@@ -81,12 +83,14 @@ const QUIET_WATER_PIER_VISUAL_PROFILE := {
 	"horizon_y": 0.58,
 	"sun_glow_center": Vector2(0.58, 0.24),
 	"sun_reflection_area": [0.32, 0.58, 0.42, 0.24],
-	"sun_path_start": Vector2(0.10, 0.61),
-	"sun_path_end": Vector2(0.90, 0.60),
-	"moon_path_start": Vector2(0.16, 0.60),
-	"moon_path_end": Vector2(0.84, 0.58),
-	"sun_arc_height": 0.31,
-	"moon_arc_height": 0.24
+	"sun_path_start": Vector2(0.34, 0.40),
+	"sun_path_end": Vector2(0.74, 0.37),
+	"moon_path_start": Vector2(0.38, 0.39),
+	"moon_path_end": Vector2(0.72, 0.36),
+	"sun_arc_height": 0.33,
+	"moon_arc_height": 0.30,
+	"sun_peak_y": 0.12,
+	"moon_peak_y": 0.13
 }
 const MORNING_PIER_VISUAL_PROFILE := {
 	"profile_key": "morning_pier",
@@ -106,12 +110,14 @@ const MORNING_PIER_VISUAL_PROFILE := {
 	"horizon_y": 0.60,
 	"sun_glow_center": Vector2(0.54, 0.22),
 	"sun_reflection_area": [0.34, 0.60, 0.38, 0.25],
-	"sun_path_start": Vector2(0.08, 0.63),
-	"sun_path_end": Vector2(0.92, 0.62),
-	"moon_path_start": Vector2(0.14, 0.61),
-	"moon_path_end": Vector2(0.86, 0.60),
-	"sun_arc_height": 0.32,
-	"moon_arc_height": 0.25
+	"sun_path_start": Vector2(0.24, 0.39),
+	"sun_path_end": Vector2(0.84, 0.35),
+	"moon_path_start": Vector2(0.30, 0.38),
+	"moon_path_end": Vector2(0.80, 0.35),
+	"sun_arc_height": 0.34,
+	"moon_arc_height": 0.31,
+	"sun_peak_y": 0.11,
+	"moon_peak_y": 0.12
 }
 const OLD_BOAT_PIER_VISUAL_PROFILE := {
 	"profile_key": "old_boat_pier",
@@ -131,12 +137,14 @@ const OLD_BOAT_PIER_VISUAL_PROFILE := {
 	"horizon_y": 0.57,
 	"sun_glow_center": Vector2(0.54, 0.24),
 	"sun_reflection_area": [0.31, 0.57, 0.42, 0.24],
-	"sun_path_start": Vector2(0.10, 0.60),
-	"sun_path_end": Vector2(0.88, 0.59),
-	"moon_path_start": Vector2(0.16, 0.58),
-	"moon_path_end": Vector2(0.84, 0.57),
-	"sun_arc_height": 0.30,
-	"moon_arc_height": 0.24
+	"sun_path_start": Vector2(0.16, 0.38),
+	"sun_path_end": Vector2(0.82, 0.34),
+	"moon_path_start": Vector2(0.22, 0.37),
+	"moon_path_end": Vector2(0.78, 0.34),
+	"sun_arc_height": 0.33,
+	"moon_arc_height": 0.30,
+	"sun_peak_y": 0.12,
+	"moon_peak_y": 0.13
 }
 const DEEP_PIER_VISUAL_PROFILE := {
 	"profile_key": "deep_pier",
@@ -159,12 +167,14 @@ const DEEP_PIER_VISUAL_PROFILE := {
 	"horizon_y": 0.52,
 	"sun_glow_center": Vector2(0.52, 0.22),
 	"sun_reflection_area": [0.30, 0.52, 0.44, 0.26],
-	"sun_path_start": Vector2(0.14, 0.55),
-	"sun_path_end": Vector2(0.84, 0.53),
-	"moon_path_start": Vector2(0.20, 0.53),
-	"moon_path_end": Vector2(0.80, 0.51),
-	"sun_arc_height": 0.28,
-	"moon_arc_height": 0.22
+	"sun_path_start": Vector2(0.24, 0.36),
+	"sun_path_end": Vector2(0.78, 0.32),
+	"moon_path_start": Vector2(0.30, 0.35),
+	"moon_path_end": Vector2(0.76, 0.32),
+	"sun_arc_height": 0.32,
+	"moon_arc_height": 0.29,
+	"sun_peak_y": 0.10,
+	"moon_peak_y": 0.11
 }
 const COLD_WATER_VISUAL_PROFILE := {
 	"profile_key": "cold_water",
@@ -184,12 +194,14 @@ const COLD_WATER_VISUAL_PROFILE := {
 	"horizon_y": 0.56,
 	"sun_glow_center": Vector2(0.52, 0.24),
 	"sun_reflection_area": [0.30, 0.56, 0.44, 0.24],
-	"sun_path_start": Vector2(0.10, 0.59),
-	"sun_path_end": Vector2(0.88, 0.58),
-	"moon_path_start": Vector2(0.16, 0.58),
-	"moon_path_end": Vector2(0.84, 0.56),
-	"sun_arc_height": 0.30,
-	"moon_arc_height": 0.23
+	"sun_path_start": Vector2(0.28, 0.37),
+	"sun_path_end": Vector2(0.76, 0.34),
+	"moon_path_start": Vector2(0.34, 0.36),
+	"moon_path_end": Vector2(0.74, 0.33),
+	"sun_arc_height": 0.32,
+	"moon_arc_height": 0.29,
+	"sun_peak_y": 0.11,
+	"moon_peak_y": 0.12
 }
 const DARK_HOLE_VISUAL_PROFILE := {
 	"profile_key": "dark_hole",
@@ -209,12 +221,14 @@ const DARK_HOLE_VISUAL_PROFILE := {
 	"horizon_y": 0.54,
 	"sun_glow_center": Vector2(0.52, 0.23),
 	"sun_reflection_area": [0.31, 0.54, 0.40, 0.24],
-	"sun_path_start": Vector2(0.14, 0.57),
-	"sun_path_end": Vector2(0.84, 0.56),
-	"moon_path_start": Vector2(0.20, 0.55),
-	"moon_path_end": Vector2(0.78, 0.53),
-	"sun_arc_height": 0.28,
-	"moon_arc_height": 0.22
+	"sun_path_start": Vector2(0.26, 0.37),
+	"sun_path_end": Vector2(0.76, 0.34),
+	"moon_path_start": Vector2(0.32, 0.36),
+	"moon_path_end": Vector2(0.74, 0.33),
+	"sun_arc_height": 0.32,
+	"moon_arc_height": 0.29,
+	"sun_peak_y": 0.11,
+	"moon_peak_y": 0.12
 }
 const MIST_PIER_VISUAL_PROFILE := {
 	"profile_key": "mist_pier",
@@ -226,19 +240,28 @@ const MIST_PIER_VISUAL_PROFILE := {
 	"show_water": false,
 	"show_forest": false,
 	"show_light_overlay": false,
-	"show_foreground": true,
+	"show_foreground": false,
 	"foreground_z": 5,
+	"foreground_material": "mist_pier_cutout",
 	"mist_enabled": false,
 	"sky_rect": [0.08, 0.05, 0.84, 0.52],
 	"horizon_y": 0.57,
-	"sun_glow_center": Vector2(0.52, 0.25),
+	"sun_glow_center": Vector2(0.61, 0.24),
 	"sun_reflection_area": [0.32, 0.57, 0.38, 0.22],
-	"sun_path_start": Vector2(0.16, 0.60),
-	"sun_path_end": Vector2(0.84, 0.59),
-	"moon_path_start": Vector2(0.22, 0.58),
-	"moon_path_end": Vector2(0.78, 0.56),
-	"sun_arc_height": 0.27,
-	"moon_arc_height": 0.22
+	"sun_path_start": Vector2(0.22, 0.40),
+	"sun_path_end": Vector2(0.82, 0.37),
+	"moon_path_start": Vector2(0.28, 0.39),
+	"moon_path_end": Vector2(0.78, 0.36),
+	"sun_arc_height": 0.32,
+	"moon_arc_height": 0.29,
+	"sun_peak_y": 0.14,
+	"moon_peak_y": 0.15,
+	"sun_size": 70.0,
+	"sun_halo_boost": 0.62,
+	"sun_alpha_boost": 0.42,
+	"sun_glow_strength": 0.22,
+	"sun_glow_radius": 0.30,
+	"sun_reflection_alpha": 0.045
 }
 const REEDS_PIER_VISUAL_PROFILE := {
 	"profile_key": "reeds_pier",
@@ -250,22 +273,27 @@ const REEDS_PIER_VISUAL_PROFILE := {
 	"show_water": false,
 	"show_forest": false,
 	"show_light_overlay": false,
-	"show_foreground": true,
+	"show_foreground": false,
 	"foreground_z": 5,
+	"foreground_material": "reeds_foreground_cutout",
 	"mist_enabled": false,
 	"sky_rect": [0.05, 0.04, 0.90, 0.52],
 	"horizon_y": 0.56,
-	"sun_glow_center": Vector2(0.50, 0.20),
+	"sun_glow_center": Vector2(0.72, 0.18),
 	"sun_reflection_area": [0.28, 0.56, 0.48, 0.23],
-	"sun_path_start": Vector2(0.10, 0.59),
-	"sun_path_end": Vector2(0.90, 0.58),
-	"moon_path_start": Vector2(0.16, 0.57),
-	"moon_path_end": Vector2(0.84, 0.55),
-	"sun_arc_height": 0.47,
-	"sun_size": 88.0,
-	"sun_halo_boost": 1.25,
-	"sun_alpha_boost": 1.10,
-	"moon_arc_height": 0.23
+	"sun_path_start": Vector2(0.16, 0.43),
+	"sun_path_end": Vector2(0.86, 0.42),
+	"moon_path_start": Vector2(0.18, 0.41),
+	"moon_path_end": Vector2(0.82, 0.40),
+	"sun_arc_height": 0.34,
+	"sun_size": 72.0,
+	"sun_halo_boost": 0.66,
+	"sun_alpha_boost": 0.46,
+	"sun_glow_strength": 0.24,
+	"sun_glow_radius": 0.32,
+	"sun_reflection_alpha": 0.055,
+	"moon_arc_height": 0.32,
+	"moon_peak_y": 0.15
 }
 const GREEN_DUCKWEED_VISUAL_PROFILE := {
 	"profile_key": "green_duckweed",
@@ -282,20 +310,24 @@ const GREEN_DUCKWEED_VISUAL_PROFILE := {
 	"sun_end_x_ratio": 1.05,
 	"sun_horizon_y_ratio": 0.30,
 	"sun_size": 82.0,
-	"moon_start_x_ratio": 0.54,
-	"moon_end_x_ratio": 0.98,
-	"moon_horizon_y_ratio": 0.31,
+	"moon_start_x_ratio": 0.74,
+	"moon_end_x_ratio": 1.02,
+	"moon_horizon_y_ratio": 0.28,
 	"mist_enabled": false,
 	"sky_rect": [0.34, 0.04, 0.62, 0.41],
 	"horizon_y": 0.45,
 	"sun_glow_center": Vector2(0.66, 0.18),
 	"sun_reflection_area": [0.38, 0.45, 0.42, 0.26],
-	"sun_path_start": Vector2(0.38, 0.48),
-	"sun_path_end": Vector2(0.98, 0.47),
-	"moon_path_start": Vector2(0.36, 0.47),
-	"moon_path_end": Vector2(0.94, 0.45),
-	"sun_arc_height": 0.24,
-	"moon_arc_height": 0.20
+	"sun_path_start": Vector2(0.36, 0.40),
+	"sun_path_end": Vector2(0.94, 0.39),
+	"moon_path_start": Vector2(0.74, 0.36),
+	"moon_path_end": Vector2(0.98, 0.34),
+	"sun_arc_height": 0.32,
+	"moon_arc_height": 0.26,
+	"sun_peak_y": 0.13,
+	"moon_peak_y": 0.12,
+	"moon_size": 46.0,
+	"moon_rise_delay_minutes": 120.0
 }
 const FROG_BACKWATER_VISUAL_PROFILE := {
 	"profile_key": "frog_backwater",
@@ -312,12 +344,14 @@ const FROG_BACKWATER_VISUAL_PROFILE := {
 	"horizon_y": 0.54,
 	"sun_glow_center": Vector2(0.55, 0.23),
 	"sun_reflection_area": [0.30, 0.54, 0.42, 0.24],
-	"sun_path_start": Vector2(0.12, 0.57),
-	"sun_path_end": Vector2(0.84, 0.56),
-	"moon_path_start": Vector2(0.18, 0.55),
-	"moon_path_end": Vector2(0.80, 0.53),
-	"sun_arc_height": 0.28,
-	"moon_arc_height": 0.22
+	"sun_path_start": Vector2(0.28, 0.40),
+	"sun_path_end": Vector2(0.76, 0.37),
+	"moon_path_start": Vector2(0.32, 0.39),
+	"moon_path_end": Vector2(0.74, 0.36),
+	"sun_arc_height": 0.33,
+	"moon_arc_height": 0.30,
+	"sun_peak_y": 0.12,
+	"moon_peak_y": 0.13
 }
 const SPOT_VISUAL_PROFILES := {
 	"old_oak_pier": OLD_OAK_PIER_VISUAL_PROFILE,
@@ -351,10 +385,10 @@ const DAWN_START := 300.0
 const DAY_START := 480.0
 const SUNSET_START := 1080.0
 const NIGHT_START := 1260.0
-const CELESTIAL_LAYER_Z := 3
+const CELESTIAL_LAYER_Z := 1
 const STARS_LAYER_Z := 0
 const MOON_SPRITE_Z := 0
-const SUN_SPRITE_Z := 0
+const SUN_SPRITE_Z := 1
 const MOUNTAINS_LAYER_Z := 2
 const SKY_REFERENCE_SIZE := Vector2(960.0, 540.0)
 const CELESTIAL_HORIZON_FADE_RATIO := 0.065
@@ -443,6 +477,8 @@ func layout_environment(screen_size: Vector2) -> void:
 		_stars_layer.call("set_viewport_size", screen_size)
 	if _stars_layer != null and _stars_layer.has_method("set_horizon_y_ratio"):
 		_stars_layer.call("set_horizon_y_ratio", _get_sky_horizon_y_ratio(visual_profile))
+	if _stars_layer != null and _stars_layer.has_method("set_sky_bounds"):
+		_stars_layer.call("set_sky_bounds", _get_sky_rect(visual_profile), _get_sky_horizon_y(visual_profile))
 
 	_update_sky_debug_overlay(visual_profile)
 	_debug_print_layout()
@@ -501,17 +537,26 @@ func update_sun_position(minutes: float) -> void:
 
 	_sun_sprite.position = position
 	_sun_sprite.scale = _get_sprite_uniform_scale(_sun_sprite, target_size)
-	_sun_sprite.visible = false
-	_sun_sprite.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	var sun_disc_alpha: float = clampf(sun_intensity * lerpf(0.78, 0.62, sun_height_factor), 0.0, 0.72)
+	_sun_sprite.visible = sun_disc_alpha > 0.018
+	_sun_sprite.modulate = Color(
+		1.0,
+		lerpf(0.70, 0.94, sun_height_factor),
+		lerpf(0.36, 0.72, sun_height_factor),
+		sun_disc_alpha
+	)
 	_update_sun_atmosphere_glow(visual_profile, glow_center, sun_intensity, sun_warmth, profile_sun_halo_boost)
 	_update_sun_water_reflection(visual_profile, glow_center, sun_intensity, sun_warmth, sun_height_factor)
 
 func update_moon_position(minutes: float) -> void:
 	var night_length: float = MINUTES_PER_DAY - NIGHT_START + DAWN_START
 	var moon_minutes: float = minutes - NIGHT_START if minutes >= NIGHT_START else minutes + MINUTES_PER_DAY - NIGHT_START
-	var moon_t: float = clampf(moon_minutes / maxf(night_length, 1.0), 0.0, 1.0)
-	var moon_alpha: float = _fade_between(moon_minutes, 0.0, 105.0) * (1.0 - _fade_between(moon_minutes, night_length - 105.0, night_length))
 	var visual_profile := _get_current_visual_profile()
+	var moon_rise_delay_minutes := clampf(_get_profile_float(visual_profile, "moon_rise_delay_minutes", 0.0), 0.0, night_length - 1.0)
+	var delayed_moon_minutes := maxf(moon_minutes - moon_rise_delay_minutes, 0.0)
+	var visible_night_length := maxf(night_length - moon_rise_delay_minutes, 1.0)
+	var moon_t: float = clampf(delayed_moon_minutes / visible_night_length, 0.0, 1.0)
+	var moon_alpha: float = _fade_between(delayed_moon_minutes, 0.0, 105.0) * (1.0 - _fade_between(delayed_moon_minutes, visible_night_length - 105.0, visible_night_length))
 	var profile_moon_arc_height := _get_profile_float(visual_profile, "moon_arc_height", moon_arc_height)
 	var profile_moon_size := _get_profile_float(visual_profile, "moon_size", moon_size)
 	var screen_scale: float = clampf(_viewport_size.y / 540.0, 0.82, 1.35)
@@ -1034,7 +1079,7 @@ func _ensure_nodes() -> void:
 		_celestial_layer.name = "CelestialLayer"
 		_environment_root.add_child(_celestial_layer)
 	_celestial_layer.z_as_relative = true
-	_celestial_layer.z_index = maxi(int(visual_profile.get("celestial_z", CELESTIAL_LAYER_Z)), CELESTIAL_LAYER_Z)
+	_celestial_layer.z_index = int(visual_profile.get("celestial_z", CELESTIAL_LAYER_Z))
 
 	if _stars_layer == null:
 		_stars_layer = StarsLayerScript.new()
@@ -1230,6 +1275,8 @@ func _apply_visual_profile_layout(profile: Dictionary, screen_size: Vector2) -> 
 		_foreground_grass_layer.z_index = int(profile.get("foreground_z", 9))
 		if bool(profile.get("foreground_stretch_scale", false)):
 			_foreground_grass_layer.stretch_mode = TextureRect.STRETCH_SCALE
+		else:
+			_foreground_grass_layer.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 
 	if _water_layer == null or not profile.has("water_rect"):
 		return
@@ -1360,7 +1407,7 @@ func _set_mist_pier_foreground_material(layer: CanvasItem) -> void:
 func _set_reeds_foreground_material(layer: CanvasItem) -> void:
 	if layer == null:
 		return
-	var material_key := "reeds_foreground_cutout"
+	var material_key := "reeds_foreground_cutout_v2"
 	if str(layer.get_meta("environment_material_key", "")) == material_key:
 		return
 
@@ -1429,32 +1476,34 @@ func _make_sun_disc_material() -> ShaderMaterial:
 	var shader := Shader.new()
 	shader.code = """
 		shader_type canvas_item;
-		render_mode blend_add;
+		render_mode blend_add, unshaded;
 
 		uniform vec4 light_color : source_color = vec4(1.0, 0.84, 0.50, 1.0);
 		uniform vec4 halo_color : source_color = vec4(1.0, 0.78, 0.42, 1.0);
-		uniform float texture_mix = 0.02;
-		uniform float halo_strength = 0.62;
-		uniform float ray_strength = 0.10;
+		uniform float texture_detail_strength = 0.10;
+		uniform float halo_strength = 0.70;
+		uniform float ray_strength = 0.06;
 
 		void fragment() {
 			vec4 vertex_color = COLOR;
 			vec4 tex = texture(TEXTURE, UV);
 			vec2 centered = UV * 2.0 - 1.0;
 			float dist = length(centered);
-			float hot_center = 1.0 - smoothstep(0.00, 0.16, dist);
-			float bloom = 1.0 - smoothstep(0.06, 0.72, dist);
-			float soft_halo = 1.0 - smoothstep(0.20, 1.20, dist);
-			float outer_glow = 1.0 - smoothstep(0.46, 1.48, dist);
-			float horizontal_ray = (1.0 - smoothstep(0.0, 0.24, abs(centered.y))) * (1.0 - smoothstep(0.12, 1.42, abs(centered.x)));
-			float vertical_ray = (1.0 - smoothstep(0.0, 0.22, abs(centered.x))) * (1.0 - smoothstep(0.12, 1.36, abs(centered.y)));
-			float diagonal_ray_a = (1.0 - smoothstep(0.0, 0.20, abs(centered.x + centered.y * 0.72))) * (1.0 - smoothstep(0.10, 1.22, dist));
-			float diagonal_ray_b = (1.0 - smoothstep(0.0, 0.18, abs(centered.x - centered.y * 0.82))) * (1.0 - smoothstep(0.12, 1.16, dist));
-			float ray = (horizontal_ray * 0.30 + vertical_ray * 0.16 + diagonal_ray_a * 0.18 + diagonal_ray_b * 0.12) * ray_strength;
-			vec3 texture_detail = mix(vec3(1.0), tex.rgb, texture_mix * 0.18);
-			vec3 body_color = mix(halo_color.rgb, light_color.rgb, clamp(hot_center * 0.52 + bloom * 0.28, 0.0, 1.0));
-			vec3 color = (body_color * (hot_center * 0.56 + bloom * 0.42) + halo_color.rgb * (soft_halo * 0.24 + outer_glow * 0.18 + ray * 0.42)) * texture_detail;
-			float alpha = clamp(hot_center * 0.38 + bloom * 0.30 + soft_halo * halo_strength * 0.30 + outer_glow * 0.20 + ray, 0.0, 0.82);
+			float hot_core = 1.0 - smoothstep(0.00, 0.13, dist);
+			float light_body = 1.0 - smoothstep(0.08, 0.48, dist);
+			float soft_halo = 1.0 - smoothstep(0.24, 1.08, dist);
+			float outer_haze = 1.0 - smoothstep(0.54, 1.34, dist);
+			float horizontal_ray = (1.0 - smoothstep(0.0, 0.20, abs(centered.y))) * (1.0 - smoothstep(0.10, 1.34, abs(centered.x)));
+			float diagonal_ray_a = (1.0 - smoothstep(0.0, 0.18, abs(centered.x + centered.y * 0.72))) * (1.0 - smoothstep(0.10, 1.18, dist));
+			float diagonal_ray_b = (1.0 - smoothstep(0.0, 0.16, abs(centered.x - centered.y * 0.82))) * (1.0 - smoothstep(0.12, 1.12, dist));
+			float ray = (horizontal_ray * 0.30 + diagonal_ray_a * 0.13 + diagonal_ray_b * 0.10) * ray_strength;
+			float overexposure = clamp(hot_core * 0.90 + light_body * 0.72 + soft_halo * 0.28 + ray * 1.40, 0.0, 1.0);
+			vec3 source_texture = mix(vec3(1.0), tex.rgb, texture_detail_strength);
+			source_texture = mix(source_texture, vec3(1.0), overexposure);
+			vec3 body_color = mix(halo_color.rgb, light_color.rgb, clamp(hot_core * 0.62 + light_body * 0.34, 0.0, 1.0));
+			vec3 color = (body_color * (hot_core * 0.50 + light_body * 0.52) + halo_color.rgb * (soft_halo * 0.22 + outer_haze * 0.16 + ray)) * source_texture;
+			float radial_clip = 1.0 - smoothstep(1.04, 1.42, dist);
+			float alpha = clamp(hot_core * 0.34 + light_body * 0.34 + soft_halo * halo_strength * 0.28 + outer_haze * 0.16 + ray, 0.0, 0.78) * radial_clip;
 			COLOR = vec4(color * vertex_color.rgb, alpha * vertex_color.a * light_color.a);
 		}
 	"""
@@ -1622,8 +1671,15 @@ func _make_reeds_foreground_material() -> ShaderMaterial:
 			float saturation = (max_channel - min_channel) / max(max_channel, 0.001);
 			float black_matte = 1.0 - smoothstep(0.015, 0.075, luminance);
 			float white_halo = smoothstep(0.84, 0.98, luminance) * (1.0 - smoothstep(0.08, 0.24, saturation));
-			tex.a *= 1.0 - clamp(black_matte + white_halo * 0.82, 0.0, 1.0);
-			if (tex.a < 0.01) {
+			float side_keep = max(1.0 - smoothstep(0.12, 0.33, UV.x), smoothstep(0.68, 0.90, UV.x));
+			float lower_keep = smoothstep(0.50, 0.70, UV.y);
+			float dark_detail = 1.0 - smoothstep(0.20, 0.58, luminance);
+			float color_detail = smoothstep(0.10, 0.34, saturation) * (1.0 - smoothstep(0.72, 0.94, luminance));
+			float organic_detail = clamp(max(dark_detail, color_detail), 0.0, 1.0);
+			float keep_alpha = clamp(max(side_keep * organic_detail, lower_keep * organic_detail * 0.82), 0.0, 1.0);
+			tex.a *= keep_alpha;
+			tex.a *= 1.0 - clamp(black_matte + white_halo * 0.88, 0.0, 1.0);
+			if (tex.a < 0.06) {
 				discard;
 			}
 			COLOR = tex * vertex_color;

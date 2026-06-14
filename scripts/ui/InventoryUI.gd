@@ -27,6 +27,10 @@ const INVENTORY_FALLBACK_ICON_PATHS := {
 	"hook": "res://assets/ui/sprites/icons/hook.png",
 	"bait": "res://assets/ui/sprites/icons/bait.png",
 	"fish": "res://assets/ui/sprites/icons/fish.png",
+	"food": "res://assets/ui/sprites/icons/inventory.png",
+	"drink": "res://assets/ui/sprites/icons/inventory.png",
+	"clothing": "res://assets/ui/sprites/icons/inventory.png",
+	"shelter": "res://assets/ui/sprites/icons/inventory.png",
 	"misc": "res://assets/ui/sprites/icons/inventory.png"
 }
 var _texture_cache: Dictionary = {}
@@ -171,6 +175,8 @@ func _ensure_inventory_window_template_nodes() -> void:
 		_tab_row.name = "InventoryTabRow"
 		_tab_row.mouse_filter = Control.MOUSE_FILTER_PASS
 		_tab_scroll.add_child(_tab_row)
+
+	_ensure_survival_category_buttons()
 
 	for item in _get_inventory_category_button_pairs():
 		var button: Button = item[0]
@@ -789,6 +795,23 @@ func _move_control_to_parent(control: Control, parent: Control) -> void:
 	parent.add_child(control)
 
 
+func _ensure_survival_category_buttons() -> void:
+	if main == null:
+		return
+	if main.category_food_button == null or not is_instance_valid(main.category_food_button):
+		main.category_food_button = Button.new()
+		main.category_food_button.name = "CategoryFoodButton"
+		main.category_food_button.text = "Еда"
+		main.category_food_button.focus_mode = Control.FOCUS_NONE
+		main.category_food_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	if main.category_clothing_button == null or not is_instance_valid(main.category_clothing_button):
+		main.category_clothing_button = Button.new()
+		main.category_clothing_button.name = "CategoryClothingButton"
+		main.category_clothing_button.text = "Одежда"
+		main.category_clothing_button.focus_mode = Control.FOCUS_NONE
+		main.category_clothing_button.mouse_filter = Control.MOUSE_FILTER_STOP
+
+
 func _update_inventory_ui() -> void:
 	_ensure_inventory_window_template_nodes()
 	_ensure_inventory_tile_nodes()
@@ -1183,6 +1206,8 @@ func _update_inventory_details_popup(selected_item: Dictionary) -> void:
 		return
 
 	var is_equippable := _is_equippable_inventory_item(selected_item)
+	var selected_category := str(selected_item.get("category", ""))
+	var is_survival_action := ["food", "drink", "clothing", "shelter"].has(selected_category)
 	var block_reason := _get_equip_block_reason(selected_item) if is_equippable else ""
 	var can_equip := is_equippable and block_reason == ""
 	var is_equipped := is_equippable and _is_inventory_item_equipped(selected_item)
@@ -1201,7 +1226,10 @@ func _update_inventory_details_popup(selected_item: Dictionary) -> void:
 	main.inventory_details_label.text = ""
 	_update_inventory_details_content(selected_item)
 
-	main.inventory_equip_button.disabled = not can_equip or is_equipped or main._fishing_ui_state != FishingUiState.IDLE
+	var can_use_primary_action: bool = bool(can_equip) and main._fishing_ui_state == FishingUiState.IDLE
+	if not is_survival_action and is_equipped:
+		can_use_primary_action = false
+	main.inventory_equip_button.disabled = not can_use_primary_action
 	if main.inventory_repair_button != null:
 		main.inventory_repair_button.disabled = not can_repair
 		main.inventory_repair_button.text = "Ремонт"
@@ -1209,7 +1237,15 @@ func _update_inventory_details_popup(selected_item: Dictionary) -> void:
 		main.inventory_discard_button.disabled = not can_discard
 		main.inventory_discard_button.text = "Выбросить"
 
-	if is_equipped:
+	if selected_category == "food" or selected_category == "drink":
+		main.inventory_equip_button.text = "Использовать"
+	elif selected_category == "shelter":
+		main.inventory_equip_button.text = "Отдохнуть"
+	elif selected_category == "clothing" and is_equipped:
+		main.inventory_equip_button.text = "Снять"
+	elif selected_category == "clothing":
+		main.inventory_equip_button.text = "Надеть"
+	elif is_equipped:
 		main.inventory_equip_button.text = "Надето"
 	elif main._fishing_ui_state != FishingUiState.IDLE and can_equip:
 		main.inventory_equip_button.text = "Только вне ловли"
@@ -1306,6 +1342,10 @@ func _get_inventory_item_parameters_text(item: Dictionary, status_text: String) 
 		_append_parameter_row(rows, "Износ", "%d%%" % _get_item_wear_percent(item))
 
 	var equip_status := "Надето" if _is_inventory_item_equipped(item) else "Не надето"
+	if category == "food" or category == "drink":
+		equip_status = "Можно использовать"
+	elif category == "shelter":
+		equip_status = "Можно отдохнуть"
 	if not _is_equippable_inventory_item(item):
 		equip_status = status_text
 	_append_parameter_row(rows, "Статус", equip_status)
@@ -1348,8 +1388,15 @@ func _get_inventory_item_details_body_text(item: Dictionary) -> String:
 	if condition_text != "":
 		_append_detail_section(sections, "Состояние", condition_text.split("\n", false))
 
+	if PlayerData.has_method("get_survival_item_effect_lines") and PlayerData.is_survival_inventory_item(item):
+		var survival_lines: Array = PlayerData.get_survival_item_effect_lines(item)
+		if not survival_lines.is_empty():
+			_append_detail_section(sections, "Эффект", survival_lines)
+
 	var stats_text := ""
-	if category == "float":
+	if PlayerData.has_method("is_survival_inventory_item") and PlayerData.is_survival_inventory_item(item):
+		stats_text = ""
+	elif category == "float":
 		stats_text = _get_float_inventory_stats_text(stats)
 	elif category == "leader":
 		stats_text = _get_leader_inventory_stats_text(item)
@@ -1710,6 +1757,8 @@ func _get_inventory_category_button_pairs() -> Array:
 		[main.category_floats_button, "float", "Поплавки"],
 		[main.category_hooks_button, "hook", "Крючки"],
 		[main.category_baits_button, "bait", "Наживки"],
+		[main.category_food_button, "food", "Еда"],
+		[main.category_clothing_button, "clothing", "Одежда"],
 		[main.category_fish_button, "fish", "Рыба"],
 		[main.category_misc_button, "misc", "Разное"]
 	]
@@ -1766,7 +1815,7 @@ func _should_show_keepnet_fish_in_inventory() -> bool:
 
 func _should_show_inventory_item(item: Dictionary) -> bool:
 	var category := str(item.get("category", "misc"))
-	if ["bait", "consumable", "groundbait"].has(category) and int(item.get("quantity", 0)) <= 0:
+	if ["bait", "consumable", "groundbait", "food", "drink"].has(category) and int(item.get("quantity", 0)) <= 0:
 		return false
 	return true
 
@@ -1810,6 +1859,8 @@ func _get_inventory_sort_key(item: Dictionary):
 
 func _is_equippable_inventory_item(item: Dictionary) -> bool:
 	var category := str(item.get("category", ""))
+	if ["food", "drink", "clothing", "shelter"].has(category):
+		return true
 	return PlayerData.TACKLE_SLOT_ITEM_CATEGORIES.values().has(category)
 
 
@@ -2024,6 +2075,14 @@ func _get_fallback_icon_category(category: String) -> String:
 			return "bait"
 		"fish":
 			return "fish"
+		"food":
+			return "food"
+		"drink":
+			return "drink"
+		"clothing":
+			return "clothing"
+		"shelter":
+			return "shelter"
 		_:
 			return "misc"
 
@@ -2316,6 +2375,8 @@ func _validation_service() -> Node:
 
 
 func _get_equip_block_reason(item: Dictionary, slot_type: String = "") -> String:
+	if ["food", "drink", "clothing", "shelter"].has(str(item.get("category", ""))):
+		return ""
 	var validation_service := _validation_service()
 	if validation_service != null and validation_service.has_method("get_equip_block_reason"):
 		return str(validation_service.call("get_equip_block_reason", slot_type, item))
@@ -2457,6 +2518,8 @@ func _get_tackle_setup_status_inline() -> String:
 
 func _is_inventory_item_equipped(item: Dictionary) -> bool:
 	var category := str(item.get("category", ""))
+	if category == "clothing" and PlayerData.has_method("is_clothing_item_equipped"):
+		return PlayerData.is_clothing_item_equipped(str(item.get("id", "")))
 	if not PlayerData.current_tackle.has(category):
 		return false
 
@@ -2479,6 +2542,14 @@ func _get_inventory_category_title(category: String) -> String:
 			return "Крючки"
 		"bait":
 			return "Наживки"
+		"food":
+			return "Еда"
+		"drink":
+			return "Напитки"
+		"clothing":
+			return "Одежда"
+		"shelter":
+			return "Укрытие"
 		"fish":
 			return "Рыба"
 		_:

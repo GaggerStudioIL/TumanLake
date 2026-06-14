@@ -163,6 +163,8 @@ const FIRST_RUN_HINT_TEXTS := {
 @onready var category_baits_button: Button = $InventoryPanel/CategoryBaitsButton
 @onready var category_fish_button: Button = $InventoryPanel/CategoryFishButton
 @onready var category_misc_button: Button = $InventoryPanel/CategoryMiscButton
+var category_food_button: Button
+var category_clothing_button: Button
 @onready var inventory_details_card: ColorRect = $InventoryPanel/InventoryDetailsCard
 @onready var inventory_tackle_card: ColorRect = $InventoryPanel/InventoryTackleCard
 @onready var inventory_item_list: ItemList = $InventoryPanel/InventoryItemList
@@ -202,6 +204,7 @@ var shop_title_label: Label
 var shop_money_label: Label
 var shop_bait_category_button: Button
 var shop_consumable_category_button: Button
+var shop_clothing_category_button: Button
 var shop_tackle_category_button: Button
 var shop_line_category_button: Button
 var shop_leader_category_button: Button
@@ -380,6 +383,10 @@ var time_hud_icon: TextureRect
 var weather_hud_icon: TextureRect
 var wind_hud_icon: TextureRect
 var wind_label: Label
+var condition_hud_group: VBoxContainer
+var condition_health_label: Label
+var condition_temperature_label: Label
+var condition_hunger_label: Label
 var lake_bg_base_rect: TextureRect
 var lake_bg_foreground_rect: TextureRect
 var water_overlay_rect: TextureRect
@@ -416,6 +423,9 @@ var _selected_waterbody_id: String = ""
 var _waterbody_spot_page: int = 0
 var _visible_waterbody_spots: Array = []
 var _selected_waterbody_spot_id: String = ""
+var _map_return_screen_id := ""
+var _map_return_waterbody_id := ""
+var _map_return_spot_id := ""
 var _pending_reward_catch: Dictionary = {}
 var _level_up_reward_queue: Array = []
 var _current_level_up_reward: Dictionary = {}
@@ -539,6 +549,7 @@ func _process(delta: float) -> void:
 	_update_catch_reward_input_lock()
 	_update_modal_tap_guard()
 	_update_time_hud()
+	_refresh_condition_hud()
 	_update_depth_hud_visibility_watchdog(delta)
 	_update_current_tackle_hold()
 
@@ -1334,6 +1345,7 @@ func _move_modal_roots_to_layer() -> void:
 			(node as Control).mouse_filter = Control.MOUSE_FILTER_STOP
 
 func open_modal(modal_name: String) -> void:
+	_close_quick_tackle_radial(false)
 	_ensure_modal_layer()
 	_move_modal_roots_to_layer()
 	if system_menu_ui != null:
@@ -1351,6 +1363,16 @@ func close_modal(modal_name: String = "") -> void:
 		_current_modal_name = ""
 	_refresh_modal_input_blocker()
 	_request_depth_hud_refresh()
+
+func _close_quick_tackle_radial(animated: bool = true) -> void:
+	if quick_tackle_panel == null:
+		return
+	if quick_tackle_panel.has_method("close_radial_menu"):
+		quick_tackle_panel.call("close_radial_menu", animated)
+	elif quick_tackle_panel.has_method("hide_radial_menu"):
+		quick_tackle_panel.call("hide_radial_menu", animated)
+	elif quick_tackle_panel.has_method("hide_popup"):
+		quick_tackle_panel.call("hide_popup")
 
 func close_current_modal() -> void:
 	match _current_modal_name:
@@ -1780,6 +1802,22 @@ func _ensure_player_xp_hud() -> void:
 	ui_canvas_layer.add_child(player_xp_hud)
 
 
+func _layout_player_xp_hud(screen_size: Vector2, ui_scale: float) -> void:
+	if player_xp_hud == null:
+		return
+	var hud_width := screen_size.x
+	var hud_height := clampf(34.0 * ui_scale, 30.0, 38.0)
+	var hud_x := 0.0
+	var hud_y := screen_size.y - hud_height
+	_anchor_control(player_xp_hud, 0.0, 0.0, 0.0, 0.0, hud_x, hud_y, hud_x + hud_width, hud_y + hud_height)
+	player_xp_hud.custom_minimum_size = Vector2(hud_width, hud_height)
+	player_xp_hud.size = Vector2(hud_width, hud_height)
+	player_xp_hud.visible = true
+	player_xp_hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	player_xp_hud.z_index = 270
+	_update_player_xp_hud(false)
+
+
 func _make_reeling_color_rect(node_name: String, parent: Node, z: int) -> ColorRect:
 	var rect := ColorRect.new()
 	rect.name = node_name
@@ -2046,6 +2084,23 @@ func _apply_button_style(button: Button, style_name: String = STYLE_SECONDARY_BU
 			ui_theme.apply_nav_button_style(button, false)
 		_:
 			ui_theme.apply_secondary_button_style(button)
+
+func _apply_top_icon_button_style(button: Button) -> void:
+	if button == null or ui_theme == null:
+		return
+	var normal: StyleBoxFlat = ui_theme.make_style(Color(0.026, 0.044, 0.044, 0.78), Color(0.74, 0.96, 0.86, 0.32), 15, 5, Color(0.0, 0.0, 0.0, 0.22))
+	var hover: StyleBoxFlat = ui_theme.make_style(Color(0.046, 0.082, 0.076, 0.88), Color(0.84, 1.0, 0.88, 0.54), 15, 7, Color(0.18, 0.66, 0.48, 0.13))
+	var pressed: StyleBoxFlat = ui_theme.make_style(Color(0.038, 0.112, 0.092, 0.94), Color(0.82, 1.0, 0.86, 0.62), 15, 3, Color(0.0, 0.0, 0.0, 0.16))
+	var disabled: StyleBoxFlat = ui_theme.make_style(Color(0.030, 0.040, 0.042, 0.44), Color(0.58, 0.64, 0.62, 0.12), 15, 1, Color.TRANSPARENT)
+	button.add_theme_stylebox_override("normal", normal)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("pressed", pressed)
+	button.add_theme_stylebox_override("disabled", disabled)
+	button.add_theme_stylebox_override("focus", hover)
+	button.add_theme_color_override("font_color", Color(0.88, 1.0, 0.94, 1.0))
+	button.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 0.94, 1.0))
+	button.add_theme_color_override("font_pressed_color", Color(0.80, 1.0, 0.92, 1.0))
+	button.add_theme_color_override("font_disabled_color", Color(0.62, 0.70, 0.68, 0.54))
 
 func _apply_action_button_style(button: Button, active: bool = false) -> void:
 	var normal_bg := Color(0.054, 0.088, 0.086, 0.94)
@@ -2776,6 +2831,7 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	_ensure_keepnet_hud_button()
 	_ensure_player_xp_hud()
 	_ensure_hud_icons()
+	_ensure_condition_hud()
 	_ensure_current_tackle_hud_nodes()
 
 	var sx: float = screen_size.x / BASE_SCREEN_SIZE.x
@@ -2911,6 +2967,8 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 		wind_hud_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		wind_hud_icon.modulate = Color(1.0, 1.0, 1.0, 0.94)
 	_order_weather_hud_row_children()
+	_layout_condition_hud(screen_size, ui_scale)
+	_refresh_condition_hud()
 
 	spot_option_button.visible = false
 	spot_option_button.disabled = true
@@ -2932,10 +2990,6 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	if quick_tackle_panel != null:
 		_reparent_node(quick_tackle_panel, ui_canvas_layer)
 
-	if player_xp_hud != null:
-		player_xp_hud.visible = false
-		player_xp_hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
 	var cast_center := _scale_point(CAST_CONTROL_CENTER_BASE, screen_size)
 	var cast_margin: float = 8.0 * ui_scale
 	var cast_min_x: float = cast_button_size.x * 0.5 + cast_margin
@@ -2945,6 +2999,7 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	cast_center.x = clamp(cast_center.x, cast_min_x, cast_max_x)
 	cast_center.y = clamp(cast_center.y, cast_min_y, cast_max_y)
 	var cast_rect := Rect2(cast_center - cast_button_size * 0.5, cast_button_size)
+	_layout_player_xp_hud(screen_size, ui_scale)
 	var glow_rect := cast_rect.grow(8.0 * ui_scale)
 	_anchor_control(action_glow, 0.0, 0.0, 0.0, 0.0, glow_rect.position.x, glow_rect.position.y, glow_rect.end.x, glow_rect.end.y)
 	action_glow.z_index = 99
@@ -3163,6 +3218,155 @@ func _ensure_hud_icons() -> void:
 	_order_weather_hud_row_children()
 
 
+func _ensure_condition_hud() -> void:
+	var parent: Node = ui_canvas_layer if ui_canvas_layer != null else self
+	if condition_hud_group == null:
+		condition_hud_group = VBoxContainer.new()
+		condition_hud_group.name = "ConditionHud"
+		condition_hud_group.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		condition_hud_group.alignment = BoxContainer.ALIGNMENT_BEGIN
+		condition_hud_group.z_index = 104
+		condition_hud_group.add_theme_constant_override("separation", 4)
+		parent.add_child(condition_hud_group)
+	elif condition_hud_group.get_parent() != parent:
+		_reparent_node(condition_hud_group, parent)
+
+	condition_health_label = _ensure_condition_hud_label(condition_health_label, "ConditionHealthLabel")
+	condition_temperature_label = _ensure_condition_hud_label(condition_temperature_label, "ConditionTemperatureLabel")
+	condition_hunger_label = _ensure_condition_hud_label(condition_hunger_label, "ConditionHungerLabel")
+
+
+func _ensure_condition_hud_label(label: Label, node_name: String) -> Label:
+	if label == null:
+		label = Label.new()
+		label.name = node_name
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		label.clip_text = true
+		condition_hud_group.add_child(label)
+	elif label.get_parent() != condition_hud_group:
+		_reparent_node(label, condition_hud_group)
+	label.visible = true
+	label.z_index = 105
+	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.78))
+	label.add_theme_constant_override("shadow_offset_x", 1)
+	label.add_theme_constant_override("shadow_offset_y", 1)
+	return label
+
+
+func _layout_condition_hud(screen_size: Vector2, ui_scale: float) -> void:
+	if condition_hud_group == null:
+		return
+	var sx: float = screen_size.x / BASE_SCREEN_SIZE.x
+	var sy: float = screen_size.y / BASE_SCREEN_SIZE.y
+	var group_width := clampf(184.0 * ui_scale, 162.0, 220.0)
+	var label_height := clampf(24.0 * ui_scale, 22.0, 28.0)
+	var item_gap := clampf(4.0 * ui_scale, 3.0, 6.0)
+	var group_height := label_height * 3.0 + item_gap * 2.0
+	var margin_x := clampf(24.0 * sx, 16.0, 30.0)
+	var margin_y := clampf(26.0 * sy, 18.0, 34.0)
+	var group_pos := Vector2(
+		screen_size.x - margin_x - group_width,
+		screen_size.y - margin_y - group_height
+	)
+	_anchor_control(condition_hud_group, 0.0, 0.0, 0.0, 0.0, group_pos.x, group_pos.y, group_pos.x + group_width, group_pos.y + group_height)
+	condition_hud_group.visible = true
+	condition_hud_group.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	condition_hud_group.add_theme_constant_override("separation", int(item_gap))
+
+	var font_size := int(clampf(13.0 * ui_scale, 12.0, 15.0))
+	for label in [condition_health_label, condition_temperature_label, condition_hunger_label]:
+		if label == null:
+			continue
+		label.custom_minimum_size = Vector2(group_width, label_height)
+		label.size_flags_horizontal = Control.SIZE_FILL
+		label.size_flags_vertical = Control.SIZE_FILL
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		label.add_theme_font_size_override("font_size", font_size)
+
+
+func _refresh_condition_hud() -> void:
+	if condition_hud_group == null:
+		return
+	var condition_manager := get_node_or_null("/root/PlayerConditionManager")
+	var state := {
+		"health": float(PlayerData.health),
+		"body_temperature": float(PlayerData.body_temperature),
+		"hunger": float(PlayerData.hunger),
+		"temperature_status": "normal",
+		"hunger_status": "normal",
+		"health_status": "normal",
+		"wellbeing_status": "normal",
+		"wellbeing_label": "Нормально"
+	}
+	if condition_manager != null and condition_manager.has_method("get_condition_state"):
+		var raw_state = condition_manager.call("get_condition_state")
+		if raw_state is Dictionary:
+			state = (raw_state as Dictionary).duplicate(true)
+
+	var body_temperature := clampf(float(state.get("body_temperature", 36.6)), 30.0, 42.0)
+	var hunger := clampf(float(state.get("hunger", 100.0)), 0.0, 100.0)
+	var wellbeing_status := str(state.get("wellbeing_status", state.get("health_status", "normal")))
+	var wellbeing_label := str(state.get("wellbeing_label", _get_condition_wellbeing_label(wellbeing_status)))
+
+	if condition_health_label != null:
+		condition_health_label.text = "Состояние: %s" % wellbeing_label
+		condition_health_label.add_theme_color_override("font_color", _get_condition_wellbeing_color(wellbeing_status))
+	if condition_temperature_label != null:
+		condition_temperature_label.text = "Температура: %.1f°C" % body_temperature
+		condition_temperature_label.add_theme_color_override("font_color", _get_condition_temperature_color(str(state.get("temperature_status", "normal"))))
+	if condition_hunger_label != null:
+		condition_hunger_label.text = "Голод: %d%%" % roundi(hunger)
+		condition_hunger_label.add_theme_color_override("font_color", _get_condition_hunger_color(hunger))
+
+
+func _get_condition_wellbeing_label(status: String) -> String:
+	match status:
+		"excellent":
+			return "Отлично"
+		"normal":
+			return "Нормально"
+		"tired":
+			return "Устал"
+		"poor":
+			return "Плохо"
+		_:
+			return "Вымотан"
+
+
+func _get_condition_wellbeing_color(status: String) -> Color:
+	match status:
+		"excellent":
+			return Color(0.78, 1.0, 0.78, 1.0)
+		"normal":
+			return Color(0.94, 1.0, 0.92, 1.0)
+		"tired":
+			return Color(1.0, 0.86, 0.38, 1.0)
+		"poor":
+			return Color(1.0, 0.64, 0.34, 1.0)
+		_:
+			return Color(1.0, 0.48, 0.30, 1.0)
+
+
+func _get_condition_temperature_color(status: String) -> Color:
+	match status:
+		"freezing", "overheating":
+			return Color(1.0, 0.28, 0.18, 1.0)
+		"cold", "hot":
+			return Color(1.0, 0.74, 0.32, 1.0)
+		_:
+			return Color(0.94, 1.0, 0.98, 1.0)
+
+
+func _get_condition_hunger_color(value: float) -> Color:
+	if value < 10.0:
+		return Color(1.0, 0.24, 0.16, 1.0)
+	if value < 30.0:
+		return Color(1.0, 0.72, 0.30, 1.0)
+	return Color(0.95, 1.0, 0.90, 1.0)
+
+
 func _order_weather_hud_row_children() -> void:
 	if top_hud_container != null and top_hud_money_group != null:
 		top_hud_container.move_child(top_hud_money_group, 0)
@@ -3337,7 +3541,7 @@ func _layout_side_menu_button(button: Button, label: String, icon_name: String, 
 
 	var icon_rect := _ensure_side_menu_icon(button)
 	var scale_factor: float = clamp(button_size.y / 48.0, 0.78, 1.22)
-	var icon_edge: float = clamp(min(button_size.x, button_size.y) * 0.76, 32.0 * scale_factor, 40.0 * scale_factor)
+	var icon_edge: float = clamp(min(button_size.x, button_size.y) * 0.86, 42.0 * scale_factor, 66.0 * scale_factor)
 	var icon_size := Vector2(icon_edge, icon_edge)
 
 	icon_rect.texture = ui_theme.get_side_menu_icon(icon_name)
@@ -3364,8 +3568,8 @@ func _layout_main_hud_v2_right_stack(screen_size: Vector2, ui_scale: float, cast
 	var margin_y: float = clampf(18.0 * sy, 14.0, 24.0)
 	var gap: float = clampf(8.0 * ui_scale, 7.0, 10.0)
 	var menu_button_size := Vector2(
-		clampf(62.0 * ui_scale, 56.0, 68.0),
-		clampf(54.0 * ui_scale, 48.0, 58.0)
+		clampf(62.0 * ui_scale, 56.0, 76.0),
+		clampf(54.0 * ui_scale, 48.0, 66.0)
 	)
 	var compact_size := Vector2(menu_button_size.y, menu_button_size.y)
 
@@ -3379,11 +3583,22 @@ func _layout_main_hud_v2_right_stack(screen_size: Vector2, ui_scale: float, cast
 		encyclopedia_button.mouse_filter = Control.MOUSE_FILTER_STOP
 		encyclopedia_button.custom_minimum_size = compact_size
 		encyclopedia_button.size = compact_size
+		encyclopedia_button.clip_contents = true
 		encyclopedia_button.z_index = 260
-		_apply_button_style(encyclopedia_button, STYLE_SECONDARY_BUTTON)
-		_set_button_icon(encyclopedia_button, "encyclopedia", compact_size.x * 0.48)
-		encyclopedia_button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		encyclopedia_button.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
+		_apply_top_icon_button_style(encyclopedia_button)
+		encyclopedia_button.icon = null
+		encyclopedia_button.expand_icon = false
+		encyclopedia_button.add_theme_constant_override("icon_max_width", 0)
+		var encyclopedia_icon := _ensure_button_overlay_icon(encyclopedia_button, "EncyclopediaIcon")
+		var encyclopedia_icon_size := Vector2(
+			clampf(compact_size.x * 0.78, 40.0, 52.0),
+			clampf(compact_size.y * 0.64, 30.0, 42.0)
+		)
+		encyclopedia_icon.texture = ui_theme.get_icon("encyclopedia") if ui_theme != null else null
+		encyclopedia_icon.position = (compact_size - encyclopedia_icon_size) * 0.5
+		encyclopedia_icon.size = encyclopedia_icon_size
+		encyclopedia_icon.modulate = Color(0.90, 1.0, 0.94, 0.96)
+		encyclopedia_icon.visible = encyclopedia_icon.texture != null
 		encyclopedia_button.add_theme_constant_override("h_separation", 0)
 
 	if current_tackle_button != null:
@@ -3424,6 +3639,18 @@ func _ensure_side_menu_icon(button: Button) -> TextureRect:
 		icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		button.add_child(icon_rect)
+	return icon_rect
+
+func _ensure_button_overlay_icon(button: Button, node_name: String) -> TextureRect:
+	var icon_rect := button.get_node_or_null(node_name) as TextureRect
+	if icon_rect == null:
+		icon_rect = TextureRect.new()
+		icon_rect.name = node_name
+		icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon_rect.z_index = 1
 		button.add_child(icon_rect)
 	return icon_rect
 
@@ -3946,6 +4173,7 @@ func _can_begin_cast_charge() -> bool:
 func _start_cast_charge() -> void:
 	if not _can_begin_cast_charge():
 		return
+	_close_quick_tackle_radial()
 	_cast_charge_active = true
 	_cast_charge_hold_time = 0.0
 	_cast_charge_power = MIN_CAST_POWER
@@ -4275,6 +4503,7 @@ func _setup_layout() -> void:
 		shop_money_label,
 		shop_bait_category_button,
 		shop_consumable_category_button,
+		shop_clothing_category_button,
 		shop_tackle_category_button,
 		shop_line_category_button,
 		shop_leader_category_button,
@@ -5542,7 +5771,7 @@ func _setup_layout() -> void:
 	var shop_inner_width: float = shop_width - shop_padding * 2.0
 	var shop_category_y := 64.0
 	var shop_category_gap := 9.0
-	var shop_category_columns := 7
+	var shop_category_columns := 8
 	var shop_category_width: float = (shop_inner_width - shop_category_gap * float(shop_category_columns - 1)) / float(shop_category_columns)
 	var shop_category_height := 42.0
 	var shop_items_y := 124.0
@@ -5569,23 +5798,28 @@ func _setup_layout() -> void:
 	shop_consumable_category_button.size = Vector2(shop_category_width, shop_category_height)
 	shop_consumable_category_button.add_theme_font_size_override("font_size", 12)
 
-	shop_tackle_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 2.0, shop_category_y)
+	if shop_clothing_category_button != null:
+		shop_clothing_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 2.0, shop_category_y)
+		shop_clothing_category_button.size = Vector2(shop_category_width, shop_category_height)
+		shop_clothing_category_button.add_theme_font_size_override("font_size", 12)
+
+	shop_tackle_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 3.0, shop_category_y)
 	shop_tackle_category_button.size = Vector2(shop_category_width, shop_category_height)
 	shop_tackle_category_button.add_theme_font_size_override("font_size", 12)
 
-	shop_line_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 3.0, shop_category_y)
+	shop_line_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 4.0, shop_category_y)
 	shop_line_category_button.size = Vector2(shop_category_width, shop_category_height)
 	shop_line_category_button.add_theme_font_size_override("font_size", 12)
 
-	shop_leader_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 4.0, shop_category_y)
+	shop_leader_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 5.0, shop_category_y)
 	shop_leader_category_button.size = Vector2(shop_category_width, shop_category_height)
 	shop_leader_category_button.add_theme_font_size_override("font_size", 12)
 
-	shop_hook_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 5.0, shop_category_y)
+	shop_hook_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 6.0, shop_category_y)
 	shop_hook_category_button.size = Vector2(shop_category_width, shop_category_height)
 	shop_hook_category_button.add_theme_font_size_override("font_size", 12)
 
-	shop_float_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 6.0, shop_category_y)
+	shop_float_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 7.0, shop_category_y)
 	shop_float_category_button.size = Vector2(shop_category_width, shop_category_height)
 	shop_float_category_button.add_theme_font_size_override("font_size", 12)
 
@@ -5794,7 +6028,9 @@ func _connect_signals() -> void:
 	inventory_item_list.item_selected.connect(_on_inventory_item_selected)
 	shop_close_button.pressed.connect(_on_shop_close_button_pressed)
 	shop_bait_category_button.pressed.connect(_set_shop_category.bind("bait"))
-	shop_consumable_category_button.pressed.connect(_set_shop_category.bind("consumable"))
+	shop_consumable_category_button.pressed.connect(_set_shop_category.bind("food"))
+	if shop_clothing_category_button != null:
+		shop_clothing_category_button.pressed.connect(_set_shop_category.bind("clothing"))
 	shop_tackle_category_button.pressed.connect(_set_shop_category.bind("rod"))
 	shop_line_category_button.pressed.connect(_set_shop_category.bind("line"))
 	shop_leader_category_button.pressed.connect(_set_shop_category.bind("leader"))
@@ -5827,6 +6063,10 @@ func _connect_signals() -> void:
 	category_floats_button.pressed.connect(_set_inventory_category.bind("float"))
 	category_hooks_button.pressed.connect(_set_inventory_category.bind("hook"))
 	category_baits_button.pressed.connect(_set_inventory_category.bind("bait"))
+	if category_food_button != null:
+		category_food_button.pressed.connect(_set_inventory_category.bind("food"))
+	if category_clothing_button != null:
+		category_clothing_button.pressed.connect(_set_inventory_category.bind("clothing"))
 	category_fish_button.pressed.connect(_set_inventory_category.bind("fish"))
 	category_misc_button.pressed.connect(_set_inventory_category.bind("misc"))
 
@@ -5846,6 +6086,14 @@ func _connect_signals() -> void:
 	FishingManager.bite_window_updated.connect(_on_bite_window_updated)
 	FishingManager.hook_success.connect(_on_hook_success)
 	FishingManager.hook_failed.connect(_on_hook_failed)
+	var condition_manager := get_node_or_null("/root/PlayerConditionManager")
+	if condition_manager != null:
+		var condition_changed_callback := Callable(self, "_on_player_condition_changed")
+		var condition_warning_callback := Callable(self, "_on_player_condition_warning")
+		if condition_manager.has_signal("condition_changed") and not condition_manager.condition_changed.is_connected(condition_changed_callback):
+			condition_manager.condition_changed.connect(condition_changed_callback)
+		if condition_manager.has_signal("condition_warning") and not condition_manager.condition_warning.is_connected(condition_warning_callback):
+			condition_manager.condition_warning.connect(condition_warning_callback)
 
 func _update_ui() -> void:
 	fishing_hud_ui._update_ui()
@@ -5854,7 +6102,16 @@ func _update_ui() -> void:
 		if quick_tackle_panel.has_method("refresh"):
 			quick_tackle_panel.call("refresh")
 	_refresh_current_tackle_hud()
+	_refresh_condition_hud()
 	_refresh_stop_fishing_button_presentation()
+
+
+func _on_player_condition_changed(_state: Dictionary) -> void:
+	_refresh_condition_hud()
+
+
+func _on_player_condition_warning(message: String, _warning_id: String) -> void:
+	_show_toast(message, false)
 
 
 func _grant_alpha_tester_bonus_if_needed() -> void:
@@ -6916,12 +7173,44 @@ func _on_spot_selected(index: int) -> void:
 	_update_ui()
 	_show_first_run_hint("cast")
 
+func _get_player_condition_cast_block_reason() -> String:
+	var condition_manager := get_node_or_null("/root/PlayerConditionManager")
+	if condition_manager == null:
+		return ""
+	if condition_manager.has_method("can_start_fishing") and bool(condition_manager.call("can_start_fishing")):
+		return ""
+	if condition_manager.has_method("get_fishing_block_message"):
+		return str(condition_manager.call("get_fishing_block_message"))
+	return "Вы слишком плохо себя чувствуете. Нужно уйти с водоёма и восстановиться."
+
+func _show_condition_cast_block_popup(message: String) -> void:
+	if failure_popup_ui == null or not failure_popup_ui.has_method("show"):
+		return
+	var lines := message.split("\n", false)
+	var primary_message := message
+	var hint := "Перекусить, выпить, открыть инвентарь, зайти в дом рыбака или отдохнуть."
+	if not lines.is_empty():
+		primary_message = str(lines[0])
+	if lines.size() > 1:
+		var hint_lines: Array = []
+		for index in range(1, lines.size()):
+			hint_lines.append(str(lines[index]))
+		hint = "\n".join(hint_lines)
+	failure_popup_ui.show({
+		"title": "Плохое самочувствие",
+		"message": primary_message,
+		"raw_message": primary_message,
+		"hint": hint,
+		"severity": "high"
+	})
+
 func _on_fish_button_pressed(cast_power: float = MIN_CAST_POWER, cast_hold_time: float = 0.0) -> void:
 	if _is_catch_reward_open():
 		return
 
 	if is_cast_animating:
 		return
+	_close_quick_tackle_radial()
 
 	if _fishing_ui_state == FishingUiState.CAUGHT:
 		if _has_pending_catch_reward():
@@ -6949,6 +7238,15 @@ func _on_fish_button_pressed(cast_power: float = MIN_CAST_POWER, cast_hold_time:
 
 	var selected_index := spot_option_button.selected
 	PlayerData.set_current_spot(str(spot_option_button.get_item_metadata(selected_index)))
+
+	var condition_block_reason := _get_player_condition_cast_block_reason()
+	if condition_block_reason != "":
+		result_label.text = condition_block_reason
+		_show_condition_cast_block_popup(condition_block_reason)
+		_show_toast(condition_block_reason, false)
+		timer_label.text = "Готов к забросу"
+		_update_ui()
+		return
 
 	var tackle_block_reason := PlayerData.get_tackle_block_reason()
 	if tackle_block_reason != "":
@@ -7106,6 +7404,34 @@ func _open_screen_via_navigation(screen_id: String) -> bool:
 	navigation_controller.open_screen(screen_id)
 	return true
 
+func _set_map_return_target_for_screen(screen_id: String, waterbody_id: String, spot_id: String = "") -> void:
+	var id := screen_id.strip_edges().to_lower()
+	if id != "shop" and id != "harbor":
+		_clear_map_return_target()
+		return
+
+	_map_return_screen_id = id
+	_map_return_waterbody_id = waterbody_id if waterbody_id != "" else PlayerData.current_waterbody
+	_map_return_spot_id = spot_id if spot_id != "" else PlayerData.current_spot
+
+func _clear_map_return_target() -> void:
+	_map_return_screen_id = ""
+	_map_return_waterbody_id = ""
+	_map_return_spot_id = ""
+
+func _restore_map_after_screen_close(screen_id: String) -> bool:
+	if _map_return_screen_id != screen_id:
+		return false
+
+	var waterbody_id := _map_return_waterbody_id
+	var spot_id := _map_return_spot_id
+	_clear_map_return_target()
+
+	if waterbody_ui == null or not waterbody_ui.has_method("open_waterbody_map"):
+		return false
+
+	return bool(waterbody_ui.call("open_waterbody_map", waterbody_id, spot_id, true))
+
 
 func _open_fishing_screen() -> void:
 	if _should_ignore_base_ui_press():
@@ -7120,6 +7446,9 @@ func _open_fishing_screen() -> void:
 
 
 func close_game_panels_before_opening_new_one(_screen_id: String = "") -> void:
+	if _map_return_screen_id != "" and _screen_id != _map_return_screen_id:
+		_clear_map_return_target()
+	_close_quick_tackle_radial(false)
 	if system_menu_ui != null:
 		system_menu_ui.close_menu()
 	if _is_catch_reward_open():
@@ -7142,8 +7471,7 @@ func _close_profile_and_encyclopedia(reset_nav: bool = false) -> void:
 
 func _prepare_for_menu_open(menu_name: String) -> void:
 	_hide_current_tackle_popup()
-	if quick_tackle_panel != null and quick_tackle_panel.has_method("hide_popup"):
-		quick_tackle_panel.call("hide_popup")
+	_close_quick_tackle_radial(false)
 	if popup_manager != null and popup_manager.has_method("prepare_for_menu_open"):
 		popup_manager.prepare_for_menu_open(menu_name)
 		return
@@ -7187,7 +7515,7 @@ func _open_inventory() -> void:
 	inventory_ui.open()
 
 func can_quick_change_tackle() -> bool:
-	return not _should_ignore_base_ui_press() and _fishing_ui_state == FishingUiState.IDLE and not is_cast_animating
+	return not _should_ignore_base_ui_press() and _fishing_ui_state == FishingUiState.IDLE and not is_cast_animating and not _cast_charge_active
 
 func refresh_after_quick_tackle_change() -> void:
 	_update_ui()
@@ -7415,6 +7743,7 @@ func _open_encyclopedia() -> void:
 	if _should_ignore_base_ui_press():
 		return
 
+	_close_quick_tackle_radial(false)
 	_hide_current_tackle_popup()
 	if profile_ui != null:
 		profile_ui.close(false)
@@ -7445,6 +7774,7 @@ func _open_profile() -> void:
 	if _should_ignore_base_ui_press():
 		return
 
+	_close_quick_tackle_radial(false)
 	_hide_current_tackle_popup()
 	if encyclopedia_ui != null:
 		encyclopedia_ui.close(false)
@@ -7456,6 +7786,7 @@ func _open_profile() -> void:
 func _open_settings() -> void:
 	if _should_ignore_base_ui_press():
 		return
+	_close_quick_tackle_radial(false)
 	if system_menu_ui != null and system_menu_ui.has_method("open_settings"):
 		system_menu_ui.open_settings()
 	elif system_menu_ui != null and system_menu_ui.has_method("_on_settings_pressed"):
@@ -7585,6 +7916,17 @@ func _on_inventory_item_selected(index: int) -> void:
 
 func _on_inventory_equip_button_pressed() -> void:
 	var selected_item := _get_selected_inventory_item()
+	var selected_category := str(selected_item.get("category", ""))
+	if ["food", "drink", "clothing", "shelter"].has(selected_category):
+		var result: Dictionary = PlayerData.use_survival_item(str(selected_item.get("id", ""))) if PlayerData.has_method("use_survival_item") else {"success": false, "message": "Действие недоступно."}
+		var success := bool(result.get("success", false))
+		var message := str(result.get("message", "Действие недоступно."))
+		result_label.text = message
+		_show_toast(message, success)
+		if success:
+			SaveManager.save_game()
+		_update_ui()
+		return
 	var validation_service := get_node_or_null("/root/TackleValidationService")
 	var block_reason := str(validation_service.call("get_equip_block_reason", "", selected_item)) if validation_service != null and validation_service.has_method("get_equip_block_reason") else PlayerData.get_equip_block_reason(selected_item)
 

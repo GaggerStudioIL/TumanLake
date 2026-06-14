@@ -1,5 +1,8 @@
 extends Control
 
+const TRACK_TEXTURE: Texture2D = preload("res://assets/ui/sprites/hud/progress_track.png")
+const FILL_TEXTURE: Texture2D = preload("res://assets/ui/sprites/hud/progress_fill_green.png")
+
 var level_label: Label
 var xp_label: Label
 var level: int = 1
@@ -63,22 +66,22 @@ func _draw() -> void:
 		return
 
 	var flash_alpha: float = clampf(flash_timer / 1.35, 0.0, 1.0)
-	var bg_color: Color = Color(0.012, 0.026, 0.026, 0.72 + flash_alpha * 0.08)
-	var border_color: Color = Color(0.58, 0.96, 0.82, 0.22 + flash_alpha * 0.28)
-	var fill_color: Color = Color(0.38, 0.95, 0.62, 0.82)
-	var glow_color: Color = Color(0.64, 1.0, 0.72, 0.18 + flash_alpha * 0.30)
+	var bar_height: float = clampf(rect.size.y * 0.22, 6.0, 8.0)
+	var bar_y: float = rect.size.y - bar_height - 1.0
+	var bar_rect := Rect2(Vector2.ZERO, Vector2(rect.size.x, bar_height))
+	bar_rect.position.y = bar_y
 
-	draw_rect(rect, bg_color, true)
-	draw_rect(Rect2(Vector2.ZERO, Vector2(rect.size.x, 1.0)), border_color, true)
+	draw_texture_rect(TRACK_TEXTURE, bar_rect, false, Color(0.78, 1.0, 0.86, 0.86 + flash_alpha * 0.10))
+	draw_rect(Rect2(Vector2(0.0, bar_y - 1.0), Vector2(rect.size.x, 1.0)), Color(0.48, 0.90, 0.68, 0.16 + flash_alpha * 0.18), true)
 
 	var fill_width: float = floorf(rect.size.x * clampf(display_ratio, 0.0, 1.0))
 	if fill_width > 0.0:
-		draw_rect(Rect2(Vector2.ZERO, Vector2(fill_width, rect.size.y)), Color(fill_color.r, fill_color.g, fill_color.b, 0.38), true)
-		draw_rect(Rect2(Vector2(0.0, rect.size.y - 3.0), Vector2(fill_width, 3.0)), fill_color, true)
-		draw_rect(Rect2(Vector2(0.0, 1.0), Vector2(fill_width, maxf(rect.size.y - 2.0, 1.0))), glow_color, true)
+		var fill_rect := Rect2(bar_rect.position, Vector2(fill_width, bar_rect.size.y))
+		draw_texture_rect(FILL_TEXTURE, fill_rect, false, Color(0.64, 1.0, 0.72, 0.90))
+		draw_rect(Rect2(Vector2(0.0, bar_y), Vector2(fill_width, 1.0)), Color(0.88, 1.0, 0.78, 0.24 + flash_alpha * 0.22), true)
 
 	if flash_alpha > 0.01:
-		draw_rect(rect, Color(0.78, 1.0, 0.62, flash_alpha * 0.14), true)
+		draw_texture_rect(TRACK_TEXTURE, bar_rect.grow(1.0), false, Color(0.78, 1.0, 0.62, flash_alpha * 0.16))
 
 
 func _ensure_children() -> void:
@@ -87,8 +90,8 @@ func _ensure_children() -> void:
 		level_label.name = "LevelLabel"
 		level_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		level_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		level_label.add_theme_font_size_override("font_size", 11)
+		level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		level_label.add_theme_font_size_override("font_size", 12)
 		level_label.add_theme_color_override("font_color", Color(0.92, 1.0, 0.88, 0.98))
 		level_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.72))
 		level_label.add_theme_constant_override("shadow_offset_x", 1)
@@ -100,8 +103,8 @@ func _ensure_children() -> void:
 		xp_label.name = "XpLabel"
 		xp_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		xp_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		xp_label.add_theme_font_size_override("font_size", 11)
+		xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		xp_label.add_theme_font_size_override("font_size", 12)
 		xp_label.add_theme_color_override("font_color", Color(0.86, 1.0, 0.88, 0.95))
 		xp_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.72))
 		xp_label.add_theme_constant_override("shadow_offset_x", 1)
@@ -111,11 +114,15 @@ func _ensure_children() -> void:
 
 func _layout_children() -> void:
 	_ensure_children()
-	var padding_x: float = maxf(size.x * 0.018, 12.0)
-	level_label.position = Vector2(padding_x, 0.0)
-	level_label.size = Vector2(108.0, size.y)
-	xp_label.position = Vector2(size.x * 0.5, 0.0)
-	xp_label.size = Vector2(size.x * 0.5 - padding_x, size.y)
+	var label_height: float = maxf(size.y - 10.0, 16.0)
+	var label_width: float = minf(size.x - 24.0, 286.0)
+	var level_width: float = 82.0
+	var gap: float = 8.0
+	var start_x: float = maxf((size.x - label_width) * 0.5, 12.0)
+	level_label.position = Vector2(start_x, 0.0)
+	level_label.size = Vector2(level_width, label_height)
+	xp_label.position = Vector2(start_x + level_width + gap, 0.0)
+	xp_label.size = Vector2(maxf(label_width - level_width - gap, 120.0), label_height)
 
 
 func _update_labels() -> void:

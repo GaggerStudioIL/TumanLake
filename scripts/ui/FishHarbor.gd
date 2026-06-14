@@ -73,6 +73,9 @@ func close(reset_nav: bool = true) -> void:
 	visible = false
 	if main != null and main.has_method("close_modal"):
 		main.close_modal("fish_harbor")
+	if reset_nav and main != null and main.has_method("_restore_map_after_screen_close") and main._restore_map_after_screen_close("harbor"):
+		closed.emit()
+		return
 	if reset_nav and main != null:
 		main._active_nav_tab = "fish"
 		if main.has_method("_refresh_bottom_nav_styles"):
@@ -1410,7 +1413,7 @@ func _create_supplier_card(item: Dictionary) -> Panel:
 
 	var accepts := _short_supplier_accepts(str(item.get("id", "")), str(item.get("accepts_text", "")))
 	var contracts := _short_supplier_contracts(str(item.get("id", "")), str(item.get("contracts_text", "")))
-	var unlock_text := "Открыт: сразу" if unlocked else str(item.get("unlock_text", "Откроется: репутация %d" % int(item.get("min_reputation", 0))))
+	var unlock_text := str(item.get("unlock_text", "Открыт: сразу" if unlocked else "Откроется: репутация %d" % int(item.get("min_reputation", 0))))
 	var body := _make_label("Принимает: %s\nКонтракты: %s\n%s" % [accepts, contracts, unlock_text], 12, Color(0.78, 0.88, 0.82, 0.95) if unlocked else Color(0.58, 0.66, 0.62, 0.86))
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -2143,6 +2146,16 @@ func _short_rejection_reason(reason: String) -> String:
 	var text := reason.strip_edges()
 	if text.is_empty():
 		return "не принимает"
+	var total_progress_prefix := "Общая репутация:"
+	if text.contains(total_progress_prefix):
+		var start := text.find(total_progress_prefix)
+		var progress := text.substr(start).replace(".", "").strip_edges()
+		if progress.length() <= 28:
+			return progress
+		return progress.substr(0, 27) + "..."
+	var total_reputation_prefix := "Откроется при общей репутации "
+	if text.begins_with(total_reputation_prefix):
+		return "Общая репутация %s" % text.substr(total_reputation_prefix.length()).replace(".", "").strip_edges()
 	var reputation_prefix := "Откроется при репутации "
 	if text.begins_with(reputation_prefix):
 		return "Репутация %s" % text.substr(reputation_prefix.length())

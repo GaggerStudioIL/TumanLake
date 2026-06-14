@@ -17,6 +17,12 @@ var main
 var theme
 var global_map_ui
 var visual_map_ui
+var fisher_home_backdrop: ColorRect
+var fisher_home_panel: Panel
+var fisher_home_title_label: Label
+var fisher_home_body_label: Label
+var fisher_home_rest_button: Button
+var fisher_home_close_button: Button
 var _map_mode := "waterbody"
 
 func setup(main_ref) -> void:
@@ -26,18 +32,23 @@ func setup(main_ref) -> void:
 	_ensure_waterbody_spot_pager_nodes()
 
 func open() -> void:
-	if main._is_catch_reward_open() or main.map_button.disabled:
-		return
+	open_waterbody_map(PlayerData.current_waterbody, PlayerData.current_spot)
+
+func open_waterbody_map(waterbody_id: String = "", spot_id: String = "", ignore_button_disabled: bool = false) -> bool:
+	if main._is_catch_reward_open() or (not ignore_button_disabled and main.map_button.disabled):
+		return false
 
 	main.open_modal("map")
 	main._active_nav_tab = "map"
 	main.waterbody_backdrop.visible = true
 	main.waterbody_panel.visible = true
-	main._selected_waterbody_id = PlayerData.current_waterbody
-	main._selected_waterbody_spot_id = PlayerData.current_spot
-	_show_waterbody_map(PlayerData.current_waterbody)
+	var target_waterbody_id := waterbody_id if waterbody_id != "" else PlayerData.current_waterbody
+	main._selected_waterbody_id = target_waterbody_id
+	main._selected_waterbody_spot_id = spot_id if spot_id != "" else PlayerData.current_spot
+	_show_waterbody_map(target_waterbody_id)
 	refresh()
 	main._refresh_bottom_nav_styles()
+	return true
 
 func close() -> void:
 	if main == null or main.waterbody_panel == null:
@@ -49,6 +60,7 @@ func close() -> void:
 		global_map_ui.visible = false
 	if visual_map_ui != null:
 		visual_map_ui.visible = false
+	_hide_fisher_home_panel()
 	main.close_modal("map")
 	main._active_nav_tab = "fish"
 	main._refresh_bottom_nav_styles()
@@ -94,7 +106,61 @@ func _ensure_waterbody_ui_nodes() -> void:
 	visual_map_ui.connect("global_requested", Callable(self, "_show_global_map"))
 	visual_map_ui.connect("shop_requested", Callable(self, "_on_visual_shop_requested"))
 	visual_map_ui.connect("harbor_requested", Callable(self, "_on_visual_harbor_requested"))
+	visual_map_ui.connect("fisher_home_requested", Callable(self, "_on_visual_fisher_home_requested"))
 	visual_map_ui.connect("close_requested", Callable(self, "_on_visual_close_requested"))
+	_ensure_fisher_home_nodes()
+
+func _ensure_fisher_home_nodes() -> void:
+	if fisher_home_panel != null:
+		return
+
+	fisher_home_backdrop = ColorRect.new()
+	fisher_home_backdrop.name = "FisherHomeBackdrop"
+	fisher_home_backdrop.visible = false
+	fisher_home_backdrop.color = Color(0.0, 0.0, 0.0, 0.22)
+	fisher_home_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	fisher_home_backdrop.z_index = 30
+	main.waterbody_panel.add_child(fisher_home_backdrop)
+	fisher_home_backdrop.gui_input.connect(_on_fisher_home_backdrop_gui_input)
+
+	fisher_home_panel = Panel.new()
+	fisher_home_panel.name = "FisherHomePanel"
+	fisher_home_panel.visible = false
+	fisher_home_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	fisher_home_panel.z_index = 31
+	main.waterbody_panel.add_child(fisher_home_panel)
+
+	fisher_home_title_label = Label.new()
+	fisher_home_title_label.name = "FisherHomeTitle"
+	fisher_home_title_label.text = "Дом рыбака"
+	fisher_home_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	fisher_home_title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	fisher_home_title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fisher_home_panel.add_child(fisher_home_title_label)
+
+	fisher_home_body_label = Label.new()
+	fisher_home_body_label.name = "FisherHomeBody"
+	fisher_home_body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	fisher_home_body_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	fisher_home_body_label.clip_text = true
+	fisher_home_body_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fisher_home_panel.add_child(fisher_home_body_label)
+
+	fisher_home_rest_button = Button.new()
+	fisher_home_rest_button.name = "FisherHomeRestButton"
+	fisher_home_rest_button.text = "Отдыхать"
+	fisher_home_rest_button.focus_mode = Control.FOCUS_NONE
+	fisher_home_panel.add_child(fisher_home_rest_button)
+	fisher_home_rest_button.pressed.connect(_on_fisher_home_rest_pressed)
+
+	fisher_home_close_button = Button.new()
+	fisher_home_close_button.name = "FisherHomeCloseButton"
+	fisher_home_close_button.text = "Закрыть"
+	fisher_home_close_button.focus_mode = Control.FOCUS_NONE
+	fisher_home_panel.add_child(fisher_home_close_button)
+	fisher_home_close_button.pressed.connect(_hide_fisher_home_panel)
+
+	_apply_fisher_home_panel_style()
 
 func _create_legacy_nodes() -> void:
 	main.waterbody_title_label = Label.new()
@@ -225,6 +291,153 @@ func _layout_visual_roots() -> void:
 			root.call("layout_global")
 		if root.has_method("layout_map"):
 			root.call("layout_map")
+	_layout_fisher_home_panel(screen_size)
+
+func _layout_fisher_home_panel(screen_size: Vector2) -> void:
+	if fisher_home_panel == null:
+		return
+
+	if fisher_home_backdrop != null:
+		fisher_home_backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+		fisher_home_backdrop.position = Vector2.ZERO
+		fisher_home_backdrop.size = screen_size
+		fisher_home_backdrop.offset_left = 0.0
+		fisher_home_backdrop.offset_top = 0.0
+		fisher_home_backdrop.offset_right = 0.0
+		fisher_home_backdrop.offset_bottom = 0.0
+
+	var ui_scale: float = clampf(min(screen_size.x / 960.0, screen_size.y / 540.0), 0.86, 1.16)
+	var panel_size := Vector2(
+		clampf(screen_size.x * 0.44, 360.0, 560.0),
+		clampf(screen_size.y * 0.40, 270.0, 340.0)
+	)
+	fisher_home_panel.position = (screen_size - panel_size) * 0.5
+	fisher_home_panel.size = panel_size
+	fisher_home_panel.custom_minimum_size = panel_size
+	_apply_fisher_home_panel_style()
+
+	var padding := clampf(22.0 * ui_scale, 18.0, 26.0)
+	var button_height := clampf(42.0 * ui_scale, 38.0, 46.0)
+	var button_gap := clampf(12.0 * ui_scale, 10.0, 14.0)
+	var close_width := clampf(118.0 * ui_scale, 108.0, 132.0)
+	var rest_width := clampf(156.0 * ui_scale, 138.0, 178.0)
+	var footer_y := panel_size.y - padding - button_height
+	var body_y := 62.0 * ui_scale
+
+	fisher_home_title_label.position = Vector2(padding, 14.0 * ui_scale)
+	fisher_home_title_label.size = Vector2(panel_size.x - padding * 2.0, 38.0 * ui_scale)
+	fisher_home_title_label.add_theme_font_size_override("font_size", int(clampf(24.0 * ui_scale, 22.0, 28.0)))
+	fisher_home_title_label.add_theme_color_override("font_color", Color(0.94, 1.0, 0.90, 1.0))
+	fisher_home_title_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.72))
+	fisher_home_title_label.add_theme_constant_override("shadow_offset_x", 1)
+	fisher_home_title_label.add_theme_constant_override("shadow_offset_y", 1)
+
+	fisher_home_body_label.position = Vector2(padding, body_y)
+	fisher_home_body_label.size = Vector2(panel_size.x - padding * 2.0, maxf(footer_y - body_y - 14.0, 120.0))
+	fisher_home_body_label.add_theme_font_size_override("font_size", int(clampf(15.0 * ui_scale, 14.0, 17.0)))
+	fisher_home_body_label.add_theme_color_override("font_color", Color(0.82, 0.94, 0.84, 0.96))
+
+	var actions_width := rest_width + button_gap + close_width
+	var actions_x := panel_size.x - padding - actions_width
+	fisher_home_rest_button.position = Vector2(actions_x, footer_y)
+	fisher_home_rest_button.size = Vector2(rest_width, button_height)
+	fisher_home_rest_button.add_theme_font_size_override("font_size", int(clampf(15.0 * ui_scale, 14.0, 17.0)))
+	_apply_fisher_home_button_style(fisher_home_rest_button, true)
+
+	fisher_home_close_button.position = Vector2(actions_x + rest_width + button_gap, footer_y)
+	fisher_home_close_button.size = Vector2(close_width, button_height)
+	fisher_home_close_button.add_theme_font_size_override("font_size", int(clampf(15.0 * ui_scale, 14.0, 17.0)))
+	_apply_fisher_home_button_style(fisher_home_close_button, false)
+
+
+func _apply_fisher_home_panel_style() -> void:
+	if fisher_home_panel == null or main == null:
+		return
+	fisher_home_panel.add_theme_stylebox_override(
+		"panel",
+		main._make_panel_style(Color(0.018, 0.046, 0.040, 0.96), Color(0.70, 0.95, 0.72, 0.40), 12, 2, Color(0.0, 0.0, 0.0, 0.22))
+	)
+
+
+func _apply_fisher_home_button_style(button: Button, primary: bool) -> void:
+	if button == null or main == null:
+		return
+	if primary:
+		button.add_theme_stylebox_override("normal", main._make_panel_style(Color(0.24, 0.52, 0.16, 0.96), Color(0.68, 1.0, 0.58, 0.44), 8, 3, Color(0.0, 0.0, 0.0, 0.16)))
+		button.add_theme_stylebox_override("hover", main._make_panel_style(Color(0.30, 0.64, 0.20, 1.0), Color(0.78, 1.0, 0.66, 0.62), 8, 4, Color(0.18, 0.68, 0.22, 0.18)))
+		button.add_theme_stylebox_override("pressed", main._make_panel_style(Color(0.18, 0.40, 0.12, 1.0), Color(0.58, 0.88, 0.48, 0.52), 8, 1, Color(0.0, 0.0, 0.0, 0.12)))
+	else:
+		button.add_theme_stylebox_override("normal", main._make_panel_style(Color(0.05, 0.13, 0.12, 0.92), Color(0.58, 0.78, 0.68, 0.34), 8, 3, Color(0.0, 0.0, 0.0, 0.12)))
+		button.add_theme_stylebox_override("hover", main._make_panel_style(Color(0.08, 0.19, 0.16, 0.98), Color(0.72, 0.98, 0.76, 0.48), 8, 4, Color(0.18, 0.68, 0.22, 0.10)))
+		button.add_theme_stylebox_override("pressed", main._make_panel_style(Color(0.03, 0.10, 0.08, 1.0), Color(0.48, 0.74, 0.58, 0.42), 8, 1, Color(0.0, 0.0, 0.0, 0.12)))
+	button.add_theme_color_override("font_color", Color(0.94, 1.0, 0.90, 1.0))
+	button.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 0.94, 1.0))
+	button.add_theme_color_override("font_pressed_color", Color(0.86, 1.0, 0.82, 1.0))
+
+
+func _refresh_fisher_home_text() -> void:
+	if fisher_home_body_label == null:
+		return
+	var state := {
+		"health": float(PlayerData.health),
+		"body_temperature": float(PlayerData.body_temperature),
+		"hunger": float(PlayerData.hunger)
+	}
+	var condition_manager: Node = main.get_node_or_null("/root/PlayerConditionManager") if main != null else null
+	if condition_manager != null and condition_manager.has_method("get_condition_state"):
+		var raw_state = condition_manager.call("get_condition_state")
+		if raw_state is Dictionary:
+			state = (raw_state as Dictionary).duplicate(true)
+	var wellbeing := clampf(float(state.get("wellbeing", state.get("health", 100.0))), 0.0, 100.0)
+	var wellbeing_label := str(state.get("wellbeing_label", _get_fisher_home_wellbeing_label(wellbeing)))
+	fisher_home_body_label.text = "Здесь можно восстановиться перед следующей рыбалкой.\n\nСамочувствие: %s\nТемпература: %.1f°C\nГолод: %d%%" % [
+		wellbeing_label,
+		float(state.get("body_temperature", 36.6)),
+		roundi(float(state.get("hunger", 100.0)))
+	]
+
+
+func _get_fisher_home_wellbeing_label(value: float) -> String:
+	if value < 20.0:
+		return "Вымотан"
+	if value < 40.0:
+		return "Плохо"
+	if value < 65.0:
+		return "Устал"
+	if value < 90.0:
+		return "Нормально"
+	return "Отлично"
+
+
+func _show_fisher_home_panel() -> void:
+	_ensure_fisher_home_nodes()
+	_layout_fisher_home_panel(main.get_viewport_rect().size)
+	_refresh_fisher_home_text()
+	if fisher_home_backdrop != null:
+		fisher_home_backdrop.visible = true
+		fisher_home_backdrop.move_to_front()
+	if fisher_home_panel != null:
+		fisher_home_panel.visible = true
+		fisher_home_panel.move_to_front()
+
+
+func _hide_fisher_home_panel() -> void:
+	if fisher_home_backdrop != null:
+		fisher_home_backdrop.visible = false
+	if fisher_home_panel != null:
+		fisher_home_panel.visible = false
+
+
+func _on_fisher_home_backdrop_gui_input(event: InputEvent) -> void:
+	var should_close := false
+	if event is InputEventMouseButton:
+		should_close = event.pressed
+	elif event is InputEventScreenTouch:
+		should_close = event.pressed
+	if should_close:
+		_hide_fisher_home_panel()
+		if main != null:
+			main.get_viewport().set_input_as_handled()
 
 func _hide_legacy_nodes() -> void:
 	for node in [
@@ -244,10 +457,12 @@ func _hide_legacy_nodes() -> void:
 			node.visible = false
 
 func _show_global_map() -> void:
+	_hide_fisher_home_panel()
 	_map_mode = "global"
 	_update_waterbody_ui()
 
 func _show_waterbody_map(waterbody_id: String) -> void:
+	_hide_fisher_home_panel()
 	_map_mode = "waterbody"
 	main._selected_waterbody_id = waterbody_id
 	if main._selected_waterbody_spot_id == "":
@@ -306,15 +521,45 @@ func _on_visual_spot_selected(waterbody_id: String, spot_id: String) -> void:
 func _on_visual_close_requested() -> void:
 	main._on_waterbody_close_button_pressed()
 
+func _on_visual_fisher_home_requested() -> void:
+	_show_fisher_home_panel()
+
 func _on_visual_shop_requested() -> void:
+	_hide_fisher_home_panel()
 	_open_screen_from_map("shop")
 
 func _on_visual_harbor_requested() -> void:
+	_hide_fisher_home_panel()
 	_open_screen_from_map("harbor")
+
+func _on_fisher_home_rest_pressed() -> void:
+	if main == null:
+		return
+
+	var fishing_manager: Node = main.get_node_or_null("/root/FishingManager")
+	if fishing_manager != null and bool(fishing_manager.get("is_fishing")):
+		main._show_toast("Сначала закончите текущую ловлю", false)
+		return
+
+	var condition_manager: Node = main.get_node_or_null("/root/PlayerConditionManager")
+	if condition_manager != null and condition_manager.has_method("rest_at_agamim_cabin"):
+		var result: Dictionary = condition_manager.call("rest_at_agamim_cabin")
+		var success := bool(result.get("success", false))
+		var message := str(result.get("message", "Отдых сейчас недоступен."))
+		main._show_toast(message, success)
+		if success:
+			SaveManager.save_game()
+		main._update_ui()
+		_refresh_fisher_home_text()
+		return
+
+	main._show_toast("Отдых сейчас недоступен", false)
 
 func _open_screen_from_map(screen_id: String) -> void:
 	if main == null:
 		return
+	if main.has_method("_set_map_return_target_for_screen"):
+		main._set_map_return_target_for_screen(screen_id, main._selected_waterbody_id, main._selected_waterbody_spot_id)
 	if main.has_method("_open_screen_via_navigation") and main._open_screen_via_navigation(screen_id):
 		return
 	if main.has_method("close_game_panels_before_opening_new_one"):

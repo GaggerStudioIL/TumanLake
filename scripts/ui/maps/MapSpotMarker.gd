@@ -8,6 +8,7 @@ var spot_id := ""
 var spot_data: Dictionary = {}
 var unlocked := true
 var current := false
+var baked_map_controls := false
 
 var marker_button: Button
 var info_button: Button
@@ -18,6 +19,11 @@ var _current_arrow_start := Vector2.ZERO
 var _current_arrow_tip := Vector2.ZERO
 var _current_marker_position := Vector2.ZERO
 var _current_marker_radius := 0.0
+
+func set_baked_map_controls(value: bool) -> void:
+	baked_map_controls = value
+	if marker_button != null:
+		_refresh_state()
 
 func setup_marker(new_waterbody_id: String, new_spot: Dictionary, is_unlocked: bool, is_current: bool) -> void:
 	waterbody_id = new_waterbody_id
@@ -34,8 +40,13 @@ func layout_marker(map_rect: Rect2, marker_size: float, info_size: float) -> voi
 
 	var marker_position := _get_normalized_position("map_position", Vector2(0.5, 0.5)) * map_rect.size
 	var info_position := _get_normalized_position("info_position", _get_default_info_position()) * map_rect.size
-	marker_button.position = marker_position - Vector2(marker_size, marker_size) * 0.5
-	marker_button.size = Vector2(marker_size, marker_size)
+	if baked_map_controls:
+		var marker_hitbox_size := Vector2(maxf(marker_size * 2.80, 96.0), maxf(marker_size * 1.58, 58.0))
+		marker_button.position = marker_position + Vector2(0.0, marker_size * 0.28) - marker_hitbox_size * 0.5
+		marker_button.size = marker_hitbox_size
+	else:
+		marker_button.position = marker_position - Vector2(marker_size, marker_size) * 0.5
+		marker_button.size = Vector2(marker_size, marker_size)
 	lock_badge.position = marker_button.position + Vector2(marker_size - 15.0, -3.0)
 	lock_badge.size = Vector2(18.0, 18.0)
 	info_button.position = info_position - Vector2(info_size, info_size) * 0.5
@@ -88,8 +99,8 @@ func _refresh_state() -> void:
 	var spot_name := str(spot_data.get("name", spot_id))
 	marker_button.tooltip_text = spot_name
 	info_button.tooltip_text = "Информация: %s" % spot_name
-	lock_badge.visible = not unlocked
-	current_label.visible = current
+	lock_badge.visible = not unlocked and not baked_map_controls
+	current_label.visible = current and not baked_map_controls
 	z_index = 10 if current else 0
 
 	# The lake map already contains the marker art, so this button is only a touch target.
@@ -99,11 +110,23 @@ func _refresh_state() -> void:
 	marker_button.add_theme_stylebox_override("pressed", transparent_style)
 	marker_button.add_theme_stylebox_override("disabled", transparent_style)
 
-	info_button.add_theme_font_size_override("font_size", 14)
-	info_button.add_theme_color_override("font_color", Color(0.90, 1.0, 0.90, 1.0))
-	info_button.add_theme_stylebox_override("normal", _make_circle_style(Color(0.02, 0.05, 0.05, 0.80), Color(0.74, 0.98, 0.78, 0.70), 1))
-	info_button.add_theme_stylebox_override("hover", _make_circle_style(Color(0.06, 0.16, 0.10, 0.96), Color(0.92, 1.0, 0.78, 0.90), 2))
-	info_button.add_theme_stylebox_override("pressed", _make_circle_style(Color(0.03, 0.10, 0.06, 0.98), Color(0.70, 0.92, 0.66, 0.88), 1))
+	if baked_map_controls:
+		info_button.text = ""
+		info_button.add_theme_font_size_override("font_size", 1)
+		info_button.add_theme_color_override("font_color", Color.TRANSPARENT)
+		info_button.add_theme_color_override("font_hover_color", Color.TRANSPARENT)
+		info_button.add_theme_color_override("font_pressed_color", Color.TRANSPARENT)
+		info_button.add_theme_stylebox_override("normal", transparent_style)
+		info_button.add_theme_stylebox_override("hover", transparent_style)
+		info_button.add_theme_stylebox_override("pressed", transparent_style)
+		info_button.add_theme_stylebox_override("disabled", transparent_style)
+	else:
+		info_button.text = "i"
+		info_button.add_theme_font_size_override("font_size", 14)
+		info_button.add_theme_color_override("font_color", Color(0.90, 1.0, 0.90, 1.0))
+		info_button.add_theme_stylebox_override("normal", _make_circle_style(Color(0.02, 0.05, 0.05, 0.80), Color(0.74, 0.98, 0.78, 0.70), 1))
+		info_button.add_theme_stylebox_override("hover", _make_circle_style(Color(0.06, 0.16, 0.10, 0.96), Color(0.92, 1.0, 0.78, 0.90), 2))
+		info_button.add_theme_stylebox_override("pressed", _make_circle_style(Color(0.03, 0.10, 0.06, 0.98), Color(0.70, 0.92, 0.66, 0.88), 1))
 
 	lock_badge.add_theme_font_size_override("font_size", 12)
 	lock_badge.add_theme_color_override("font_color", Color(1.0, 0.86, 0.58, 1.0))
@@ -116,32 +139,28 @@ func _refresh_state() -> void:
 	current_label.add_theme_stylebox_override("normal", _make_current_label_style())
 
 func _draw() -> void:
+	if baked_map_controls:
+		return
 	if not current or current_label == null or not current_label.visible:
 		return
 
-	var glow_color := Color(1.0, 0.70, 0.18, 0.18)
-	var ring_color := Color(1.0, 0.78, 0.28, 0.92)
-	var highlight_color := Color(1.0, 0.97, 0.70, 0.70)
+	var arrow_color := Color(1.0, 0.78, 0.28, 0.92)
 	var shadow_color := Color(0.0, 0.0, 0.0, 0.44)
-	draw_circle(_current_marker_position, _current_marker_radius * 0.62, glow_color)
-	draw_arc(_current_marker_position, _current_marker_radius * 0.58, 0.0, TAU, 48, shadow_color, 5.0, true)
-	draw_arc(_current_marker_position, _current_marker_radius * 0.58, 0.0, TAU, 48, ring_color, 2.4, true)
-	draw_arc(_current_marker_position, _current_marker_radius * 0.44, 0.0, TAU, 48, highlight_color, 1.2, true)
 
 	if _current_arrow_start.distance_squared_to(_current_arrow_tip) <= 1.0:
 		return
 
 	draw_line(_current_arrow_start + Vector2(1.5, 2.0), _current_arrow_tip + Vector2(1.5, 2.0), shadow_color, 4.0, true)
-	draw_line(_current_arrow_start, _current_arrow_tip, ring_color, 2.4, true)
+	draw_line(_current_arrow_start, _current_arrow_tip, arrow_color, 2.4, true)
 	_draw_arrow_head(_current_arrow_tip + Vector2(1.5, 2.0), _current_arrow_start + Vector2(1.5, 2.0), shadow_color)
-	_draw_arrow_head(_current_arrow_tip, _current_arrow_start, ring_color)
+	_draw_arrow_head(_current_arrow_tip, _current_arrow_start, arrow_color)
 
 func _layout_current_indicator(marker_position: Vector2, marker_size: float) -> void:
 	if current_label == null:
 		return
 
-	current_label.visible = current
-	if not current:
+	current_label.visible = current and not baked_map_controls
+	if not current or baked_map_controls:
 		return
 
 	_current_marker_position = marker_position

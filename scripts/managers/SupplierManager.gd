@@ -17,6 +17,16 @@ const SUPPLIER_REPUTATION_BONUS_CAPS := {
 	"cannery": 0.03
 }
 
+const ACCESS_TOTAL_REPUTATION_REQUIREMENTS := {
+	"local_market": 0,
+	"fish_shop": 0,
+	"cannery": 10,
+	"restaurant": 30,
+	"wholesale_buyer": 60,
+	"collector": 120,
+	"export_company": 180
+}
+
 const SUPPLIERS := {
 	"local_market": {
 		"name": "Местный рынок",
@@ -54,32 +64,32 @@ const SUPPLIERS := {
 		"max_freshness_age_hours": -1.0,
 		"accepts_text": "Почти любая рыба, включая несвежую и почти испорченную.",
 		"contracts_text": "Массовые партии дешёвой и старой рыбы.",
-		"unlock_text": "Нужна репутация у консервного завода: 10."
+		"unlock_text": "Откроется при общей репутации 10."
 	},
 	"restaurant": {
 		"name": "Ресторан",
 		"description": "Платит выше за свежую зачётную рыбу ресторанных видов. Мелочь не принимает.",
 		"price_multiplier": 1.26,
 		"min_status": "keeper",
-		"min_reputation": 20,
+		"min_reputation": 30,
 		"accepted_fish_ids": ["bream", "zander", "pike", "catfish", "tench", "perch", "crucian", "eel"],
 		"accepted_rarity_types": [],
 		"accepts_text": "Свежую зачётную рыбу ресторанных видов.",
 		"contracts_text": "Поставки в трактир и праздничные заказы.",
-		"unlock_text": "Нужна репутация у ресторана: 20."
+		"unlock_text": "Откроется при общей репутации 30."
 	},
 	"wholesale_buyer": {
 		"name": "Коптильня",
 		"description": "Берёт массовую обычную рыбу среднего размера. Хороша для партий без редких бонусов.",
 		"price_multiplier": 1.14,
 		"min_status": "keeper",
-		"min_reputation": 30,
+		"min_reputation": 60,
 		"accepted_fish_ids": ["roach", "rudd", "perch", "crucian", "silver_crucian", "golden_crucian", "bream", "white_bream", "skimmer_bream", "tench"],
 		"accepted_rarity_types": ["common"],
 		"min_weight_kg": 0.4,
 		"accepts_text": "Обычную зачётную рыбу от 0.4 кг для копчения.",
 		"contracts_text": "Партии средней рыбы по общему весу.",
-		"unlock_text": "Нужна репутация у коптильни: 30."
+		"unlock_text": "Откроется при общей репутации 60."
 	},
 	"collector": {
 		"name": "Трофейный коллекционер",
@@ -92,7 +102,7 @@ const SUPPLIERS := {
 		"accepts_trophy_or_rare": true,
 		"accepts_text": "Редкие виды и любые трофейные экземпляры.",
 		"contracts_text": "Редкие заявки и трофейные поручения.",
-		"unlock_text": "Нужна репутация у коллекционера: 120."
+		"unlock_text": "Откроется при общей репутации 120."
 	},
 	"export_company": {
 		"name": "Редкий торговец",
@@ -104,7 +114,7 @@ const SUPPLIERS := {
 		"accepted_rarity_types": ["rare", "legendary_species"],
 		"accepts_text": "Зачётные редкие и легендарные виды.",
 		"contracts_text": "Редкие поставки с высоким чеком.",
-		"unlock_text": "Нужна репутация у редкого торговца: 180."
+		"unlock_text": "Откроется при общей репутации 180."
 	},
 	"factory": {
 		"name": "Переработка",
@@ -183,6 +193,14 @@ func get_primary_supplier_ids() -> Array:
 func get_supplier_title(supplier_id: String) -> String:
 	var supplier: Dictionary = get_supplier(supplier_id)
 	return str(supplier.get("name", supplier_id))
+
+
+func get_required_total_reputation(supplier_id: String) -> int:
+	return _get_required_total_reputation(supplier_id, get_supplier(supplier_id))
+
+
+func get_supplier_lock_reason(supplier_id: String) -> String:
+	return _get_total_reputation_lock_text(supplier_id, get_supplier(supplier_id))
 
 
 func is_buyer_unlocked(buyer_id: String) -> bool:
@@ -292,7 +310,7 @@ func get_buyer_offer(fish_instance: Dictionary, buyer_id: String) -> Dictionary:
 		return offer
 
 	if not _is_supplier_unlocked(buyer_id):
-		offer["reason"] = "Откроется при репутации %d" % int(supplier.get("min_reputation", 0))
+		offer["reason"] = _get_total_reputation_lock_text(buyer_id, supplier)
 		return offer
 
 	if not can_buy(prepared, buyer_id):
@@ -384,22 +402,27 @@ func get_supplier_reputation_bonus(supplier_id: String, reputation_override: int
 
 func get_supplier_summary(limit: int = 0) -> Array:
 	var items: Array = []
+	var total_reputation := _get_total_reputation()
 	for supplier_id in PRIMARY_SUPPLIER_IDS:
 		var supplier: Dictionary = get_supplier(str(supplier_id))
+		var required_total := _get_required_total_reputation(str(supplier_id), supplier)
+		var unlocked := _is_supplier_unlocked(str(supplier_id))
 		items.append({
 			"id": str(supplier_id),
 			"name": str(supplier.get("name", supplier_id)),
 			"description": str(supplier.get("description", "")),
 			"reputation": _get_reputation(str(supplier_id)),
-			"unlocked": _is_supplier_unlocked(str(supplier_id)),
-			"min_reputation": int(supplier.get("min_reputation", 0)),
+			"unlocked": unlocked,
+			"min_reputation": required_total,
+			"required_total_reputation": required_total,
+			"total_reputation": total_reputation,
 			"price_multiplier": float(supplier.get("price_multiplier", 1.0)),
 			"accepts_text": str(supplier.get("accepts_text", "Любой улов.")),
 			"contracts_text": str(supplier.get("contracts_text", "Поставки улова.")),
-			"unlock_text": str(supplier.get("unlock_text", "Открыт."))
+			"unlock_text": _get_supplier_unlock_text(str(supplier_id), supplier, unlocked, total_reputation)
 		})
 
-	items.sort_custom(func(a, b): return int(a.get("min_reputation", 0)) < int(b.get("min_reputation", 0)))
+	items.sort_custom(func(a, b): return int(a.get("required_total_reputation", 0)) < int(b.get("required_total_reputation", 0)))
 	if limit > 0 and items.size() > limit:
 		return items.slice(0, limit)
 	return items
@@ -414,7 +437,7 @@ func get_rejection_reason(catch_data: Dictionary, supplier_id: String) -> String
 	if supplier.is_empty():
 		return "Не принимает этот вид"
 	if not _is_supplier_unlocked(supplier_id):
-		return "Репутация %d" % int(supplier.get("min_reputation", 0))
+		return _get_total_reputation_lock_text(supplier_id, supplier)
 	if can_buy(catch_data, supplier_id):
 		return "Готово к продаже"
 	return _get_rejection_reason(catch_data, supplier_id)
@@ -424,10 +447,37 @@ func _is_supplier_unlocked(supplier_id: String) -> bool:
 	var supplier: Dictionary = get_supplier(supplier_id)
 	if supplier.is_empty():
 		return false
-	var required_reputation := int(supplier.get("min_reputation", 0))
-	if required_reputation <= 0:
+	var required_total_reputation := _get_required_total_reputation(supplier_id, supplier)
+	if required_total_reputation <= 0:
 		return true
-	return _get_reputation(supplier_id) >= required_reputation
+	return _get_total_reputation() >= required_total_reputation
+
+
+func _get_required_total_reputation(supplier_id: String, supplier: Dictionary = {}) -> int:
+	if ACCESS_TOTAL_REPUTATION_REQUIREMENTS.has(supplier_id):
+		return int(ACCESS_TOTAL_REPUTATION_REQUIREMENTS[supplier_id])
+	if not supplier.is_empty() and supplier.has("unlock_total_reputation"):
+		return int(supplier.get("unlock_total_reputation", 0))
+	return int(supplier.get("min_reputation", 0)) if not supplier.is_empty() else 0
+
+
+func _get_supplier_unlock_text(supplier_id: String, supplier: Dictionary, unlocked: bool, total_reputation: int = -1) -> String:
+	var required_total := _get_required_total_reputation(supplier_id, supplier)
+	if required_total <= 0:
+		return str(supplier.get("unlock_text", "Открыт сразу."))
+	var current_total := _get_total_reputation() if total_reputation < 0 else total_reputation
+	if unlocked:
+		return "Открыт: общая репутация %d / %d." % [current_total, required_total]
+	return "Откроется при общей репутации %d.\nОбщая репутация: %d / %d." % [required_total, current_total, required_total]
+
+
+func _get_total_reputation_lock_text(supplier_id: String, supplier: Dictionary = {}) -> String:
+	var data := supplier if not supplier.is_empty() else get_supplier(supplier_id)
+	var required_total := _get_required_total_reputation(supplier_id, data)
+	var current_total := _get_total_reputation()
+	if required_total <= 0:
+		return "Открыт сразу."
+	return "Откроется при общей репутации %d.\nОбщая репутация: %d / %d." % [required_total, current_total, required_total]
 
 
 func _get_rejection_reason(catch_data: Dictionary, supplier_id: String) -> String:

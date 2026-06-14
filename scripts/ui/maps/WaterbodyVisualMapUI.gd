@@ -4,11 +4,19 @@ signal spot_selected(waterbody_id: String, spot_id: String)
 signal global_requested
 signal shop_requested
 signal harbor_requested
+signal fisher_home_requested
 signal close_requested
 
 const MapSpotMarkerScript := preload("res://scripts/ui/maps/MapSpotMarker.gd")
 const SpotInfoPanelScript := preload("res://scripts/ui/maps/SpotInfoPanel.gd")
 const FALLBACK_MAP_TEXTURE: Texture2D = preload("res://assets/environment/lake/lake_bg_base.png.png")
+const BAKED_ACTION_BUTTON_RECTS := {
+	"waterbodies": Rect2(0.0146, 0.0222, 0.1302, 0.0630),
+	"home": Rect2(0.1604, 0.0222, 0.1292, 0.0630),
+	"shop": Rect2(0.6563, 0.0222, 0.1104, 0.0630),
+	"harbor": Rect2(0.7729, 0.0222, 0.1052, 0.0630),
+	"close": Rect2(0.8854, 0.0222, 0.1000, 0.0630)
+}
 
 var main
 var waterbody_data: Dictionary = {}
@@ -20,6 +28,7 @@ var marker_layer: Control
 var title_label: Label
 var placeholder_label: Label
 var waterbodies_button: Button
+var home_button: Button
 var shop_button: Button
 var harbor_button: Button
 var close_button: Button
@@ -52,6 +61,7 @@ func layout_map() -> void:
 	marker_layer.size = view_size
 	placeholder_label.position = Vector2(view_size.x * 0.5 - 210.0, view_size.y * 0.5 - 34.0)
 	placeholder_label.size = Vector2(420.0, 68.0)
+	var map_rect: Rect2 = _get_drawn_map_rect(view_size)
 
 	var top_margin: float = maxf(12.0, view_size.y * 0.024)
 	var top_button_y: float = top_margin + 2.0
@@ -60,22 +70,39 @@ func layout_map() -> void:
 	var edge_margin: float = maxf(18.0, view_size.x * 0.018)
 	var back_button_width: float = clampf(view_size.x * 0.142, 126.0, 150.0)
 	var menu_button_width: float = clampf(view_size.x * 0.112, 96.0, 124.0)
+	var home_button_width: float = clampf(view_size.x * 0.126, 112.0, 142.0)
 	var close_button_width: float = clampf(view_size.x * 0.098, 86.0, 104.0)
 
 	title_label.position = Vector2.ZERO
 	title_label.size = Vector2.ZERO
-	waterbodies_button.position = Vector2(edge_margin, top_button_y)
-	waterbodies_button.size = Vector2(back_button_width, top_button_height)
-	close_button.position = Vector2(view_size.x - edge_margin - close_button_width, top_button_y)
-	close_button.size = Vector2(close_button_width, top_button_height)
-	harbor_button.position = Vector2(close_button.position.x - top_button_gap - menu_button_width, top_button_y)
-	harbor_button.size = Vector2(menu_button_width, top_button_height)
-	shop_button.position = Vector2(harbor_button.position.x - top_button_gap - menu_button_width, top_button_y)
-	shop_button.size = Vector2(menu_button_width, top_button_height)
+	if _uses_baked_map_controls():
+		_layout_baked_action_button(waterbodies_button, "waterbodies", "К водоёмам", map_rect)
+		_layout_baked_action_button(home_button, "home", "Дом рыбака", map_rect)
+		_layout_baked_action_button(shop_button, "shop", "Магазин", map_rect)
+		_layout_baked_action_button(harbor_button, "harbor", "Гавань", map_rect)
+		_layout_baked_action_button(close_button, "close", "Закрыть", map_rect)
+	else:
+		_prepare_visible_action_button(waterbodies_button, "К водоёмам")
+		_prepare_visible_action_button(home_button, "Дом рыбака")
+		_prepare_visible_action_button(shop_button, "Магазин")
+		_prepare_visible_action_button(harbor_button, "Гавань")
+		_prepare_visible_action_button(close_button, "Закрыть")
+		waterbodies_button.position = Vector2(edge_margin, top_button_y)
+		waterbodies_button.size = Vector2(back_button_width, top_button_height)
+		home_button.position = Vector2(waterbodies_button.position.x + back_button_width + top_button_gap, top_button_y)
+		home_button.size = Vector2(home_button_width, top_button_height)
+		close_button.position = Vector2(view_size.x - edge_margin - close_button_width, top_button_y)
+		close_button.size = Vector2(close_button_width, top_button_height)
+		harbor_button.position = Vector2(close_button.position.x - top_button_gap - menu_button_width, top_button_y)
+		harbor_button.size = Vector2(menu_button_width, top_button_height)
+		shop_button.position = Vector2(harbor_button.position.x - top_button_gap - menu_button_width, top_button_y)
+		shop_button.size = Vector2(menu_button_width, top_button_height)
 
 	var marker_size: float = clampf(view_size.y * 0.078, 38.0, 50.0)
 	var info_size: float = clampf(view_size.y * 0.044, 22.0, 28.0)
-	var map_rect: Rect2 = _get_drawn_map_rect(view_size)
+	if _uses_baked_map_controls():
+		marker_size = clampf(map_rect.size.y * 0.088, 42.0, 92.0)
+		info_size = clampf(map_rect.size.y * 0.040, 22.0, 42.0)
 	for marker in marker_nodes:
 		if marker != null and marker.has_method("layout_marker"):
 			marker.call("layout_marker", map_rect, marker_size, info_size)
@@ -97,7 +124,7 @@ func _ensure_nodes() -> void:
 	map_texture = TextureRect.new()
 	map_texture.name = "WaterbodyMapTexture"
 	map_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	map_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	map_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	map_texture.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(map_texture)
 
@@ -148,6 +175,13 @@ func _ensure_nodes() -> void:
 	shop_button.pressed.connect(func(): shop_requested.emit())
 	add_child(shop_button)
 
+	home_button = Button.new()
+	home_button.name = "WaterbodyMapFisherHomeButton"
+	home_button.text = "Дом рыбака"
+	home_button.focus_mode = Control.FOCUS_NONE
+	home_button.pressed.connect(func(): fisher_home_requested.emit())
+	add_child(home_button)
+
 	harbor_button = Button.new()
 	harbor_button.name = "WaterbodyMapHarborButton"
 	harbor_button.text = "Гавань"
@@ -169,6 +203,7 @@ func _ensure_nodes() -> void:
 	spot_info_panel.connect("select_requested", Callable(self, "_on_info_select_requested"))
 
 	_apply_small_button_style(waterbodies_button)
+	_apply_small_button_style(home_button)
 	_apply_small_button_style(shop_button)
 	_apply_small_button_style(harbor_button)
 	_apply_small_button_style(close_button)
@@ -200,6 +235,8 @@ func _rebuild_markers() -> void:
 		marker_layer.add_child(marker)
 		var unlocked: bool = _can_use_spot(spot_id) and PlayerData.can_use_waterbody(waterbody_id)
 		var current: bool = waterbody_id == PlayerData.current_waterbody and spot_id == PlayerData.current_spot
+		if marker.has_method("set_baked_map_controls"):
+			marker.call("set_baked_map_controls", _uses_baked_map_controls())
 		marker.call("setup_marker", waterbody_id, spot, unlocked, current)
 		marker.connect("spot_pressed", Callable(self, "_on_marker_spot_pressed"))
 		marker.connect("info_pressed", Callable(self, "_on_marker_info_pressed"))
@@ -241,7 +278,9 @@ func _get_drawn_map_rect(view_size: Vector2) -> Rect2:
 	if texture_size.x <= 0.0 or texture_size.y <= 0.0:
 		return Rect2(Vector2.ZERO, view_size)
 
-	var scale_factor: float = maxf(view_size.x / texture_size.x, view_size.y / texture_size.y)
+	var scale_factor: float = minf(view_size.x / texture_size.x, view_size.y / texture_size.y)
+	if map_texture != null and map_texture.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_COVERED:
+		scale_factor = maxf(view_size.x / texture_size.x, view_size.y / texture_size.y)
 	var drawn_size: Vector2 = texture_size * scale_factor
 	var offset: Vector2 = (view_size - drawn_size) * 0.5
 	return Rect2(offset, drawn_size)
@@ -267,6 +306,65 @@ func _apply_small_button_style(button: Button) -> void:
 	button.add_theme_stylebox_override("normal", _make_panel_style(Color(0.025, 0.050, 0.045, 0.88), Color(0.70, 0.95, 0.72, 0.48), 10, 2))
 	button.add_theme_stylebox_override("hover", _make_panel_style(Color(0.060, 0.160, 0.100, 0.96), Color(0.86, 1.0, 0.76, 0.78), 10, 2))
 	button.add_theme_stylebox_override("pressed", _make_panel_style(Color(0.035, 0.105, 0.065, 0.98), Color(0.62, 0.92, 0.62, 0.82), 10, 2))
+
+func _uses_baked_map_controls() -> bool:
+	return bool(waterbody_data.get("map_controls_baked", false))
+
+func _layout_baked_action_button(button: Button, rect_key: String, tooltip: String, map_rect: Rect2) -> void:
+	if button == null:
+		return
+	var normalized_rect: Rect2 = BAKED_ACTION_BUTTON_RECTS.get(rect_key, Rect2())
+	var button_position := map_rect.position + Vector2(
+		normalized_rect.position.x * map_rect.size.x,
+		normalized_rect.position.y * map_rect.size.y
+	)
+	var button_size := Vector2(
+		normalized_rect.size.x * map_rect.size.x,
+		normalized_rect.size.y * map_rect.size.y
+	)
+	button.position = button_position
+	button.size = button_size
+	button.custom_minimum_size = button_size
+	button.visible = true
+	button.disabled = false
+	button.text = ""
+	button.tooltip_text = tooltip
+	button.mouse_filter = Control.MOUSE_FILTER_STOP
+	_apply_hitbox_button_style(button)
+
+func _prepare_visible_action_button(button: Button, text: String) -> void:
+	if button == null:
+		return
+	button.visible = true
+	button.disabled = false
+	button.text = text
+	button.tooltip_text = ""
+	button.mouse_filter = Control.MOUSE_FILTER_STOP
+	_apply_small_button_style(button)
+
+func _apply_hitbox_button_style(button: Button) -> void:
+	var style := _make_hitbox_style()
+	button.add_theme_stylebox_override("normal", style)
+	button.add_theme_stylebox_override("hover", style)
+	button.add_theme_stylebox_override("pressed", style)
+	button.add_theme_stylebox_override("disabled", style)
+	button.add_theme_stylebox_override("focus", style)
+	button.add_theme_color_override("font_color", Color.TRANSPARENT)
+	button.add_theme_color_override("font_hover_color", Color.TRANSPARENT)
+	button.add_theme_color_override("font_pressed_color", Color.TRANSPARENT)
+	button.add_theme_color_override("font_disabled_color", Color.TRANSPARENT)
+	button.add_theme_font_size_override("font_size", 1)
+
+func _make_hitbox_style() -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color.TRANSPARENT
+	style.border_color = Color.TRANSPARENT
+	style.shadow_color = Color.TRANSPARENT
+	style.content_margin_left = 0.0
+	style.content_margin_top = 0.0
+	style.content_margin_right = 0.0
+	style.content_margin_bottom = 0.0
+	return style
 
 func _make_panel_style(fill: Color, border: Color, radius: int, border_width: int) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
