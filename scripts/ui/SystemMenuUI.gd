@@ -8,6 +8,10 @@ const BUTTON_BASE_SIZE := Vector2(62.0, 54.0)
 const PANEL_BASE_WIDTH := 258.0
 const ITEM_BASE_HEIGHT := 58.0
 const ITEM_ICON_BASE_SIZE := 44.0
+const DEFAULT_SETTINGS_MUSIC_VOLUME := 0.28
+const DEFAULT_SETTINGS_RADIO_VOLUME := 0.28
+const DEFAULT_SETTINGS_SFX_VOLUME := 0.38
+const DEFAULT_SETTINGS_AMBIENT_VOLUME := 0.36
 
 var main
 var root: Control
@@ -864,9 +868,9 @@ func _sync_settings_controls_from_audio_manager() -> void:
 		if radio_settings_value is Dictionary:
 			radio_settings = radio_settings_value as Dictionary
 
-	var music_value := float(settings.get("music_volume", 0.55))
-	var radio_volume_value := float(radio_settings.get("music_volume", 0.55))
-	var sfx_value := maxf(float(settings.get("sfx_volume", 0.75)), float(settings.get("ambient_volume", 0.72)))
+	var music_value := float(settings.get("music_volume", DEFAULT_SETTINGS_MUSIC_VOLUME))
+	var radio_volume_value := float(radio_settings.get("music_volume", DEFAULT_SETTINGS_RADIO_VOLUME))
+	var sfx_value := maxf(float(settings.get("sfx_volume", DEFAULT_SETTINGS_SFX_VOLUME)), float(settings.get("ambient_volume", DEFAULT_SETTINGS_AMBIENT_VOLUME)))
 	var source := str(settings.get("music_source", "game"))
 	var radio_enabled := bool(radio_settings.get("radio_enabled", source == "radio"))
 	var vibration_enabled := true

@@ -28,7 +28,9 @@ const TEMPERATURE_NIGHT_SAMPLE_MINUTES := 23.0 * 60.0
 const SCHEDULED_MORNING_FORECAST_MINUTES := 7.0 * 60.0
 const SCHEDULED_NIGHT_FORECAST_MINUTES := 23.0 * 60.0
 const SCHEDULED_FORECAST_POLL_SECONDS := 1.0
-const RADIO_SETTINGS_VERSION := 2
+const RADIO_SETTINGS_VERSION := 3
+const DEFAULT_RADIO_MUSIC_VOLUME := 0.28
+const LEGACY_DEFAULT_RADIO_MUSIC_VOLUME := 0.55
 
 const MUSIC_DIRS := {
 	"morning": "res://assets/audio/radio/music/morning/",
@@ -65,7 +67,7 @@ const JINGLE_DIR := "res://assets/audio/radio/jingles/"
 
 var radio_enabled: bool = true
 var current_station: String = STATION_TUMAN_FM
-var music_volume: float = 0.55
+var music_volume: float = DEFAULT_RADIO_MUSIC_VOLUME
 var voice_volume: float = 0.85
 var jingle_volume: float = 0.80
 var voice_cooldown_seconds: float = 240.0
@@ -271,6 +273,8 @@ func set_radio_settings(settings: Dictionary) -> void:
 		current_station = str(settings.get("current_station", STATION_TUMAN_FM))
 	if settings.has("music_volume"):
 		music_volume = clampf(float(settings.get("music_volume", music_volume)), 0.0, 1.0)
+	if legacy_settings and is_equal_approx(music_volume, LEGACY_DEFAULT_RADIO_MUSIC_VOLUME):
+		music_volume = DEFAULT_RADIO_MUSIC_VOLUME
 	if settings.has("voice_volume"):
 		voice_volume = clampf(float(settings.get("voice_volume", voice_volume)), 0.0, 1.0)
 	if settings.has("jingle_volume"):

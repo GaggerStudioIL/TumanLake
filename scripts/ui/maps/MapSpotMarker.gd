@@ -15,6 +15,10 @@ var info_button: Button
 var lock_badge: Label
 var current_label: Label
 
+const BAKED_INFO_TOUCH_MIN_SIZE := 72.0
+const BAKED_INFO_TOUCH_MAX_SIZE := 98.0
+const BAKED_INFO_TOUCH_SCALE := 2.7
+
 var _current_arrow_start := Vector2.ZERO
 var _current_arrow_tip := Vector2.ZERO
 var _current_marker_position := Vector2.ZERO
@@ -50,8 +54,12 @@ func layout_marker(map_rect: Rect2, marker_size: float, info_size: float) -> voi
 		marker_button.size = Vector2(marker_size, marker_size)
 	lock_badge.position = marker_button.position + Vector2(marker_size - 15.0, -3.0)
 	lock_badge.size = Vector2(18.0, 18.0)
-	info_button.position = info_position - Vector2(info_size, info_size) * 0.5
-	info_button.size = Vector2(info_size, info_size)
+	var info_hitbox_size := Vector2(info_size, info_size)
+	if baked_map_controls:
+		var info_hitbox_edge := clampf(info_size * BAKED_INFO_TOUCH_SCALE, BAKED_INFO_TOUCH_MIN_SIZE, BAKED_INFO_TOUCH_MAX_SIZE)
+		info_hitbox_size = Vector2(info_hitbox_edge, info_hitbox_edge)
+	info_button.position = info_position - info_hitbox_size * 0.5
+	info_button.size = info_hitbox_size
 	_layout_current_indicator(marker_position, marker_size)
 	queue_redraw()
 

@@ -8,6 +8,14 @@ const SFX_TROPHY_CATCH := "trophy_catch"
 const SFX_RARE_TROPHY_CATCH := "rare_trophy_catch"
 const SFX_LINE_BREAK := "line_break"
 const MUSIC_SILENCE_DB := -80.0
+const AUDIO_SETTINGS_VERSION := 2
+const DEFAULT_MASTER_VOLUME := 1.0
+const DEFAULT_AMBIENT_VOLUME := 0.36
+const DEFAULT_SFX_VOLUME := 0.38
+const DEFAULT_MUSIC_VOLUME := 0.28
+const LEGACY_DEFAULT_AMBIENT_VOLUME := 0.72
+const LEGACY_DEFAULT_SFX_VOLUME := 0.75
+const LEGACY_DEFAULT_MUSIC_VOLUME := 0.55
 
 const SFX_PATHS := {
 	"cast": "res://assets/audio/sfx/bite_soft_01.ogg",
@@ -61,22 +69,22 @@ const PERIOD_KEY_ALIASES := {
 	"ночь": "night"
 }
 
-var master_volume: float = 1.0:
+var master_volume: float = DEFAULT_MASTER_VOLUME:
 	set(value):
 		master_volume = clampf(value, 0.0, 1.0)
 		_apply_volumes()
 
-var ambient_volume: float = 0.72:
+var ambient_volume: float = DEFAULT_AMBIENT_VOLUME:
 	set(value):
 		ambient_volume = clampf(value, 0.0, 1.0)
 		_apply_volumes()
 
-var sfx_volume: float = 0.75:
+var sfx_volume: float = DEFAULT_SFX_VOLUME:
 	set(value):
 		sfx_volume = clampf(value, 0.0, 1.0)
 		_apply_volumes()
 
-var music_volume: float = 0.55:
+var music_volume: float = DEFAULT_MUSIC_VOLUME:
 	set(value):
 		music_volume = clampf(value, 0.0, 1.0)
 		_apply_music_volume()
@@ -175,6 +183,8 @@ func get_music_source() -> String:
 	return music_source
 
 func set_volume_settings(settings: Dictionary) -> void:
+	var settings_version := int(settings.get("settings_version", 0))
+	var migrate_legacy_defaults := settings_version < AUDIO_SETTINGS_VERSION
 	if settings.has("master_volume"):
 		master_volume = clampf(float(settings["master_volume"]), 0.0, 1.0)
 	if settings.has("ambient_volume"):
@@ -183,6 +193,13 @@ func set_volume_settings(settings: Dictionary) -> void:
 		sfx_volume = clampf(float(settings["sfx_volume"]), 0.0, 1.0)
 	if settings.has("music_volume"):
 		music_volume = clampf(float(settings["music_volume"]), 0.0, 1.0)
+	if migrate_legacy_defaults:
+		if _approximately_equal(ambient_volume, LEGACY_DEFAULT_AMBIENT_VOLUME):
+			ambient_volume = DEFAULT_AMBIENT_VOLUME
+		if _approximately_equal(sfx_volume, LEGACY_DEFAULT_SFX_VOLUME):
+			sfx_volume = DEFAULT_SFX_VOLUME
+		if _approximately_equal(music_volume, LEGACY_DEFAULT_MUSIC_VOLUME):
+			music_volume = DEFAULT_MUSIC_VOLUME
 	if settings.has("music_source"):
 		music_source = str(settings["music_source"]).strip_edges().to_lower()
 		if not ["game", "radio"].has(music_source):
@@ -195,12 +212,16 @@ func set_volume_settings(settings: Dictionary) -> void:
 
 func get_volume_settings() -> Dictionary:
 	return {
+		"settings_version": AUDIO_SETTINGS_VERSION,
 		"master_volume": master_volume,
 		"ambient_volume": ambient_volume,
 		"sfx_volume": sfx_volume,
 		"music_volume": music_volume,
 		"music_source": music_source
 	}
+
+func _approximately_equal(a: float, b: float) -> bool:
+	return absf(a - b) <= 0.001
 
 func play_splash() -> void:
 	play_cast()
