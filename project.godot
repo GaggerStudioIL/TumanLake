@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="TumanLake"
+config/name="Рыбное Место"
 run/main_scene="res://scenes/intro/IntroCinematic.tscn"
 config/features=PackedStringArray("4.6", "Mobile")
 boot_splash/bg_color=Color(0.02, 0.025, 0.025, 1)

@@ -478,7 +478,10 @@ func _start_waiting_for_active_bite(spot: Dictionary, spot_id: String, available
 	fishing_started.emit(0)
 	if _fight_mode == "reel":
 		_initialize_lure_retrieve()
-		lure_retrieve_started.emit(_get_lure_retrieve_state())
+		var retrieve_state := _get_lure_retrieve_state()
+		if BuildConfig.ENABLE_VERBOSE_LOGS:
+			_debug_log_spinning_state("retrieve_start", retrieve_state)
+		lure_retrieve_started.emit(retrieve_state)
 
 
 func _update_active_bite_system(delta: float) -> void:
@@ -643,6 +646,19 @@ func _get_lure_retrieve_state() -> Dictionary:
 		"reel_line_out_speed": _reel_line_out_speed,
 		"feedback_message": _feedback_message
 	}
+
+
+func _debug_log_spinning_state(context: String, state: Dictionary = {}) -> void:
+	if not BuildConfig.ENABLE_VERBOSE_LOGS or _fight_mode != "reel":
+		return
+	print("[SpinningTest] %s tackle=%s handle=%.2f input=%s tension=%.2f fish_force=%.2f" % [
+		context,
+		str(_tackle_stats.get("tackle_type", "spinning")),
+		float(state.get("reel_handle_speed", _reel_handle_speed)),
+		str(state.get("input_active", _reel_input_active)),
+		float(state.get("tension", _tension)),
+		float(state.get("fish_force", _fish_force))
+	])
 
 
 func _update_false_nudge(delta: float) -> void:
@@ -964,6 +980,17 @@ func cancel_current_fishing_wait() -> bool:
 	if not can_cancel_current_fishing_wait():
 		return false
 
+	return cancel_current_fishing()
+
+
+func can_cancel_current_fishing() -> bool:
+	return is_fishing or is_reeling or fishing_state != FishingState.IDLE
+
+
+func cancel_current_fishing() -> bool:
+	if not can_cancel_current_fishing():
+		return false
+
 	_fishing_cycle_id += 1
 	is_fishing = false
 	is_reeling = false
@@ -974,6 +1001,8 @@ func cancel_current_fishing_wait() -> bool:
 	_pending_catch.clear()
 	_pending_bite_data.clear()
 	_clear_active_bite_data()
+	_last_fail_kind = ""
+	stop_fight_vibration()
 	return true
 
 
@@ -1995,6 +2024,7 @@ func _start_reeling(catch_data: Dictionary) -> void:
 	_initialize_reel_mode(catch_data)
 
 	if BuildConfig.ENABLE_VERBOSE_LOGS:
+		_debug_log_spinning_state("fight_start", _get_reeling_state())
 		print("[TensionFight] fish=%s, weight=%.2fkg, strength=%.2f, safe_zone=%d%%-%d%%, target_duration=%.1fs" % [
 			str(catch_data.get("name", fish.get("name", "-"))),
 			catch_weight,

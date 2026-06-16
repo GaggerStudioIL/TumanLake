@@ -5,6 +5,7 @@ const BASIC_FLOAT_ID := "float_drop_basic"
 const BASIC_LEADER_ID := "nylon_leader_20cm_1kg"
 const BASIC_REEL_ID := "river_reel_1000"
 const BASIC_LURE_ID := "silver_spinner_5g"
+const STARTER_REEL_TACKLE_ITEM_IDS := ["river_spin_210", BASIC_REEL_ID, BASIC_LURE_ID]
 const BETA_HIDDEN_TACKLE_CATEGORIES := {
 	"reel": true,
 	"lure": true,
@@ -5995,7 +5996,7 @@ func _is_quick_tackle_item_available(item: Dictionary, category: String) -> bool
 	return true
 
 func get_default_owned_items() -> Array:
-	return [
+	var items := [
 		_make_owned_catalog_item("simple_pole_rod_4m", 1),
 		_make_owned_catalog_item("mono_1_2kg", 1),
 		_make_owned_catalog_item(BASIC_LEADER_ID, 1),
@@ -6003,6 +6004,12 @@ func get_default_owned_items() -> Array:
 		_make_owned_catalog_item("small_hook_12", 1),
 		_make_owned_catalog_item("worm", 30)
 	]
+	if BuildConfig.SPINNING_ENABLED and BuildConfig.ENABLE_SPINNING_TEST_MODE:
+		for item_id in STARTER_REEL_TACKLE_ITEM_IDS:
+			var starter_item := _make_owned_catalog_item(str(item_id), 1)
+			if not starter_item.is_empty():
+				items.append(starter_item)
+	return items
 
 func set_current_tackle(saved_tackle: Dictionary) -> void:
 	var default_tackle := get_default_tackle()
@@ -6119,7 +6126,7 @@ func _ensure_starter_reel_tackle_owned() -> void:
 	if not BuildConfig.ENABLE_SPINNING_FEATURES:
 		return
 
-	for item_id in ["river_spin_210", BASIC_REEL_ID, BASIC_LURE_ID]:
+	for item_id in STARTER_REEL_TACKLE_ITEM_IDS:
 		if not get_owned_item(str(item_id)).is_empty():
 			continue
 		var starter_item := _make_owned_catalog_item(str(item_id), 1)
@@ -6161,8 +6168,15 @@ func get_visible_owned_items() -> Array:
 
 	return items
 
+func _is_spinning_test_item(item: Dictionary) -> bool:
+	return STARTER_REEL_TACKLE_ITEM_IDS.has(str(item.get("id", "")))
+
 func _is_beta_hidden_tackle_item(item: Dictionary) -> bool:
-	if BuildConfig.ENABLE_SPINNING_FEATURES or item.is_empty():
+	if item.is_empty():
+		return false
+	if BuildConfig.SPINNING_ENABLED and not BuildConfig.ENABLE_SPINNING_TEST_MODE:
+		return false
+	if BuildConfig.SPINNING_ENABLED and BuildConfig.ENABLE_SPINNING_TEST_MODE and _is_spinning_test_item(item):
 		return false
 
 	var category := str(item.get("category", item.get("type", ""))).strip_edges().to_lower()
@@ -6186,6 +6200,8 @@ func _is_beta_hidden_tackle_item(item: Dictionary) -> bool:
 
 func normalize_tackle_type(raw_type: String) -> String:
 	var type_key := raw_type.strip_edges().to_lower()
+	if not BuildConfig.SPINNING_ENABLED and type_key == "spinning":
+		return DEFAULT_TACKLE_TYPE
 	return str(TACKLE_TYPE_ALIASES.get(type_key, DEFAULT_TACKLE_TYPE))
 
 func get_current_tackle_type() -> String:
@@ -6383,6 +6399,8 @@ func set_current_tackle_slot(slot_id: String, item: Dictionary) -> bool:
 		return false
 	if item.is_empty():
 		return false
+	if _is_beta_hidden_tackle_item(item):
+		return false
 
 	var slot_category := _get_tackle_slot_item_category(slot_id)
 	var item_category := str(item.get("category", item.get("type", "")))
@@ -6414,6 +6432,8 @@ func set_current_tackle_slot(slot_id: String, item: Dictionary) -> bool:
 	for key in ["tackle_type", "fishing_type", "assembly_type", "rod_type"]:
 		if catalog_item.has(key) or item.has(key):
 			component[key] = str(catalog_item.get(key, item.get(key, "")) if use_catalog_identity else item.get(key, catalog_item.get(key, "")))
+	if _is_beta_hidden_tackle_item(component):
+		return false
 
 	if slot_category == "bait":
 		component["quantity"] = int(item.get("quantity", 0))
@@ -6431,6 +6451,12 @@ func clear_current_tackle_slot(slot_id: String) -> void:
 	current_tackle[slot_id] = {}
 
 func _sync_tackle_slots_for_current_rod() -> void:
+	if not BuildConfig.SPINNING_ENABLED:
+		for reel_only_slot in ["reel", "lure", "feeder_rig", "hook_or_lure", "sinker_or_rig"]:
+			if current_tackle.has(reel_only_slot):
+				current_tackle[reel_only_slot] = {}
+		return
+
 	var rod := get_current_rod_data()
 	if rod.is_empty():
 		return
@@ -6450,6 +6476,8 @@ func can_equip_item(item: Dictionary) -> bool:
 func get_equip_block_reason(item: Dictionary, slot_type: String = "") -> String:
 	if item.is_empty():
 		return "Предмет не выбран."
+	if _is_beta_hidden_tackle_item(item):
+		return "Спиннинг и катушечная снасть временно недоступны в beta-сборке."
 
 	var category := str(item.get("category", ""))
 	if slot_type != "":

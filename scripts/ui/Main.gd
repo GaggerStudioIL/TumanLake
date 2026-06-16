@@ -110,6 +110,8 @@ const FIRST_RUN_HINT_TEXTS := {
 @onready var top_hud_panel: Panel = $TopHudPanel
 @onready var left_hud_panel: Panel = $LeftHudPanel
 @onready var right_hud_panel: Panel = $RightHudPanel
+# TODO: `bottom_nav_*` is legacy naming. The nodes now render the left vertical menu;
+# rename scene nodes and references in one dedicated UI pass to keep this change small.
 @onready var bottom_nav_panel: Panel = $BottomNavPanel
 @onready var action_panel: Panel = $ActionPanel
 @onready var action_glow: ColorRect = $ActionGlow
@@ -512,7 +514,7 @@ var _last_reeling_state := {
 
 func _ready() -> void:
 	if BuildConfig.ENABLE_VERBOSE_LOGS:
-		print("Tuman Lake: Main scene loaded")
+		print("%s: Main scene loaded" % BuildConfig.PUBLIC_GAME_NAME)
 	_play_main_ambient()
 
 	theme = TUMAN_LAKE_THEME
@@ -1592,6 +1594,8 @@ func _ensure_mobile_ui_containers() -> void:
 	if nav_fish_button.get_parent() == bottom_nav_container:
 		_reparent_node(nav_fish_button, ui_canvas_layer)
 	nav_fish_button.visible = false
+	nav_fish_button.disabled = true
+	nav_fish_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if basket_button != null:
 		_reparent_node(basket_button, ui_canvas_layer)
 		basket_button.visible = false
@@ -1612,6 +1616,7 @@ func _ensure_mobile_ui_containers() -> void:
 			_reparent_node(node, ui_canvas_layer)
 			node.visible = false
 			node.disabled = true
+			node.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	for node in [encyclopedia_button, profile_button, current_tackle_button]:
 		if node != null:
@@ -3083,22 +3088,10 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	bottom_nav_container.mouse_filter = Control.MOUSE_FILTER_PASS
 	bottom_nav_container.add_theme_constant_override("separation", int(9.0 * ui_scale))
 
-	var nav_buttons: Array = [nav_fish_button, inventory_button, shop_button, harbor_button, map_button]
-	var nav_labels: Array = ["Ловля", "Инвентарь", "Магазин", "Гавань", "Карта"]
-	var nav_button_size := _scale_size(Vector2(LEFT_NAV_WIDTH - 18.0, 42.0), screen_size)
-	for i in nav_buttons.size():
-		_layout_nav_button(nav_buttons[i], nav_labels[i], Vector2.ZERO, nav_button_size, i == 0)
-	var nav_icons: Array = ["fish", "inventory", "shop", "harbor", "map"]
-	for i in nav_buttons.size():
-		_set_button_icon(nav_buttons[i], nav_icons[i], 12.0)
-
 	nav_fish_button.visible = false
-	var side_menu_buttons: Array = [inventory_button, map_button]
-	var side_menu_labels: Array = ["Инвентарь", "Карта"]
-	var side_menu_icons: Array = ["inventory", "map"]
 	var side_menu_button_size := _scale_size(Vector2(LEFT_NAV_WIDTH, 48.0), screen_size)
-	for i in side_menu_buttons.size():
-		_layout_side_menu_button(side_menu_buttons[i], side_menu_labels[i], side_menu_icons[i], side_menu_button_size, false)
+	_layout_side_menu_button(inventory_button, "Инвентарь", "inventory", side_menu_button_size, false)
+	_layout_side_menu_button(map_button, "Карта", "map", side_menu_button_size, false)
 	for node in [shop_button, harbor_button]:
 		node.visible = false
 		node.disabled = true
@@ -3109,7 +3102,9 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	basket_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	inventory_button.disabled = false
+	inventory_button.mouse_filter = Control.MOUSE_FILTER_STOP
 	map_button.disabled = false
+	map_button.mouse_filter = Control.MOUSE_FILTER_STOP
 	encyclopedia_button.visible = true
 	profile_button.visible = false
 	encyclopedia_button.disabled = false
@@ -4072,9 +4067,14 @@ func _can_cancel_current_fishing_wait() -> bool:
 	if is_cast_animating or _is_catch_reward_open():
 		return false
 	var waiting_ui := _fishing_ui_state == FishingUiState.WAITING
+	var fighting_ui := _fishing_ui_state == FishingUiState.FIGHTING
 	var manager_waiting := bool(FishingManager.get("is_fishing")) and not bool(FishingManager.get("is_reeling"))
 	if waiting_ui and manager_waiting:
 		return true
+	if fighting_ui and (bool(FishingManager.get("is_fishing")) or bool(FishingManager.get("is_reeling"))):
+		return true
+	if (waiting_ui or fighting_ui) and FishingManager.has_method("can_cancel_current_fishing"):
+		return bool(FishingManager.can_cancel_current_fishing())
 	if FishingManager.has_method("can_cancel_current_fishing_wait"):
 		return bool(FishingManager.can_cancel_current_fishing_wait())
 	return waiting_ui and manager_waiting
@@ -4340,9 +4340,6 @@ func _configure_fishing_presence_style() -> void:
 
 func _get_line_normal(from: Vector2, to: Vector2, prefer_down: bool = false) -> Vector2:
 	return fishing_presence_ui._get_line_normal(from, to, prefer_down)
-
-func _make_ellipse_points(center: Vector2, radius: Vector2, steps: int = 16) -> PackedVector2Array:
-	return fishing_presence_ui._make_ellipse_points(center, radius, steps)
 
 func _set_short_cross_line(line: Line2D, center: Vector2, direction_to_tip: Vector2, length: float) -> void:
 	fishing_presence_ui._set_short_cross_line(line, center, direction_to_tip, length)
@@ -4767,7 +4764,7 @@ func _setup_layout() -> void:
 	action_glow.z_index = 6
 	action_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	title_label.text = "Tuman Lake"
+	title_label.text = BuildConfig.PUBLIC_GAME_NAME
 	title_label.position = Vector2(margin, 18)
 	title_label.size = Vector2(left_width, 48)
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -4866,7 +4863,7 @@ func _setup_layout() -> void:
 	fight_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	fight_hint_label.add_theme_font_size_override("font_size", 16)
 
-	title_label.text = "Tuman Lake"
+	title_label.text = BuildConfig.PUBLIC_GAME_NAME
 	title_label.position = top_hud_panel.position + Vector2(14.0, 8.0)
 	title_label.size = Vector2(126.0, 20.0)
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -4963,13 +4960,16 @@ func _setup_layout() -> void:
 		nav_button.size = Vector2(nav_width, 44.0)
 		nav_button.add_theme_font_size_override("font_size", 11)
 		_apply_button_style(nav_button, STYLE_BOTTOM_NAV_ACTIVE if i == 0 else STYLE_BOTTOM_NAV_BUTTON)
+		nav_button.disabled = false
+		nav_button.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	nav_fish_button.visible = false
+	nav_fish_button.disabled = true
+	nav_fish_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	for node in [shop_button, harbor_button]:
 		node.visible = false
 		node.disabled = true
 		node.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	map_button.disabled = false
 	encyclopedia_button.visible = true
 	profile_button.visible = false
 	encyclopedia_button.disabled = false
@@ -7296,7 +7296,9 @@ func _cancel_current_fishing_wait() -> void:
 		return
 
 	var cancelled := false
-	if FishingManager.has_method("cancel_current_fishing_wait"):
+	if FishingManager.has_method("cancel_current_fishing"):
+		cancelled = bool(FishingManager.cancel_current_fishing())
+	elif FishingManager.has_method("cancel_current_fishing_wait"):
 		cancelled = bool(FishingManager.cancel_current_fishing_wait())
 	if not cancelled:
 		return

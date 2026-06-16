@@ -681,8 +681,9 @@ func _build_description(fish: Dictionary) -> String:
 	var base := str(fish.get("description", "")).strip_edges()
 	if base.is_empty():
 		base = "Вид хорошо заметен по форме и повадкам."
-	return "%s В Tuman Lake чаще выбирает %s; на вываживании ведёт себя как %s рыба." % [
+	return "%s В «%s» чаще выбирает %s; на вываживании ведёт себя как %s рыба." % [
 		base,
+		BuildConfig.PUBLIC_GAME_NAME,
 		habitat,
 		behavior
 	]

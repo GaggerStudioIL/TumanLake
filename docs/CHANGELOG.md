@@ -1,4 +1,4 @@
-# Tuman Lake — Changelog
+# Рыбное Место — Changelog
 
 ## После v0.1.0-beta.2 — 2026-06-14
 

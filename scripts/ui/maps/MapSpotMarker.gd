@@ -41,7 +41,8 @@ func layout_marker(map_rect: Rect2, marker_size: float, info_size: float) -> voi
 	var marker_position := _get_normalized_position("map_position", Vector2(0.5, 0.5)) * map_rect.size
 	var info_position := _get_normalized_position("info_position", _get_default_info_position()) * map_rect.size
 	if baked_map_controls:
-		var marker_hitbox_size := Vector2(maxf(marker_size * 2.80, 96.0), maxf(marker_size * 1.58, 58.0))
+		var marker_hitbox_edge := clampf(marker_size * 0.95, 42.0, 58.0)
+		var marker_hitbox_size := Vector2(marker_hitbox_edge, marker_hitbox_edge)
 		marker_button.position = marker_position + Vector2(0.0, marker_size * 0.28) - marker_hitbox_size * 0.5
 		marker_button.size = marker_hitbox_size
 	else:
@@ -64,6 +65,7 @@ func _ensure_nodes() -> void:
 		marker_button.focus_mode = Control.FOCUS_NONE
 		marker_button.mouse_filter = Control.MOUSE_FILTER_STOP
 		marker_button.text = ""
+		marker_button.z_index = 0
 		add_child(marker_button)
 		marker_button.pressed.connect(_on_marker_pressed)
 
@@ -73,6 +75,7 @@ func _ensure_nodes() -> void:
 		info_button.focus_mode = Control.FOCUS_NONE
 		info_button.mouse_filter = Control.MOUSE_FILTER_STOP
 		info_button.text = "i"
+		info_button.z_index = 30
 		add_child(info_button)
 		info_button.pressed.connect(_on_info_pressed)
 
@@ -83,6 +86,7 @@ func _ensure_nodes() -> void:
 		lock_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		lock_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		lock_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		lock_badge.z_index = 20
 		add_child(lock_badge)
 
 	if current_label == null:
@@ -93,6 +97,7 @@ func _ensure_nodes() -> void:
 		current_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		current_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		current_label.visible = false
+		current_label.z_index = 20
 		add_child(current_label)
 
 func _refresh_state() -> void:
@@ -101,7 +106,7 @@ func _refresh_state() -> void:
 	info_button.tooltip_text = "Информация: %s" % spot_name
 	lock_badge.visible = not unlocked and not baked_map_controls
 	current_label.visible = current and not baked_map_controls
-	z_index = 10 if current else 0
+	z_index = 5 if current else 0
 
 	# The lake map already contains the marker art, so this button is only a touch target.
 	var transparent_style := _make_transparent_style()

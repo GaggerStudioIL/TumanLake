@@ -1,4 +1,4 @@
-# Tuman Lake — Android Build Notes
+# Рыбное Место — Android Build Notes
 
 Этот документ описывает базовый порядок подготовки Android beta-билда для тестеров.
 
@@ -118,12 +118,12 @@ Project -> Export
 Команда:
 
 ```bash
-Godot_v4.6.2-stable_win64_console.exe --display-driver windows --rendering-driver opengl3 --path . --export-debug Android build/TumanLake_0.1.0-beta.2_2026-06-09.apk
+Godot_v4.6.2-stable_win64_console.exe --display-driver windows --rendering-driver opengl3 --path . --export-debug Android build/RybnoeMesto_0.1.0-beta.2.apk
 ```
 
 Результат:
 
-- APK собран: `build/TumanLake_0.1.0-beta.2_2026-06-09.apk`.
+- APK собран: `build/RybnoeMesto_0.1.0-beta.2.apk`.
 - Размер: `324298967` bytes.
 - Godot export дошёл до `Signing debug APK` и `Verifying APK` без ошибки.
 - Android preset обновлён на `version/name="0.1.0-beta.2"` и `version/code=102`.

@@ -1,4 +1,4 @@
-# Tuman Lake — Beta Preflight
+# Рыбное Место — Beta Preflight
 
 Этот чек-лист нужно пройти перед каждой сборкой beta-билда для тестеров.
 
