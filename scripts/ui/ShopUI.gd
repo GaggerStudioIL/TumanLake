@@ -841,6 +841,9 @@ func _rebuild_shop_cards() -> void:
 	var rows: int = int(ceil(float(items.size()) / float(columns))) if not items.is_empty() else 0
 	var card_min_height := 178.0 if is_bait_category else (148.0 if is_image_category else 60.0)
 	var card_max_height := 178.0 if is_bait_category else (160.0 if is_image_category else 68.0)
+	if is_rod_category:
+		card_min_height = 294.0
+		card_max_height = 326.0
 	if is_line_category or is_leader_category:
 		card_min_height = 100.0
 		card_max_height = 104.0
@@ -1390,6 +1393,322 @@ func _populate_bait_shop_card(card: Panel, item: Dictionary, card_size: Vector2,
 
 
 func _populate_rod_image_card(card: Panel, item: Dictionary, card_size: Vector2, texture: Texture2D, rarity_color: Color) -> void:
+	var item_id := str(item.get("id", ""))
+	var category := str(item.get("category", item.get("type", "misc")))
+	var stats: Dictionary = item.get("stats", {}) if item.get("stats", {}) is Dictionary else {}
+	var padding := 12.0
+	var image_area_height: float = clampf(card_size.y * 0.38, 82.0, 98.0)
+	var content_y: float = padding + image_area_height + 8.0
+	var image_area_size := Vector2(maxf(card_size.x - padding * 2.0, 1.0), image_area_height)
+	_apply_rod_shop_card_style(card, rarity_color)
+
+	var image_area := Panel.new()
+	image_area.name = "RodCardImageArea"
+	image_area.position = Vector2(padding, padding)
+	image_area.size = image_area_size
+	image_area.clip_contents = true
+	image_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	image_area.add_theme_stylebox_override(
+		"panel",
+		main._make_panel_style(Color(0.010, 0.027, 0.030, 0.30), Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.16), 8, 0, Color.TRANSPARENT)
+	)
+	card.add_child(image_area)
+
+	var image := TextureRect.new()
+	image.name = "RodCardImage"
+	image.texture = _get_rod_display_texture(texture) if category == SHOP_CATEGORY_ROD else texture
+	image.position = Vector2(-image_area_size.x * 0.035, -8.0)
+	image.size = image_area_size + Vector2(image_area_size.x * 0.07, 16.0)
+	image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	image.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	image_area.add_child(image)
+
+	var badge := Label.new()
+	badge.name = "ShopCardBadge"
+	badge.text = "Lv.%d" % int(ROD_CARD_BADGE_NUMBERS.get(item_id, 1))
+	badge.position = Vector2(8.0, 8.0)
+	badge.size = Vector2(58.0, 28.0)
+	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	badge.add_theme_font_size_override("font_size", 14)
+	badge.add_theme_color_override("font_color", Color(rarity_color.r, rarity_color.g, rarity_color.b, 1.0))
+	badge.add_theme_stylebox_override(
+		"normal",
+		main._make_panel_style(Color(0.020, 0.050, 0.044, 0.88), Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.70), 7, 2, Color(0.0, 0.0, 0.0, 0.16))
+	)
+	image_area.add_child(badge)
+
+	var class_chip := Label.new()
+	class_chip.name = "RodCardClassChip"
+	class_chip.text = _get_rod_class_chip_text(stats)
+	class_chip.position = Vector2(card_size.x - padding - 118.0, image_area.position.y + 8.0)
+	class_chip.size = Vector2(110.0, 24.0)
+	class_chip.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	class_chip.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	class_chip.clip_text = true
+	class_chip.add_theme_font_size_override("font_size", 12)
+	class_chip.add_theme_color_override("font_color", Color(rarity_color.r, rarity_color.g, rarity_color.b, 1.0))
+	card.add_child(class_chip)
+
+	var name_label := Label.new()
+	name_label.name = "RodCardNameLabel"
+	name_label.text = _get_item_display_name(item)
+	name_label.position = Vector2(padding + 4.0, content_y)
+	name_label.size = Vector2(card_size.x - padding * 2.0 - 124.0, 26.0)
+	name_label.clip_text = true
+	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	name_label.add_theme_font_size_override("font_size", 17)
+	name_label.add_theme_color_override("font_color", Color(0.94, 1.0, 0.91, 1.0))
+	card.add_child(name_label)
+
+	var type_label := Label.new()
+	type_label.name = "RodCardTypeLabel"
+	type_label.text = _get_rod_type_display_text(item)
+	type_label.position = Vector2(padding + 4.0, content_y + 25.0)
+	type_label.size = Vector2(card_size.x - padding * 2.0 - 152.0, 20.0)
+	type_label.clip_text = true
+	type_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	type_label.add_theme_font_size_override("font_size", 12)
+	type_label.add_theme_color_override("font_color", Color(0.74, 0.84, 0.76, 0.92))
+	card.add_child(type_label)
+
+	_add_shop_price_row(
+		card,
+		float(item.get("price", 0.0)),
+		Rect2(Vector2(card_size.x - padding - 116.0, content_y + 27.0), Vector2(112.0, 19.0)),
+		13,
+		Vector2(16.0, 16.0),
+		true,
+		Color(0.93, 1.0, 0.82, 0.98),
+		"RodCardPriceRow"
+	)
+
+	var separator := ColorRect.new()
+	separator.name = "RodCardSeparator"
+	separator.color = Color(0.70, 0.90, 0.78, 0.16)
+	separator.position = Vector2(padding + 4.0, content_y + 51.0)
+	separator.size = Vector2(card_size.x - padding * 2.0 - 8.0, 1.0)
+	separator.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(separator)
+
+	var stats_y: float = content_y + 61.0
+	var left_x: float = padding + 4.0
+	var right_x: float = card_size.x * 0.52
+	var left_width: float = maxf(right_x - left_x - 10.0, 86.0)
+	var right_width: float = maxf(card_size.x - right_x - padding, 96.0)
+	_add_rod_stat_label(card, Vector2(left_x, stats_y), Vector2(left_width, 18.0), "Длина:", "%.1f м" % float(stats.get("length_m", 0.0)))
+	_add_rod_stat_label(card, Vector2(left_x, stats_y + 22.0), Vector2(left_width, 18.0), "Тест:", _get_rod_test_text(stats))
+	_add_rod_stat_label(card, Vector2(left_x, stats_y + 44.0), Vector2(left_width, 18.0), "Рыба:", _get_rod_fish_capacity_text(stats))
+	_add_rod_star_row(card, Vector2(right_x, stats_y), Vector2(right_width, 18.0), "Контроль:", _get_rod_control_rating(stats))
+	_add_rod_star_row(card, Vector2(right_x, stats_y + 22.0), Vector2(right_width, 18.0), "Чувств.:", _get_rod_sensitivity_rating(stats))
+
+	var owned_count: int = _get_owned_shop_item_quantity(item_id)
+	if owned_count > 0:
+		var owned_label := Label.new()
+		owned_label.name = "RodCardOwnedLabel"
+		owned_label.text = "Есть: %d" % owned_count
+		owned_label.position = Vector2(right_x, stats_y + 44.0)
+		owned_label.size = Vector2(right_width, 18.0)
+		owned_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		owned_label.clip_text = true
+		owned_label.add_theme_font_size_override("font_size", 10)
+		owned_label.add_theme_color_override("font_color", Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.82))
+		card.add_child(owned_label)
+
+	var actions_height := 34.0
+	var action_gap := 10.0
+	var button_width: float = clampf((card_size.x - padding * 2.0 - action_gap) * 0.5, 112.0, 150.0)
+	var actions_y: float = card_size.y - padding - actions_height
+	var buy_x: float = card_size.x - padding - button_width
+	var details_x: float = buy_x - action_gap - button_width
+
+	var details_button := Button.new()
+	details_button.name = "RodCardDetailsButton"
+	details_button.text = "Подробнее"
+	details_button.position = Vector2(details_x, actions_y)
+	details_button.size = Vector2(button_width, actions_height)
+	_apply_shop_details_button_style(details_button)
+	details_button.add_theme_font_size_override("font_size", 12)
+	details_button.pressed.connect(_show_shop_details.bind(item_id))
+	card.add_child(details_button)
+
+	var buy_button := Button.new()
+	buy_button.name = "RodCardBuyButton"
+	buy_button.text = "Купить"
+	buy_button.position = Vector2(buy_x, actions_y)
+	buy_button.size = Vector2(button_width, actions_height)
+	_apply_shop_buy_button_style(buy_button)
+	buy_button.add_theme_font_size_override("font_size", 12)
+	buy_button.pressed.connect(_on_shop_buy_pressed.bind(item_id))
+	card.add_child(buy_button)
+
+
+func _apply_rod_shop_card_style(card: Panel, rarity_color: Color) -> void:
+	card.add_theme_stylebox_override(
+		"panel",
+		main._make_panel_style(
+			Color(0.013, 0.034, 0.036, 0.91),
+			Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.48),
+			10,
+			5,
+			Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.10)
+		)
+	)
+
+
+func _add_rod_stat_label(parent: Control, position: Vector2, size: Vector2, title: String, value: String) -> void:
+	var label := Label.new()
+	label.position = position
+	label.size = size
+	label.clip_text = true
+	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	label.text = "%s %s" % [title, value]
+	label.add_theme_font_size_override("font_size", 11)
+	label.add_theme_color_override("font_color", Color(0.76, 0.86, 0.78, 0.94))
+	parent.add_child(label)
+
+
+func _add_rod_star_row(parent: Control, position: Vector2, size: Vector2, title: String, rating: int) -> void:
+	var title_label := Label.new()
+	title_label.position = position
+	title_label.size = Vector2(minf(76.0, size.x * 0.48), size.y)
+	title_label.clip_text = true
+	title_label.text = title
+	title_label.add_theme_font_size_override("font_size", 11)
+	title_label.add_theme_color_override("font_color", Color(0.76, 0.86, 0.78, 0.94))
+	parent.add_child(title_label)
+
+	var stars_label := Label.new()
+	stars_label.position = Vector2(position.x + title_label.size.x, position.y - 1.0)
+	stars_label.size = Vector2(maxf(size.x - title_label.size.x, 1.0), size.y + 2.0)
+	stars_label.clip_text = true
+	stars_label.text = _format_star_rating(rating)
+	stars_label.add_theme_font_size_override("font_size", 13)
+	stars_label.add_theme_color_override("font_color", Color(1.0, 0.74, 0.25, 0.98))
+	parent.add_child(stars_label)
+
+
+func _format_star_rating(rating: int) -> String:
+	var clamped_rating: int = clampi(rating, 1, 5)
+	var result := ""
+	for index in range(5):
+		result += "★" if index < clamped_rating else "☆"
+	return result
+
+
+func _get_rod_class_chip_text(stats: Dictionary) -> String:
+	var rod_class := str(stats.get("rod_class", "medium"))
+	match rod_class:
+		"ultra_light":
+			return "УЛЬТРАЛАЙТ"
+		"light":
+			return "ЛАЙТ"
+		"medium":
+			return "СРЕДНИЙ"
+		"universal":
+			return "УНИВЕРСАЛ"
+		"heavy":
+			return "ТЯЖЁЛЫЙ"
+		"extra_heavy":
+			return "ЭКСТРА"
+		_:
+			return rod_class.to_upper()
+
+
+func _get_rod_type_display_text(item: Dictionary) -> String:
+	var stats: Dictionary = item.get("stats", {}) if item.get("stats", {}) is Dictionary else {}
+	var rod_class := _get_rod_class_title(str(stats.get("rod_class", "medium")))
+	var rod_type := str(stats.get("rod_type", item.get("rod_type", item.get("tackle_type", "")))).to_lower()
+	var requires_reel := bool(stats.get("requires_reel", item.get("requires_reel", false)))
+	if requires_reel or rod_type == "spinning":
+		return "%s спиннинг" % rod_class
+	return "%s удочка" % rod_class
+
+
+func _get_rod_class_title(rod_class: String) -> String:
+	match rod_class:
+		"ultra_light":
+			return "Ультралайт"
+		"light":
+			return "Лайт"
+		"medium":
+			return "Средняя"
+		"universal":
+			return "Универсальная"
+		"heavy":
+			return "Тяжёлая"
+		"extra_heavy":
+			return "Экстра-хэви"
+		_:
+			return rod_class.capitalize()
+
+
+func _get_rod_test_text(stats: Dictionary) -> String:
+	if stats.has("test_min") or stats.has("test_max"):
+		return "%.0f-%.0f г" % [
+			float(stats.get("test_min", 0.0)),
+			float(stats.get("test_max", stats.get("max_fish_weight", 1.0)))
+		]
+	var rod_class := str(stats.get("rod_class", "medium"))
+	match rod_class:
+		"ultra_light":
+			return "0.5-7 г"
+		"light":
+			return "1-10 г"
+		"medium":
+			return "3-18 г"
+		"universal":
+			return "5-24 г"
+		"heavy":
+			return "12-40 г"
+		"extra_heavy":
+			return "25-80 г"
+		_:
+			return "3-18 г"
+
+
+func _get_rod_fish_capacity_text(stats: Dictionary) -> String:
+	var max_weight: float = float(stats.get("max_fish_weight", 0.0))
+	return "до %.1f кг, %s" % [max_weight, _get_rod_fish_size_label(max_weight)]
+
+
+func _get_rod_fish_size_label(max_weight: float) -> String:
+	if max_weight <= 1.2:
+		return "мелкая"
+	if max_weight <= 3.0:
+		return "средняя"
+	if max_weight <= 6.0:
+		return "крупная"
+	return "трофейная"
+
+
+func _get_rod_control_rating(stats: Dictionary) -> int:
+	var control: float = float(stats.get("control_bonus", stats.get("tension_bonus", 0.0)))
+	var handling: float = float(stats.get("handling_bonus", 0.0))
+	return clampi(roundi(1.6 + control * 13.0 + maxf(handling, 0.0) * 7.0), 1, 5)
+
+
+func _get_rod_sensitivity_rating(stats: Dictionary) -> int:
+	var control: float = float(stats.get("control_bonus", stats.get("tension_bonus", 0.0)))
+	var handling: float = float(stats.get("handling_bonus", 0.0))
+	var stiffness: float = float(stats.get("stiffness", stats.get("strength", 1.0)))
+	var class_bonus: float = 0.0
+	match str(stats.get("rod_class", "medium")):
+		"ultra_light":
+			class_bonus = 0.8
+		"light":
+			class_bonus = 0.45
+		"universal":
+			class_bonus = 0.15
+		"heavy", "extra_heavy":
+			class_bonus = -0.25
+	var rating_value: float = 1.8 + control * 10.0 + handling * 9.0 + class_bonus - maxf(stiffness - 1.35, 0.0) * 0.7
+	return clampi(roundi(rating_value), 1, 5)
+
+
+func _populate_rod_image_card_legacy(card: Panel, item: Dictionary, card_size: Vector2, texture: Texture2D, rarity_color: Color) -> void:
 	var item_id := str(item.get("id", ""))
 	var category := str(item.get("category", item.get("type", "misc")))
 	var padding := 8.0

@@ -8,6 +8,7 @@ const WaterbodyUIScript := preload("res://scripts/ui/WaterbodyUI.gd")
 const CatchPopupUIScript := preload("res://scripts/ui/CatchPopupUI.gd")
 const FishingHUDUIScript := preload("res://scripts/ui/FishingHUDUI.gd")
 const FishingPresenceUIScript := preload("res://scripts/ui/FishingPresenceUI.gd")
+const FloatBitePreviewScene := preload("res://scenes/ui/FloatBitePreview.tscn")
 const ProfileUIScript := preload("res://scripts/ui/ProfileUI.gd")
 const EncyclopediaUIScript := preload("res://scripts/ui/EncyclopediaUI.gd")
 const SystemMenuUIScript := preload("res://scripts/ui/SystemMenuUI.gd")
@@ -32,6 +33,9 @@ const FishHarborScene := preload("res://scenes/economy/FishHarbor.tscn")
 const TUMAN_LAKE_THEME := preload("res://themes/TumanLakeUI.tres")
 const DEPTH_HOOK_ICON := preload("res://assets/ui/icons/icon_depth_hook.png")
 const WIND_HUD_ICON_PATH := "res://assets/ui/icons/wind.png"
+const CONDITION_HEALTH_ICON := preload("res://assets/ui/icons/hud/condition_health.png")
+const CONDITION_TEMPERATURE_ICON := preload("res://assets/ui/icons/hud/condition_temperature.png")
+const CONDITION_HUNGER_ICON := preload("res://assets/ui/icons/hud/condition_hunger.png")
 
 const STYLE_HUD_PANEL := "HUDPanel"
 const STYLE_INFO_CARD := "InfoCard"
@@ -44,6 +48,8 @@ const HUD_HEIGHT := 44.0
 const LEFT_NAV_WIDTH := 58.0
 const LEFT_NAV_HEIGHT := 222.0
 const ACTION_BAR_HEIGHT := 46.0
+const HUD_GLASS_RADIUS := 14
+const HUD_GLASS_BORDER_WIDTH := 1
 const MENU_BACKDROP_Z := 300
 const MENU_PANEL_Z := 301
 const PILOT_WATER_SPOT_ID := "old_oak_pier"
@@ -328,6 +334,7 @@ var waterbody_ui
 var catch_popup_ui
 var fishing_hud_ui
 var fishing_presence_ui
+var float_bite_preview: Control
 var profile_ui
 var encyclopedia_ui
 var system_menu_ui
@@ -385,7 +392,14 @@ var time_hud_icon: TextureRect
 var weather_hud_icon: TextureRect
 var wind_hud_icon: TextureRect
 var wind_label: Label
+var condition_hud_card: Panel
 var condition_hud_group: VBoxContainer
+var condition_health_row: HBoxContainer
+var condition_temperature_row: HBoxContainer
+var condition_hunger_row: HBoxContainer
+var condition_health_icon: TextureRect
+var condition_temperature_icon: TextureRect
+var condition_hunger_icon: TextureRect
 var condition_health_label: Label
 var condition_temperature_label: Label
 var condition_hunger_label: Label
@@ -521,6 +535,7 @@ func _ready() -> void:
 	SaveManager.load_game()
 	_setup_ui_controllers()
 	_ensure_ui_canvas_layer()
+	_ensure_float_bite_preview()
 	_ensure_tuman_fm_hud()
 	_ensure_system_menu_ui()
 	_ensure_fish_harbor_ui()
@@ -554,6 +569,7 @@ func _process(delta: float) -> void:
 	_refresh_condition_hud()
 	_update_depth_hud_visibility_watchdog(delta)
 	_update_current_tackle_hold()
+	_refresh_float_bite_preview_visibility()
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_RESUMED:
@@ -1568,9 +1584,11 @@ func _ensure_mobile_ui_containers() -> void:
 	if money_hud_icon != null:
 		_reparent_node(money_hud_icon, top_hud_money_group)
 	_reparent_node(money_label, top_hud_money_group)
-	if weather_hud_icon != null:
-		_reparent_node(weather_hud_icon, top_hud_time_group)
+	if time_hud_icon != null:
+		_reparent_node(time_hud_icon, top_hud_time_group)
 	_reparent_node(clock_label, top_hud_time_group)
+	if weather_hud_icon != null:
+		_reparent_node(weather_hud_icon, top_hud_temperature_group)
 	_reparent_node(weather_label, top_hud_temperature_group)
 	if wind_hud_icon != null:
 		_reparent_node(wind_hud_icon, top_hud_wind_group)
@@ -1722,6 +1740,88 @@ func _ensure_stop_fishing_button() -> void:
 	ui_canvas_layer.add_child(stop_fishing_button)
 
 
+func _ensure_float_bite_preview() -> void:
+	if float_bite_preview != null and is_instance_valid(float_bite_preview):
+		return
+	if ui_canvas_layer == null:
+		_ensure_ui_canvas_layer()
+
+	float_bite_preview = FloatBitePreviewScene.instantiate() as Control
+	float_bite_preview.name = "FloatBitePreview"
+	float_bite_preview.visible = false
+	float_bite_preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	float_bite_preview.z_index = 103
+	ui_canvas_layer.add_child(float_bite_preview)
+	_layout_float_bite_preview(get_viewport_rect().size, min(get_viewport_rect().size.x / BASE_SCREEN_SIZE.x, get_viewport_rect().size.y / BASE_SCREEN_SIZE.y))
+
+
+func _layout_float_bite_preview(screen_size: Vector2, ui_scale: float) -> void:
+	if float_bite_preview == null or not is_instance_valid(float_bite_preview):
+		return
+
+	var diameter: float = clamp(176.0 * ui_scale, 148.0, 188.0)
+	var preview_size := Vector2(diameter, diameter)
+	var margin: float = clamp(18.0 * ui_scale, 12.0, 24.0)
+	var top_guard: float = HUD_HEIGHT * ui_scale + margin
+	var action_button_guard: float = clamp(132.0 * ui_scale, 104.0, 152.0)
+	var desired_x: float = screen_size.x * 0.33 - preview_size.x * 0.5
+	var desired_y: float = max(top_guard, screen_size.y * 0.58)
+	var preview_pos := Vector2(desired_x, desired_y)
+	preview_pos.x = clamp(preview_pos.x, margin, max(margin, screen_size.x - preview_size.x - margin))
+	preview_pos.x = min(preview_pos.x, max(margin, screen_size.x - preview_size.x - action_button_guard))
+	preview_pos.y = clamp(preview_pos.y, top_guard, max(top_guard, screen_size.y - preview_size.y - margin))
+
+	_anchor_control(float_bite_preview, 0.0, 0.0, 0.0, 0.0, preview_pos.x, preview_pos.y, preview_pos.x + preview_size.x, preview_pos.y + preview_size.y)
+	float_bite_preview.custom_minimum_size = preview_size
+	float_bite_preview.size = preview_size
+	float_bite_preview.z_index = 103
+	float_bite_preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+
+func _show_float_bite_preview_idle() -> void:
+	if _is_reel_tackle_mode() or _is_menu_overlay_open():
+		_hide_float_bite_preview()
+		return
+	_ensure_float_bite_preview()
+	if float_bite_preview == null:
+		return
+	_layout_float_bite_preview(get_viewport_rect().size, min(get_viewport_rect().size.x / BASE_SCREEN_SIZE.x, get_viewport_rect().size.y / BASE_SCREEN_SIZE.y))
+	float_bite_preview.visible = true
+	float_bite_preview.modulate = Color.WHITE
+	float_bite_preview.move_to_front()
+	if float_bite_preview.has_method("show_preview"):
+		float_bite_preview.call("show_preview")
+	if float_bite_preview.has_method("set_idle"):
+		float_bite_preview.call("set_idle")
+
+
+func _hide_float_bite_preview() -> void:
+	if float_bite_preview == null or not is_instance_valid(float_bite_preview):
+		return
+	if float_bite_preview.has_method("hide_preview"):
+		float_bite_preview.call("hide_preview")
+	else:
+		float_bite_preview.visible = false
+
+
+func _refresh_float_bite_preview_visibility() -> void:
+	_ensure_float_bite_preview()
+	if float_bite_preview == null or not is_instance_valid(float_bite_preview):
+		return
+
+	var should_show := (
+		_fishing_ui_state == FishingUiState.WAITING
+		and not bool(FishingManager.get("is_reeling"))
+		and not _is_reel_tackle_mode()
+		and not _is_menu_overlay_open()
+	)
+	if should_show:
+		if not float_bite_preview.visible:
+			_show_float_bite_preview_idle()
+	else:
+		_hide_float_bite_preview()
+
+
 func _ensure_depth_hud_controls() -> void:
 	if depth_hud_minus_button == null:
 		depth_hud_minus_button = Button.new()
@@ -1810,10 +1910,10 @@ func _ensure_player_xp_hud() -> void:
 func _layout_player_xp_hud(screen_size: Vector2, ui_scale: float) -> void:
 	if player_xp_hud == null:
 		return
-	var hud_width := screen_size.x
-	var hud_height := clampf(34.0 * ui_scale, 30.0, 38.0)
-	var hud_x := 0.0
-	var hud_y := screen_size.y - hud_height
+	var hud_width := clampf(screen_size.x * 0.42, 360.0 * ui_scale, 520.0 * ui_scale)
+	var hud_height := clampf(36.0 * ui_scale, 32.0, 42.0)
+	var hud_x := (screen_size.x - hud_width) * 0.5
+	var hud_y := screen_size.y - hud_height - clampf(9.0 * ui_scale, 7.0, 12.0)
 	_anchor_control(player_xp_hud, 0.0, 0.0, 0.0, 0.0, hud_x, hud_y, hud_x + hud_width, hud_y + hud_height)
 	player_xp_hud.custom_minimum_size = Vector2(hud_width, hud_height)
 	player_xp_hud.size = Vector2(hud_width, hud_height)
@@ -2055,6 +2155,45 @@ func _make_panel_style(
 ) -> StyleBoxFlat:
 	return ui_theme.make_style(bg_color, border_color, radius, shadow_size, shadow_color)
 
+
+func _make_hud_glass_style(active: bool = false, radius: int = HUD_GLASS_RADIUS) -> StyleBoxFlat:
+	var bg := Color(0.018, 0.034, 0.036, 0.68)
+	var border := Color(0.70, 0.86, 0.80, 0.24)
+	var shadow := Color(0.0, 0.0, 0.0, 0.24)
+	var shadow_size := 4
+	if active:
+		bg = Color(0.034, 0.082, 0.062, 0.78)
+		border = Color(0.66, 1.0, 0.72, 0.46)
+		shadow = Color(0.20, 0.72, 0.38, 0.15)
+		shadow_size = 7
+	var style := _make_panel_style(bg, border, radius, shadow_size, shadow)
+	style.set_border_width_all(HUD_GLASS_BORDER_WIDTH)
+	style.content_margin_left = 10.0
+	style.content_margin_top = 7.0
+	style.content_margin_right = 10.0
+	style.content_margin_bottom = 7.0
+	return style
+
+
+func _is_primary_action_signal_active() -> bool:
+	return (
+		(_fishing_ui_state == FishingUiState.WAITING and _presence_bite_timer > 0.0)
+		or _fishing_ui_state == FishingUiState.FIGHTING
+		or _fishing_ui_state == FishingUiState.CAUGHT
+		or _fishing_ui_state == FishingUiState.FAILED
+	)
+
+
+func _apply_hud_text_shadow(label: Label, outline_size: int = 1) -> void:
+	if label == null:
+		return
+	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.80))
+	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.50))
+	label.add_theme_constant_override("outline_size", outline_size)
+	label.add_theme_constant_override("shadow_offset_x", 0)
+	label.add_theme_constant_override("shadow_offset_y", 1)
+
+
 func _get_panel_style(style_name: String) -> StyleBoxFlat:
 	match style_name:
 		STYLE_INFO_CARD:
@@ -2108,23 +2247,23 @@ func _apply_top_icon_button_style(button: Button) -> void:
 	button.add_theme_color_override("font_disabled_color", Color(0.62, 0.70, 0.68, 0.54))
 
 func _apply_action_button_style(button: Button, active: bool = false) -> void:
-	var normal_bg := Color(0.054, 0.088, 0.086, 0.94)
-	var hover_bg := Color(0.078, 0.130, 0.116, 0.98)
-	var pressed_bg := Color(0.082, 0.176, 0.118, 1.0)
-	var border := Color(0.80, 0.96, 0.86, 0.40)
-	var shadow := Color(0.0, 0.0, 0.0, 0.18)
+	var normal_bg := Color(0.018, 0.034, 0.036, 0.68)
+	var hover_bg := Color(0.030, 0.062, 0.058, 0.76)
+	var pressed_bg := Color(0.036, 0.088, 0.070, 0.84)
+	var border := Color(0.70, 0.86, 0.80, 0.24)
+	var shadow := Color(0.0, 0.0, 0.0, 0.22)
 
 	if active:
-		normal_bg = Color(0.142, 0.332, 0.176, 1.0)
-		hover_bg = Color(0.180, 0.420, 0.210, 1.0)
-		pressed_bg = Color(0.100, 0.270, 0.140, 1.0)
-		border = Color(0.70, 1.0, 0.72, 0.54)
-		shadow = Color(0.18, 0.66, 0.24, 0.20)
+		normal_bg = Color(0.052, 0.130, 0.078, 0.84)
+		hover_bg = Color(0.070, 0.166, 0.096, 0.92)
+		pressed_bg = Color(0.084, 0.206, 0.112, 0.98)
+		border = Color(0.66, 1.0, 0.72, 0.48)
+		shadow = Color(0.20, 0.72, 0.34, 0.14)
 
-	button.add_theme_stylebox_override("normal", _make_panel_style(normal_bg, border, 18, 4, shadow))
-	button.add_theme_stylebox_override("hover", _make_panel_style(hover_bg, Color(border.r, border.g, border.b, min(border.a + 0.12, 1.0)), 18, 5, shadow))
-	button.add_theme_stylebox_override("pressed", _make_panel_style(pressed_bg, Color(border.r, border.g, border.b, min(border.a + 0.16, 1.0)), 18, 2, Color(0.0, 0.0, 0.0, 0.12)))
-	button.add_theme_stylebox_override("disabled", _make_panel_style(Color(0.040, 0.050, 0.052, 0.48), Color(0.58, 0.64, 0.62, 0.14), 18, 1, Color.TRANSPARENT))
+	button.add_theme_stylebox_override("normal", _make_panel_style(normal_bg, border, HUD_GLASS_RADIUS, 4, shadow))
+	button.add_theme_stylebox_override("hover", _make_panel_style(hover_bg, Color(border.r, border.g, border.b, min(border.a + 0.12, 1.0)), HUD_GLASS_RADIUS, 5, shadow))
+	button.add_theme_stylebox_override("pressed", _make_panel_style(pressed_bg, Color(border.r, border.g, border.b, min(border.a + 0.16, 1.0)), HUD_GLASS_RADIUS, 2, Color(0.0, 0.0, 0.0, 0.12)))
+	button.add_theme_stylebox_override("disabled", _make_panel_style(Color(0.024, 0.032, 0.034, 0.46), Color(0.58, 0.64, 0.62, 0.14), HUD_GLASS_RADIUS, 1, Color.TRANSPARENT))
 	button.add_theme_color_override("font_color", Color(0.94, 1.0, 0.92, 1.0))
 	button.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 0.94, 1.0))
 	button.add_theme_color_override("font_pressed_color", Color(0.86, 1.0, 0.84, 1.0))
@@ -2139,7 +2278,7 @@ func _make_primary_action_circle_style(
 	shadow_color: Color
 ) -> StyleBoxFlat:
 	var style := _make_panel_style(bg_color, border_color, radius, shadow_size, shadow_color)
-	style.set_border_width_all(2)
+	style.set_border_width_all(HUD_GLASS_BORDER_WIDTH)
 	style.content_margin_left = 0.0
 	style.content_margin_top = 0.0
 	style.content_margin_right = 0.0
@@ -2148,35 +2287,23 @@ func _make_primary_action_circle_style(
 
 func _apply_primary_fishing_action_style(button: Button, target_size: Vector2) -> void:
 	var radius := roundi(max(target_size.x, target_size.y) * 0.5)
-	var normal_bg := Color(0.045, 0.090, 0.070, 0.74)
-	var hover_bg := Color(0.065, 0.135, 0.095, 0.88)
-	var pressed_bg := Color(0.082, 0.188, 0.112, 0.94)
-	var border := Color(0.66, 1.0, 0.68, 0.50)
-	var shadow := Color(0.12, 0.50, 0.22, 0.16)
+	var normal_bg := Color(0.014, 0.034, 0.032, 0.70)
+	var hover_bg := Color(0.028, 0.064, 0.052, 0.82)
+	var pressed_bg := Color(0.036, 0.096, 0.064, 0.90)
+	var border := Color(0.68, 0.86, 0.78, 0.30)
+	var shadow := Color(0.0, 0.0, 0.0, 0.24)
 
-	if _fishing_ui_state == FishingUiState.WAITING:
-		normal_bg = Color(0.050, 0.108, 0.078, 0.78)
-		hover_bg = Color(0.074, 0.152, 0.102, 0.90)
-		pressed_bg = Color(0.092, 0.200, 0.118, 0.96)
-		border = Color(0.70, 1.0, 0.70, 0.58)
-		shadow = Color(0.14, 0.56, 0.24, 0.18)
-	elif _fishing_ui_state == FishingUiState.FIGHTING:
-		normal_bg = Color(0.065, 0.132, 0.084, 0.84)
-		hover_bg = Color(0.088, 0.178, 0.108, 0.94)
-		pressed_bg = Color(0.110, 0.230, 0.128, 1.0)
-		border = Color(0.76, 1.0, 0.70, 0.66)
-		shadow = Color(0.18, 0.64, 0.24, 0.20)
-	elif _fishing_ui_state == FishingUiState.CAUGHT or _fishing_ui_state == FishingUiState.FAILED:
-		normal_bg = Color(0.052, 0.104, 0.080, 0.80)
-		hover_bg = Color(0.074, 0.148, 0.104, 0.92)
-		pressed_bg = Color(0.092, 0.200, 0.118, 0.98)
-		border = Color(0.70, 1.0, 0.70, 0.56)
-		shadow = Color(0.14, 0.54, 0.24, 0.18)
+	if _is_primary_action_signal_active():
+		normal_bg = Color(0.048, 0.128, 0.078, 0.86)
+		hover_bg = Color(0.070, 0.166, 0.096, 0.94)
+		pressed_bg = Color(0.086, 0.214, 0.118, 1.0)
+		border = Color(0.68, 1.0, 0.72, 0.58)
+		shadow = Color(0.20, 0.72, 0.34, 0.18)
 
 	button.custom_minimum_size = target_size
 	button.size = target_size
-	button.add_theme_stylebox_override("normal", _make_primary_action_circle_style(normal_bg, border, radius, 5, shadow))
-	button.add_theme_stylebox_override("hover", _make_primary_action_circle_style(hover_bg, Color(border.r, border.g, border.b, min(border.a + 0.10, 1.0)), radius, 7, shadow))
+	button.add_theme_stylebox_override("normal", _make_primary_action_circle_style(normal_bg, border, radius, 4, shadow))
+	button.add_theme_stylebox_override("hover", _make_primary_action_circle_style(hover_bg, Color(border.r, border.g, border.b, min(border.a + 0.10, 1.0)), radius, 6, shadow))
 	button.add_theme_stylebox_override("pressed", _make_primary_action_circle_style(pressed_bg, Color(border.r, border.g, border.b, min(border.a + 0.16, 1.0)), radius, 2, Color(0.0, 0.0, 0.0, 0.16)))
 	button.add_theme_stylebox_override("disabled", _make_primary_action_circle_style(Color(1.0, 1.0, 1.0, 0.020), Color(1.0, 1.0, 1.0, 0.34), radius, 1, Color.TRANSPARENT))
 	button.add_theme_stylebox_override("focus", _make_primary_action_circle_style(Color(1.0, 1.0, 1.0, 0.075), Color(1.0, 1.0, 1.0, 0.92), radius, 6, shadow))
@@ -2211,29 +2338,17 @@ func _apply_weather_hud_panel_style(panel: Panel) -> void:
 
 func _apply_weather_hud_text_style(ui_scale: float = 1.0) -> void:
 	if clock_label != null:
-		clock_label.add_theme_font_size_override("font_size", int(clamp(17.0 * ui_scale, 15.0, 19.0)))
-		clock_label.add_theme_color_override("font_color", Color(0.97, 1.0, 0.98, 1.0))
-		clock_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.78))
-		clock_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.50))
-		clock_label.add_theme_constant_override("outline_size", 2)
-		clock_label.add_theme_constant_override("shadow_offset_x", 0)
-		clock_label.add_theme_constant_override("shadow_offset_y", 2)
+		clock_label.add_theme_font_size_override("font_size", int(clampf(15.0 * ui_scale, 13.0, 17.0)))
+		clock_label.add_theme_color_override("font_color", Color(0.94, 0.98, 0.92, 1.0))
+		_apply_hud_text_shadow(clock_label, 1)
 	if weather_label != null:
-		weather_label.add_theme_font_size_override("font_size", int(clamp(16.0 * ui_scale, 14.0, 18.0)))
-		weather_label.add_theme_color_override("font_color", Color(0.88, 1.0, 0.93, 1.0))
-		weather_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.72))
-		weather_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.44))
-		weather_label.add_theme_constant_override("outline_size", 2)
-		weather_label.add_theme_constant_override("shadow_offset_x", 0)
-		weather_label.add_theme_constant_override("shadow_offset_y", 2)
+		weather_label.add_theme_font_size_override("font_size", int(clampf(15.0 * ui_scale, 13.0, 17.0)))
+		weather_label.add_theme_color_override("font_color", Color(0.94, 0.98, 0.92, 1.0))
+		_apply_hud_text_shadow(weather_label, 1)
 	if wind_label != null:
-		wind_label.add_theme_font_size_override("font_size", int(clamp(15.0 * ui_scale, 13.0, 17.0)))
-		wind_label.add_theme_color_override("font_color", Color(0.82, 0.96, 1.0, 1.0))
-		wind_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.72))
-		wind_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.44))
-		wind_label.add_theme_constant_override("outline_size", 2)
-		wind_label.add_theme_constant_override("shadow_offset_x", 0)
-		wind_label.add_theme_constant_override("shadow_offset_y", 2)
+		wind_label.add_theme_font_size_override("font_size", int(clampf(14.0 * ui_scale, 12.0, 16.0)))
+		wind_label.add_theme_color_override("font_color", Color(0.88, 0.96, 1.0, 1.0))
+		_apply_hud_text_shadow(wind_label, 1)
 
 func _apply_label_style(label: Label, primary: bool = false) -> void:
 	ui_theme.apply_label_style(label, "title" if primary else "body")
@@ -2832,6 +2947,7 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	_ensure_cast_button_visual()
 	_ensure_cast_power_indicator()
 	_ensure_stop_fishing_button()
+	_ensure_float_bite_preview()
 	_ensure_depth_hud_controls()
 	_ensure_keepnet_hud_button()
 	_ensure_player_xp_hud()
@@ -2842,8 +2958,8 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	var sx: float = screen_size.x / BASE_SCREEN_SIZE.x
 	var sy: float = screen_size.y / BASE_SCREEN_SIZE.y
 	var ui_scale: float = min(sx, sy)
-	var top_height: float = HUD_HEIGHT * sy
-	var cast_button_edge: float = clamp(126.0 * ui_scale, 104.0, 136.0)
+	var top_height: float = clampf(40.0 * ui_scale, 34.0, 42.0)
+	var cast_button_edge: float = clampf(106.0 * ui_scale, 88.0, 116.0)
 	var cast_button_size := Vector2(cast_button_edge, cast_button_edge)
 	_water_surface_y = WATER_SURFACE_Y * sy
 	_water_zone_top = _water_surface_y - 12.0 * sy
@@ -2868,17 +2984,20 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	result_label.visible = false
 	debug_panel.visible = BuildConfig.ENABLE_DEBUG_PANEL
 
-	var hud_rect := _scale_rect(Rect2(20.0, 16.0, 910.0, HUD_HEIGHT), screen_size)
-	hud_rect.size.x = max(260.0 * sx, screen_size.x - hud_rect.position.x - 128.0 * sx)
+	var hud_rect := _scale_rect(Rect2(18.0, 14.0, 560.0, HUD_HEIGHT), screen_size)
+	hud_rect.size.x = clampf(560.0 * ui_scale, 470.0, max(470.0, screen_size.x - hud_rect.position.x - 250.0 * ui_scale))
+	hud_rect.size.y = top_height
+	_anchor_control(top_hud_panel, 0.0, 0.0, 0.0, 0.0, hud_rect.position.x, hud_rect.position.y, hud_rect.end.x, hud_rect.end.y)
+	top_hud_panel.visible = false
+	top_hud_panel.custom_minimum_size = hud_rect.size
+	top_hud_panel.size = hud_rect.size
+	top_hud_panel.z_index = 99
+	top_hud_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top_hud_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	_anchor_control(top_hud_container, 0.0, 0.0, 0.0, 0.0, hud_rect.position.x, hud_rect.position.y, hud_rect.end.x, hud_rect.end.y)
 	top_hud_container.z_index = 100
-	top_hud_container.add_theme_constant_override("separation", int(clamp(22.0 * ui_scale, 18.0, 28.0)))
+	top_hud_container.add_theme_constant_override("separation", int(clampf(18.0 * ui_scale, 14.0, 22.0)))
 	top_hud_spacer.custom_minimum_size = Vector2(1.0, 1.0)
-
-	top_hud_panel.visible = false
-	top_hud_panel.custom_minimum_size = Vector2.ZERO
-	top_hud_panel.size = Vector2.ZERO
-	top_hud_panel.z_index = 100
 
 	time_hud_panel.visible = false
 	time_hud_panel.custom_minimum_size = Vector2.ZERO
@@ -2893,7 +3012,7 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	title_label.visible = false
 	level_label.visible = false
 	xp_progress_bar.visible = false
-	var hud_icon_edge := clampf(32.0 * ui_scale, 30.0, 36.0)
+	var hud_icon_edge := clampf(26.0 * ui_scale, 23.0, 29.0)
 	var hud_icon_size := Vector2(hud_icon_edge, hud_icon_edge)
 	var group_height := maxf(top_height, hud_icon_edge)
 	for group in [top_hud_money_group, top_hud_time_group, top_hud_temperature_group, top_hud_wind_group]:
@@ -2904,21 +3023,23 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 		group.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		group.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		group.alignment = BoxContainer.ALIGNMENT_BEGIN
-		group.add_theme_constant_override("separation", int(clamp(5.0 * ui_scale, 4.0, 8.0)))
+		group.add_theme_constant_override("separation", int(clampf(5.0 * ui_scale, 4.0, 7.0)))
 
 	money_label.visible = true
 	money_label.z_index = 102
-	money_label.custom_minimum_size = Vector2(clamp(80.0 * ui_scale, 76.0, 104.0), group_height)
+	money_label.custom_minimum_size = Vector2(clampf(68.0 * ui_scale, 58.0, 86.0), group_height)
 	money_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	money_label.size_flags_vertical = Control.SIZE_FILL
 	money_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	money_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	money_label.add_theme_font_size_override("font_size", int(clamp(17.0 * ui_scale, 15.0, 19.0)))
+	money_label.add_theme_font_size_override("font_size", int(clampf(16.0 * ui_scale, 14.0, 18.0)))
+	money_label.add_theme_color_override("font_color", Color(0.94, 0.98, 0.92, 1.0))
+	_apply_hud_text_shadow(money_label, 1)
 	money_label.clip_text = true
 
 	clock_label.visible = true
 	clock_label.z_index = 102
-	clock_label.custom_minimum_size = Vector2(clamp(62.0 * ui_scale, 58.0, 78.0), group_height)
+	clock_label.custom_minimum_size = Vector2(clampf(58.0 * ui_scale, 52.0, 70.0), group_height)
 	clock_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	clock_label.size_flags_vertical = Control.SIZE_FILL
 	clock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -2927,7 +3048,7 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 
 	weather_label.visible = true
 	weather_label.z_index = 102
-	weather_label.custom_minimum_size = Vector2(clamp(52.0 * ui_scale, 48.0, 66.0), group_height)
+	weather_label.custom_minimum_size = Vector2(clampf(56.0 * ui_scale, 48.0, 70.0), group_height)
 	weather_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	weather_label.size_flags_vertical = Control.SIZE_FILL
 	weather_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -2936,7 +3057,7 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	if wind_label != null:
 		wind_label.visible = true
 		wind_label.z_index = 102
-		wind_label.custom_minimum_size = Vector2(clamp(82.0 * ui_scale, 76.0, 104.0), group_height)
+		wind_label.custom_minimum_size = Vector2(clampf(92.0 * ui_scale, 82.0, 118.0), group_height)
 		wind_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		wind_label.size_flags_vertical = Control.SIZE_FILL
 		wind_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -2954,7 +3075,14 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 		money_hud_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		money_hud_icon.modulate = Color(1.0, 1.0, 1.0, 0.96)
 	if time_hud_icon != null:
-		time_hud_icon.visible = false
+		time_hud_icon.visible = true
+		time_hud_icon.custom_minimum_size = hud_icon_size
+		time_hud_icon.size = hud_icon_size
+		time_hud_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		time_hud_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		time_hud_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		time_hud_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		time_hud_icon.modulate = Color(1.0, 1.0, 1.0, 0.92)
 	if weather_hud_icon != null:
 		weather_hud_icon.custom_minimum_size = hud_icon_size
 		weather_hud_icon.size = hud_icon_size
@@ -2995,7 +3123,7 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	if quick_tackle_panel != null:
 		_reparent_node(quick_tackle_panel, ui_canvas_layer)
 
-	var cast_center := _scale_point(CAST_CONTROL_CENTER_BASE, screen_size)
+	var cast_center := _scale_point(CAST_CONTROL_CENTER_BASE + Vector2(18.0, 22.0), screen_size)
 	var cast_margin: float = 8.0 * ui_scale
 	var cast_min_x: float = cast_button_size.x * 0.5 + cast_margin
 	var cast_max_x: float = max(cast_min_x, screen_size.x - cast_button_size.x * 0.5 - cast_margin)
@@ -3008,7 +3136,7 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	var glow_rect := cast_rect.grow(8.0 * ui_scale)
 	_anchor_control(action_glow, 0.0, 0.0, 0.0, 0.0, glow_rect.position.x, glow_rect.position.y, glow_rect.end.x, glow_rect.end.y)
 	action_glow.z_index = 99
-	action_glow.visible = true
+	action_glow.visible = _is_primary_action_signal_active()
 	action_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	for quick_button in [feed_button, bait_button, tackle_button]:
@@ -3044,6 +3172,7 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 		stop_fishing_button.size = stop_size
 		_apply_primary_fishing_action_style(stop_fishing_button, stop_size)
 		_apply_stop_fishing_button_symbol_style(stop_fishing_button, stop_edge)
+	_layout_float_bite_preview(screen_size, ui_scale)
 
 	if keepnet_hud_button != null:
 		var keepnet_edge: float = clamp(cast_button_size.x * 0.68, 72.0, 92.0)
@@ -3069,7 +3198,7 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 
 	_set_action_button_icon(feed_button, "hud_feed", 19.0)
 	_set_action_button_icon(bait_button, "hud_bait", 19.0)
-	var primary_icon_size: float = clamp(cast_button_size.x * 0.88, 88.0, 110.0)
+	var primary_icon_size: float = clampf(cast_button_size.x * 0.72, 58.0, 82.0)
 	_set_primary_fishing_button_icon(fish_button, _get_primary_fishing_action_icon(), primary_icon_size)
 	_set_action_button_icon(tackle_button, "hud_tackle", 19.0)
 	_refresh_fish_button_presentation()
@@ -3201,10 +3330,11 @@ func _ensure_compact_hud_panels() -> void:
 func _ensure_hud_icons() -> void:
 	var money_icon_parent: Control = top_hud_money_group if top_hud_money_group != null else top_hud_panel
 	var time_icon_parent: Control = top_hud_time_group if top_hud_time_group != null else (weather_hud_row if weather_hud_row != null else time_hud_panel)
+	var weather_icon_parent: Control = top_hud_temperature_group if top_hud_temperature_group != null else time_icon_parent
 	var wind_icon_parent: Control = top_hud_wind_group if top_hud_wind_group != null else time_icon_parent
 	money_hud_icon = _ensure_hud_icon(money_hud_icon, "MoneyHudIcon", money_icon_parent, "money")
-	time_hud_icon = _ensure_hud_icon(time_hud_icon, "TimeHudIcon", time_hud_panel, "time")
-	weather_hud_icon = _ensure_hud_icon(weather_hud_icon, "WeatherHudIcon", time_icon_parent, "weather")
+	time_hud_icon = _ensure_hud_icon(time_hud_icon, "TimeHudIcon", time_icon_parent, "time")
+	weather_hud_icon = _ensure_hud_icon(weather_hud_icon, "WeatherHudIcon", weather_icon_parent, "weather")
 	wind_hud_icon = _ensure_hud_texture_icon(wind_hud_icon, "WindHudIcon", wind_icon_parent, _get_wind_hud_texture())
 	if money_hud_icon != null:
 		money_hud_icon.visible = false
@@ -3215,70 +3345,148 @@ func _ensure_hud_icons() -> void:
 
 func _ensure_condition_hud() -> void:
 	var parent: Node = ui_canvas_layer if ui_canvas_layer != null else self
+	if condition_hud_card == null:
+		condition_hud_card = Panel.new()
+		condition_hud_card.name = "ConditionHudCard"
+		condition_hud_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		condition_hud_card.z_index = 104
+		parent.add_child(condition_hud_card)
+	elif condition_hud_card.get_parent() != parent:
+		_reparent_node(condition_hud_card, parent)
+	condition_hud_card.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+
 	if condition_hud_group == null:
 		condition_hud_group = VBoxContainer.new()
 		condition_hud_group.name = "ConditionHud"
 		condition_hud_group.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		condition_hud_group.alignment = BoxContainer.ALIGNMENT_BEGIN
-		condition_hud_group.z_index = 104
+		condition_hud_group.z_index = 105
 		condition_hud_group.add_theme_constant_override("separation", 4)
-		parent.add_child(condition_hud_group)
-	elif condition_hud_group.get_parent() != parent:
-		_reparent_node(condition_hud_group, parent)
+		condition_hud_card.add_child(condition_hud_group)
+	elif condition_hud_group.get_parent() != condition_hud_card:
+		_reparent_node(condition_hud_group, condition_hud_card)
 
-	condition_health_label = _ensure_condition_hud_label(condition_health_label, "ConditionHealthLabel")
-	condition_temperature_label = _ensure_condition_hud_label(condition_temperature_label, "ConditionTemperatureLabel")
-	condition_hunger_label = _ensure_condition_hud_label(condition_hunger_label, "ConditionHungerLabel")
+	condition_health_row = _ensure_condition_hud_row(condition_health_row, "ConditionHealthRow")
+	condition_temperature_row = _ensure_condition_hud_row(condition_temperature_row, "ConditionTemperatureRow")
+	condition_hunger_row = _ensure_condition_hud_row(condition_hunger_row, "ConditionHungerRow")
+
+	condition_health_icon = _ensure_condition_hud_icon(condition_health_icon, "ConditionHealthIcon", condition_health_row, CONDITION_HEALTH_ICON)
+	condition_temperature_icon = _ensure_condition_hud_icon(condition_temperature_icon, "ConditionTemperatureIcon", condition_temperature_row, CONDITION_TEMPERATURE_ICON)
+	condition_hunger_icon = _ensure_condition_hud_icon(condition_hunger_icon, "ConditionHungerIcon", condition_hunger_row, CONDITION_HUNGER_ICON)
+
+	condition_health_label = _ensure_condition_hud_label(condition_health_label, "ConditionHealthLabel", condition_health_row)
+	condition_temperature_label = _ensure_condition_hud_label(condition_temperature_label, "ConditionTemperatureLabel", condition_temperature_row)
+	condition_hunger_label = _ensure_condition_hud_label(condition_hunger_label, "ConditionHungerLabel", condition_hunger_row)
 
 
-func _ensure_condition_hud_label(label: Label, node_name: String) -> Label:
+func _ensure_condition_hud_row(row: HBoxContainer, node_name: String) -> HBoxContainer:
+	if row == null:
+		row = HBoxContainer.new()
+		row.name = node_name
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.alignment = BoxContainer.ALIGNMENT_BEGIN
+		row.add_theme_constant_override("separation", 7)
+		condition_hud_group.add_child(row)
+	elif row.get_parent() != condition_hud_group:
+		_reparent_node(row, condition_hud_group)
+	row.visible = true
+	row.z_index = 106
+	row.size_flags_horizontal = Control.SIZE_FILL
+	row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	return row
+
+
+func _ensure_condition_hud_icon(icon: TextureRect, node_name: String, row: Control, texture: Texture2D) -> TextureRect:
+	if icon == null:
+		icon = TextureRect.new()
+		icon.name = node_name
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		row.add_child(icon)
+	elif icon.get_parent() != row:
+		_reparent_node(icon, row)
+	icon.texture = texture
+	icon.visible = texture != null
+	icon.z_index = 107
+	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon.modulate = Color(1.0, 1.0, 1.0, 0.94)
+	return icon
+
+
+func _ensure_condition_hud_label(label: Label, node_name: String, row: Control) -> Label:
 	if label == null:
 		label = Label.new()
 		label.name = node_name
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		label.clip_text = true
-		condition_hud_group.add_child(label)
-	elif label.get_parent() != condition_hud_group:
-		_reparent_node(label, condition_hud_group)
+		row.add_child(label)
+	elif label.get_parent() != row:
+		_reparent_node(label, row)
 	label.visible = true
-	label.z_index = 105
-	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.78))
-	label.add_theme_constant_override("shadow_offset_x", 1)
-	label.add_theme_constant_override("shadow_offset_y", 1)
+	label.z_index = 106
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.size_flags_vertical = Control.SIZE_FILL
+	_apply_hud_text_shadow(label, 1)
 	return label
 
 
 func _layout_condition_hud(screen_size: Vector2, ui_scale: float) -> void:
-	if condition_hud_group == null:
+	if condition_hud_group == null or condition_hud_card == null:
 		return
 	var sx: float = screen_size.x / BASE_SCREEN_SIZE.x
 	var sy: float = screen_size.y / BASE_SCREEN_SIZE.y
-	var group_width := clampf(184.0 * ui_scale, 162.0, 220.0)
+	var card_width := clampf(154.0 * ui_scale, 138.0, 176.0)
+	var padding_x := clampf(6.0 * ui_scale, 4.0, 8.0)
+	var padding_y := clampf(6.0 * ui_scale, 4.0, 8.0)
+	var group_width := card_width - padding_x * 2.0
 	var label_height := clampf(24.0 * ui_scale, 22.0, 28.0)
 	var item_gap := clampf(4.0 * ui_scale, 3.0, 6.0)
 	var group_height := label_height * 3.0 + item_gap * 2.0
-	var margin_x := clampf(24.0 * sx, 16.0, 30.0)
+	var card_height := group_height + padding_y * 2.0
+	var margin_x := clampf(10.0 * sx, 6.0, 14.0)
 	var margin_y := clampf(26.0 * sy, 18.0, 34.0)
-	var group_pos := Vector2(
-		screen_size.x - margin_x - group_width,
-		screen_size.y - margin_y - group_height
+	var card_pos := Vector2(
+		screen_size.x - margin_x - card_width,
+		screen_size.y - margin_y - card_height
 	)
-	_anchor_control(condition_hud_group, 0.0, 0.0, 0.0, 0.0, group_pos.x, group_pos.y, group_pos.x + group_width, group_pos.y + group_height)
+	_anchor_control(condition_hud_card, 0.0, 0.0, 0.0, 0.0, card_pos.x, card_pos.y, card_pos.x + card_width, card_pos.y + card_height)
+	condition_hud_card.visible = true
+	condition_hud_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	condition_hud_card.z_index = 104
+	condition_hud_card.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	_anchor_control(condition_hud_group, 0.0, 0.0, 0.0, 0.0, padding_x, padding_y, padding_x + group_width, padding_y + group_height)
 	condition_hud_group.visible = true
 	condition_hud_group.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	condition_hud_group.add_theme_constant_override("separation", int(item_gap))
 
 	var font_size := int(clampf(13.0 * ui_scale, 12.0, 15.0))
+	var icon_edge := clampf(21.0 * ui_scale, 19.0, 25.0)
+	var icon_gap := int(clampf(7.0 * ui_scale, 6.0, 9.0))
+	for row in [condition_health_row, condition_temperature_row, condition_hunger_row]:
+		if row == null:
+			continue
+		row.custom_minimum_size = Vector2(group_width, label_height)
+		row.size_flags_horizontal = Control.SIZE_FILL
+		row.size_flags_vertical = Control.SIZE_FILL
+		row.add_theme_constant_override("separation", icon_gap)
+	for icon in [condition_health_icon, condition_temperature_icon, condition_hunger_icon]:
+		if icon == null:
+			continue
+		icon.custom_minimum_size = Vector2(icon_edge, icon_edge)
+		icon.size = Vector2(icon_edge, icon_edge)
 	for label in [condition_health_label, condition_temperature_label, condition_hunger_label]:
 		if label == null:
 			continue
-		label.custom_minimum_size = Vector2(group_width, label_height)
-		label.size_flags_horizontal = Control.SIZE_FILL
+		label.custom_minimum_size = Vector2(maxf(group_width - icon_edge - float(icon_gap), 70.0), label_height)
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		label.size_flags_vertical = Control.SIZE_FILL
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		label.add_theme_font_size_override("font_size", font_size)
+		_apply_hud_text_shadow(label, 1)
 
 
 func _refresh_condition_hud() -> void:
@@ -3305,14 +3513,18 @@ func _refresh_condition_hud() -> void:
 	var wellbeing_status := str(state.get("wellbeing_status", state.get("health_status", "normal")))
 	var wellbeing_label := str(state.get("wellbeing_label", _get_condition_wellbeing_label(wellbeing_status)))
 
+	for icon in [condition_health_icon, condition_temperature_icon, condition_hunger_icon]:
+		if icon != null:
+			icon.modulate = Color(1.0, 1.0, 1.0, 0.96)
+
 	if condition_health_label != null:
-		condition_health_label.text = "Состояние: %s" % wellbeing_label
+		condition_health_label.text = wellbeing_label
 		condition_health_label.add_theme_color_override("font_color", _get_condition_wellbeing_color(wellbeing_status))
 	if condition_temperature_label != null:
-		condition_temperature_label.text = "Температура: %.1f°C" % body_temperature
+		condition_temperature_label.text = "%.1f°C" % body_temperature
 		condition_temperature_label.add_theme_color_override("font_color", _get_condition_temperature_color(str(state.get("temperature_status", "normal"))))
 	if condition_hunger_label != null:
-		condition_hunger_label.text = "Голод: %d%%" % roundi(hunger)
+		condition_hunger_label.text = "%d%%" % roundi(hunger)
 		condition_hunger_label.add_theme_color_override("font_color", _get_condition_hunger_color(hunger))
 
 
@@ -3373,12 +3585,14 @@ func _order_weather_hud_row_children() -> void:
 		top_hud_money_group.move_child(money_hud_icon, 0)
 	if money_label != null and money_label.get_parent() == top_hud_money_group:
 		top_hud_money_group.move_child(money_label, min(1, top_hud_money_group.get_child_count() - 1))
-	if weather_hud_icon != null and weather_hud_icon.get_parent() == top_hud_time_group:
-		top_hud_time_group.move_child(weather_hud_icon, 0)
+	if time_hud_icon != null and time_hud_icon.get_parent() == top_hud_time_group:
+		top_hud_time_group.move_child(time_hud_icon, 0)
 	if clock_label != null and clock_label.get_parent() == top_hud_time_group:
 		top_hud_time_group.move_child(clock_label, min(1, top_hud_time_group.get_child_count() - 1))
+	if weather_hud_icon != null and weather_hud_icon.get_parent() == top_hud_temperature_group:
+		top_hud_temperature_group.move_child(weather_hud_icon, 0)
 	if weather_label != null and weather_label.get_parent() == top_hud_temperature_group:
-		top_hud_temperature_group.move_child(weather_label, 0)
+		top_hud_temperature_group.move_child(weather_label, min(1, top_hud_temperature_group.get_child_count() - 1))
 	if wind_hud_icon != null and wind_hud_icon.get_parent() == top_hud_wind_group:
 		top_hud_wind_group.move_child(wind_hud_icon, 0)
 	if wind_label != null and wind_label.get_parent() == top_hud_wind_group:
@@ -3717,7 +3931,7 @@ func _refresh_fish_button_presentation() -> void:
 	if target_size == Vector2.ZERO:
 		var viewport_size := get_viewport_rect().size
 		var button_scale: float = min(viewport_size.x / BASE_SCREEN_SIZE.x, viewport_size.y / BASE_SCREEN_SIZE.y)
-		var button_edge: float = clamp(126.0 * button_scale, 104.0, 136.0)
+		var button_edge: float = clampf(106.0 * button_scale, 88.0, 116.0)
 		target_size = Vector2(button_edge, button_edge)
 
 	fish_button.visible = true
@@ -3730,6 +3944,8 @@ func _refresh_fish_button_presentation() -> void:
 		cast_button_visual.visible = false
 	_cast_button_hovered = false
 	_apply_primary_fishing_action_style(fish_button, target_size)
+	if action_glow != null:
+		action_glow.visible = _is_primary_action_signal_active()
 	fish_button.add_theme_font_size_override("font_size", int(clampf(min(target_size.x, target_size.y) * 0.135, 14.0, 18.0)))
 	fish_button.clip_text = true
 	var action_label := _get_primary_fishing_action_label()
@@ -3830,7 +4046,7 @@ func _refresh_depth_hud_controls() -> void:
 	depth_radial_control.mouse_filter = Control.MOUSE_FILTER_PASS if should_show else Control.MOUSE_FILTER_IGNORE
 	if not should_show:
 		if ui_theme != null:
-			var restore_icon_size: float = clamp(min(fish_button.size.x, fish_button.size.y) * 0.88, 88.0, 110.0)
+			var restore_icon_size: float = clampf(min(fish_button.size.x, fish_button.size.y) * 0.72, 58.0, 82.0)
 			_set_primary_fishing_button_icon(fish_button, _get_primary_fishing_action_icon(), restore_icon_size)
 		return
 
@@ -3881,7 +4097,10 @@ func _refresh_depth_hud_controls() -> void:
 	label_pos.y = clamp(label_pos.y, margin, viewport_size.y - label_size.y - margin)
 	_anchor_control(depth_hud_label, 0.0, 0.0, 0.0, 0.0, label_pos.x, label_pos.y, label_pos.x + label_size.x, label_pos.y + label_size.y)
 	depth_hud_label.text = "%.1f м" % PlayerData.fishing_depth
-	depth_hud_label.add_theme_font_size_override("font_size", int(clamp(16.0 * ui_scale, 15.0, 19.0)))
+	depth_hud_label.add_theme_font_size_override("font_size", int(clampf(15.0 * ui_scale, 13.0, 17.0)))
+	depth_hud_label.add_theme_color_override("font_color", Color(0.94, 0.98, 0.92, 0.98))
+	_apply_hud_text_shadow(depth_hud_label, 1)
+	depth_hud_label.add_theme_stylebox_override("normal", _make_hud_glass_style(false, HUD_GLASS_RADIUS))
 
 
 func _layout_depth_hud_value_label() -> void:
@@ -3905,11 +4124,10 @@ func _layout_depth_hud_value_label() -> void:
 	depth_hud_label.visible = true
 	depth_hud_label.z_index = 263
 	depth_hud_label.text = "%.1f м" % PlayerData.fishing_depth
-	depth_hud_label.add_theme_font_size_override("font_size", int(clamp(17.0 * ui_scale, 15.0, 20.0)))
-	depth_hud_label.add_theme_stylebox_override(
-		"normal",
-		_make_panel_style(Color(0.026, 0.052, 0.055, 0.72), Color(0.74, 0.96, 0.86, 0.30), 13, 4, Color(0.0, 0.0, 0.0, 0.24))
-	)
+	depth_hud_label.add_theme_font_size_override("font_size", int(clampf(15.0 * ui_scale, 13.0, 17.0)))
+	depth_hud_label.add_theme_color_override("font_color", Color(0.94, 0.98, 0.92, 0.98))
+	_apply_hud_text_shadow(depth_hud_label, 1)
+	depth_hud_label.add_theme_stylebox_override("normal", _make_hud_glass_style(false, HUD_GLASS_RADIUS))
 
 
 func _update_depth_hud_value_label() -> void:
@@ -3998,19 +4216,25 @@ func _build_cast_depth_context(cast_power: float, hold_time: float) -> Dictionar
 
 func _get_cast_float_wind_modifiers(spot: Dictionary) -> Dictionary:
 	var float_data: Dictionary = PlayerData.get_current_float_data() if PlayerData.has_method("get_current_float_data") else {}
+	var tackle_stats: Dictionary = PlayerData.get_tackle_stats()
 	var cast_distance_bonus: float = clamp(float(float_data.get("cast_distance_bonus", 0.0)), -0.20, 0.25)
 	var long_range_accuracy_bonus: float = clamp(float(float_data.get("long_range_accuracy_bonus", 0.0)), 0.0, 0.20)
 	var setup_comfort: float = clamp(float(float_data.get("setup_comfort", 0.0)), 0.0, 0.20)
 	var wind_resistance: float = clamp(float(float_data.get("wind_resistance", 0.65)), 0.0, 1.0)
+	var rig_cast_accuracy_multiplier: float = clamp(float(tackle_stats.get("rig_cast_accuracy_multiplier", 1.0)), 0.72, 1.02)
+	var rig_cast_distance_bonus: float = clamp(float(tackle_stats.get("rig_cast_distance_bonus", 0.0)), -0.10, 0.0)
+	cast_distance_bonus = clamp(cast_distance_bonus + rig_cast_distance_bonus, -0.30, 0.25)
 	var wind_state: Dictionary = _get_effective_wind_state_for_spot(str(spot.get("id", PlayerData.current_spot)))
 	var wind_speed: float = max(float(wind_state.get("speed_mps", 0.0)), 0.0)
 	var wind_cast_penalty: float = max(wind_speed - 2.0, 0.0) / 8.0 * (1.0 - wind_resistance * 0.65)
-	var cast_accuracy: float = clamp(1.0 - wind_cast_penalty * 0.20 + cast_distance_bonus * 0.10 + long_range_accuracy_bonus * 0.18 + setup_comfort * 0.08, 0.72, 1.14)
+	var cast_accuracy: float = clamp((1.0 - wind_cast_penalty * 0.20 + cast_distance_bonus * 0.10 + long_range_accuracy_bonus * 0.18 + setup_comfort * 0.08) * rig_cast_accuracy_multiplier, 0.58, 1.14)
 	return {
 		"cast_distance_bonus": cast_distance_bonus,
 		"long_range_accuracy_bonus": long_range_accuracy_bonus,
 		"wind_cast_penalty": clamp(wind_cast_penalty, 0.0, 0.60),
-		"cast_accuracy": cast_accuracy
+		"cast_accuracy": cast_accuracy,
+		"rig_cast_accuracy_multiplier": rig_cast_accuracy_multiplier,
+		"rig_cast_distance_bonus": rig_cast_distance_bonus
 	}
 
 
@@ -4051,9 +4275,9 @@ func _debug_log_cast_depth(context: Dictionary) -> void:
 
 
 func _apply_depth_hud_button_style(button: Button) -> void:
-	var normal := _make_primary_action_circle_style(Color(0.030, 0.075, 0.084, 0.92), Color(0.86, 1.0, 0.90, 0.56), 24, 5, Color(0.0, 0.0, 0.0, 0.24))
-	var hover := _make_primary_action_circle_style(Color(0.055, 0.128, 0.120, 0.98), Color(1.0, 0.84, 0.42, 0.78), 24, 7, Color(0.18, 0.64, 0.48, 0.18))
-	var pressed := _make_primary_action_circle_style(Color(0.116, 0.128, 0.070, 1.0), Color(1.0, 0.78, 0.30, 0.90), 24, 3, Color(0.0, 0.0, 0.0, 0.18))
+	var normal := _make_primary_action_circle_style(Color(0.018, 0.034, 0.036, 0.72), Color(0.70, 0.86, 0.80, 0.28), 24, 4, Color(0.0, 0.0, 0.0, 0.22))
+	var hover := _make_primary_action_circle_style(Color(0.034, 0.078, 0.066, 0.84), Color(0.66, 1.0, 0.72, 0.46), 24, 6, Color(0.20, 0.72, 0.34, 0.14))
+	var pressed := _make_primary_action_circle_style(Color(0.048, 0.120, 0.076, 0.92), Color(0.72, 1.0, 0.66, 0.58), 24, 2, Color(0.0, 0.0, 0.0, 0.16))
 	button.add_theme_stylebox_override("normal", normal)
 	button.add_theme_stylebox_override("hover", hover)
 	button.add_theme_stylebox_override("pressed", pressed)
@@ -6082,6 +6306,7 @@ func _connect_signals() -> void:
 	FishingManager.lure_retrieve_updated.connect(_on_lure_retrieve_updated)
 	FishingManager.lure_retrieve_finished.connect(_on_lure_retrieve_finished)
 	FishingManager.float_nudge.connect(_on_float_nudge)
+	FishingManager.bite_preview_event.connect(_on_bite_preview_event)
 	FishingManager.bite_started.connect(_on_bite_started)
 	FishingManager.bite_window_updated.connect(_on_bite_window_updated)
 	FishingManager.hook_success.connect(_on_hook_success)
@@ -6104,6 +6329,7 @@ func _update_ui() -> void:
 	_refresh_current_tackle_hud()
 	_refresh_condition_hud()
 	_refresh_stop_fishing_button_presentation()
+	_refresh_float_bite_preview_visibility()
 
 
 func _on_player_condition_changed(_state: Dictionary) -> void:
@@ -7320,6 +7546,7 @@ func _cancel_current_fishing_wait() -> void:
 	timer_label.text = "Готов к забросу"
 	result_label.text = "Ловля прекращена. Удочка вытянута."
 	fight_status_label.text = ""
+	_hide_float_bite_preview()
 	_reset_reeling_ui()
 	_update_ui()
 
@@ -8030,6 +8257,7 @@ func _return_to_idle_after_result() -> void:
 	_pending_cast_depth_context = {}
 	is_cast_animating = false
 	_hide_catch_reward_popup(false)
+	_hide_float_bite_preview()
 	if fishing_presence_ui != null:
 		if fishing_presence_ui.has_method("set_rod_uncasted"):
 			fishing_presence_ui.set_rod_uncasted()
@@ -8051,6 +8279,8 @@ func _is_reel_tackle_mode() -> bool:
 	if not BuildConfig.ENABLE_SPINNING_FEATURES:
 		return false
 	if PlayerData == null:
+		return false
+	if PlayerData.has_method("get_current_tackle_type") and str(PlayerData.call("get_current_tackle_type")) != "spinning":
 		return false
 	if PlayerData.has_method("get_current_fight_mode"):
 		return str(PlayerData.call("get_current_fight_mode")) == "reel"
@@ -8127,6 +8357,10 @@ func _on_waiting_for_bite_started() -> void:
 	var reel_tackle_mode := _is_reel_tackle_mode()
 	if not reel_tackle_mode and fishing_presence_ui != null and fishing_presence_ui.has_method("set_float_in_water"):
 		fishing_presence_ui.set_float_in_water(true)
+	if reel_tackle_mode:
+		_hide_float_bite_preview()
+	else:
+		_show_float_bite_preview_idle()
 	_reset_reeling_ui()
 	timer_label.text = "Следи за поплавком"
 	result_label.text = "Поплавок в воде. Жди настоящую поклёвку и нажми “Подсечь”."
@@ -8142,11 +8376,65 @@ func _on_float_nudge(nudge_data: Dictionary) -> void:
 		return
 	if fishing_presence_ui != null and fishing_presence_ui.has_method("play_float_nudge"):
 		fishing_presence_ui.play_float_nudge(nudge_data)
+	if float_bite_preview != null and float_bite_preview.visible and float_bite_preview.has_method("play_wind_nudge"):
+		float_bite_preview.call("play_wind_nudge", nudge_data)
 
 	if str(nudge_data.get("kind", "small")) == "suspicious":
 		fight_status_label.text = "Поплавок подозрительно качнулся..."
 
+func _on_bite_preview_event(event_data: Dictionary) -> void:
+	if _is_reel_tackle_mode() or _is_menu_overlay_open():
+		_hide_float_bite_preview()
+		return
+
+	_ensure_float_bite_preview()
+	if float_bite_preview == null:
+		return
+	if not float_bite_preview.visible and float_bite_preview.has_method("show_preview"):
+		float_bite_preview.call("show_preview")
+
+	var phase := str(event_data.get("phase", ""))
+	var style := str(event_data.get("visual_style", ""))
+	match phase:
+		"interest":
+			if float_bite_preview.has_method("play_interest"):
+				float_bite_preview.call("play_interest", event_data)
+		"nibble":
+			if style == "cautious_nibble" and float_bite_preview.has_method("play_cautious_nibble"):
+				float_bite_preview.call("play_cautious_nibble", event_data)
+			elif style == "small_fish_taps" and float_bite_preview.has_method("play_small_fish_taps"):
+				float_bite_preview.call("play_small_fish_taps", event_data)
+			elif float_bite_preview.has_method("play_nibble"):
+				float_bite_preview.call("play_nibble", event_data)
+		"lost_interest":
+			if float_bite_preview.has_method("play_lost_interest"):
+				float_bite_preview.call("play_lost_interest", event_data)
+		"bait_stolen":
+			if float_bite_preview.has_method("play_bait_stolen"):
+				float_bite_preview.call("play_bait_stolen", event_data)
+		"take", "strong_bite":
+			_play_float_bite_preview_take(style, event_data)
+
+
+func _play_float_bite_preview_take(style: String, data: Dictionary) -> void:
+	if float_bite_preview == null or not is_instance_valid(float_bite_preview):
+		return
+	match style:
+		"aggressive_take":
+			if float_bite_preview.has_method("play_aggressive_take"):
+				float_bite_preview.call("play_aggressive_take", data)
+		"heavy_take":
+			if float_bite_preview.has_method("play_heavy_take"):
+				float_bite_preview.call("play_heavy_take", data)
+		"erratic_take":
+			if float_bite_preview.has_method("play_erratic_take"):
+				float_bite_preview.call("play_erratic_take", data)
+		_:
+			if float_bite_preview.has_method("play_submerge"):
+				float_bite_preview.call("play_submerge", data)
+
 func _on_lure_retrieve_started(state: Dictionary) -> void:
+	_hide_float_bite_preview()
 	_fishing_ui_state = FishingUiState.WAITING
 	_presence_bite_timer = 0.0
 	_presence_caught_timer = 0.0
@@ -8167,6 +8455,7 @@ func _on_lure_retrieve_updated(state: Dictionary) -> void:
 	_update_ui()
 
 func _on_lure_retrieve_finished(state: Dictionary) -> void:
+	_hide_float_bite_preview()
 	_apply_lure_retrieve_state(state)
 	_fishing_ui_state = FishingUiState.IDLE
 	_presence_bite_timer = 0.0
@@ -8189,6 +8478,10 @@ func _apply_lure_retrieve_state(state: Dictionary) -> void:
 func _on_bite_started(bite_data: Dictionary) -> void:
 	_fishing_ui_state = FishingUiState.WAITING
 	_presence_bite_timer = max(float(bite_data.get("bite_window_seconds", 1.4)), 0.8)
+	if float_bite_preview != null and is_instance_valid(float_bite_preview) and float_bite_preview.has_method("play_hook_ready"):
+		float_bite_preview.call("play_hook_ready", bite_data)
+	else:
+		_play_float_bite_preview_take(str(bite_data.get("visual_style", "submerge")), bite_data)
 	timer_label.text = "Клюёт! Подсекай!"
 	result_label.text = "Поклёвка: %s\nЖми “Подсечь” в момент рывка." % str(bite_data.get("fish_name", "рыба"))
 	fight_status_label.text = "Окно подсечки открыто"
@@ -8205,6 +8498,7 @@ func _on_bite_window_updated(bite_data: Dictionary) -> void:
 	timer_label.text = "Подсечь: %.1f" % remaining
 
 func _on_hook_success(catch_data: Dictionary) -> void:
+	_hide_float_bite_preview()
 	timer_label.text = "Подсечка!"
 	result_label.text = "Подсечка! На крючке: %s" % str(catch_data.get("name", "-"))
 	if fishing_presence_ui != null and fishing_presence_ui.has_method("play_hook_result"):
@@ -8229,9 +8523,11 @@ func _on_hook_failed(reason: String, data: Dictionary) -> void:
 	fight_status_label.text = "Ожидание продолжается"
 	if fishing_presence_ui != null and fishing_presence_ui.has_method("play_hook_result"):
 		fishing_presence_ui.play_hook_result(false, reason)
+	_show_float_bite_preview_idle()
 	_update_ui()
 
 func _on_reeling_started(catch_data: Dictionary, state: Dictionary) -> void:
+	_hide_float_bite_preview()
 	if not bool(FishingManager.get("use_new_bite_system")):
 		_call_audio_manager("play_bite")
 	_presence_bite_timer = 0.95
@@ -8259,6 +8555,7 @@ func _on_reeling_updated(state: Dictionary) -> void:
 
 func _on_fish_caught(catch_data: Dictionary) -> void:
 	_call_audio_manager("play_catch_success")
+	_hide_float_bite_preview()
 	_presence_bite_timer = 0.0
 	_presence_caught_timer = 1.1
 	_fishing_ui_state = FishingUiState.CAUGHT
@@ -8300,6 +8597,7 @@ func _on_fish_caught(catch_data: Dictionary) -> void:
 
 func _on_fishing_failed_detailed(failure_data: Dictionary) -> void:
 	_play_line_break_sfx_if_needed(failure_data)
+	_hide_float_bite_preview()
 	_last_detailed_failure_msec = Time.get_ticks_msec()
 	_pending_reward_catch = {}
 	_hide_catch_reward_popup(false)
@@ -8331,6 +8629,7 @@ func _on_fishing_failed(message: String) -> void:
 	if _message_mentions_line_break(message):
 		_call_audio_manager("play_line_break")
 
+	_hide_float_bite_preview()
 	_pending_reward_catch = {}
 	_hide_catch_reward_popup(false)
 	_presence_bite_timer = 0.0

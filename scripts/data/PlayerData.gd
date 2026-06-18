@@ -5322,12 +5322,136 @@ func get_tackle_shop_items() -> Array:
 
 		if float(item.get("price", 0.0)) > 0.0 and str(item.get("type", "")) != "bait":
 			var shop_item: Dictionary = item.duplicate(true)
+			var catalog_price := float(shop_item.get("price", 0.0))
 			shop_item["shop_category"] = "tackle"
 			shop_item["quantity"] = 1
 			shop_item["icon"] = _get_item_icon(str(shop_item.get("type", shop_item.get("category", ""))))
+			shop_item["catalog_price"] = catalog_price
+			shop_item["price_before_balance"] = catalog_price
+			shop_item["price"] = _get_balanced_tackle_shop_price(shop_item)
 			items.append(shop_item)
 
 	return items
+
+func _get_balanced_tackle_shop_price(item: Dictionary) -> float:
+	var category := str(item.get("type", item.get("category", "")))
+	var stats: Dictionary = {}
+	var raw_stats = item.get("stats", {})
+	if raw_stats is Dictionary:
+		stats = (raw_stats as Dictionary)
+	var rarity := str(item.get("rarity", "common")).to_lower()
+	var level_required: int = max(int(item.get("level_required", stats.get("level_required", 1))), 1)
+
+	match category:
+		"hook":
+			var hook_size: int = int(stats.get("hook_size", 12))
+			var target_size := str(stats.get("target_fish_size", "small")).to_lower()
+			var hook_chance: float = float(stats.get("hook_chance", stats.get("hook_success_bonus", 0.08)))
+			var hook_strength: float = float(stats.get("hook_strength", 0.75))
+			var hook_price := 2.0
+			match target_size:
+				"large":
+					hook_price = 8.0 + clampf((6.0 - float(hook_size)) * 2.4, 0.0, 16.0)
+				"medium":
+					hook_price = 3.0 + clampf((10.0 - float(hook_size)) * 0.55, 0.0, 5.0)
+				_:
+					hook_price = 1.0 + clampf((24.0 - float(hook_size)) * 0.16, 0.0, 2.2)
+			hook_price += max(hook_chance - 0.06, 0.0) * 70.0
+			hook_price += max(hook_strength - 0.70, 0.0) * 5.0
+			hook_price += float(level_required - 1) * 0.7
+			match rarity:
+				"uncommon":
+					hook_price += 1.5
+				"rare":
+					hook_price += 4.0
+				"epic":
+					hook_price += 8.0
+				"trophy", "legendary":
+					hook_price += 12.0
+			return float(roundi(clampf(hook_price, 1.0, 35.0)))
+		"float":
+			var float_type := str(stats.get("float_type", item.get("float_type", stats.get("base_type", "drop")))).to_lower()
+			var sensitivity: float = clampf(float(stats.get("sensitivity", 0.85)), 0.0, 1.0)
+			var stability: float = clampf(float(stats.get("stability", 0.75)), 0.0, 1.0)
+			var night_bonus: float = clampf(float(stats.get("night_bonus", 0.0)), 0.0, 0.60)
+			var cast_bonus: float = max(float(stats.get("cast_distance_bonus", 0.0)), 0.0)
+			var timing_bonus: float = max(float(stats.get("hook_timing_bonus", 0.0)), 0.0)
+			var float_price := 6.0
+			match float_type:
+				"feather", "glow_feather":
+					float_price = 5.0
+				"spindle":
+					float_price = 10.0
+				"barrel":
+					float_price = 9.0
+				"waggler", "sliding":
+					float_price = 16.0
+				_:
+					float_price = 6.0
+			float_price += max(sensitivity - 0.82, 0.0) * 58.0
+			float_price += max(stability - 0.82, 0.0) * 34.0
+			float_price += night_bonus * 34.0
+			float_price += cast_bonus * 44.0
+			float_price += timing_bonus * 58.0
+			float_price += float(level_required - 1) * 0.8
+			match rarity:
+				"uncommon":
+					float_price += 2.0
+				"rare":
+					float_price += 5.0
+				"epic":
+					float_price += 10.0
+				"trophy", "legendary":
+					float_price += 14.0
+			return float(roundi(clampf(float_price, 3.0, 45.0)))
+		"leader":
+			var material := str(stats.get("material", stats.get("leader_type", "nylon"))).to_lower()
+			var load_kg: float = max(float(stats.get("max_load_kg", stats.get("max_load", stats.get("strength", 1.0)))), 0.1)
+			var length_cm: float = clampf(float(stats.get("length_cm", 20)), 5.0, 80.0)
+			var leader_price := 3.0
+			match material:
+				"fluoro", "fluorocarbon":
+					leader_price = 4.0 + load_kg * 2.0 + length_cm * 0.05
+				"braid", "braided":
+					leader_price = 8.0 + load_kg * 2.2 + length_cm * 0.04
+				"steel", "reinforced":
+					leader_price = 14.0 + load_kg * 1.35 + length_cm * 0.04
+				_:
+					leader_price = 2.0 + load_kg * 2.2 + length_cm * 0.03
+			leader_price += float(level_required - 1) * 0.5
+			match rarity:
+				"uncommon":
+					leader_price += 1.0
+				"rare":
+					leader_price += 3.0
+				"epic":
+					leader_price += 6.0
+				"trophy", "legendary":
+					leader_price += 9.0
+			return float(roundi(clampf(leader_price, 2.0, 45.0)))
+		"line":
+			var line_type := str(stats.get("line_type", stats.get("material", "nylon"))).to_lower()
+			var line_load_kg: float = max(float(stats.get("max_load_kg", stats.get("max_load", stats.get("strength", 1.0)))), 0.1)
+			var line_floor_price: float = 5.0 + line_load_kg * 3.2
+			match line_type:
+				"fluoro", "fluorocarbon":
+					line_floor_price += 4.0
+				"braid", "braided":
+					line_floor_price += 6.0
+				_:
+					line_floor_price += 0.0
+			match rarity:
+				"uncommon":
+					line_floor_price += 2.0
+				"rare":
+					line_floor_price += 5.0
+				"epic":
+					line_floor_price += 9.0
+				"trophy", "legendary":
+					line_floor_price += 14.0
+			return float(roundi(max(float(item.get("price", 0.0)), clampf(line_floor_price, 5.0, 95.0))))
+
+	return float(item.get("price", 0.0))
 
 func _make_tackle_component(item_id: String) -> Dictionary:
 	var item := get_tackle_catalog_item(item_id)
@@ -5438,10 +5562,11 @@ func _normalize_equipment_stats(stats: Dictionary, category: String, item_id: St
 				normalized["durability_loss"] = 0.012
 			if not normalized.has("power"):
 				normalized["power"] = float(normalized.get("strength", normalized.get("stiffness", 1.0)))
+			var default_test_range := _get_default_rod_test_range(str(normalized["rod_class"]), float(normalized["length_m"]), bool(normalized["requires_reel"]))
 			if not normalized.has("test_min"):
-				normalized["test_min"] = 0.0 if not bool(normalized["requires_reel"]) else 3.0
+				normalized["test_min"] = float(default_test_range.get("min", 0.5))
 			if not normalized.has("test_max"):
-				normalized["test_max"] = float(normalized.get("max_fish_weight", 1.0)) * 4.0 if bool(normalized["requires_reel"]) else float(normalized.get("max_fish_weight", 1.0))
+				normalized["test_max"] = float(default_test_range.get("max", 5.0))
 			if not normalized.has("flexibility"):
 				normalized["flexibility"] = clamp(1.25 - float(normalized.get("stiffness", 1.0)) * 0.45, 0.20, 0.95)
 			if not normalized.has("compatible_reel_min_size"):
@@ -5774,6 +5899,39 @@ func _get_default_rod_class(length_m: float) -> String:
 	if length_m <= 5.8:
 		return "universal"
 	return "heavy"
+
+func _get_default_rod_test_range(rod_class: String, length_m: float, requires_reel: bool) -> Dictionary:
+	if requires_reel:
+		match rod_class:
+			"ultra_light":
+				return {"min": 1.0, "max": 7.0}
+			"light":
+				return {"min": 3.0, "max": 14.0}
+			"medium":
+				return {"min": 7.0, "max": 28.0}
+			"heavy":
+				return {"min": 20.0, "max": 70.0}
+			"extra_heavy":
+				return {"min": 40.0, "max": 120.0}
+			_:
+				return {"min": 5.0, "max": 24.0}
+
+	match rod_class:
+		"ultra_light":
+			return {"min": 0.2, "max": 3.0}
+		"light":
+			return {"min": 0.4, "max": 5.5}
+		"medium":
+			return {"min": 0.8, "max": 8.0}
+		"universal":
+			return {"min": 1.0, "max": 12.0}
+		"heavy":
+			return {"min": 2.0, "max": 18.0}
+		"extra_heavy":
+			return {"min": 4.0, "max": 30.0}
+		_:
+			var length_bonus: float = clampf((length_m - 4.0) * 1.15, -0.8, 3.0)
+			return {"min": 0.6, "max": max(5.0 + length_bonus, 3.0)}
 
 func _get_default_rod_reach_bonus(length_m: float) -> float:
 	return clamp((length_m - 4.0) * 0.045, -0.04, 0.18)
@@ -6892,6 +7050,10 @@ func get_tackle_setup_issues() -> Array:
 	if not get_current_rod_requires_reel() and typeof(dangling_reel) == TYPE_DICTIONARY and str(dangling_reel.get("id", "")) != "":
 		issues.append("На маховую удочку катушка не ставится.")
 
+	var weight_block_reason := _get_tackle_weight_block_reason()
+	if weight_block_reason != "":
+		issues.append(weight_block_reason)
+
 	return issues
 
 func get_tackle_setup_status_text() -> String:
@@ -6899,6 +7061,214 @@ func get_tackle_setup_status_text() -> String:
 	if issues.is_empty():
 		return "Снасть готова к ловле."
 	return "Снасть не готова:\n- %s" % "\n- ".join(issues)
+
+func get_tackle_setup_warnings() -> Array:
+	var profile := _build_current_tackle_weight_profile()
+	if profile.is_empty():
+		return []
+	var warnings = profile.get("warnings", [])
+	if warnings is Array:
+		return (warnings as Array).duplicate()
+	return []
+
+func _get_tackle_weight_block_reason() -> String:
+	var profile := _build_current_tackle_weight_profile()
+	if profile.is_empty():
+		return ""
+	return str(profile.get("block_reason", ""))
+
+func _build_current_tackle_weight_profile() -> Dictionary:
+	var rod_raw = current_tackle.get("rod", {})
+	if not (rod_raw is Dictionary) or str((rod_raw as Dictionary).get("id", "")) == "":
+		return {}
+
+	var rod: Dictionary = _normalize_equipment_stats((rod_raw as Dictionary).duplicate(true), "rod")
+	var leader: Dictionary = _normalize_equipment_stats(current_tackle.get("leader", {}).duplicate(true), "leader")
+	var float_part: Dictionary = get_current_float_data()
+	var hook: Dictionary = _normalize_equipment_stats(current_tackle.get("hook", {}).duplicate(true), "hook")
+	var bait: Dictionary = _normalize_equipment_stats(current_tackle.get("bait", {}).duplicate(true), "bait", str(current_tackle.get("bait", {}).get("id", "")))
+	var lure: Dictionary = _normalize_equipment_stats(current_tackle.get("lure", {}).duplicate(true), "lure", str(current_tackle.get("lure", {}).get("id", "")))
+	var tackle_type_key := normalize_tackle_type(_get_tackle_type_from_item(rod))
+	if not BuildConfig.ENABLE_SPINNING_FEATURES:
+		tackle_type_key = DEFAULT_TACKLE_TYPE
+	var second_bait: Dictionary = _normalize_equipment_stats(current_tackle.get("bait_2", {}).duplicate(true), "bait", str(current_tackle.get("bait_2", {}).get("id", ""))) if _has_active_second_bait() and tackle_type_key != "spinning" else {}
+	return _build_tackle_weight_profile(rod, leader, float_part, hook, bait, second_bait, lure, tackle_type_key)
+
+func _build_tackle_weight_profile(
+	rod: Dictionary,
+	leader: Dictionary,
+	float_part: Dictionary,
+	hook: Dictionary,
+	bait: Dictionary,
+	second_bait: Dictionary = {},
+	lure: Dictionary = {},
+	tackle_type_key: String = DEFAULT_TACKLE_TYPE
+) -> Dictionary:
+	var rod_test_min: float = max(float(rod.get("test_min", 0.0)), 0.0)
+	var rod_test_max: float = max(float(rod.get("test_max", rod.get("max_fish_weight", 1.0))), max(rod_test_min, 0.1))
+	var leader_weight_g: float = _get_tackle_component_weight_g(leader, "leader")
+	var float_weight_g: float = _get_tackle_component_weight_g(float_part, "float")
+	var float_load_g: float = _get_float_required_load_weight_g(float_part)
+	var hook_weight_g: float = _get_tackle_component_weight_g(hook, "hook")
+	var bait_weight_g: float = _get_tackle_component_weight_g(bait, "bait")
+	var second_bait_weight_g: float = _get_tackle_component_weight_g(second_bait, "bait") if not second_bait.is_empty() else 0.0
+	var lure_weight_g: float = _get_tackle_component_weight_g(lure, "lure")
+	var rig_weight_g: float = lure_weight_g if tackle_type_key == "spinning" else leader_weight_g + float_weight_g + float_load_g + hook_weight_g + bait_weight_g + second_bait_weight_g
+	var float_system_weight_g: float = float_weight_g + float_load_g
+	var warnings: Array = []
+	var block_reason := ""
+	var state := "ok"
+	var overload_ratio: float = rig_weight_g / max(rod_test_max, 0.1)
+	var underload_ratio: float = rig_weight_g / max(rod_test_min, 0.1) if rod_test_min > 0.0 else 1.0
+	var heavy_severity := 0.0
+	var light_severity := 0.0
+
+	if tackle_type_key != "spinning":
+		if float_system_weight_g > rod_test_max * 1.55:
+			block_reason = "Поплавок слишком тяжёлый для этой удочки."
+			state = "blocked_float_heavy"
+		elif rig_weight_g > rod_test_max * 1.75:
+			block_reason = "Оснастка слишком тяжёлая для теста удочки."
+			state = "blocked_heavy"
+		elif rig_weight_g > rod_test_max * 1.12:
+			warnings.append("Оснастка слишком тяжёлая для теста удочки.")
+			state = "heavy"
+			heavy_severity = clampf((rig_weight_g - rod_test_max) / max(rod_test_max, 0.1), 0.0, 1.0)
+		elif float_system_weight_g > rod_test_max * 1.05:
+			warnings.append("Поплавок слишком тяжёлый для этой удочки.")
+			state = "float_heavy"
+			heavy_severity = clampf((float_system_weight_g - rod_test_max) / max(rod_test_max, 0.1), 0.0, 1.0)
+
+		if block_reason == "" and rod_test_min > 0.0 and rig_weight_g < rod_test_min * 0.55:
+			warnings.append("Оснастка слишком лёгкая, заброс будет неточным.")
+			state = "light" if state == "ok" else state
+			light_severity = clampf((rod_test_min * 0.55 - rig_weight_g) / max(rod_test_min * 0.55, 0.1), 0.0, 1.0)
+
+	var cast_accuracy_multiplier: float = clampf(1.0 - heavy_severity * 0.12 - light_severity * 0.18, 0.72, 1.02)
+	var cast_distance_bonus: float = clampf(-heavy_severity * 0.035 - light_severity * 0.055, -0.10, 0.0)
+	var bite_chance_multiplier: float = clampf(1.0 - heavy_severity * 0.08 - light_severity * 0.04, 0.82, 1.0)
+	var commit_multiplier: float = clampf(1.0 - heavy_severity * 0.08, 0.86, 1.0)
+	var bite_detection_penalty: float = clampf(heavy_severity * 0.04 + light_severity * 0.02, 0.0, 0.08)
+
+	return {
+		"rig_weight_g": rig_weight_g,
+		"total_rig_weight_g": rig_weight_g,
+		"leader_weight_g": leader_weight_g,
+		"float_weight_g": float_weight_g,
+		"float_load_g": float_load_g,
+		"float_system_weight_g": float_system_weight_g,
+		"hook_weight_g": hook_weight_g,
+		"bait_weight_g": bait_weight_g,
+		"second_bait_weight_g": second_bait_weight_g,
+		"lure_weight_g": lure_weight_g,
+		"rod_test_min": rod_test_min,
+		"rod_test_max": rod_test_max,
+		"rig_weight_state": state,
+		"rig_overload_ratio": overload_ratio,
+		"rig_underload_ratio": underload_ratio,
+		"warnings": warnings,
+		"primary_warning": str(warnings[0]) if not warnings.is_empty() else "",
+		"block_reason": block_reason,
+		"rig_cast_accuracy_multiplier": cast_accuracy_multiplier,
+		"rig_cast_distance_bonus": cast_distance_bonus,
+		"rig_bite_chance_multiplier": bite_chance_multiplier,
+		"rig_commit_multiplier": commit_multiplier,
+		"rig_bite_detection_penalty": bite_detection_penalty
+	}
+
+func _get_tackle_component_weight_g(component: Dictionary, category: String) -> float:
+	if component.is_empty():
+		return 0.0
+	if component.has("weight_g"):
+		return max(float(component.get("weight_g", 0.0)), 0.0)
+	if component.has("weight"):
+		return max(float(component.get("weight", 0.0)), 0.0)
+
+	match category:
+		"leader":
+			var length_cm: float = clampf(float(component.get("length_cm", 20.0)), 5.0, 80.0)
+			var load_kg: float = max(float(component.get("max_load_kg", component.get("max_load", component.get("strength", 1.0)))), 0.1)
+			var material := str(component.get("material", component.get("leader_type", "nylon"))).to_lower()
+			var material_factor := 1.0
+			match material:
+				"fluoro", "fluorocarbon":
+					material_factor = 1.25
+				"braid", "braided":
+					material_factor = 0.85
+				"steel", "reinforced":
+					material_factor = 2.4
+				_:
+					material_factor = 1.0
+			return clampf((length_cm * 0.002 + load_kg * 0.012) * material_factor, 0.02, 1.20)
+		"float":
+			var float_type := str(component.get("float_type", component.get("base_type", "drop"))).to_lower()
+			var buoyancy: float = clampf(float(component.get("buoyancy", 1.0)), 0.4, 1.8)
+			var base_weight := 0.75
+			match float_type:
+				"feather", "glow_feather":
+					base_weight = 0.28
+				"spindle":
+					base_weight = 0.55
+				"barrel":
+					base_weight = 1.35
+				"waggler":
+					base_weight = 2.10
+				"sliding":
+					base_weight = 2.35
+				_:
+					base_weight = 0.75
+			return clampf(base_weight * (0.72 + buoyancy * 0.36) + max(float(component.get("cast_distance_bonus", 0.0)), 0.0) * 1.2, 0.12, 6.0)
+		"hook":
+			var hook_size: int = int(component.get("hook_size", 12))
+			if hook_size <= 0:
+				return clampf(0.78 + abs(float(hook_size)) * 0.26, 0.78, 1.85)
+			if hook_size <= 4:
+				return 0.56
+			if hook_size <= 8:
+				return 0.34
+			if hook_size <= 12:
+				return 0.22
+			if hook_size <= 18:
+				return 0.12
+			return 0.07
+		"bait":
+			var bait_id := str(component.get("id", component.get("bait_id", ""))).to_lower()
+			var bait_type := str(component.get("bait_type", "worm")).to_lower()
+			var tags: Array = _to_string_array(component.get("bait_tags", []))
+			if tags.has("live_bait") or tags.has("large") or bait_id.find("fish_piece") >= 0 or bait_id.find("frog") >= 0:
+				return 2.4
+			if bait_type == "bread" or bait_id.find("bread") >= 0:
+				return 0.24
+			if bait_type == "maggot" or bait_id.find("maggot") >= 0 or bait_id.find("opar") >= 0:
+				return 0.08
+			if bait_type == "dough" or bait_id.find("dough") >= 0:
+				return 0.42
+			if bait_type == "worm" or bait_id.find("worm") >= 0 or bait_id.find("cherv") >= 0:
+				return 0.34
+			return 0.22
+		"lure":
+			return 5.0
+
+	return 0.0
+
+func _get_float_required_load_weight_g(float_part: Dictionary) -> float:
+	if float_part.is_empty():
+		return 0.0
+	for key in ["shot_weight_g", "load_weight_g", "load_g", "required_shot_g", "sinkers_weight_g"]:
+		if float_part.has(key):
+			return max(float(float_part.get(key, 0.0)), 0.0)
+
+	var buoyancy: float = clampf(float(float_part.get("buoyancy", 1.0)), 0.4, 1.8)
+	var heavy_support: float = clampf(float(float_part.get("heavy_bait_support", 0.55)), 0.0, 1.0)
+	var float_type := str(float_part.get("float_type", float_part.get("base_type", "drop"))).to_lower()
+	var base_load: float = buoyancy * lerp(0.45, 0.95, heavy_support)
+	if float_type == "feather" or float_type == "glow_feather":
+		base_load *= 0.62
+	elif float_type == "barrel":
+		base_load *= 1.08
+	elif float_type == "waggler" or float_type == "sliding":
+		base_load *= 1.18
+	return clampf(base_load, 0.20, 3.20)
 
 func _get_tackle_slot_issue(slot: String, slot_schema: Dictionary = {}) -> String:
 	var title := str(slot_schema.get("title", _get_tackle_slot_title(slot)))
@@ -7338,7 +7708,9 @@ func get_tackle_stats() -> Dictionary:
 	if not second_bait.is_empty():
 		heavy_bait_load = max(heavy_bait_load, _get_bait_float_load(second_bait) * 0.85)
 	var heavy_bait_penalty: float = clamp(heavy_bait_load * (1.0 - float_heavy_bait_support_rating * 0.60), 0.0, 0.22)
-	bite_detection_bonus = max(bite_detection_bonus - heavy_bait_penalty * 0.35, -0.15)
+	var rig_weight_profile := _build_tackle_weight_profile(rod, leader, float_part, hook, bait, second_bait, lure, tackle_type_key)
+	var rig_bite_detection_penalty: float = clamp(float(rig_weight_profile.get("rig_bite_detection_penalty", 0.0)), 0.0, 0.08)
+	bite_detection_bonus = max(bite_detection_bonus - heavy_bait_penalty * 0.35 - rig_bite_detection_penalty, -0.18)
 
 	return {
 		"tackle_type": tackle_type_key,
@@ -7358,6 +7730,24 @@ func get_tackle_stats() -> Dictionary:
 		"rod_power": float(rod.get("power", rod.get("strength", 1.0))),
 		"rod_test_min": float(rod.get("test_min", 0.0)),
 		"rod_test_max": float(rod.get("test_max", rod.get("max_fish_weight", 1.0))),
+		"rig_weight_g": float(rig_weight_profile.get("rig_weight_g", 0.0)),
+		"total_rig_weight_g": float(rig_weight_profile.get("total_rig_weight_g", 0.0)),
+		"rig_weight_state": str(rig_weight_profile.get("rig_weight_state", "ok")),
+		"rig_overload_ratio": float(rig_weight_profile.get("rig_overload_ratio", 0.0)),
+		"rig_underload_ratio": float(rig_weight_profile.get("rig_underload_ratio", 1.0)),
+		"rig_warning": str(rig_weight_profile.get("primary_warning", "")),
+		"rig_warnings": rig_weight_profile.get("warnings", []),
+		"rig_cast_accuracy_multiplier": float(rig_weight_profile.get("rig_cast_accuracy_multiplier", 1.0)),
+		"rig_cast_distance_bonus": float(rig_weight_profile.get("rig_cast_distance_bonus", 0.0)),
+		"rig_bite_chance_multiplier": float(rig_weight_profile.get("rig_bite_chance_multiplier", 1.0)),
+		"rig_commit_multiplier": float(rig_weight_profile.get("rig_commit_multiplier", 1.0)),
+		"float_weight_g": float(rig_weight_profile.get("float_weight_g", 0.0)),
+		"float_load_g": float(rig_weight_profile.get("float_load_g", 0.0)),
+		"float_system_weight_g": float(rig_weight_profile.get("float_system_weight_g", 0.0)),
+		"hook_weight_g": float(rig_weight_profile.get("hook_weight_g", 0.0)),
+		"bait_weight_g": float(rig_weight_profile.get("bait_weight_g", 0.0)),
+		"second_bait_weight_g": float(rig_weight_profile.get("second_bait_weight_g", 0.0)),
+		"leader_weight_g": float(rig_weight_profile.get("leader_weight_g", 0.0)),
 		"rod_flexibility": float(rod.get("flexibility", 0.5)),
 		"compatible_reel_min_size": int(rod.get("compatible_reel_min_size", 0)),
 		"compatible_reel_max_size": int(rod.get("compatible_reel_max_size", 0)),

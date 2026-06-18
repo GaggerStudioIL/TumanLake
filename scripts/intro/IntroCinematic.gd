@@ -5,7 +5,7 @@ const DESIGN_SIZE := Vector2(1920.0, 1080.0)
 const FADE_DURATION := 1.7
 const TITLE_FADE_DURATION := 1.4
 const INTRO_INPUT_ARM_DELAY := 0.35
-const FINAL_INPUT_ARM_DELAY := 0.85
+const FINAL_INPUT_ARM_DELAY := 0.35
 const IntroFxLayerScript := preload("res://scripts/intro/IntroFxLayer.gd")
 
 @export var change_scene_on_finish := true
@@ -164,7 +164,7 @@ func _build_scene_defs() -> void:
 		},
 		{
 			"kind": "final",
-			"image": "res://assets/intro/logo_final.png",
+			"image": "res://assets/intro/rybnoe_mesto_final_start.png",
 			"duration": 10.5,
 			"effect": "final",
 			"ambient": "water"
@@ -293,8 +293,8 @@ func _apply_intro_button_style(button: Button, primary: bool) -> void:
 		pressed_bg = Color(0.090, 0.210, 0.115, 1.0)
 		border = Color(0.96, 0.76, 0.32, 0.62)
 		shadow = Color(0.82, 0.54, 0.12, 0.20)
-		radius = 22
-		font_size = 18
+		radius = 26
+		font_size = 22
 
 	button.add_theme_stylebox_override("normal", _make_button_style(normal_bg, border, radius, 6, shadow))
 	button.add_theme_stylebox_override("hover", _make_button_style(hover_bg, Color(border.r, border.g, border.b, minf(border.a + 0.14, 1.0)), radius, 8, shadow))
@@ -320,10 +320,10 @@ func _make_button_style(
 	style.set_corner_radius_all(radius)
 	style.shadow_size = shadow_size
 	style.shadow_color = shadow_color
-	style.content_margin_left = 16.0
-	style.content_margin_right = 16.0
-	style.content_margin_top = 8.0
-	style.content_margin_bottom = 8.0
+	style.content_margin_left = 24.0
+	style.content_margin_right = 24.0
+	style.content_margin_top = 14.0
+	style.content_margin_bottom = 14.0
 	return style
 
 func _make_label(label_name: String, font_size: int, h_align: int, v_align: int) -> Label:
@@ -387,8 +387,11 @@ func _apply_fullscreen_layout() -> void:
 
 	if start_button != null:
 		start_button.set_anchors_preset(Control.PRESET_CENTER)
-		start_button.size = Vector2(260.0, 52.0)
-		start_button.position = viewport_size * 0.5 - start_button.size * 0.5 + Vector2(0.0, minf(viewport_size.y * 0.34, 250.0))
+		var start_width: float = clampf(viewport_size.x * 0.34, 340.0, 500.0)
+		var start_height: float = clampf(viewport_size.y * 0.075, 74.0, 92.0)
+		start_button.size = Vector2(start_width, start_height)
+		start_button.custom_minimum_size = start_button.size
+		start_button.position = viewport_size * 0.5 - start_button.size * 0.5 + Vector2(0.0, minf(viewport_size.y * 0.38, 330.0))
 
 func _get_layout_size() -> Vector2:
 	var viewport_size := get_viewport_rect().size
@@ -461,11 +464,11 @@ func _enter_active_scene() -> void:
 		final_input_armed_at_msec = Time.get_ticks_msec() + int(FINAL_INPUT_ARM_DELAY * 1000.0)
 		_set_intro_ambient(str(scene_def.get("ambient", "")))
 		_setup_image_scene({
-			"image": str(scene_def.get("image", "res://assets/intro/logo_final.png")),
+			"image": str(scene_def.get("image", "res://assets/intro/rybnoe_mesto_final_start.png")),
 			"effect": str(scene_def.get("effect", "final")),
-			"zoom_from": 1.045,
-			"zoom_to": 1.085,
-			"drift": Vector2(6.0, -8.0)
+			"zoom_from": 1.0,
+			"zoom_to": 1.018,
+			"drift": Vector2(2.0, -3.0)
 		})
 		image_layer.modulate.a = 0.0
 		_update_intro_buttons()
@@ -495,24 +498,19 @@ func _update_art_scene(scene_def: Dictionary, duration: float) -> void:
 
 func _update_final_scene(scene_def: Dictionary, duration: float) -> void:
 	fade_rect.modulate.a = 1.0 - _smooth01(active_scene_time / FADE_DURATION)
-	final_text_label.modulate.a = clampf(
-		minf(_smooth01((active_scene_time - 0.4) / 1.4), 1.0 - _smooth01((active_scene_time - 3.4) / 1.0)),
-		0.0,
-		1.0
-	)
-	image_layer.modulate.a = _smooth01((active_scene_time - 4.2) / 1.35)
-	var press_base := _smooth01((active_scene_time - 5.4) / 1.2)
-	var pulse := 0.72 + sin(active_scene_time * 3.1) * 0.28
+	final_text_label.modulate.a = 0.0
+	image_layer.modulate.a = _smooth01((active_scene_time - 0.15) / 0.65)
+	var press_base := _smooth01((active_scene_time - 0.55) / 0.55)
 	press_label.modulate.a = 0.0
-	final_start_enabled = active_scene_time >= 6.0 and Time.get_ticks_msec() >= final_input_armed_at_msec
+	final_start_enabled = active_scene_time >= 1.0 and Time.get_ticks_msec() >= final_input_armed_at_msec
 	if start_button != null:
 		start_button.visible = true
 		start_button.disabled = not final_start_enabled
-		start_button.modulate.a = clampf(press_base * pulse, 0.0, 1.0)
+		start_button.modulate.a = press_base
 	_apply_camera_progress({
-		"zoom_from": 1.045,
-		"zoom_to": 1.065,
-		"drift": Vector2(3.0, -4.0)
+		"zoom_from": 1.0,
+		"zoom_to": 1.018,
+		"drift": Vector2(2.0, -3.0)
 	}, duration)
 
 func _apply_camera_progress(scene_def: Dictionary, duration: float) -> void:

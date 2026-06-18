@@ -13,6 +13,7 @@ signal lure_retrieve_started(state: Dictionary)
 signal lure_retrieve_updated(state: Dictionary)
 signal lure_retrieve_finished(state: Dictionary)
 signal float_nudge(nudge_data: Dictionary)
+signal bite_preview_event(event_data: Dictionary)
 signal bite_started(bite_data: Dictionary)
 signal bite_window_updated(bite_data: Dictionary)
 signal hook_success(catch_data: Dictionary)
@@ -46,6 +47,11 @@ var _bite_window_elapsed: float = 0.0
 var _bite_window_seconds: float = 0.0
 var _false_nudge_timer: float = 0.0
 var _hook_cooldown_timer: float = 0.0
+var _bite_phase: String = "idle"
+var _bite_phase_timer: float = 0.0
+var _bite_phase_data: Dictionary = {}
+var _bite_phase_nibble_index: int = 0
+var _bite_phase_nibble_count: int = 0
 var _fishing_cycle_id := 0
 var _last_hook_attempt_msec := 0
 var _current_behavior: String = "calm"
@@ -115,12 +121,27 @@ var _safe_zone_strength_factor: float = 1.0
 var _safe_zone_size_ratio: float = 0.0
 
 const USE_NEW_BITE_SYSTEM := true
-const BITE_CHECK_INTERVAL := 1.0
+const BITE_CHECK_INTERVAL := 0.8
 const BASE_BITE_WINDOW_SECONDS := 1.4
 const EARLY_HOOK_COOLDOWN := 1.5
 const FALSE_NUDGE_MIN_DELAY := 1.2
 const FALSE_NUDGE_MAX_DELAY := 3.2
 const FALSE_NUDGE_CHANCE := 0.28
+const APPROACH_GOOD_MIN := 1.8
+const APPROACH_GOOD_MAX := 3.8
+const APPROACH_NORMAL_MIN := 3.0
+const APPROACH_NORMAL_MAX := 6.0
+const APPROACH_WEAK_MIN := 5.0
+const APPROACH_WEAK_MAX := 10.0
+const APPROACH_POOR_MIN := 8.0
+const APPROACH_POOR_MAX := 16.0
+const APPROACH_AFTER_LEFT_MULTIPLIER := 1.02
+const APPROACH_AFTER_SPOOK_MULTIPLIER := 1.14
+const APPROACH_AFTER_BAIT_STOLEN_MULTIPLIER := 1.06
+const BITE_PHASE_INTEREST_MIN := 0.55
+const BITE_PHASE_INTEREST_MAX := 1.45
+const BITE_DECISION_MIN := 0.18
+const BITE_DECISION_MAX := 0.55
 const HOOK_INPUT_GUARD_MSEC := 260
 const PLAYER_PULL_FORCE := 1.18
 const PLAYER_RELEASE_FORCE := -0.92
@@ -249,9 +270,10 @@ func start_fishing(spot_id: String) -> void:
 	_last_hook_attempt_msec = 0
 	_clear_active_bite_data()
 	_tackle_stats = PlayerData.get_tackle_stats()
-	_fight_mode = str(_tackle_stats.get("fight_mode", "pole"))
+	_fight_mode = _get_effective_fight_mode_from_stats(_tackle_stats)
 	if not BuildConfig.ENABLE_SPINNING_FEATURES:
 		_fight_mode = "pole"
+	_tackle_stats["fight_mode"] = _fight_mode
 	cast_started.emit()
 	var tackle_block_reason := PlayerData.get_tackle_block_reason()
 	if tackle_block_reason != "":
@@ -301,6 +323,7 @@ func start_fishing(spot_id: String) -> void:
 	weather_bite_multiplier *= float(wind_effects.get("bite_chance_multiplier", 1.0))
 	var condition_modifiers := _get_condition_fishing_modifiers()
 	weather_bite_multiplier *= float(condition_modifiers.get("bite_chance_multiplier", 1.0))
+	weather_bite_multiplier *= clampf(float(_tackle_stats.get("rig_bite_chance_multiplier", 1.0)), 0.82, 1.05)
 
 	if use_new_bite_system:
 		_start_waiting_for_active_bite(spot, spot_id, available_fish, spot_depth_modifier)
@@ -407,10 +430,12 @@ func try_hook() -> void:
 		if _hook_cooldown_timer > 0.0:
 			return
 
-		_fail_hook("too_early", {
+		var early_hook_data := {
 			"message": "Рыба испугалась!",
-			"cooldown": EARLY_HOOK_COOLDOWN
-		})
+			"cooldown": EARLY_HOOK_COOLDOWN,
+			"bite_phase": _bite_phase
+		}
+		_fail_hook("too_early", early_hook_data)
 		return
 
 	if fishing_state != FishingState.BITE_WINDOW:
@@ -468,7 +493,8 @@ func _start_waiting_for_active_bite(spot: Dictionary, spot_id: String, available
 	_active_spot_depth_modifier = spot_depth_modifier
 	_pending_catch.clear()
 	_pending_bite_data.clear()
-	_bite_check_timer = BITE_CHECK_INTERVAL
+	_reset_bite_preview_phase()
+	_bite_check_timer = _roll_next_approach_delay(_get_active_bite_balance_data())
 	_bite_window_elapsed = 0.0
 	_bite_window_seconds = 0.0
 	_false_nudge_timer = randf_range(FALSE_NUDGE_MIN_DELAY, FALSE_NUDGE_MAX_DELAY)
@@ -499,10 +525,12 @@ func _update_active_bite_system(delta: float) -> void:
 		if _hook_cooldown_timer > 0.0:
 			return
 
-		_bite_check_timer -= delta
-		if _bite_check_timer <= 0.0:
-			_bite_check_timer = BITE_CHECK_INTERVAL
-			_try_start_active_bite()
+		if _bite_phase == "idle" or _bite_phase == "approach_wait":
+			_bite_check_timer -= delta
+			if _bite_check_timer <= 0.0:
+				_try_start_active_bite()
+		else:
+			_update_float_bite_phase(delta)
 	elif fishing_state == FishingState.BITE_WINDOW:
 		_bite_window_elapsed += delta
 		var updated_data := _pending_bite_data.duplicate(true)
@@ -661,6 +689,16 @@ func _debug_log_spinning_state(context: String, state: Dictionary = {}) -> void:
 	])
 
 
+func _get_effective_fight_mode_from_stats(stats: Dictionary) -> String:
+	if not BuildConfig.ENABLE_SPINNING_FEATURES:
+		return "pole"
+	var tackle_type := str(stats.get("tackle_type", "float")).strip_edges().to_lower()
+	var fight_mode := str(stats.get("fight_mode", "pole")).strip_edges().to_lower()
+	if tackle_type == "spinning" and fight_mode == "reel":
+		return "reel"
+	return "pole"
+
+
 func _update_false_nudge(delta: float) -> void:
 	if _fight_mode == "reel":
 		return
@@ -722,8 +760,9 @@ func _try_start_active_bite() -> void:
 		return
 
 	var bite_data := _get_active_bite_balance_data()
-	var bite_chance := float(bite_data.get("bite_chance", 0.08))
-	if randf() > bite_chance:
+	var approach_chance: float = clampf(0.64 + float(bite_data.get("bite_chance", 0.10)) * 1.85, 0.62, 0.96)
+	if randf() > approach_chance:
+		_schedule_next_fish_approach(bite_data, "no_fish_approached")
 		return
 
 	var weather_modifiers: Dictionary = bite_data.get("weather_modifiers", {})
@@ -732,6 +771,49 @@ func _try_start_active_bite() -> void:
 		float(_active_spot.get("rare_chance_modifier", 1.0)),
 		weather_modifiers
 	)
+
+	var staged_catch_data := _prepare_catch_data_for_bite(fish_id, bite_data)
+	if staged_catch_data.is_empty():
+		_schedule_next_fish_approach(bite_data, "fish_inspected_and_left")
+		return
+
+	var fish := FishDatabase.get_fish(fish_id)
+	var profile := _get_fish_bite_profile(fish, float(staged_catch_data.get("weight", -1.0)))
+	profile = _apply_bite_profile_context(profile, fish, fish_id, bite_data)
+	if randf() > float(profile.get("interest_chance", 0.64)):
+		_emit_bite_preview_event("lost_interest", {
+			"fish_id": fish_id,
+			"behavior": str(profile.get("behavior", "calm")),
+			"visual_style": "lost_interest",
+			"strength": 0.14,
+			"duration": 0.35,
+			"outcome": "fish_inspected_and_left",
+			"wind_effects": bite_data.get("wind_effects", {})
+		})
+		_schedule_next_fish_approach(bite_data, "fish_inspected_and_left")
+		return
+
+	_bite_phase = "interest"
+	_bite_phase_timer = randf_range(BITE_PHASE_INTEREST_MIN, BITE_PHASE_INTEREST_MAX)
+	_bite_phase_nibble_index = 0
+	_bite_phase_nibble_count = randi_range(int(profile.get("nibble_count_min", 1)), int(profile.get("nibble_count_max", 3)))
+	_bite_phase_data = {
+		"fish_id": fish_id,
+		"fish": fish.duplicate(true),
+		"catch_data": staged_catch_data.duplicate(true),
+		"profile": profile.duplicate(true),
+		"balance_data": bite_data.duplicate(true)
+	}
+	_emit_bite_preview_event("interest", {
+		"fish_id": fish_id,
+		"behavior": str(profile.get("behavior", "calm")),
+		"visual_style": "interest",
+		"strength": 0.12,
+		"duration": _bite_phase_timer,
+		"wind_effects": bite_data.get("wind_effects", {}),
+		"bite_visibility_multiplier": float(profile.get("bite_visibility_multiplier", 1.0))
+	})
+	return
 
 	if not PlayerData.consume_current_terminal_tackle_for_bite(1):
 		is_fishing = false
@@ -766,6 +848,320 @@ func _try_start_active_bite() -> void:
 	bite_started.emit(_pending_bite_data.duplicate(true))
 
 
+func _update_float_bite_phase(delta: float) -> void:
+	if _bite_phase == "idle" or _bite_phase == "approach_wait":
+		return
+
+	if _bite_phase_data.is_empty() and _bite_phase != "lost_interest":
+		_schedule_next_fish_approach(_get_active_bite_balance_data(), "fish_inspected_and_left")
+		return
+
+	_bite_phase_timer -= delta
+	if _bite_phase_timer > 0.0:
+		return
+
+	match _bite_phase:
+		"interest":
+			_advance_interest_phase()
+		"nibble_pause":
+			_start_next_nibble_phase()
+		"nibble":
+			if _bite_phase_nibble_index >= _bite_phase_nibble_count:
+				_bite_phase = "decision"
+				_bite_phase_timer = randf_range(BITE_DECISION_MIN, BITE_DECISION_MAX)
+			else:
+				var profile: Dictionary = _bite_phase_data.get("profile", {})
+				_bite_phase = "nibble_pause"
+				_bite_phase_timer = randf_range(
+					float(profile.get("nibble_interval_min", 0.28)),
+					float(profile.get("nibble_interval_max", 0.82))
+				)
+		"decision":
+			_resolve_bite_decision()
+		"take":
+			_open_bite_window_from_phase()
+		"lost_interest":
+			_finish_bite_preview_sequence(str(_bite_phase_data.get("outcome", "fish_nibbled_and_left")))
+		"bait_stolen":
+			_finish_bite_preview_sequence("bait_stolen")
+		_:
+			_schedule_next_fish_approach(_get_active_bite_balance_data(), "fish_inspected_and_left")
+
+
+func _advance_interest_phase() -> void:
+	var profile: Dictionary = _bite_phase_data.get("profile", {})
+	var spook_chance: float = clampf(float(profile.get("spook_chance", 0.08)) * 0.35, 0.0, 0.24)
+	if randf() < spook_chance:
+		_start_lost_interest_phase("fish_inspected_and_left")
+		return
+
+	if _bite_phase_nibble_count <= 0:
+		_bite_phase = "decision"
+		_bite_phase_timer = randf_range(BITE_DECISION_MIN, BITE_DECISION_MAX)
+		return
+
+	_bite_phase = "nibble_pause"
+	_bite_phase_timer = randf_range(
+		float(profile.get("nibble_interval_min", 0.28)),
+		float(profile.get("nibble_interval_max", 0.82))
+	)
+
+
+func _start_next_nibble_phase() -> void:
+	if _bite_phase_data.is_empty():
+		_schedule_next_fish_approach(_get_active_bite_balance_data(), "fish_inspected_and_left")
+		return
+
+	if _bite_phase_nibble_index >= _bite_phase_nibble_count:
+		_bite_phase = "decision"
+		_bite_phase_timer = randf_range(BITE_DECISION_MIN, BITE_DECISION_MAX)
+		return
+
+	var profile: Dictionary = _bite_phase_data.get("profile", {})
+	var wind_effects: Dictionary = _get_phase_wind_effects()
+	var visibility_multiplier: float = clampf(
+		float(profile.get("bite_visibility_multiplier", 1.0)) * float(wind_effects.get("bite_visibility_multiplier", 1.0)),
+		0.45,
+		1.16
+	)
+	var style := str(profile.get("visual_style", "nibble"))
+	var strength: float = randf_range(
+		float(profile.get("nibble_strength_min", 0.18)),
+		float(profile.get("nibble_strength_max", 0.42))
+	) * visibility_multiplier
+	var duration: float = clampf(randf_range(0.16, 0.36) * (1.18 if style == "cautious_nibble" else 1.0), 0.12, 0.62)
+
+	_bite_phase_nibble_index += 1
+	_bite_phase = "nibble"
+	_bite_phase_timer = duration
+	_emit_bite_preview_event("nibble", {
+		"fish_id": str(_bite_phase_data.get("fish_id", "")),
+		"behavior": str(profile.get("behavior", "calm")),
+		"strength": clampf(strength, 0.08, 0.92),
+		"duration": duration,
+		"nibble_index": _bite_phase_nibble_index,
+		"nibble_count": _bite_phase_nibble_count,
+		"visual_style": style,
+		"wind_effects": wind_effects,
+		"bite_visibility_multiplier": visibility_multiplier
+	})
+
+
+func _resolve_bite_decision() -> void:
+	if _bite_phase_data.is_empty():
+		_schedule_next_fish_approach(_get_active_bite_balance_data(), "fish_inspected_and_left")
+		return
+
+	var profile: Dictionary = _bite_phase_data.get("profile", {})
+	var commit_chance: float = clampf(float(profile.get("commit_chance", 0.45)), 0.04, 0.90)
+	var bait_steal_chance: float = clampf(float(profile.get("bait_steal_chance", 0.10)), 0.0, 0.45)
+	var spook_chance: float = clampf(float(profile.get("spook_chance", 0.08)), 0.0, 0.44)
+	var max_nibbles: int = max(int(profile.get("nibble_count_max", _bite_phase_nibble_count)), _bite_phase_nibble_count)
+	var continue_chance: float = clampf(0.10 + (1.0 - commit_chance) * 0.12 + spook_chance * 0.10, 0.04, 0.30)
+	if _bite_phase_nibble_index < max_nibbles and randf() < continue_chance:
+		_bite_phase_nibble_count += 1
+		_bite_phase = "nibble_pause"
+		_bite_phase_timer = randf_range(
+			float(profile.get("nibble_interval_min", 0.28)),
+			float(profile.get("nibble_interval_max", 0.82))
+		)
+		return
+
+	var roll := randf()
+	if roll < commit_chance:
+		_start_strong_bite_phase()
+		return
+
+	if roll < commit_chance + bait_steal_chance:
+		_start_bait_stolen_phase()
+		return
+
+	_start_lost_interest_phase("fish_nibbled_and_left" if roll > commit_chance + bait_steal_chance + spook_chance else "fish_inspected_and_left")
+
+
+func _start_lost_interest_phase(outcome: String) -> void:
+	var profile: Dictionary = _bite_phase_data.get("profile", {})
+	_bite_phase_data["outcome"] = outcome
+	_bite_phase = "lost_interest"
+	_bite_phase_timer = 0.46
+	_emit_bite_preview_event("lost_interest", {
+		"fish_id": str(_bite_phase_data.get("fish_id", "")),
+		"behavior": str(profile.get("behavior", "calm")),
+		"strength": 0.12,
+		"duration": _bite_phase_timer,
+		"visual_style": "lost_interest",
+		"outcome": outcome,
+		"wind_effects": _get_phase_wind_effects(),
+		"bite_visibility_multiplier": float(profile.get("bite_visibility_multiplier", 1.0))
+	})
+
+
+func _start_bait_stolen_phase() -> void:
+	if not _consume_terminal_tackle_for_bite_outcome("bait_stolen"):
+		return
+
+	var profile: Dictionary = _bite_phase_data.get("profile", {})
+	_bite_phase_data["outcome"] = "bait_stolen"
+	_bite_phase = "bait_stolen"
+	_bite_phase_timer = 0.58
+	_emit_bite_preview_event("bait_stolen", {
+		"fish_id": str(_bite_phase_data.get("fish_id", "")),
+		"behavior": str(profile.get("behavior", "calm")),
+		"strength": clampf(float(profile.get("nibble_strength_max", 0.45)) + 0.16, 0.25, 0.82),
+		"duration": _bite_phase_timer,
+		"visual_style": "bait_stolen",
+		"outcome": "bait_stolen",
+		"wind_effects": _get_phase_wind_effects(),
+		"bite_visibility_multiplier": float(profile.get("bite_visibility_multiplier", 1.0))
+	})
+
+
+func _start_strong_bite_phase() -> void:
+	if _bite_phase_data.is_empty():
+		_schedule_next_fish_approach(_get_active_bite_balance_data(), "fish_inspected_and_left")
+		return
+
+	var fish_id := str(_bite_phase_data.get("fish_id", ""))
+	var catch_data: Dictionary = _bite_phase_data.get("catch_data", {})
+	var balance_data: Dictionary = _bite_phase_data.get("balance_data", {})
+	var profile: Dictionary = _bite_phase_data.get("profile", {})
+	if fish_id == "" or catch_data.is_empty():
+		_schedule_next_fish_approach(balance_data, "fish_inspected_and_left")
+		return
+
+	if not _consume_terminal_tackle_for_bite_outcome("strong_bite"):
+		return
+
+	var bite_balance := balance_data.duplicate(true)
+	bite_balance["bite_profile"] = profile.duplicate(true)
+	_pending_catch = catch_data.duplicate(true)
+	_pending_bite_data = _build_bite_window_data(fish_id, _pending_catch, bite_balance)
+	_bite_window_seconds = float(_pending_bite_data.get("bite_window_seconds", BASE_BITE_WINDOW_SECONDS))
+	_bite_window_elapsed = 0.0
+	var take_delay := randf_range(float(profile.get("take_delay_min", 0.10)), float(profile.get("take_delay_max", 0.36)))
+	_bite_phase_data["outcome"] = "strong_bite"
+	_bite_phase = "take"
+	_bite_phase_timer = take_delay
+	_emit_bite_preview_event("take", {
+		"fish_id": fish_id,
+		"behavior": str(profile.get("behavior", "calm")),
+		"strength": clampf(float(_pending_bite_data.get("strength", profile.get("strong_bite_strength", 0.75))), 0.30, 1.0),
+		"duration": take_delay,
+		"visual_style": str(_pending_bite_data.get("visual_style", profile.get("visual_style", "submerge"))),
+		"wind_effects": _get_phase_wind_effects(),
+		"bite_visibility_multiplier": float(_pending_bite_data.get("bite_visibility_multiplier", profile.get("bite_visibility_multiplier", 1.0))),
+		"submerge_speed": float(profile.get("submerge_speed", 1.0))
+	})
+
+
+func _open_bite_window_from_phase() -> void:
+	if _pending_catch.is_empty() or _pending_bite_data.is_empty():
+		_schedule_next_fish_approach(_get_active_bite_balance_data(), "fish_inspected_and_left")
+		return
+
+	_bite_window_seconds = float(_pending_bite_data.get("bite_window_seconds", BASE_BITE_WINDOW_SECONDS))
+	_bite_window_elapsed = 0.0
+	fishing_state = FishingState.BITE_WINDOW
+	_reset_bite_preview_phase()
+	bite_started.emit(_pending_bite_data.duplicate(true))
+
+
+func _consume_terminal_tackle_for_bite_outcome(outcome: String) -> bool:
+	if PlayerData.consume_current_terminal_tackle_for_bite(1):
+		return true
+
+	is_fishing = false
+	fishing_state = FishingState.FAILED
+	_reset_bite_preview_phase()
+	_emit_fishing_failure(
+		FAILURE_WEAK_TACKLE,
+		"РќРµС‚ РЅР°Р¶РёРІРєРё",
+		"РќР°Р¶РёРІРєР° Р·Р°РєРѕРЅС‡РёР»Р°СЃСЊ РґРѕ РїРѕРєР»С‘РІРєРё.",
+		"РџРѕРїРѕР»РЅРёС‚Рµ РЅР°Р¶РёРІРєСѓ РёР»Рё СЌРєРёРїРёСЂСѓР№С‚Рµ РґСЂСѓРіСѓСЋ.",
+		{"severity": "low", "spot_id": _active_spot_id, "outcome": outcome}
+	)
+	return false
+
+
+func _finish_bite_preview_sequence(outcome: String) -> void:
+	var balance_data: Dictionary = _bite_phase_data.get("balance_data", {})
+	_pending_catch.clear()
+	_pending_bite_data.clear()
+	_bite_window_elapsed = 0.0
+	_bite_window_seconds = 0.0
+	_reset_bite_preview_phase()
+	_schedule_next_fish_approach(balance_data, outcome)
+
+
+func _schedule_next_fish_approach(balance_data: Dictionary = {}, outcome: String = "no_fish_approached") -> void:
+	_pending_catch.clear()
+	_pending_bite_data.clear()
+	_bite_window_elapsed = 0.0
+	_bite_window_seconds = 0.0
+	_bite_phase = "approach_wait"
+	_bite_phase_timer = 0.0
+	_bite_phase_data.clear()
+	_bite_phase_nibble_index = 0
+	_bite_phase_nibble_count = 0
+	_bite_check_timer = _roll_next_approach_delay(balance_data, outcome)
+
+
+func _roll_next_approach_delay(balance_data: Dictionary = {}, outcome: String = "") -> float:
+	if balance_data.is_empty():
+		balance_data = _get_active_bite_balance_data()
+
+	var bite_chance: float = clampf(float(balance_data.get("bite_chance", 0.08)), 0.02, 0.28)
+	var score: float = clampf((bite_chance - 0.04) / 0.20, 0.0, 1.0)
+	var min_delay := APPROACH_POOR_MIN
+	var max_delay := APPROACH_POOR_MAX
+	if score >= 0.64:
+		min_delay = APPROACH_GOOD_MIN
+		max_delay = APPROACH_GOOD_MAX
+	elif score >= 0.28:
+		min_delay = APPROACH_NORMAL_MIN
+		max_delay = APPROACH_NORMAL_MAX
+	elif score >= 0.12:
+		min_delay = APPROACH_WEAK_MIN
+		max_delay = APPROACH_WEAK_MAX
+
+	var delay := randf_range(min_delay, max_delay)
+	match outcome:
+		"fish_inspected_and_left", "fish_nibbled_and_left":
+			delay *= APPROACH_AFTER_LEFT_MULTIPLIER
+		"fish_spooked", "too_early", "early_hook":
+			delay *= APPROACH_AFTER_SPOOK_MULTIPLIER
+		"bait_stolen":
+			delay *= APPROACH_AFTER_BAIT_STOLEN_MULTIPLIER
+		"missed_bite", "late_hook":
+			delay *= 1.28
+	return max(delay, BITE_CHECK_INTERVAL)
+
+
+func _reset_bite_preview_phase() -> void:
+	_bite_phase = "idle"
+	_bite_phase_timer = 0.0
+	_bite_phase_data.clear()
+	_bite_phase_nibble_index = 0
+	_bite_phase_nibble_count = 0
+
+
+func _get_phase_wind_effects() -> Dictionary:
+	var balance_data: Dictionary = _bite_phase_data.get("balance_data", {})
+	if balance_data.has("wind_effects") and balance_data.get("wind_effects") is Dictionary:
+		return (balance_data.get("wind_effects") as Dictionary).duplicate(true)
+	return _get_wind_effects(_active_spot)
+
+
+func _emit_bite_preview_event(phase: String, event_data: Dictionary = {}) -> void:
+	var payload := event_data.duplicate(true)
+	payload["phase"] = phase
+	if not payload.has("wind_effects"):
+		payload["wind_effects"] = _get_phase_wind_effects()
+	if not payload.has("bite_phase"):
+		payload["bite_phase"] = _bite_phase
+	bite_preview_event.emit(payload)
+
+
 func _get_active_bite_balance_data() -> Dictionary:
 	var bait_bonus: float = _get_best_bait_bonus(_active_available_fish)
 	var time_activity_modifier: float = _get_average_time_activity_modifier(_active_available_fish)
@@ -775,17 +1171,18 @@ func _get_active_bite_balance_data() -> Dictionary:
 	var weather_bite_multiplier: float = float(weather_modifiers.get("bite_chance", 1.0))
 	var wind_effects := _get_wind_effects(_active_spot)
 	var condition_modifiers := _get_condition_fishing_modifiers()
+	var rig_bite_multiplier: float = clampf(float(_tackle_stats.get("rig_bite_chance_multiplier", 1.0)), 0.82, 1.05)
 	var bite_chance: float = clamp(
 		(
-			0.085
+			0.115
 			+ float(_tackle_stats.get("bite_detection_bonus", 0.0)) * 0.10
 			+ float(_tackle_stats.get("fish_attraction", 0.0)) * 0.10
 			+ bait_bonus * 0.09
 			+ float(_tackle_stats.get("hook_success_bonus", 0.0)) * 0.06
 			- float(_tackle_stats.get("visibility_penalty", 0.0)) * 0.08
-		) * spot_bite_modifier * clamp(time_activity_modifier, 0.42, 1.38) * weather_bite_multiplier * float(wind_effects.get("bite_chance_multiplier", 1.0)) * float(condition_modifiers.get("bite_chance_multiplier", 1.0)),
-		0.04,
-		0.22
+		) * spot_bite_modifier * clamp(time_activity_modifier, 0.42, 1.38) * weather_bite_multiplier * float(wind_effects.get("bite_chance_multiplier", 1.0)) * float(condition_modifiers.get("bite_chance_multiplier", 1.0)) * rig_bite_multiplier,
+		0.075,
+		0.30
 	)
 
 	if SHOW_WEATHER_BITE_DEBUG and BuildConfig.ENABLE_VERBOSE_LOGS:
@@ -808,6 +1205,275 @@ func _get_active_bite_balance_data() -> Dictionary:
 		"wind_effects": wind_effects,
 		"condition_modifiers": condition_modifiers
 	}
+
+
+func _get_fish_bite_profile(fish: Dictionary, catch_weight: float = -1.0) -> Dictionary:
+	var behavior := str(fish.get("behavior_type", fish.get("behavior", "calm"))).to_lower()
+	var aggression: float = clampf(float(fish.get("aggression", 0.35)), 0.0, 1.0)
+	var escape_risk: float = clampf(float(fish.get("escape_risk", fish.get("escape_chance", 0.20))), 0.0, 1.0)
+	var reference_weight: float = catch_weight
+	if reference_weight <= 0.0:
+		reference_weight = (float(fish.get("min_weight", 0.05)) + float(fish.get("max_weight", 0.8))) * 0.5
+	var max_weight: float = max(float(fish.get("max_weight", max(reference_weight, 0.1))), 0.1)
+	var size_ratio: float = clampf(reference_weight / max_weight, 0.0, 1.0)
+	var size_class := _get_fish_size_class(fish, reference_weight)
+	var rarity := str(fish.get("rarity", "common")).to_lower()
+
+	var profile := {
+		"approach_interval_min": APPROACH_NORMAL_MIN,
+		"approach_interval_max": APPROACH_NORMAL_MAX,
+		"interest_chance": 0.86,
+		"commit_chance": 0.68,
+		"nibble_count_min": 1,
+		"nibble_count_max": 3,
+		"nibble_interval_min": 0.28,
+		"nibble_interval_max": 0.82,
+		"nibble_strength_min": 0.18,
+		"nibble_strength_max": 0.42,
+		"take_delay_min": 0.18,
+		"take_delay_max": 0.46,
+		"strong_bite_strength": 0.68,
+		"submerge_speed": 1.0,
+		"spook_chance": 0.08,
+		"bait_steal_chance": 0.10,
+		"bite_window_multiplier": 1.0,
+		"visual_style": "nibble",
+		"behavior": behavior,
+		"bite_visibility_multiplier": 1.0
+	}
+
+	match behavior:
+		"cautious", "shy":
+			profile["interest_chance"] = 0.78
+			profile["commit_chance"] = 0.54
+			profile["nibble_count_min"] = 2
+			profile["nibble_count_max"] = 5
+			profile["nibble_interval_min"] = 0.44
+			profile["nibble_interval_max"] = 1.18
+			profile["nibble_strength_min"] = 0.10
+			profile["nibble_strength_max"] = 0.30
+			profile["take_delay_min"] = 0.18
+			profile["take_delay_max"] = 0.46
+			profile["spook_chance"] = 0.16
+			profile["bait_steal_chance"] = 0.14
+			profile["bite_window_multiplier"] = 0.90
+			profile["visual_style"] = "cautious_nibble"
+		"aggressive":
+			profile["interest_chance"] = 0.90
+			profile["commit_chance"] = 0.76
+			profile["nibble_count_min"] = 0
+			profile["nibble_count_max"] = 2
+			profile["nibble_interval_min"] = 0.14
+			profile["nibble_interval_max"] = 0.42
+			profile["nibble_strength_min"] = 0.34
+			profile["nibble_strength_max"] = 0.68
+			profile["take_delay_min"] = 0.10
+			profile["take_delay_max"] = 0.30
+			profile["strong_bite_strength"] = 0.84
+			profile["submerge_speed"] = 1.34
+			profile["spook_chance"] = 0.06
+			profile["bait_steal_chance"] = 0.08
+			profile["bite_window_multiplier"] = 1.04
+			profile["visual_style"] = "aggressive_take"
+		"erratic":
+			profile["interest_chance"] = 0.84
+			profile["commit_chance"] = 0.68
+			profile["nibble_count_min"] = 1
+			profile["nibble_count_max"] = 4
+			profile["nibble_interval_min"] = 0.18
+			profile["nibble_interval_max"] = 0.70
+			profile["nibble_strength_min"] = 0.22
+			profile["nibble_strength_max"] = 0.62
+			profile["take_delay_min"] = 0.14
+			profile["take_delay_max"] = 0.36
+			profile["strong_bite_strength"] = 0.78
+			profile["submerge_speed"] = 1.18
+			profile["spook_chance"] = 0.11
+			profile["bait_steal_chance"] = 0.12
+			profile["visual_style"] = "erratic_take"
+
+	if size_class == "small" or max_weight <= 0.22:
+		profile["interest_chance"] = float(profile["interest_chance"]) + 0.04
+		profile["commit_chance"] = float(profile["commit_chance"]) - 0.06
+		profile["nibble_count_min"] = max(int(profile["nibble_count_min"]), 3)
+		profile["nibble_count_max"] = max(int(profile["nibble_count_max"]), 6)
+		profile["nibble_interval_min"] = min(float(profile["nibble_interval_min"]), 0.18)
+		profile["nibble_interval_max"] = min(float(profile["nibble_interval_max"]), 0.52)
+		profile["nibble_strength_min"] = min(float(profile["nibble_strength_min"]), 0.08)
+		profile["nibble_strength_max"] = min(float(profile["nibble_strength_max"]), 0.28)
+		profile["bait_steal_chance"] = float(profile["bait_steal_chance"]) + 0.10
+		profile["visual_style"] = "small_fish_taps"
+	elif size_class == "large" or reference_weight >= 1.35 or max_weight >= 2.25:
+		profile["interest_chance"] = float(profile["interest_chance"]) - 0.04
+		profile["commit_chance"] = float(profile["commit_chance"]) - 0.01
+		profile["nibble_count_min"] = max(int(profile["nibble_count_min"]), 1)
+		profile["nibble_count_max"] = max(int(profile["nibble_count_max"]), 3)
+		profile["nibble_interval_min"] = max(float(profile["nibble_interval_min"]), 0.42)
+		profile["nibble_interval_max"] = max(float(profile["nibble_interval_max"]), 1.10)
+		profile["nibble_strength_min"] = max(float(profile["nibble_strength_min"]), 0.30)
+		profile["nibble_strength_max"] = max(float(profile["nibble_strength_max"]), 0.62)
+		profile["take_delay_min"] = max(float(profile["take_delay_min"]), 0.18)
+		profile["take_delay_max"] = max(float(profile["take_delay_max"]), 0.48)
+		profile["strong_bite_strength"] = max(float(profile["strong_bite_strength"]), 0.82)
+		profile["submerge_speed"] = 0.72
+		profile["bite_window_multiplier"] = float(profile["bite_window_multiplier"]) * 0.94
+		profile["visual_style"] = "heavy_take"
+
+	profile["interest_chance"] = float(profile["interest_chance"]) + (aggression - 0.35) * 0.10 - escape_risk * 0.06
+	profile["commit_chance"] = float(profile["commit_chance"]) + (aggression - 0.35) * 0.24 - escape_risk * 0.12 + size_ratio * 0.04
+	profile["spook_chance"] = float(profile["spook_chance"]) + escape_risk * 0.12 - aggression * 0.04
+	profile["strong_bite_strength"] = float(profile["strong_bite_strength"]) + aggression * 0.10 + size_ratio * 0.12
+
+	if rarity == "rare":
+		profile["commit_chance"] = float(profile["commit_chance"]) - 0.03
+		profile["spook_chance"] = float(profile["spook_chance"]) + 0.03
+	elif rarity == "very_rare" or rarity == "legendary":
+		profile["commit_chance"] = float(profile["commit_chance"]) - 0.04
+		profile["spook_chance"] = float(profile["spook_chance"]) + 0.06
+		profile["bite_window_multiplier"] = float(profile["bite_window_multiplier"]) * 0.92
+
+	profile["interest_chance"] = clampf(float(profile["interest_chance"]), 0.18, 0.94)
+	profile["commit_chance"] = clampf(float(profile["commit_chance"]), 0.06, 0.88)
+	profile["spook_chance"] = clampf(float(profile["spook_chance"]), 0.0, 0.42)
+	profile["bait_steal_chance"] = clampf(float(profile["bait_steal_chance"]), 0.0, 0.46)
+	profile["strong_bite_strength"] = clampf(float(profile["strong_bite_strength"]), 0.30, 1.0)
+	profile["bite_window_multiplier"] = clampf(float(profile["bite_window_multiplier"]), 0.68, 1.26)
+	return profile
+
+
+func _apply_bite_profile_context(profile: Dictionary, fish: Dictionary, fish_id: String, balance_data: Dictionary) -> Dictionary:
+	var result := profile.duplicate(true)
+	var depth_multiplier: float = clampf(_get_depth_match_multiplier(fish), 0.0, 1.25)
+	var bait_multiplier: float = clampf(_get_bait_match_multiplier(fish, fish_id), 0.0, 1.80)
+	var hook_multiplier: float = clampf(_get_hook_match_multiplier(fish), 0.0, 1.30)
+	var line_multiplier: float = clampf(_get_line_visibility_multiplier(fish), 0.50, 1.16)
+	var time_multiplier: float = clampf(_get_time_activity_modifier(fish), 0.30, 1.48)
+	var peak_multiplier: float = 1.0 + _get_time_peak_modifier(fish) * 0.16
+	var weather_modifiers: Dictionary = balance_data.get("weather_modifiers", _get_weather_bite_modifiers(_get_current_weather_type()))
+	var weather_multiplier: float = clampf(_get_weather_fish_weight_multiplier(fish, weather_modifiers), 0.65, 1.35)
+	var wind_effects: Dictionary = balance_data.get("wind_effects", _get_wind_effects(_active_spot))
+	var condition_modifiers: Dictionary = balance_data.get("condition_modifiers", _get_condition_fishing_modifiers())
+	var condition_multiplier: float = clampf(float(condition_modifiers.get("bite_chance_multiplier", 1.0)), 0.65, 1.25)
+	var temp_multiplier: float = _get_temperature_activity_modifier(fish)
+	var rig_commit_multiplier: float = clampf(float(_tackle_stats.get("rig_commit_multiplier", 1.0)), 0.86, 1.05)
+	var rig_interest_multiplier: float = clampf(float(_tackle_stats.get("rig_bite_chance_multiplier", 1.0)), 0.82, 1.05)
+
+	var interest_context: float = clampf(
+		(0.78 + depth_multiplier * 0.22)
+			* (0.60 + bait_multiplier * 0.34)
+			* (0.78 + line_multiplier * 0.20)
+			* clampf(time_multiplier, 0.40, 1.22)
+			* weather_multiplier
+			* condition_multiplier
+			* temp_multiplier
+			* rig_interest_multiplier,
+		0.42,
+		1.45
+	)
+	var commit_context: float = clampf(
+		(0.62 + bait_multiplier * 0.36)
+			* (0.64 + hook_multiplier * 0.32)
+			* (0.88 + _get_time_peak_modifier(fish) * 0.18)
+			* clampf(weather_multiplier, 0.70, 1.22)
+			* temp_multiplier
+			* rig_commit_multiplier,
+		0.38,
+		1.38
+	)
+	result["interest_chance"] = clampf(float(result.get("interest_chance", 0.68)) * interest_context, 0.16, 0.95)
+	result["commit_chance"] = clampf(float(result.get("commit_chance", 0.44)) * commit_context, 0.10, 0.90)
+
+	if bait_multiplier < 0.55:
+		result["commit_chance"] = float(result["commit_chance"]) * 0.78
+		result["bait_steal_chance"] = float(result.get("bait_steal_chance", 0.10)) + 0.035
+		result["nibble_count_max"] = max(int(result.get("nibble_count_max", 3)), int(result.get("nibble_count_min", 1)) + 1)
+	elif bait_multiplier > 1.08:
+		result["commit_chance"] = float(result["commit_chance"]) + 0.06
+		result["interest_chance"] = float(result["interest_chance"]) + 0.04
+
+	if hook_multiplier < 0.70:
+		result["commit_chance"] = float(result["commit_chance"]) * clampf(0.74 + hook_multiplier * 0.24, 0.64, 0.90)
+		result["spook_chance"] = float(result.get("spook_chance", 0.08)) + (0.70 - hook_multiplier) * 0.12
+		result["bite_window_multiplier"] = float(result.get("bite_window_multiplier", 1.0)) * clampf(0.86 + hook_multiplier * 0.14, 0.78, 0.96)
+	elif hook_multiplier > 1.06:
+		result["bite_window_multiplier"] = float(result.get("bite_window_multiplier", 1.0)) * 1.04
+
+	if line_multiplier < 0.82:
+		result["spook_chance"] = float(result.get("spook_chance", 0.08)) + (0.82 - line_multiplier) * 0.12
+		result["interest_chance"] = float(result["interest_chance"]) * clampf(0.78 + line_multiplier * 0.22, 0.68, 1.0)
+
+	var wind_visibility: float = clampf(float(wind_effects.get("bite_visibility_multiplier", 1.0)), 0.68, 1.08)
+	var wind_penalty: float = clampf(float(wind_effects.get("effective_wind_penalty", 0.0)), 0.0, 0.60)
+	result["bite_visibility_multiplier"] = clampf(float(result.get("bite_visibility_multiplier", 1.0)) * wind_visibility, 0.48, 1.16)
+	result["nibble_strength_min"] = float(result.get("nibble_strength_min", 0.16)) * clampf(wind_visibility + 0.05, 0.70, 1.08)
+	result["nibble_strength_max"] = float(result.get("nibble_strength_max", 0.42)) * clampf(wind_visibility + 0.04, 0.70, 1.08)
+	result["spook_chance"] = float(result.get("spook_chance", 0.08)) + wind_penalty * 0.05
+	result["commit_chance"] = float(result["commit_chance"]) * peak_multiplier
+	result["bite_window_multiplier"] = float(result.get("bite_window_multiplier", 1.0)) * clampf(float(condition_modifiers.get("reaction_multiplier", 1.0)), 0.74, 1.14)
+
+	result["interest_chance"] = clampf(float(result["interest_chance"]), 0.14, 0.95)
+	result["commit_chance"] = clampf(float(result["commit_chance"]), 0.08, 0.92)
+	result["spook_chance"] = clampf(float(result.get("spook_chance", 0.08)), 0.0, 0.48)
+	result["bait_steal_chance"] = clampf(float(result.get("bait_steal_chance", 0.10)), 0.0, 0.50)
+	result["bite_window_multiplier"] = clampf(float(result.get("bite_window_multiplier", 1.0)), 0.62, 1.34)
+	result["nibble_strength_min"] = clampf(float(result.get("nibble_strength_min", 0.12)), 0.06, 0.75)
+	result["nibble_strength_max"] = clampf(float(result.get("nibble_strength_max", 0.38)), float(result["nibble_strength_min"]) + 0.03, 0.92)
+	return result
+
+
+func _get_current_temperature_c() -> float:
+	var weather_manager := get_node_or_null("/root/WeatherManager")
+	if weather_manager != null:
+		if weather_manager.has_method("get_current_weather_state"):
+			var manager_state = weather_manager.call("get_current_weather_state")
+			if manager_state is Dictionary:
+				var state_dict := manager_state as Dictionary
+				if state_dict.has("temperature"):
+					return float(state_dict.get("temperature", 20.0))
+				if state_dict.has("current_temperature"):
+					return float(state_dict.get("current_temperature", 20.0))
+		var direct_temperature = weather_manager.get("temperature")
+		if direct_temperature != null:
+			return float(direct_temperature)
+		var current_temperature = weather_manager.get("current_temperature")
+		if current_temperature != null:
+			return float(current_temperature)
+
+	var time_manager := get_node_or_null("/root/TimeManager")
+	if time_manager != null:
+		var time_temperature = time_manager.get("temperature")
+		if time_temperature != null:
+			return float(time_temperature)
+		var time_weather_state = time_manager.get("weather_state")
+		if time_weather_state is Dictionary:
+			var time_weather_dict := time_weather_state as Dictionary
+			if time_weather_dict.has("temperature"):
+				return float(time_weather_dict.get("temperature", 20.0))
+
+	var helper_state := WeatherUIHelperScript.get_current_weather_state(time_manager)
+	return float(helper_state.get("temperature", 20.0))
+
+
+func _get_temperature_activity_modifier(fish: Dictionary) -> float:
+	if not fish.has("preferred_temperature_min") and not fish.has("preferred_temperature_max") and not fish.has("preferred_temperature_optimal"):
+		return 1.0
+
+	var current_temperature := _get_current_temperature_c()
+	var min_temperature: float = float(fish.get("preferred_temperature_min", fish.get("preferred_temperature_optimal", 20.0) - 5.0))
+	var max_temperature: float = float(fish.get("preferred_temperature_max", fish.get("preferred_temperature_optimal", 20.0) + 5.0))
+	if min_temperature > max_temperature:
+		var swap := min_temperature
+		min_temperature = max_temperature
+		max_temperature = swap
+	var optimal_temperature: float = clampf(float(fish.get("preferred_temperature_optimal", (min_temperature + max_temperature) * 0.5)), min_temperature, max_temperature)
+
+	if current_temperature >= min_temperature and current_temperature <= max_temperature:
+		var warm_range: float = max(max(abs(optimal_temperature - min_temperature), abs(max_temperature - optimal_temperature)), 1.0)
+		var optimal_distance: float = abs(current_temperature - optimal_temperature) / warm_range
+		return clampf(1.08 - optimal_distance * 0.16, 0.92, 1.08)
+
+	var distance: float = min(abs(current_temperature - min_temperature), abs(current_temperature - max_temperature))
+	return clampf(0.92 - distance * 0.055, 0.55, 0.92)
 
 
 func _prepare_catch_data_for_bite(fish_id: String, bite_data: Dictionary = {}) -> Dictionary:
@@ -864,6 +1530,7 @@ func _attach_catch_context_metadata(catch_data: Dictionary) -> void:
 
 func _build_bite_window_data(fish_id: String, catch_data: Dictionary, balance_data: Dictionary) -> Dictionary:
 	var fish := FishDatabase.get_fish(fish_id)
+	var profile: Dictionary = balance_data.get("bite_profile", {})
 	var rarity := str(catch_data.get("rarity", fish.get("rarity", "common")))
 	var behavior := str(catch_data.get("behavior_type", catch_data.get("behavior", fish.get("behavior_type", fish.get("behavior", "calm")))))
 	var weight := float(catch_data.get("weight", 0.0))
@@ -898,6 +1565,7 @@ func _build_bite_window_data(fish_id: String, catch_data: Dictionary, balance_da
 	window += (visibility_rating - 0.75) * 0.08
 	window *= 1.0 + hook_timing_bonus
 	window *= clampf(float(condition_modifiers.get("bite_window_multiplier", 1.0)), 0.55, 1.0)
+	window *= clampf(float(profile.get("bite_window_multiplier", 1.0)), 0.65, 1.35)
 	window -= effective_wind_penalty * 0.12
 	window = clamp(window - size_ratio * 0.12, 0.85, 1.8)
 	var perfect_start: float = window * 0.25
@@ -906,6 +1574,11 @@ func _build_bite_window_data(fish_id: String, catch_data: Dictionary, balance_da
 	perfect_start = clamp(perfect_start - timing_padding, window * 0.12, window * 0.44)
 	perfect_end = clamp(perfect_end + timing_padding, perfect_start + 0.35, window * 0.92)
 	var strength: float = clamp((0.42 + size_ratio * 0.38 + float(balance_data.get("bite_chance", 0.08)) * 0.90) * bite_visibility_multiplier, 0.30, 1.0)
+	strength = max(strength, clampf(float(profile.get("strong_bite_strength", strength)), 0.30, 1.0))
+	var profile_visibility_multiplier: float = clampf(float(profile.get("bite_visibility_multiplier", 1.0)), 0.48, 1.16)
+	var visual_style := str(profile.get("visual_style", "submerge"))
+	if visual_style == "nibble" or visual_style == "cautious_nibble" or visual_style == "small_fish_taps":
+		visual_style = "submerge"
 
 	return {
 		"fish_id": fish_id,
@@ -918,7 +1591,10 @@ func _build_bite_window_data(fish_id: String, catch_data: Dictionary, balance_da
 		"behavior": behavior,
 		"weight": weight,
 		"wind_effects": wind_effects,
-		"condition_modifiers": condition_modifiers
+		"condition_modifiers": condition_modifiers,
+		"visual_style": visual_style,
+		"bite_profile": profile.duplicate(true),
+		"bite_visibility_multiplier": profile_visibility_multiplier
 	}
 
 
@@ -926,20 +1602,27 @@ func _fail_hook(reason: String, data: Dictionary = {}) -> void:
 	var failure_data := data.duplicate(true)
 	failure_data["reason"] = reason
 	failure_data["bite_data"] = _pending_bite_data.duplicate(true)
+	failure_data["bite_phase"] = _bite_phase
 	hook_failed.emit(reason, failure_data)
 	_pending_catch.clear()
 	_pending_bite_data.clear()
 	_bite_window_elapsed = 0.0
 	_bite_window_seconds = 0.0
 	fishing_state = FishingState.WAITING_FOR_BITE
+	var next_approach_outcome := reason
+	if reason == "too_early" or reason == "early_hook":
+		next_approach_outcome = "fish_spooked"
+	_reset_bite_preview_phase()
 	_hook_cooldown_timer = float(failure_data.get("cooldown", EARLY_HOOK_COOLDOWN if reason == "too_early" or reason == "early_hook" else 0.65))
-	_bite_check_timer = max(_hook_cooldown_timer, BITE_CHECK_INTERVAL)
+	_bite_phase = "approach_wait"
+	_bite_check_timer = max(_hook_cooldown_timer, _roll_next_approach_delay(_get_active_bite_balance_data(), next_approach_outcome))
 	_false_nudge_timer = randf_range(FALSE_NUDGE_MIN_DELAY, FALSE_NUDGE_MAX_DELAY)
 
 
 func _clear_active_bite_data() -> void:
 	_pending_catch.clear()
 	_pending_bite_data.clear()
+	_reset_bite_preview_phase()
 	_active_spot.clear()
 	_active_spot_id = ""
 	_active_available_fish.clear()
@@ -1032,10 +1715,10 @@ func _get_tackle_available_fish(spot_fish: Array) -> Array:
 		if float(fish.get("min_weight", 0.0)) > tackle_weight_limit:
 			continue
 
-		if _get_hook_match_multiplier(fish) <= 0.08:
+		if _get_hook_match_multiplier(fish) < 0.06:
 			continue
 
-		if _get_bait_match_multiplier(fish, str(fish_id)) <= 0.06:
+		if _get_bait_match_multiplier(fish, str(fish_id)) < 0.05:
 			continue
 
 		filtered_fish.append(fish_id)
@@ -1403,7 +2086,7 @@ func _get_line_visibility_multiplier(fish: Dictionary) -> float:
 	elif behavior == "calm":
 		caution = 1.05
 
-	return clamp((1.0 - visibility * caution) * _get_leader_fish_bite_multiplier(fish), 0.38, 1.12)
+	return clamp((1.0 - visibility * caution) * _get_leader_fish_bite_multiplier(fish), 0.52, 1.12)
 
 func _get_leader_fish_bite_multiplier(fish: Dictionary) -> float:
 	var leader_strength: float = float(_tackle_stats.get("leader_strength", 0.0))
@@ -1522,7 +2205,7 @@ func _get_hook_match_multiplier(fish: Dictionary, catch_weight: float = -1.0) ->
 
 	if hook_size < min_hook_size:
 		var too_big_steps: int = min_hook_size - hook_size
-		return clamp(0.18 - float(too_big_steps) * 0.02, 0.08, 0.18)
+		return clamp(0.24 - float(too_big_steps) * 0.025, 0.10, 0.24)
 
 	if hook_size > max_hook_size:
 		var too_small_steps: int = hook_size - max_hook_size
@@ -1543,7 +2226,7 @@ func _get_hook_match_multiplier(fish: Dictionary, catch_weight: float = -1.0) ->
 			elif fish_size == "medium":
 				target_fit = 0.88
 			else:
-				target_fit = 0.62
+				target_fit = 0.74
 		"medium":
 			if fish_size == "small":
 				target_fit = 0.92
@@ -1553,7 +2236,7 @@ func _get_hook_match_multiplier(fish: Dictionary, catch_weight: float = -1.0) ->
 				target_fit = 0.92
 		"large":
 			if fish_size == "small":
-				target_fit = 0.66
+				target_fit = 0.78
 			elif fish_size == "medium":
 				target_fit = 0.96
 			else:
@@ -1892,9 +2575,10 @@ func _start_reeling(catch_data: Dictionary) -> void:
 	fishing_state = FishingState.REELING
 	_reel_input_active = false
 	_tackle_stats = PlayerData.get_tackle_stats()
-	_fight_mode = str(_tackle_stats.get("fight_mode", "pole"))
+	_fight_mode = _get_effective_fight_mode_from_stats(_tackle_stats)
 	if not BuildConfig.ENABLE_SPINNING_FEATURES:
 		_fight_mode = "pole"
+	_tackle_stats["fight_mode"] = _fight_mode
 
 	var fish: Dictionary = FishDatabase.get_fish(str(catch_data["id"]))
 	var rarity: String = str(catch_data.get("rarity", "common"))
@@ -2838,10 +3522,10 @@ func _build_no_candidate_failure_data(spot: Dictionary, spot_id: String) -> Dict
 		if float(fish.get("min_weight", 0.0)) > tackle_weight_limit:
 			blocker_counts[FAILURE_FISH_TOO_STRONG] += 1
 			continue
-		if _get_hook_match_multiplier(fish) <= 0.08:
+		if _get_hook_match_multiplier(fish) < 0.06:
 			blocker_counts[FAILURE_BAD_HOOK] += 1
 			continue
-		if _get_bait_match_multiplier(fish, str(fish_id)) <= 0.06:
+		if _get_bait_match_multiplier(fish, str(fish_id)) < 0.05:
 			blocker_counts[FAILURE_BAD_BAIT] += 1
 			continue
 

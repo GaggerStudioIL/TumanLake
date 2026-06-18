@@ -1174,6 +1174,7 @@ func _apply_menu_button_style() -> void:
 	menu_button.add_theme_stylebox_override("hover", hover)
 	menu_button.add_theme_stylebox_override("pressed", pressed)
 	menu_button.add_theme_stylebox_override("disabled", disabled)
+	menu_button.add_theme_stylebox_override("focus", hover)
 	menu_button.add_theme_color_override("font_color", Color(0.88, 1.0, 0.94, 1.0))
 	menu_button.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 0.94, 1.0))
 	menu_button.add_theme_color_override("font_pressed_color", Color(0.80, 1.0, 0.92, 1.0))

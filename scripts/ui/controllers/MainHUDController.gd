@@ -80,7 +80,7 @@ func update_wind() -> void:
 	var gust_active: bool = bool((wind_state as Dictionary).get("gust_active", false))
 	var description: String = str((wind_state as Dictionary).get("description", ""))
 	var arrow: String = _get_wind_direction_arrow(degrees)
-	var speed_text: String = "Штиль" if speed <= 0.5 and not gust_active else "%.1f м/с" % speed
+	var speed_text: String = "%.1f м/с" % speed
 	main.wind_label.text = "%s %s%s" % [arrow, speed_text, " ↑" if gust_active else ""]
 	main.wind_label.visible = true
 	main.wind_label.tooltip_text = "%s, %.1f м/с, %.0f°" % [description, speed, degrees]

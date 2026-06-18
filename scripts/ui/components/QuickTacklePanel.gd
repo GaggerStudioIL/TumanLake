@@ -1046,7 +1046,7 @@ func _should_show_radial_hud() -> bool:
 			return false
 		if main.has_method("_is_menu_overlay_open") and bool(main.call("_is_menu_overlay_open")):
 			return false
-	return _can_change_tackle()
+	return true
 
 
 func _get_slot_visual_state(category: String) -> String:

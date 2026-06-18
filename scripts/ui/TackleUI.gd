@@ -1718,6 +1718,10 @@ func _get_tackle_setup_status_or_hints_text() -> String:
 
 func _get_tackle_setup_hints() -> Array:
 	var hints: Array = []
+	for warning in PlayerData.get_tackle_setup_warnings():
+		var warning_text := str(warning)
+		if warning_text != "":
+			hints.append(warning_text)
 	var spot = SpotDatabase.get_spot(PlayerData.current_spot)
 	var spot_fish: Array = spot.get("available_fish", [])
 	var depth = PlayerData.fishing_depth
@@ -1789,7 +1793,7 @@ func _get_tackle_setup_hints() -> Array:
 	if depth_candidates.is_empty():
 		hints.append(_get_no_bite_candidate_reason(PlayerData.current_spot))
 	elif too_big_hook_count > fitting_hook_count and depth <= 1.6:
-		hints.append("Крючок слишком большой для мелкой рыбы.")
+		hints.append("Крючок слишком крупный для выбранной рыбы.")
 	elif too_small_hook_count > 0 and large_fish_nearby:
 		hints.append("Крючок маловат для крупной рыбы: выше риск схода.")
 
@@ -1798,7 +1802,7 @@ func _get_tackle_setup_hints() -> Array:
 	if leader_warning:
 		hints.append("Поводок слабоват: при рывке он станет самым слабым элементом.")
 	if coarse_leader_warning:
-		hints.append("Поводок грубоват для осторожной мелкой рыбы: шанс поклёвки ниже.")
+		hints.append("Снасть грубая для осторожной рыбы.")
 
 	if bait_match_names.is_empty():
 		hints.append("Наживка не лучшая для рыбы на этой глубине.")
