@@ -96,11 +96,18 @@ scripts/core/BuildConfig.gd
 - ENABLE_ALPHA_TESTER_BONUS
 - ENABLE_DEBUG_PANEL
 - ENABLE_VERBOSE_LOGS
+- ENABLE_WATER_DEBUG_VISUALS
+- SPINNING_ENABLED
+- ENABLE_SPINNING_TEST_MODE
 
 Перед beta-сборкой убедиться, что:
+- IS_BETA_BUILD = true
 - ENABLE_ALPHA_TESTER_BONUS = false
 - ENABLE_DEBUG_PANEL = false
 - ENABLE_VERBOSE_LOGS = false
+- ENABLE_WATER_DEBUG_VISUALS = false
+- SPINNING_ENABLED = false
+- ENABLE_SPINNING_TEST_MODE = false
 
 ## Перед отправкой билда тестерам
 
@@ -114,8 +121,11 @@ scripts/core/BuildConfig.gd
 6. Агамим доступен.
 7. Будущие водоёмы не открываются как рабочие.
 8. Рыбалка запускается.
-9. Сохранение работает после перезапуска.
-10. APK/AAB собран из актуальной ветки.
+9. Карта, магазин, Рыбная гавань, инвентарь и сборка снасти открываются.
+10. Садок показывает улов, продажа идёт через Рыбную гавань.
+11. Сохранение работает после перезапуска: деньги, снасть, улов и текущая точка сохраняются.
+12. Debug panel не видна, spinning-предметы и спиннинг-механика недоступны.
+13. APK/AAB собран из актуальной ветки.
 
 ## Git
 

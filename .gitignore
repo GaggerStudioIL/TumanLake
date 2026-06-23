@@ -8,6 +8,10 @@ export_presets.cfg
 *.bak
 tmp_*.gd
 tmp_*.uid
+tmp_*.png
+tmp_*.png.import
+tmp_*.webp
+tmp_*.webp.import
 
 # Logs and local debug output
 *.log

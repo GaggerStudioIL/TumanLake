@@ -43,6 +43,7 @@ Project -> Export
 - выбран правильный Android export preset;
 - включены нужные архитектуры;
 - package name не изменён случайно;
+- package id принят осознанно до публичной публикации;
 - version/name соответствуют текущему beta-билду;
 - основной запуск идёт через `res://scenes/intro/IntroCinematic.tscn`;
 - build создаётся из актуальной ветки.
@@ -139,26 +140,35 @@ Godot_v4.6.2-stable_win64_console.exe --display-driver windows --rendering-drive
 Команда:
 
 ```bash
-Godot_v4.6.2-stable_win64_console.exe --display-driver windows --rendering-driver opengl3 --path . --export-debug Android build/RybnoeMesto_0.1.0-beta.3_v547.apk
+Godot_v4.6.2-stable_win64_console.exe --display-driver windows --rendering-driver opengl3 --path . --export-debug Android build/RybnoeMesto_0.1.0-beta.3.apk
 ```
 
 Перед экспортом проверено:
 
 - `GameVersion.VERSION="0.1.0-beta.3"`.
-- `GameVersion.BUILD_NAME="HUD and Cast Control Refresh"`.
+- `GameVersion.BUILD_NAME="ZBT Cleanup Fixes"`.
 - `GameVersion.BUILD_DATE="2026-06-23"`.
 - `BuildConfig.IS_BETA_BUILD = true`.
 - `BuildConfig.ENABLE_ALPHA_TESTER_BONUS = false`.
 - `BuildConfig.ENABLE_DEBUG_PANEL = false`.
 - `BuildConfig.ENABLE_VERBOSE_LOGS = false`.
+- `BuildConfig.ENABLE_WATER_DEBUG_VISUALS = false`.
+- `BuildConfig.SPINNING_ENABLED = false`.
+- `BuildConfig.ENABLE_SPINNING_TEST_MODE = false`.
 - Android preset обновлён на `version/name="0.1.0-beta.3"` и `version/code=547`.
-- Android preset экспортирует `build/RybnoeMesto_0.1.0-beta.3_v547.apk`.
+- Android preset экспортирует `build/RybnoeMesto_0.1.0-beta.3.apk`.
+- Android package id сейчас остаётся `com.tumanlake.game`.
 - `exclude_filter` исключает неигровые папки и артефакты: `landing`, `tools`, `docs`, `build`, `saves`, source-only `assets/ui/cast_depth/psd_layers_raw`, неиспользуемые cast-depth промежуточные PNG, старые APK/AAB/IDSIG/keystore и future-scope spinning art.
+
+Pre-release package id note:
+
+- Если проект ещё не опубликован в Google Play, финальный package id стоит утвердить до первой публичной публикации. Рекомендуемый кандидат: `com.gaggerstudio.rybnoemesto`.
+- Менять `package/unique_name` перед очередной beta без решения команды рискованно: Android будет считать новый package id другим приложением, установка поверх старой beta не сработает как обычное обновление.
 
 После экспорта проверить:
 
 - Godot export дошёл до `Signing debug APK` и `Verifying APK` без ошибки.
-- APK существует по пути `build/RybnoeMesto_0.1.0-beta.3_v547.apk`.
+- APK существует по пути `build/RybnoeMesto_0.1.0-beta.3.apk`.
 - `apksigner verify --verbose --print-certs` проходит без ошибок.
 - `aapt2 dump badging` показывает `versionName='0.1.0-beta.3'` и `versionCode='547'`.
 - Установка на устройство и короткий tap-through остаются обязательной ручной проверкой перед отправкой тестерам.
