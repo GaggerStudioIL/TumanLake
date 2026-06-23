@@ -169,6 +169,8 @@ Pre-release package id note:
 
 - Godot export дошёл до `Signing debug APK` и `Verifying APK` без ошибки.
 - APK существует по пути `build/RybnoeMesto_0.1.0-beta.3.apk`.
+- Если `aapt2 dump badging` предупреждает про отсутствующий `res/mipmap-anydpi-v26/themed_icon.xml`, выполнить:
+  `tools/patch_android_themed_icon.ps1 -ApkPath build/RybnoeMesto_0.1.0-beta.3.apk`.
 - `apksigner verify --verbose --print-certs` проходит без ошибок.
 - `aapt2 dump badging` показывает `versionName='0.1.0-beta.3'` и `versionCode='547'`.
 - Установка на устройство и короткий tap-through остаются обязательной ручной проверкой перед отправкой тестерам.
