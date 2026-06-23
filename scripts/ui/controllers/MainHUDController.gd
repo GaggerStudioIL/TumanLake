@@ -41,13 +41,19 @@ func update_weather() -> void:
 		return
 	var weather_state := WeatherUIHelperScript.get_current_weather_state(get_time_manager())
 	main.weather_label.text = str(weather_state.get("temperature_text", "18°C"))
+	var uses_texture_panel: bool = _uses_top_weather_panel_texture()
 	if main.weather_hud_icon != null:
-		var icon_path := str(weather_state.get("icon_path", ""))
-		if icon_path != _last_weather_icon_path:
-			_last_weather_icon_path = icon_path
-			_last_weather_icon_texture = load(icon_path) if icon_path != "" else null
-		main.weather_hud_icon.texture = _last_weather_icon_texture
-		main.weather_hud_icon.visible = _last_weather_icon_texture != null
+		if uses_texture_panel:
+			main.weather_hud_icon.visible = true
+			if main.has_method("refresh_top_weather_condition_icon"):
+				main.refresh_top_weather_condition_icon(weather_state)
+		else:
+			var icon_path := str(weather_state.get("icon_path", ""))
+			if icon_path != _last_weather_icon_path:
+				_last_weather_icon_path = icon_path
+				_last_weather_icon_texture = load(icon_path) if icon_path != "" else null
+			main.weather_hud_icon.texture = _last_weather_icon_texture
+			main.weather_hud_icon.visible = _last_weather_icon_texture != null
 	main.weather_label.tooltip_text = str(weather_state.get("description", ""))
 	if main.weather_effects_controller != null and main.weather_effects_controller.has_method("update_weather_state"):
 		main.weather_effects_controller.update_weather_state(weather_state)
@@ -79,15 +85,19 @@ func update_wind() -> void:
 	var degrees: float = float((wind_state as Dictionary).get("direction_degrees", 0.0))
 	var gust_active: bool = bool((wind_state as Dictionary).get("gust_active", false))
 	var description: String = str((wind_state as Dictionary).get("description", ""))
-	var arrow: String = _get_wind_direction_arrow(degrees)
-	var speed_text: String = "%.1f м/с" % speed
-	main.wind_label.text = "%s %s%s" % [arrow, speed_text, " ↑" if gust_active else ""]
+	var speed_text: String = "%d м/с" % roundi(speed)
+	var uses_texture_panel: bool = _uses_top_weather_panel_texture()
+	main.wind_label.text = speed_text
 	main.wind_label.visible = true
 	main.wind_label.tooltip_text = "%s, %.1f м/с, %.0f°" % [description, speed, degrees]
-	main.wind_label.modulate = Color(1.0, 0.92, 0.66, 1.0) if gust_active else Color.WHITE
+	main.wind_label.modulate = Color.WHITE if uses_texture_panel else (Color(1.0, 0.92, 0.66, 1.0) if gust_active else Color.WHITE)
 	if main.wind_hud_icon != null:
-		main.wind_hud_icon.visible = true
-		main.wind_hud_icon.modulate = Color(1.0, 0.92, 0.66, 0.96) if gust_active else Color(1.0, 1.0, 1.0, 0.94)
+		if uses_texture_panel:
+			main.wind_hud_icon.visible = true
+			main.wind_hud_icon.modulate = Color(0.88, 1.0, 0.98, 1.0)
+		else:
+			main.wind_hud_icon.visible = true
+			main.wind_hud_icon.modulate = Color(1.0, 0.92, 0.66, 0.96) if gust_active else Color(1.0, 1.0, 1.0, 0.94)
 
 
 func update_location() -> void:
@@ -121,6 +131,10 @@ func get_wind_manager() -> Node:
 	if root == null:
 		return null
 	return root.get_node_or_null("/root/WindManager")
+
+
+func _uses_top_weather_panel_texture() -> bool:
+	return main != null and main.has_method("is_using_top_weather_panel_texture") and main.is_using_top_weather_panel_texture()
 
 
 func _get_wind_direction_arrow(degrees: float) -> String:

@@ -80,25 +80,25 @@ const steps: Step[] = [
     number: "01",
     title: "Выбери точку",
     text: "Изучи карту Озера Агамим и найди подходящее место.",
-    image: "/screenshots/agamin-map.jpg",
+    image: "/steps/choose-spot.png",
   },
   {
     number: "02",
     title: "Собери снасть",
     text: "Подбери удочку, леску, крючок, поплавок и наживку.",
-    image: "/screenshots/shop-rods.jpg",
+    image: "/steps/assemble-tackle.png",
   },
   {
     number: "03",
     title: "Дождись поклевки",
     text: "Следи за поплавком, погодой, глубиной и временем суток.",
-    image: "/screenshots/float-depth-night.jpg",
+    image: "/steps/wait-bite.png",
   },
   {
     number: "04",
     title: "Вываживай рыбу",
     text: "Удерживай натяжение лески и доведи борьбу до трофея.",
-    image: "/screenshots/gameplay-reeling.jpg",
+    image: "/steps/reel-fish.png",
   },
 ];
 
@@ -130,6 +130,14 @@ const screenshots: Screenshot[] = [
   {
     title: "Настройка глубины",
     image: "/screenshots/float-depth-night.jpg",
+  },
+  {
+    title: "Tuman FM",
+    image: "/screenshots/tuman-fm-settings.jpg",
+  },
+  {
+    title: "Навыки маховой ловли",
+    image: "/screenshots/skill-tree.jpg",
   },
 ];
 
@@ -163,6 +171,16 @@ const inProgress: Feature[] = [
     title: "Дом рыбака",
     text: "Будет расширен до отдельной сцены для отдыха, еды, снастей и трофеев.",
     Icon: Home,
+  },
+  {
+    title: "Будущие водоёмы",
+    text: "Новые места уже видны на карте как контент в разработке и откроются позже.",
+    Icon: Map,
+  },
+  {
+    title: "Пресеты снастей",
+    text: "Запланированы сохранённые сборки для быстрого переключения готовых комплектов.",
+    Icon: BookOpen,
   },
 ];
 
@@ -266,6 +284,34 @@ function App() {
           </div>
         </section>
 
+        <section className="radio-section" aria-labelledby="radio-title">
+          <div className="section-inner radio-inner">
+            <div className="radio-copy">
+              <p className="eyebrow">Tuman FM</p>
+              <h2 id="radio-title">Радио у воды</h2>
+              <p>
+                Tuman FM - отдельная игровая радиостанция, а не просто замена фоновой
+                музыки. В эфире можно слушать треки, ловить сводки о погоде, новости
+                гавани и полезные подсказки по рыбалке. Иногда радио намекает, где
+                появился редкий клёв.
+              </p>
+              <div className="radio-points" aria-label="Возможности Tuman FM">
+                <span>Музыка в эфире</span>
+                <span>Сводки погоды</span>
+                <span>Подсказки по клёву</span>
+                <span>Редкие места</span>
+              </div>
+            </div>
+            <figure className="radio-preview">
+              <img src="/screenshots/tuman-fm-settings.jpg" alt="Настройки Tuman FM" loading="lazy" />
+              <figcaption>
+                <Radio size={18} aria-hidden="true" />
+                Tuman FM имеет отдельную громкость и работает как внутриигровой эфир.
+              </figcaption>
+            </figure>
+          </div>
+        </section>
+
         <section className="section" aria-labelledby="loop-title">
           <div className="section-inner">
             <div className="section-heading centered">
@@ -292,7 +338,7 @@ function App() {
           <div className="section-inner">
             <div className="section-heading centered">
               <p className="eyebrow">Скриншоты</p>
-              <h2 id="screenshots-title">Реальные экраны из горизонтальной игры</h2>
+              <h2 id="screenshots-title">Скриншоты из игры</h2>
             </div>
 
             <div className="screenshots-grid">
@@ -343,8 +389,10 @@ function App() {
             <div className="roadmap-grid">
               {inProgress.map(({ title, text, Icon }) => (
                 <article className="roadmap-card" key={title}>
-                  <span className="badge">В разработке</span>
-                  <Icon size={28} aria-hidden="true" />
+                  <div className="roadmap-card-head">
+                    <span className="badge">В разработке</span>
+                    <Icon size={28} aria-hidden="true" />
+                  </div>
                   <h3>{title}</h3>
                   <p>{text}</p>
                 </article>

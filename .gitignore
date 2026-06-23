@@ -38,6 +38,15 @@ saves/
 # Beta builds must not accidentally package local future-scope spinning art.
 assets/fishing/spinning/
 
+# Source-only UI layer exports. Generated gameplay PNGs live one folder up.
+assets/ui/cast_depth/psd_layers_raw/
+assets/ui/cast_depth/cast_button_*.png
+assets/ui/cast_depth/cast_button_*.png.import
+assets/ui/cast_depth/cast_icon_*.png
+assets/ui/cast_depth/cast_icon_*.png.import
+assets/ui/cast_depth/cast_control_meter.png
+assets/ui/cast_depth/cast_control_meter.png.import
+
 *.apk
 *.aab
 *.idsig

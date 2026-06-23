@@ -120,6 +120,10 @@ func layout(screen_size: Vector2) -> void:
 	menu_button.custom_minimum_size = button_size
 	menu_button.add_theme_font_size_override("font_size", int(clampf(31.0 * ui_scale, 29.0, 38.0)))
 	_apply_menu_button_style()
+	menu_button.visible = false
+	menu_button.disabled = true
+	menu_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	close_menu()
 
 	_menu_open_position = Vector2(screen_size.x - margin_x - panel_width, button_y + button_size.y + 8.0 * ui_scale)
 	dropdown_panel.position = _menu_open_position
@@ -353,6 +357,9 @@ func close_forecast(reset_nav: bool = true) -> void:
 			main._refresh_bottom_nav_styles()
 	_refresh_main_depth_controls()
 
+func open_forecast() -> void:
+	_on_forecast_pressed()
+
 func close_bug_report(reset_nav: bool = true) -> void:
 	if bug_report_panel == null or bug_report_backdrop == null:
 		return
@@ -421,7 +428,6 @@ func _ensure_menu_nodes() -> void:
 	forecast_item = _create_menu_item("Прогноз погоды", "weather")
 	settings_item = _create_menu_item("Настройки", "settings")
 	bug_report_item = _create_menu_item("Помощь", "settings")
-	menu_items_box.add_child(profile_item)
 	menu_items_box.add_child(settings_item)
 	menu_items_box.add_child(bug_report_item)
 
@@ -989,6 +995,10 @@ func _save_settings_if_dirty() -> void:
 	_settings_dirty = false
 
 
+func open_settings() -> void:
+	_on_settings_pressed()
+
+
 func _on_settings_pressed() -> void:
 	close_menu()
 	if main == null:
@@ -1126,7 +1136,7 @@ func _get_build_version_label() -> String:
 		version_node = main.get_node_or_null("/root/GameVersion")
 	if version_node != null and version_node.has_method("get_version_label"):
 		return str(version_node.call("get_version_label"))
-	return "v0.1.0-beta.2"
+	return "v0.1.0-beta.3"
 
 
 func _clear_children(node: Node) -> void:

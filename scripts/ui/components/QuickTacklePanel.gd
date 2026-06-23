@@ -1,6 +1,6 @@
 extends Control
 
-const DEFAULT_CATEGORY_ORDER := ["line", "leader", "hook", "float", "bait", "full_tackle"]
+const DEFAULT_CATEGORY_ORDER := ["line", "leader", "float", "hook", "bait", "full_tackle"]
 const CATEGORY_TITLES := {
 	"line": "Леска",
 	"leader": "Поводок",
@@ -42,7 +42,8 @@ const RADIAL_STATE_OPENING := "opening"
 const RADIAL_STATE_OPEN := "open"
 const RADIAL_STATE_CLOSING := "closing"
 const RADIAL_STATE_DISABLED := "disabled"
-const RADIAL_ANIMATION_SECONDS := 0.18
+const RADIAL_ANIMATION_SECONDS := 0.22
+const TOGGLE_LONG_PRESS_MSEC := 520
 
 var main
 var is_tackle_radial_open := false
@@ -67,22 +68,25 @@ var _radial_tween: Tween
 var _collapsed_button_position := Vector2.ZERO
 var _slot_target_positions: Dictionary = {}
 var _has_layout := false
+var _toggle_press_started_msec := 0
+var _toggle_long_press_triggered := false
 
 
 func setup(main_ref) -> void:
 	main = main_ref
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	z_index = 266
+	set_process(false)
 	set_process_input(true)
 	_ensure_nodes()
 	refresh()
 
 
-func layout(rect: Rect2, ui_scale: float) -> void:
+func layout(_rect: Rect2, ui_scale: float) -> void:
 	_ui_scale = clamp(ui_scale, 0.82, 1.24)
 	_ensure_nodes()
 	_ensure_popup_overlay_parent()
-	var category_order: Array = _get_category_order()
+	var category_order: Array = _get_expand_category_order()
 	var should_show := _should_show_radial_hud()
 	visible = should_show
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -94,52 +98,26 @@ func layout(rect: Rect2, ui_scale: float) -> void:
 		_radial_state = RADIAL_STATE_CLOSED
 		is_tackle_radial_open = false
 
-	_button_edge = clamp(rect.size.x * 0.39, 46.0 * _ui_scale, 56.0 * _ui_scale)
-	_toggle_edge = clamp(rect.size.x * 0.34, 42.0 * _ui_scale, 50.0 * _ui_scale)
+	_button_edge = clamp(60.0 * _ui_scale, 56.0, 72.0)
+	_toggle_edge = _button_edge
 	var viewport_size := get_viewport_rect().size
-	var center := rect.position + rect.size * 0.5
-	var radius: float = clamp(rect.size.x * 0.78, _button_edge * 1.50, _button_edge * 1.92)
-	var margin: float = max(8.0 * _ui_scale, 6.0)
-	var min_pos := Vector2(INF, INF)
-	var max_pos := Vector2(-INF, -INF)
-	var slot_centers: Dictionary = {}
-	var toggle_center := center + Vector2(rect.size.x * 0.72, -rect.size.y * 0.08)
-	toggle_center.x = clamp(toggle_center.x, margin + _toggle_edge * 0.5, viewport_size.x - margin - _toggle_edge * 0.5)
-	toggle_center.y = clamp(toggle_center.y, margin + _toggle_edge * 0.5, viewport_size.y - margin - _toggle_edge * 0.5)
-	min_pos.x = min(min_pos.x, toggle_center.x - _toggle_edge * 0.5)
-	min_pos.y = min(min_pos.y, toggle_center.y - _toggle_edge * 0.5)
-	max_pos.x = max(max_pos.x, toggle_center.x + _toggle_edge * 0.5)
-	max_pos.y = max(max_pos.y, toggle_center.y + _toggle_edge * 0.5)
-	min_pos.x = min(min_pos.x, center.x - _button_edge * 0.5)
-	min_pos.y = min(min_pos.y, center.y - _button_edge * 0.5)
-	max_pos.x = max(max_pos.x, center.x + _button_edge * 0.5)
-	max_pos.y = max(max_pos.y, center.y + _button_edge * 0.5)
+	var button_count: int = maxi(category_order.size() + 1, 1)
+	var gap: float = clamp(6.0 * _ui_scale, 5.0, 9.0)
+	var row_width: float = _button_edge * float(button_count) + gap * float(button_count - 1)
+	var side_margin: float = max(10.0 * _ui_scale, 8.0)
+	row_width = min(row_width, max(viewport_size.x - side_margin * 2.0, _button_edge))
+	var row_left: float = clamp((viewport_size.x - row_width) * 0.5, side_margin, max(side_margin, viewport_size.x - row_width - side_margin))
+	var row_top: float = viewport_size.y - clamp(44.0 * _ui_scale, 42.0, 68.0) - _button_edge
+	row_top = clamp(row_top, side_margin, max(side_margin, viewport_size.y - _button_edge - side_margin))
+	var row_origin := Vector2(row_left, row_top)
+	var row_size := Vector2(row_width, _button_edge)
+	var toggle_center := row_origin + Vector2(row_width - _toggle_edge * 0.5, _button_edge * 0.5)
 
-	for category_value in category_order:
-		var category := str(category_value)
-		var offset_value = RADIAL_SLOT_OFFSETS.get(category, Vector2.ZERO)
-		var offset: Vector2 = offset_value if offset_value is Vector2 else Vector2.ZERO
-		if offset == Vector2.ZERO:
-			continue
-		var slot_center := center + offset.normalized() * radius
-		slot_center.x = clamp(slot_center.x, margin + _button_edge * 0.5, viewport_size.x - margin - _button_edge * 0.5)
-		slot_center.y = clamp(slot_center.y, margin + _button_edge * 0.5, viewport_size.y - margin - _button_edge * 0.5)
-		slot_centers[category] = slot_center
-		min_pos.x = min(min_pos.x, slot_center.x - _button_edge * 0.5)
-		min_pos.y = min(min_pos.y, slot_center.y - _button_edge * 0.5)
-		max_pos.x = max(max_pos.x, slot_center.x + _button_edge * 0.5)
-		max_pos.y = max(max_pos.y, slot_center.y + _button_edge * 0.5)
-
-	if slot_centers.is_empty():
-		visible = false
-		hide_popup()
-		return
-
-	position = min_pos
-	size = max_pos - min_pos
+	position = row_origin
+	size = row_size
 	custom_minimum_size = size
 	_has_layout = true
-	_collapsed_button_position = center - position - Vector2(_button_edge, _button_edge) * 0.5
+	_collapsed_button_position = toggle_center - position - Vector2(_button_edge, _button_edge) * 0.5
 	_slot_target_positions.clear()
 	_layout_toggle_button(toggle_center - position)
 
@@ -148,13 +126,13 @@ func layout(rect: Rect2, ui_scale: float) -> void:
 		if stale_button != null:
 			stale_button.visible = _is_radial_visible() and category_order.has(str(key))
 
-	for category_value in category_order:
+	for index in range(category_order.size()):
+		var category_value = category_order[index]
 		var category := str(category_value)
 		var button := _buttons.get(category) as Button
 		if button == null:
 			continue
-		var slot_center: Vector2 = slot_centers.get(category, center)
-		var target_position := slot_center - position - Vector2(_button_edge, _button_edge) * 0.5
+		var target_position := Vector2(float(index) * (_button_edge + gap), 0.0)
 		_slot_target_positions[category] = target_position
 		if _radial_state == RADIAL_STATE_OPEN:
 			button.position = target_position
@@ -171,9 +149,8 @@ func layout(rect: Rect2, ui_scale: float) -> void:
 		_apply_slot_button_style(button, _get_slot_visual_state(category))
 		var icon := _button_icons.get(category) as TextureRect
 		if icon != null:
-			var inset: float = _button_edge * 0.18
-			icon.position = Vector2(inset, inset)
-			icon.size = button.size - Vector2(inset * 2.0, inset * 2.0)
+			icon.position = Vector2.ZERO
+			icon.size = button.size
 
 	_layout_popup()
 	refresh()
@@ -194,7 +171,7 @@ func refresh() -> void:
 		_radial_state = RADIAL_STATE_CLOSED
 		is_tackle_radial_open = false
 
-	var category_order: Array = _get_category_order()
+	var category_order: Array = _get_expand_category_order()
 	var can_change := _can_change_tackle()
 	_refresh_toggle_button(can_change)
 	for key in _buttons.keys():
@@ -210,11 +187,16 @@ func refresh() -> void:
 		if button != null:
 			button.disabled = not can_change
 			button.tooltip_text = _get_button_tooltip(key)
-			button.modulate = Color.WHITE if can_change else Color(0.76, 0.82, 0.80, 0.62)
+			var alpha := button.modulate.a
+			if _radial_state == RADIAL_STATE_OPEN:
+				alpha = 1.0
+			elif _radial_state == RADIAL_STATE_CLOSED:
+				alpha = 0.0
+			button.modulate = Color(1.0, 1.0, 1.0, alpha) if can_change else Color(0.76, 0.82, 0.80, minf(alpha, 0.62))
 			_apply_slot_button_style(button, _get_slot_visual_state(key))
 		var icon := _button_icons.get(key) as TextureRect
 		if icon != null:
-			icon.texture = _get_current_slot_texture(key)
+			icon.texture = _get_category_texture(key)
 			icon.modulate = Color(1.0, 1.0, 1.0, 0.98) if equipped else Color(1.0, 0.78, 0.72, 0.94)
 
 	if _popup_panel != null and _popup_panel.visible and _popup_category != "" and not category_order.has(_popup_category):
@@ -276,6 +258,17 @@ func get_radial_state() -> String:
 	return _radial_state
 
 
+func _process(_delta: float) -> void:
+	if _toggle_press_started_msec <= 0 or _toggle_long_press_triggered:
+		return
+	if Time.get_ticks_msec() - _toggle_press_started_msec < TOGGLE_LONG_PRESS_MSEC:
+		return
+	_toggle_long_press_triggered = true
+	_toggle_press_started_msec = 0
+	set_process(false)
+	_open_full_tackle_from_toggle()
+
+
 func _input(event: InputEvent) -> void:
 	if not _is_radial_visible() and (_popup_panel == null or not _popup_panel.visible):
 		return
@@ -307,6 +300,8 @@ func _ensure_nodes() -> void:
 		_toggle_button.focus_mode = Control.FOCUS_NONE
 		_toggle_button.visible = false
 		_toggle_button.add_theme_constant_override("h_separation", 0)
+		_toggle_button.button_down.connect(_on_toggle_button_down)
+		_toggle_button.button_up.connect(_on_toggle_button_up)
 		_toggle_button.pressed.connect(_on_toggle_pressed)
 		add_child(_toggle_button)
 
@@ -318,7 +313,7 @@ func _ensure_nodes() -> void:
 		_toggle_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		_toggle_button.add_child(_toggle_icon)
 
-	var category_order: Array = _get_category_order()
+	var category_order: Array = _get_expand_category_order()
 	for category in category_order:
 		var key := str(category)
 		if not _buttons.has(key):
@@ -382,9 +377,8 @@ func _layout_toggle_button(local_center: Vector2) -> void:
 	_toggle_button.z_index = 2
 	_apply_toggle_button_style()
 	if _toggle_icon != null:
-		var inset: float = _toggle_edge * 0.20
-		_toggle_icon.position = Vector2(inset, inset)
-		_toggle_icon.size = toggle_size - Vector2(inset * 2.0, inset * 2.0)
+		_toggle_icon.position = Vector2.ZERO
+		_toggle_icon.size = toggle_size
 		_toggle_icon.texture = _get_category_texture("full_tackle")
 	_refresh_toggle_button(_can_change_tackle())
 
@@ -394,14 +388,45 @@ func _refresh_toggle_button(can_change: bool) -> void:
 		return
 	_toggle_button.visible = _should_show_radial_hud()
 	_toggle_button.disabled = not can_change
+	_toggle_button.tooltip_text = "Нажмите: быстрый выбор. Удерживайте: сборка удочки"
 	_toggle_button.mouse_filter = Control.MOUSE_FILTER_STOP if _toggle_button.visible and can_change else Control.MOUSE_FILTER_IGNORE
 	_toggle_button.modulate = Color.WHITE if can_change else Color(0.76, 0.82, 0.80, 0.62)
 	if _toggle_icon != null:
 		_toggle_icon.modulate = Color(1.0, 1.0, 1.0, 0.98 if can_change else 0.56)
 
 
+func _on_toggle_button_down() -> void:
+	if _toggle_button == null or _toggle_button.disabled:
+		return
+	_toggle_press_started_msec = Time.get_ticks_msec()
+	_toggle_long_press_triggered = false
+	_toggle_button.pivot_offset = _toggle_button.size * 0.5
+	_toggle_button.scale = Vector2.ONE * 1.05
+	set_process(true)
+
+
+func _on_toggle_button_up() -> void:
+	_toggle_press_started_msec = 0
+	set_process(false)
+	if _toggle_button != null:
+		_toggle_button.scale = Vector2.ONE
+
+
 func _on_toggle_pressed() -> void:
+	if _toggle_long_press_triggered:
+		_toggle_long_press_triggered = false
+		return
 	toggle_radial_menu()
+
+
+func _open_full_tackle_from_toggle() -> void:
+	if not _can_change_tackle():
+		_show_toast("Снасть можно менять только перед забросом.", false)
+		return
+	hide_popup()
+	close_radial_menu(false)
+	if main != null and main.has_method("open_full_tackle_from_quick_panel"):
+		main.open_full_tackle_from_quick_panel()
 
 
 func _is_radial_visible() -> bool:
@@ -425,19 +450,20 @@ func _set_disabled_state() -> void:
 		_radial_tween.kill()
 	hide_popup()
 	is_tackle_radial_open = false
-	_radial_state = RADIAL_STATE_DISABLED
+	_radial_state = RADIAL_STATE_CLOSED
 	_hide_radial_buttons()
 	if _toggle_button != null:
 		_toggle_button.visible = false
 		_toggle_button.disabled = true
 		_toggle_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_toggle_button.scale = Vector2.ONE
 	visible = false
 
 
 func _animate_radial_buttons(opening: bool) -> void:
 	if is_instance_valid(_radial_tween):
 		_radial_tween.kill()
-	var category_order: Array = _get_category_order()
+	var category_order: Array = _get_expand_category_order()
 	var can_change := _can_change_tackle()
 	var start_alpha := 0.0 if opening else 1.0
 	var end_alpha := 1.0 if opening else 0.0
@@ -445,7 +471,8 @@ func _animate_radial_buttons(opening: bool) -> void:
 	var end_scale := Vector2.ONE * (1.0 if opening else 0.2)
 	_radial_tween = create_tween()
 	_radial_tween.set_parallel(true)
-	for category_value in category_order:
+	for index in range(category_order.size()):
+		var category_value = category_order[index]
 		var category := str(category_value)
 		var button := _buttons.get(category) as Button
 		if button == null:
@@ -459,9 +486,10 @@ func _animate_radial_buttons(opening: bool) -> void:
 			button.position = _collapsed_button_position
 			button.scale = start_scale
 			button.modulate = Color(1.0, 1.0, 1.0, start_alpha)
-		_radial_tween.tween_property(button, "position", target_position if opening else _collapsed_button_position, RADIAL_ANIMATION_SECONDS).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT if opening else Tween.EASE_IN)
-		_radial_tween.tween_property(button, "scale", end_scale, RADIAL_ANIMATION_SECONDS).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT if opening else Tween.EASE_IN)
-		_radial_tween.tween_property(button, "modulate:a", end_alpha, RADIAL_ANIMATION_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT if opening else Tween.EASE_IN)
+		var delay := float(index) * 0.018 if opening else float(category_order.size() - index - 1) * 0.012
+		_radial_tween.tween_property(button, "position", target_position if opening else _collapsed_button_position, RADIAL_ANIMATION_SECONDS).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT if opening else Tween.EASE_IN).set_delay(delay)
+		_radial_tween.tween_property(button, "scale", end_scale, RADIAL_ANIMATION_SECONDS).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT if opening else Tween.EASE_IN).set_delay(delay)
+		_radial_tween.tween_property(button, "modulate:a", end_alpha, RADIAL_ANIMATION_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT if opening else Tween.EASE_IN).set_delay(delay)
 	_radial_tween.finished.connect(func() -> void:
 		if opening:
 			_radial_state = RADIAL_STATE_OPEN
@@ -501,6 +529,16 @@ func _get_category_order() -> Array:
 		order = DEFAULT_CATEGORY_ORDER.duplicate()
 
 	_current_category_order = order.duplicate()
+	return order
+
+
+func _get_expand_category_order() -> Array:
+	var order: Array = []
+	for category_value in _get_category_order():
+		var category := str(category_value)
+		if category == "full_tackle" or category == "tackle":
+			continue
+		order.append(category)
 	return order
 
 
@@ -1108,64 +1146,35 @@ func _get_current_slot_texture(category: String) -> Texture2D:
 	return _get_category_texture(category)
 
 
+func _apply_image_button_style(button: Button) -> void:
+	button.flat = true
+	button.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
+	button.add_theme_stylebox_override("hover", StyleBoxEmpty.new())
+	button.add_theme_stylebox_override("pressed", StyleBoxEmpty.new())
+	button.add_theme_stylebox_override("disabled", StyleBoxEmpty.new())
+	button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	button.add_theme_constant_override("h_separation", 0)
+
+
 func _apply_slot_button_style(button: Button, state: String = "normal") -> void:
-	var radius: float = _button_edge * 0.5
-	var fill := Color(0.026, 0.045, 0.044, 0.84)
-	var border := Color(0.62, 0.96, 0.78, 0.58)
-	var hover_fill := Color(0.044, 0.076, 0.068, 0.92)
-	var hover_border := Color(0.80, 1.0, 0.88, 0.82)
-	var pressed_fill := Color(0.056, 0.112, 0.078, 0.98)
-	var pressed_border := Color(0.92, 1.0, 0.74, 0.96)
-	var disabled_fill := Color(0.034, 0.044, 0.044, 0.42)
-	var disabled_border := Color(0.52, 0.66, 0.60, 0.22)
-	var shadow := Color(0.0, 0.0, 0.0, 0.28)
-	var border_width := 2
-
-	match state:
-		"warning":
-			fill = Color(0.13, 0.045, 0.038, 0.88)
-			border = Color(1.0, 0.35, 0.26, 0.90)
-			hover_fill = Color(0.19, 0.060, 0.046, 0.96)
-			hover_border = Color(1.0, 0.62, 0.48, 1.0)
-			pressed_fill = Color(0.28, 0.074, 0.052, 1.0)
-			pressed_border = Color(1.0, 0.82, 0.58, 1.0)
-			border_width = 3
-		"disabled":
-			fill = disabled_fill
-			border = disabled_border
-			hover_fill = disabled_fill
-			hover_border = disabled_border
-			pressed_fill = disabled_fill
-			pressed_border = disabled_border
-			shadow = Color.TRANSPARENT
-
-	button.add_theme_stylebox_override("normal", _make_round_style(fill, border, radius, border_width, shadow))
-	button.add_theme_stylebox_override("hover", _make_round_style(hover_fill, hover_border, radius, border_width, shadow))
-	button.add_theme_stylebox_override("pressed", _make_round_style(pressed_fill, pressed_border, radius, border_width, Color.TRANSPARENT))
-	button.add_theme_stylebox_override("disabled", _make_round_style(disabled_fill, disabled_border, radius, border_width, Color.TRANSPARENT))
+	_apply_image_button_style(button)
 	button.add_theme_color_override("icon_normal_color", Color(0.94, 1.0, 0.96, 0.94))
 	button.add_theme_color_override("icon_hover_color", Color(1.0, 1.0, 0.92, 1.0))
 	button.add_theme_color_override("icon_pressed_color", Color(0.86, 1.0, 0.74, 1.0))
 	button.add_theme_color_override("icon_disabled_color", Color(0.62, 0.70, 0.68, 0.56))
-	button.add_theme_constant_override("icon_max_width", int(_button_edge * 0.68))
+	button.add_theme_constant_override("icon_max_width", 0)
+	if state == "warning":
+		button.self_modulate = Color(1.0, 0.88, 0.86, 1.0)
+	elif state == "disabled":
+		button.self_modulate = Color(0.72, 0.76, 0.74, 1.0)
+	else:
+		button.self_modulate = Color.WHITE
 
 
 func _apply_toggle_button_style() -> void:
 	if _toggle_button == null:
 		return
-	var radius: float = _toggle_edge * 0.5
-	var fill := Color(0.026, 0.045, 0.044, 0.88)
-	var border := Color(0.70, 1.0, 0.82, 0.62)
-	var hover_fill := Color(0.046, 0.080, 0.070, 0.94)
-	var hover_border := Color(0.86, 1.0, 0.90, 0.86)
-	var pressed_fill := Color(0.060, 0.118, 0.084, 1.0)
-	var pressed_border := Color(0.96, 1.0, 0.76, 0.96)
-	var disabled_fill := Color(0.034, 0.044, 0.044, 0.42)
-	var disabled_border := Color(0.52, 0.66, 0.60, 0.22)
-	_toggle_button.add_theme_stylebox_override("normal", _make_round_style(fill, border, radius, 2, Color(0.0, 0.0, 0.0, 0.28)))
-	_toggle_button.add_theme_stylebox_override("hover", _make_round_style(hover_fill, hover_border, radius, 2, Color(0.0, 0.0, 0.0, 0.24)))
-	_toggle_button.add_theme_stylebox_override("pressed", _make_round_style(pressed_fill, pressed_border, radius, 2, Color.TRANSPARENT))
-	_toggle_button.add_theme_stylebox_override("disabled", _make_round_style(disabled_fill, disabled_border, radius, 2, Color.TRANSPARENT))
+	_apply_image_button_style(_toggle_button)
 	_toggle_button.add_theme_color_override("font_color", Color.TRANSPARENT)
 	_toggle_button.add_theme_color_override("font_hover_color", Color.TRANSPARENT)
 	_toggle_button.add_theme_color_override("font_pressed_color", Color.TRANSPARENT)

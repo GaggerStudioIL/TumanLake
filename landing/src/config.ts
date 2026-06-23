@@ -3,10 +3,12 @@ const env = import.meta.env;
 const withFallback = (value: string | undefined, fallback = "#zbt") =>
   value && value.trim().length > 0 ? value : fallback;
 
+const defaultTelegramUrl = "https://t.me/+6jhVn0EWIPE0MzE8";
+
 export const links = {
   apk: withFallback(env.NEXT_PUBLIC_APK_URL),
-  telegram: withFallback(env.NEXT_PUBLIC_TELEGRAM_URL),
-  bugReport: withFallback(env.NEXT_PUBLIC_BUG_REPORT_URL),
+  telegram: withFallback(env.NEXT_PUBLIC_TELEGRAM_URL, defaultTelegramUrl),
+  bugReport: withFallback(env.NEXT_PUBLIC_BUG_REPORT_URL, defaultTelegramUrl),
   vk: withFallback(env.NEXT_PUBLIC_VK_URL),
   youtube: withFallback(env.NEXT_PUBLIC_YOUTUBE_URL),
   privacy: withFallback(env.NEXT_PUBLIC_PRIVACY_URL),

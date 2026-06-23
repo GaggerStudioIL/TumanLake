@@ -2,7 +2,9 @@ node_modules/
 dist/
 .tsbuildinfo/
 build-cache/
+.vercel/
 vite-dev*.log
+*.import
 .env
 .env.*
 !.env.example

@@ -2,6 +2,7 @@
 extends RefCounted
 
 const SkillTreeUIScript := preload("res://scripts/ui/SkillTreeUI.gd")
+const LevelRankData := preload("res://scripts/data/LevelRankData.gd")
 
 const TAB_INFO := "info"
 const TAB_SKILLS := "skills"
@@ -203,14 +204,18 @@ func _add_info_section() -> void:
 	theme.apply_card_style(avatar)
 	top.add_child(avatar)
 
-	var initials := Label.new()
-	initials.text = _get_player_initials()
-	initials.set_anchors_preset(Control.PRESET_FULL_RECT)
-	initials.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	initials.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	initials.add_theme_font_size_override("font_size", 38)
-	initials.add_theme_color_override("font_color", Color(0.84, 1.0, 0.90, 0.96))
-	avatar.add_child(initials)
+	var rank_icon := TextureRect.new()
+	rank_icon.name = "ProfileRankIcon"
+	rank_icon.texture = LevelRankData.get_icon_for_level(PlayerData.level)
+	rank_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rank_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	rank_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	rank_icon.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rank_icon.offset_left = 14.0
+	rank_icon.offset_top = 10.0
+	rank_icon.offset_right = -14.0
+	rank_icon.offset_bottom = -10.0
+	avatar.add_child(rank_icon)
 
 	var grid := _make_grid(3)
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL

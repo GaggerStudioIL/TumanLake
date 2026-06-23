@@ -55,3 +55,5 @@ NEXT_PUBLIC_PRIVACY_URL=
 - `shop-baits.jpg`
 - `shop-rods.jpg`
 - `float-depth-night.jpg`
+- `tuman-fm-settings.jpg`
+- `skill-tree.jpg`

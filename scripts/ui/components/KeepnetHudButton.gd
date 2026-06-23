@@ -1,11 +1,16 @@
 extends Button
 
+const SADOK_EMPTY_TEXTURE := preload("res://assets/ui/ux/fishing_spot/sadok_0.png")
+const SADOK_HALF_TEXTURE := preload("res://assets/ui/ux/fishing_spot/sadok_50.png")
+const SADOK_FULL_TEXTURE := preload("res://assets/ui/ux/fishing_spot/sadok_full.png")
+
 var icon_rect: TextureRect
 var count_label: Label
 var progress_value := 0.0
 var target_progress_value := 0.0
 var fish_count := 0
 var capacity := 30
+var fallback_icon_texture: Texture2D
 var _press_visual_active := false
 var _hover_visual_active := false
 
@@ -25,7 +30,8 @@ func _ready() -> void:
 
 func set_icon_texture(texture: Texture2D) -> void:
 	_ensure_children()
-	icon_rect.texture = texture
+	fallback_icon_texture = texture
+	_refresh_icon_state()
 
 
 func set_counts(count: int, max_count: int, animate := true) -> void:
@@ -38,6 +44,7 @@ func set_counts(count: int, max_count: int, animate := true) -> void:
 	else:
 		set_process(true)
 	_update_count_label()
+	_refresh_icon_state()
 	_layout_children()
 	queue_redraw()
 
@@ -57,37 +64,7 @@ func _notification(what: int) -> void:
 
 
 func _draw() -> void:
-	var edge: float = min(size.x, size.y)
-	if edge <= 2.0:
-		return
-
-	var center := size * 0.5
-	var alpha := 0.58 if disabled else 1.0
-	var radius: float = edge * 0.5 - 4.0
-	var ring_width: float = maxf(edge * 0.045, 3.0)
-	var inner_radius: float = maxf(radius - ring_width * 1.70, 2.0)
-
-	draw_circle(center, radius + 2.0, Color(0.0, 0.0, 0.0, 0.22 * alpha))
-	draw_circle(center, radius, Color(0.018, 0.034, 0.036, 0.70 * alpha))
-	draw_circle(center, inner_radius, Color(0.020, 0.048, 0.046, 0.54 * alpha))
-	draw_arc(center, radius, 0.0, TAU, 112, Color(0.70, 0.86, 0.80, 0.28 * alpha), ring_width, true)
-
-	var progress_color := Color(0.48, 0.95, 0.66, 0.95 * alpha)
-	if target_progress_value >= 0.85:
-		progress_color = Color(1.0, 0.74, 0.30, 0.96 * alpha)
-	if target_progress_value >= 0.98:
-		progress_color = Color(1.0, 0.36, 0.28, 0.98 * alpha)
-
-	if progress_value > 0.001:
-		var start_angle := -PI * 0.5
-		var end_angle := start_angle + TAU * progress_value
-		draw_arc(center, radius, start_angle, end_angle, 96, progress_color, ring_width, true)
-
-	if _hover_visual_active and not disabled:
-		draw_arc(center, radius - ring_width * 1.6, 0.0, TAU, 96, Color(0.66, 1.0, 0.72, 0.16), 2.0, true)
-
-	var count_bg_rect := Rect2(Vector2(edge * 0.18, edge * 0.68), Vector2(edge * 0.64, edge * 0.23))
-	draw_style_box(_make_style(Color(0.010, 0.020, 0.022, 0.64 * alpha), Color(0.72, 0.86, 0.78, 0.18 * alpha), 8), count_bg_rect)
+	pass
 
 
 func _ensure_children() -> void:
@@ -113,26 +90,36 @@ func _ensure_children() -> void:
 		count_label.add_theme_constant_override("shadow_offset_x", 0)
 		count_label.add_theme_constant_override("shadow_offset_y", 1)
 		add_child(count_label)
+	count_label.visible = false
 
 
 func _layout_children() -> void:
 	_ensure_children()
-	var edge: float = min(size.x, size.y)
 	pivot_offset = size * 0.5
 	_apply_press_scale()
-	var icon_size := Vector2(edge * 0.56, edge * 0.56)
-	icon_rect.position = Vector2((size.x - icon_size.x) * 0.5, edge * 0.12)
-	icon_rect.size = icon_size
-	icon_rect.modulate = Color(0.88, 1.0, 0.90, 0.94 if not disabled else 0.54)
+	icon_rect.position = Vector2.ZERO
+	icon_rect.size = size
+	icon_rect.modulate = Color(1.0, 1.0, 1.0, 0.98 if not disabled else 0.54)
 
-	count_label.position = Vector2(edge * 0.18, edge * 0.68)
-	count_label.size = Vector2(edge * 0.64, edge * 0.23)
-	count_label.add_theme_font_size_override("font_size", int(clampf(edge * 0.145, 10.0, 13.0)))
+	count_label.visible = false
 
 
 func _update_count_label() -> void:
 	_ensure_children()
 	count_label.text = "%d/%d" % [fish_count, capacity]
+	count_label.visible = false
+
+
+func _refresh_icon_state() -> void:
+	_ensure_children()
+	if target_progress_value >= 0.80:
+		icon_rect.texture = SADOK_FULL_TEXTURE
+	elif target_progress_value <= 0.35:
+		icon_rect.texture = SADOK_EMPTY_TEXTURE
+	else:
+		icon_rect.texture = SADOK_HALF_TEXTURE
+	if icon_rect.texture == null:
+		icon_rect.texture = fallback_icon_texture
 
 
 func _set_press_visual(value: bool) -> void:

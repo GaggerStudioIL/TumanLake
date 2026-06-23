@@ -134,7 +134,36 @@ Godot_v4.6.2-stable_win64_console.exe --display-driver windows --rendering-drive
 
 - Первый export внутри sandbox упал из-за недоступных путей Godot/AppData и Android SDK/editor templates; повтор вне sandbox успешно собрал APK.
 
-## 10. Blocker для отправки
+## 10. 2026-06-23 beta.3 debug export prep
+
+Команда:
+
+```bash
+Godot_v4.6.2-stable_win64_console.exe --display-driver windows --rendering-driver opengl3 --path . --export-debug Android build/RybnoeMesto_0.1.0-beta.3_v547.apk
+```
+
+Перед экспортом проверено:
+
+- `GameVersion.VERSION="0.1.0-beta.3"`.
+- `GameVersion.BUILD_NAME="HUD and Cast Control Refresh"`.
+- `GameVersion.BUILD_DATE="2026-06-23"`.
+- `BuildConfig.IS_BETA_BUILD = true`.
+- `BuildConfig.ENABLE_ALPHA_TESTER_BONUS = false`.
+- `BuildConfig.ENABLE_DEBUG_PANEL = false`.
+- `BuildConfig.ENABLE_VERBOSE_LOGS = false`.
+- Android preset обновлён на `version/name="0.1.0-beta.3"` и `version/code=547`.
+- Android preset экспортирует `build/RybnoeMesto_0.1.0-beta.3_v547.apk`.
+- `exclude_filter` исключает неигровые папки и артефакты: `landing`, `tools`, `docs`, `build`, `saves`, source-only `assets/ui/cast_depth/psd_layers_raw`, неиспользуемые cast-depth промежуточные PNG, старые APK/AAB/IDSIG/keystore и future-scope spinning art.
+
+После экспорта проверить:
+
+- Godot export дошёл до `Signing debug APK` и `Verifying APK` без ошибки.
+- APK существует по пути `build/RybnoeMesto_0.1.0-beta.3_v547.apk`.
+- `apksigner verify --verbose --print-certs` проходит без ошибок.
+- `aapt2 dump badging` показывает `versionName='0.1.0-beta.3'` и `versionCode='547'`.
+- Установка на устройство и короткий tap-through остаются обязательной ручной проверкой перед отправкой тестерам.
+
+## 11. Blocker для отправки
 
 Не отправлять билд, если:
 

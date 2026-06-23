@@ -63,6 +63,19 @@ const SIDE_MENU_ICON_MAP := preload("res://assets/ui/icons/side_menu/optimized/m
 const SIDE_MENU_ICON_PROFILE := preload("res://assets/ui/icons/side_menu/optimized/profile.png")
 const SIDE_MENU_ICON_FISH_ATLAS := preload("res://assets/ui/icons/side_menu/optimized/fish_atlas.png")
 const SIDE_MENU_ICON_SETTINGS := preload("res://assets/ui/icons/side_menu/optimized/settings.png")
+const UX_ICON_KEEPNET := preload("res://assets/ui/ux/fishing_spot/keepnet.png")
+const UX_ICON_CART := preload("res://assets/ui/ux/fishing_spot/cart.png")
+const UX_ICON_SHOP_CHEST := preload("res://assets/ui/ux/fishing_spot/shop_chest.png")
+const UX_ICON_BACKPACK := preload("res://assets/ui/ux/fishing_spot/backpack.png")
+const UX_ICON_MAP_PIN := preload("res://assets/ui/ux/fishing_spot/map_pin.png")
+const UX_ICON_FISH_ATLAS_BOOK := preload("res://assets/ui/ux/fishing_spot/fish_atlas_book.png")
+const UX_ICON_ATLAS := preload("res://assets/ui/ux/fishing_spot/atlas.png")
+const UX_ICON_HARBOR_CHEST := preload("res://assets/ui/ux/fishing_spot/gavan.png")
+const UX_ICON_SETTINGS_GEAR := preload("res://assets/ui/ux/fishing_spot/settings_gear.png")
+const UX_ICON_MONEY_COIN := preload("res://assets/ui/ux/fishing_spot/money_coin.png")
+const UX_ICON_WEATHER_CLOUD := preload("res://assets/ui/ux/fishing_spot/weather_cloud.png")
+const UX_ICON_TEMPERATURE := preload("res://assets/ui/ux/fishing_spot/temperature_neon.png")
+const UX_ICON_WIND := preload("res://assets/ui/ux/fishing_spot/wind_neon.png")
 
 const GLASS_BG := Color(0.030, 0.043, 0.046, 0.72)
 const GLASS_BG_STRONG := Color(0.028, 0.038, 0.040, 0.86)
@@ -418,7 +431,7 @@ func get_icon(icon_name: String) -> Texture2D:
 		"encyclopedia", "atlas", "fish_atlas":
 			return ICON_FISH_ATLAS
 		"basket", "keepnet":
-			return ICON_KEEPNET
+			return UX_ICON_KEEPNET
 		"bait":
 			return ICON_BAIT
 		"rod", "tackle":
@@ -426,11 +439,11 @@ func get_icon(icon_name: String) -> Texture2D:
 		"gear", "settings":
 			return ICON_SETTINGS
 		"cart", "shop":
-			return ICON_SHOP
+			return UX_ICON_CART
 		"harbor", "fish_harbor":
 			return ICON_HARBOR
 		"money":
-			return ICON_MONEY
+			return UX_ICON_MONEY_COIN
 		"location":
 			return ICON_LOCATION
 		"profile":
@@ -440,9 +453,9 @@ func get_icon(icon_name: String) -> Texture2D:
 		"map":
 			return ICON_MAP
 		"weather", "weather_clear":
-			return ICON_WEATHER_CLEAR
+			return UX_ICON_WEATHER_CLOUD
 		"weather_cloudy":
-			return ICON_WEATHER_CLOUDY
+			return UX_ICON_WEATHER_CLOUD
 		"weather_rainy":
 			return ICON_WEATHER_RAINY
 		"weather_storm":
@@ -451,6 +464,10 @@ func get_icon(icon_name: String) -> Texture2D:
 			return ICON_WEATHER_FOG
 		"time":
 			return ICON_TIME
+		"temperature":
+			return UX_ICON_TEMPERATURE
+		"wind":
+			return UX_ICON_WIND
 		"line":
 			return ICON_LINE
 		_:
@@ -523,48 +540,54 @@ func get_atlas_icon(icon_name: String) -> Texture2D:
 func get_side_menu_icon(icon_name: String) -> Texture2D:
 	match icon_name:
 		"keepnet", "basket", "sadok":
-			return SIDE_MENU_ICON_KEEPNET
+			return UX_ICON_KEEPNET
 		"inventory":
-			return SIDE_MENU_ICON_INVENTORY
+			return UX_ICON_BACKPACK
 		"shop":
-			return SIDE_MENU_ICON_SHOP
+			return UX_ICON_CART
 		"harbor", "fish_harbor":
-			return SIDE_MENU_ICON_HARBOR
+			return UX_ICON_HARBOR_CHEST
 		"map":
-			return SIDE_MENU_ICON_MAP
+			return UX_ICON_MAP_PIN
 		"profile":
 			return SIDE_MENU_ICON_PROFILE
 		"encyclopedia", "atlas":
-			return SIDE_MENU_ICON_FISH_ATLAS
+			return UX_ICON_ATLAS
 		"settings":
-			return SIDE_MENU_ICON_SETTINGS
+			return UX_ICON_SETTINGS_GEAR
 		_:
 			return null
 
 func get_side_menu_button_style(state: String = "normal") -> StyleBoxFlat:
-	var bg := Color(0.035, 0.048, 0.045, 0.78)
-	var border := Color(0.76, 0.88, 0.72, 0.32)
-	var shadow := Color(0.0, 0.0, 0.0, 0.34)
+	var bg := Color(0.010, 0.020, 0.022, 0.78)
+	var border := Color(0.82, 0.94, 0.92, 0.42)
+	var shadow := Color(0.0, 0.0, 0.0, 0.36)
+	var shadow_size := 5
 
 	match state:
 		"hover":
-			bg = Color(0.050, 0.084, 0.064, 0.88)
-			border = Color(0.76, 1.0, 0.62, 0.58)
-			shadow = Color(0.22, 0.70, 0.20, 0.16)
+			bg = Color(0.020, 0.054, 0.056, 0.88)
+			border = Color(0.68, 0.98, 1.0, 0.70)
+			shadow = Color(0.08, 0.72, 0.84, 0.18)
+			shadow_size = 8
 		"pressed":
-			bg = Color(0.020, 0.034, 0.032, 0.92)
-			border = Color(0.58, 0.88, 0.48, 0.48)
-			shadow = Color(0.0, 0.0, 0.0, 0.20)
+			bg = Color(0.018, 0.042, 0.044, 0.94)
+			border = Color(0.56, 0.86, 0.92, 0.62)
+			shadow = Color(0.0, 0.0, 0.0, 0.22)
+			shadow_size = 3
 		"active":
-			bg = Color(0.060, 0.126, 0.074, 0.88)
-			border = Color(0.68, 1.0, 0.58, 0.70)
-			shadow = Color(0.20, 0.70, 0.22, 0.22)
+			bg = Color(0.026, 0.076, 0.078, 0.90)
+			border = Color(0.64, 1.0, 1.0, 0.78)
+			shadow = Color(0.08, 0.78, 0.92, 0.22)
+			shadow_size = 9
 		"disabled":
-			bg = Color(0.030, 0.038, 0.038, 0.48)
-			border = Color(0.62, 0.68, 0.60, 0.16)
+			bg = Color(0.018, 0.024, 0.026, 0.44)
+			border = Color(0.68, 0.76, 0.74, 0.16)
 			shadow = Color(0.0, 0.0, 0.0, 0.12)
+			shadow_size = 1
 
-	var style := make_style(bg, border, 10, 5, shadow)
+	var style := make_style(bg, border, 12, shadow_size, shadow)
+	style.set_border_width_all(2)
 	style.content_margin_left = 0.0
 	style.content_margin_top = 0.0
 	style.content_margin_right = 0.0

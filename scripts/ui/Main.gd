@@ -24,6 +24,7 @@ const MainHUDControllerScript := preload("res://scripts/ui/controllers/MainHUDCo
 const PopupManagerScript := preload("res://scripts/ui/controllers/PopupManager.gd")
 const CatchPopupControllerScript := preload("res://scripts/ui/controllers/CatchPopupController.gd")
 const CatchResultHandlerScript := preload("res://scripts/gameplay/handlers/CatchResultHandler.gd")
+const LevelRankData := preload("res://scripts/data/LevelRankData.gd")
 const WeatherEffectsControllerScript := preload("res://scripts/environment/WeatherEffectsController.gd")
 const AmbientVoicesControllerScript := preload("res://scripts/environment/AmbientVoicesController.gd")
 const WeatherUIHelperScript := preload("res://scripts/ui/helpers/WeatherUIHelper.gd")
@@ -32,10 +33,24 @@ const SIDE_MENU_CONTROLLER_PATH := "res://scripts/ui/controllers/SideMenuControl
 const FishHarborScene := preload("res://scenes/economy/FishHarbor.tscn")
 const TUMAN_LAKE_THEME := preload("res://themes/TumanLakeUI.tres")
 const DEPTH_HOOK_ICON := preload("res://assets/ui/icons/icon_depth_hook.png")
-const WIND_HUD_ICON_PATH := "res://assets/ui/icons/wind.png"
+const TOP_WEATHER_PANEL_TEXTURE := preload("res://assets/ui/ux/fishing_spot/top_weather_panel.png")
+const PLAYER_PORTRAIT_ICON := preload("res://assets/ui/ux/fishing_spot/avatar.png")
+const TOP_MONEY_BAR_TEXTURE := preload("res://assets/ui/ux/fishing_spot/money_bar.png")
+const TOP_WEATHER_CLOUD_ICON := preload("res://assets/ui/ux/fishing_spot/weather_cloud.png")
+const TOP_WEATHER_CLOUD_NIGHT_ICON := preload("res://assets/ui/ux/fishing_spot/weather_cloud_night.png")
+const TOP_WEATHER_NIGHT_ICON := preload("res://assets/ui/ux/fishing_spot/weather_night.png")
+const TOP_WEATHER_RAIN_ICON := preload("res://assets/ui/ux/fishing_spot/weather_rain.png")
+const TOP_WEATHER_SUN_DAY_ICON := preload("res://assets/ui/ux/fishing_spot/weather_sun_day.png")
+const TOP_WEATHER_THUNDERSTORM_ICON := preload("res://assets/ui/ux/fishing_spot/weather_thunderstorm.png")
+const TOP_WEATHER_THUNDERSTORM_DAY_ICON := preload("res://assets/ui/ux/fishing_spot/weather_thunderstorm_day.png")
+const RIGHT_SIDE_BUTTON_BACK_TEXTURE := preload("res://assets/ui/ux/fishing_spot/back_for_buttons_right.png")
+const WIND_HUD_ICON_PATH := "res://assets/ui/ux/fishing_spot/wind_neon.png"
 const CONDITION_HEALTH_ICON := preload("res://assets/ui/icons/hud/condition_health.png")
-const CONDITION_TEMPERATURE_ICON := preload("res://assets/ui/icons/hud/condition_temperature.png")
+const CONDITION_TEMPERATURE_ICON := preload("res://assets/ui/ux/fishing_spot/temperature_neon.png")
 const CONDITION_HUNGER_ICON := preload("res://assets/ui/icons/hud/condition_hunger.png")
+const RIGHT_SIDE_BUTTON_HOVER_OFFSET := Vector2(0.0, -3.0)
+const RIGHT_SIDE_BUTTON_HOVER_SCALE := Vector2(1.045, 1.045)
+const RIGHT_SIDE_BUTTON_PRESS_SCALE := Vector2(0.975, 0.975)
 
 const STYLE_HUD_PANEL := "HUDPanel"
 const STYLE_INFO_CARD := "InfoCard"
@@ -59,6 +74,8 @@ const SPOT_WATER_LAYER_Z := -13
 const SPOT_FOREGROUND_LAYER_Z := -10
 const MODAL_TAP_GUARD_MSEC := 320
 const LEVEL_UP_MODAL_NAME := "level_up_reward"
+const LEVEL_PROGRESS_MODAL_NAME := "level_progress"
+const LEVEL_PROGRESS_LOOKAHEAD := 20
 const WATER_SURFACE_Y := 402.0
 const FLOAT_DEFAULT_POS := Vector2(500.0, 402.0)
 const ROD_ANCHOR_POS := Vector2(610.0, 562.0)
@@ -317,6 +334,19 @@ var level_up_unlocks_label: Label
 var level_up_rewards_label: Label
 var level_up_warning_label: Label
 var level_up_confirm_button: Button
+var level_progress_backdrop: ColorRect
+var level_progress_panel: Panel
+var level_progress_title_label: Label
+var level_progress_rank_icon: TextureRect
+var level_progress_summary_label: Label
+var level_progress_scroll: ScrollContainer
+var level_progress_rows: VBoxContainer
+var level_progress_close_button: Button
+var premium_backdrop: ColorRect
+var premium_panel: Panel
+var premium_title_label: Label
+var premium_body_label: Label
+var premium_close_button: Button
 var toast_label: Label
 var main_hud_controller
 var popup_manager
@@ -368,10 +398,17 @@ var top_hud_money_group: HBoxContainer
 var top_hud_time_group: HBoxContainer
 var top_hud_temperature_group: HBoxContainer
 var top_hud_wind_group: HBoxContainer
+var top_player_portrait_panel: Panel
+var top_player_portrait_texture: TextureRect
+var top_money_panel: Panel
+var top_money_panel_texture: TextureRect
+var top_weather_panel_group: Control
+var top_weather_panel_texture_rect: TextureRect
 var quick_actions_container: VBoxContainer
 var bottom_nav_container: VBoxContainer
 var encyclopedia_button: Button
 var harbor_button: Button
+var settings_button: Button
 var current_tackle_button: Button
 var current_tackle_popup: Panel
 var current_tackle_popup_box: VBoxContainer
@@ -470,6 +507,7 @@ var _cast_charge_power := MIN_CAST_POWER
 var _cast_release_action_guard_msec := 0
 var _fish_button_action_guard_msec := 0
 var _fish_button_pointer_action_active := false
+var _depth_radial_pointer_active := false
 var _current_tackle_press_started_msec := 0
 var _current_tackle_long_press_triggered := false
 var _modal_tap_guard_until_msec := 0
@@ -568,6 +606,7 @@ func _process(delta: float) -> void:
 	_update_time_hud()
 	_refresh_condition_hud()
 	_update_depth_hud_visibility_watchdog(delta)
+	_refresh_stop_fishing_button_presentation()
 	_update_current_tackle_hold()
 	_refresh_float_bite_preview_visibility()
 
@@ -592,9 +631,6 @@ func _refresh_after_application_resumed() -> void:
 
 func _input(event: InputEvent) -> void:
 	if is_modal_open or _is_modal_tap_guard_active():
-		return
-
-	if _is_depth_radial_pointer_event(event):
 		return
 
 	if _cast_charge_active and _is_cast_charge_release_event(event):
@@ -689,6 +725,12 @@ func _setup_ui_controllers() -> void:
 	harbor_button.text = "Гавань"
 	harbor_button.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(harbor_button)
+
+	settings_button = Button.new()
+	settings_button.name = "SettingsButton"
+	settings_button.text = "Настройки"
+	settings_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(settings_button)
 
 	_ensure_current_tackle_hud_nodes()
 
@@ -1154,6 +1196,7 @@ func _ensure_ui_canvas_layer() -> void:
 		map_button,
 		profile_button,
 		encyclopedia_button,
+		settings_button,
 		current_tackle_button,
 		current_tackle_popup,
 		feed_button,
@@ -1356,6 +1399,10 @@ func _move_modal_roots_to_layer() -> void:
 		waterbody_panel,
 		level_up_backdrop,
 		level_up_panel,
+		level_progress_backdrop,
+		level_progress_panel,
+		premium_backdrop,
+		premium_panel,
 		fish_harbor_ui
 	]:
 		_reparent_node(node, root)
@@ -1380,7 +1427,18 @@ func close_modal(modal_name: String = "") -> void:
 	if modal_name == "" or _current_modal_name == modal_name:
 		_current_modal_name = ""
 	_refresh_modal_input_blocker()
+	if not is_modal_open:
+		call_deferred("_restore_gameplay_hud_after_modal_close")
 	_request_depth_hud_refresh()
+
+func _restore_gameplay_hud_after_modal_close() -> void:
+	if _is_any_modal_visible():
+		return
+	_setup_layout()
+	_update_keepnet_hud_button(false)
+	if quick_tackle_panel != null and quick_tackle_panel.has_method("refresh"):
+		quick_tackle_panel.call("refresh")
+	_refresh_bottom_nav_styles()
 
 func _close_quick_tackle_radial(animated: bool = true) -> void:
 	if quick_tackle_panel == null:
@@ -1416,6 +1474,8 @@ func close_current_modal() -> void:
 		"weather_forecast":
 			if system_menu_ui != null and system_menu_ui.has_method("close_forecast"):
 				system_menu_ui.close_forecast()
+		"premium_store":
+			_close_premium_store()
 		"bug_report":
 			if system_menu_ui != null and system_menu_ui.has_method("close_bug_report"):
 				system_menu_ui.close_bug_report()
@@ -1430,6 +1490,8 @@ func close_current_modal() -> void:
 			if _block_level_up_reward_close_attempt():
 				return
 			_hide_level_up_reward_popup()
+		"level_progress":
+			_close_level_progress_popup()
 		_:
 			_hide_modal_roots_except("")
 			if profile_ui != null:
@@ -1486,6 +1548,16 @@ func _hide_modal_roots_except(modal_name: String) -> void:
 			level_up_panel.visible = false
 		if level_up_backdrop != null:
 			level_up_backdrop.visible = false
+	if modal_name != LEVEL_PROGRESS_MODAL_NAME:
+		if level_progress_panel != null:
+			level_progress_panel.visible = false
+		if level_progress_backdrop != null:
+			level_progress_backdrop.visible = false
+	if modal_name != "premium_store":
+		if premium_panel != null:
+			premium_panel.visible = false
+		if premium_backdrop != null:
+			premium_backdrop.visible = false
 	if modal_name != "profile" and profile_ui != null:
 		profile_ui.close(false)
 	if modal_name != "encyclopedia" and encyclopedia_ui != null:
@@ -1514,10 +1586,13 @@ func _is_any_modal_visible() -> bool:
 		tackle_panel,
 		waterbody_panel,
 		catch_popup_panel,
-		level_up_panel
+		level_up_panel,
+		level_progress_panel
 	]:
 		if _is_visible_ui_control(control):
 			return true
+	if _is_visible_ui_control(premium_panel):
+		return true
 	if profile_ui != null and profile_ui.is_any_modal_open():
 		return true
 	if encyclopedia_ui != null and encyclopedia_ui.is_any_modal_open():
@@ -1552,6 +1627,9 @@ func _ensure_mobile_ui_containers() -> void:
 		top_hud_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		top_hud_container.add_child(top_hud_spacer)
 	_ensure_top_hud_groups()
+	_ensure_top_player_portrait_panel()
+	_ensure_top_money_panel()
+	_ensure_top_weather_panel_group()
 
 	if quick_actions_container == null:
 		quick_actions_container = VBoxContainer.new()
@@ -1572,28 +1650,28 @@ func _ensure_mobile_ui_containers() -> void:
 		node.visible = false
 		node.custom_minimum_size = Vector2.ZERO
 		node.size = Vector2.ZERO
+	_reparent_node(top_player_portrait_panel, top_hud_container)
+	if player_xp_hud != null:
+		_reparent_node(player_xp_hud, top_hud_container)
+	_reparent_node(top_money_panel, top_hud_container)
 	_reparent_node(top_hud_spacer, top_hud_container)
 	_reparent_node(spot_option_button, top_hud_container)
-	top_hud_container.move_child(top_hud_money_group, 0)
-	top_hud_container.move_child(top_hud_time_group, 1)
-	top_hud_container.move_child(top_hud_temperature_group, 2)
-	top_hud_container.move_child(top_hud_wind_group, 3)
+	top_hud_container.move_child(top_player_portrait_panel, 0)
+	if player_xp_hud != null:
+		top_hud_container.move_child(player_xp_hud, 1)
+	top_hud_container.move_child(top_money_panel, 2)
+	top_hud_container.move_child(top_weather_panel_group, 3)
 	top_hud_container.move_child(top_hud_spacer, 4)
 	top_hud_container.move_child(spot_option_button, 5)
 
+	_reparent_node(top_hud_money_group, top_money_panel)
 	if money_hud_icon != null:
 		_reparent_node(money_hud_icon, top_hud_money_group)
 	_reparent_node(money_label, top_hud_money_group)
-	if time_hud_icon != null:
-		_reparent_node(time_hud_icon, top_hud_time_group)
-	_reparent_node(clock_label, top_hud_time_group)
-	if weather_hud_icon != null:
-		_reparent_node(weather_hud_icon, top_hud_temperature_group)
-	_reparent_node(weather_label, top_hud_temperature_group)
-	if wind_hud_icon != null:
-		_reparent_node(wind_hud_icon, top_hud_wind_group)
+	_reparent_node(clock_label, top_weather_panel_group)
+	_reparent_node(weather_label, top_weather_panel_group)
 	if wind_label != null:
-		_reparent_node(wind_label, top_hud_wind_group)
+		_reparent_node(wind_label, top_weather_panel_group)
 	_order_weather_hud_row_children()
 
 	for node in [feed_button, bait_button, tackle_button]:
@@ -1624,12 +1702,12 @@ func _ensure_mobile_ui_containers() -> void:
 		_reparent_node(node, bottom_nav_container)
 	bottom_nav_container.move_child(inventory_button, 0)
 	bottom_nav_container.move_child(map_button, 1)
-	bottom_nav_panel.visible = true
-	bottom_nav_panel.mouse_filter = Control.MOUSE_FILTER_PASS
-	bottom_nav_container.visible = true
-	bottom_nav_container.mouse_filter = Control.MOUSE_FILTER_PASS
+	bottom_nav_panel.visible = false
+	bottom_nav_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bottom_nav_container.visible = false
+	bottom_nav_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	for node in [shop_button, harbor_button]:
+	for node in [shop_button, harbor_button, settings_button]:
 		if node != null:
 			_reparent_node(node, ui_canvas_layer)
 			node.visible = false
@@ -1650,6 +1728,102 @@ func _ensure_top_hud_groups() -> void:
 	top_hud_time_group = _ensure_top_hud_group(top_hud_time_group, "TimeGroup")
 	top_hud_temperature_group = _ensure_top_hud_group(top_hud_temperature_group, "TemperatureGroup")
 	top_hud_wind_group = _ensure_top_hud_group(top_hud_wind_group, "WindGroup")
+
+
+func _ensure_top_player_portrait_panel() -> void:
+	if top_player_portrait_panel == null:
+		top_player_portrait_panel = Panel.new()
+		top_player_portrait_panel.name = "TopPlayerPortraitPanel"
+		top_player_portrait_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		top_player_portrait_panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		top_player_portrait_panel.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		top_hud_container.add_child(top_player_portrait_panel)
+	elif top_player_portrait_panel.get_parent() != top_hud_container:
+		_reparent_node(top_player_portrait_panel, top_hud_container)
+	top_player_portrait_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	top_player_portrait_panel.tooltip_text = "Профиль"
+	var profile_click := Callable(self, "_on_top_profile_panel_gui_input")
+	if not top_player_portrait_panel.gui_input.is_connected(profile_click):
+		top_player_portrait_panel.gui_input.connect(profile_click)
+
+	if top_player_portrait_texture == null:
+		top_player_portrait_texture = TextureRect.new()
+		top_player_portrait_texture.name = "TopPlayerPortraitTexture"
+		top_player_portrait_texture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		top_player_portrait_texture.texture = PLAYER_PORTRAIT_ICON
+		top_player_portrait_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		top_player_portrait_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		top_player_portrait_panel.add_child(top_player_portrait_texture)
+	elif top_player_portrait_texture.get_parent() != top_player_portrait_panel:
+		_reparent_node(top_player_portrait_texture, top_player_portrait_panel)
+
+	top_player_portrait_texture.texture = PLAYER_PORTRAIT_ICON
+	top_player_portrait_texture.visible = true
+
+
+func _ensure_top_money_panel() -> void:
+	if top_money_panel == null:
+		top_money_panel = Panel.new()
+		top_money_panel.name = "TopMoneyPanel"
+		top_money_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		top_money_panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		top_money_panel.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		top_hud_container.add_child(top_money_panel)
+	elif top_money_panel.get_parent() != top_hud_container:
+		_reparent_node(top_money_panel, top_hud_container)
+	top_money_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	top_money_panel.tooltip_text = "Премиум и валюта"
+	var money_click := Callable(self, "_on_top_money_panel_gui_input")
+	if not top_money_panel.gui_input.is_connected(money_click):
+		top_money_panel.gui_input.connect(money_click)
+
+	if top_money_panel_texture == null:
+		top_money_panel_texture = TextureRect.new()
+		top_money_panel_texture.name = "TopMoneyPanelTexture"
+		top_money_panel_texture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		top_money_panel_texture.texture = TOP_MONEY_BAR_TEXTURE
+		top_money_panel_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		top_money_panel_texture.stretch_mode = TextureRect.STRETCH_SCALE
+		top_money_panel.add_child(top_money_panel_texture)
+	elif top_money_panel_texture.get_parent() != top_money_panel:
+		_reparent_node(top_money_panel_texture, top_money_panel)
+
+	top_money_panel_texture.texture = TOP_MONEY_BAR_TEXTURE
+	top_money_panel_texture.visible = true
+	top_money_panel_texture.z_index = 0
+	top_money_panel.move_child(top_money_panel_texture, 0)
+
+
+func _ensure_top_weather_panel_group() -> void:
+	if top_weather_panel_group == null:
+		top_weather_panel_group = Control.new()
+		top_weather_panel_group.name = "TopWeatherTexturePanel"
+		top_weather_panel_group.mouse_filter = Control.MOUSE_FILTER_STOP
+		top_weather_panel_group.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		top_weather_panel_group.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		top_hud_container.add_child(top_weather_panel_group)
+	elif top_weather_panel_group.get_parent() != top_hud_container:
+		_reparent_node(top_weather_panel_group, top_hud_container)
+	top_weather_panel_group.mouse_filter = Control.MOUSE_FILTER_STOP
+	top_weather_panel_group.tooltip_text = "Прогноз погоды"
+	var weather_click := Callable(self, "_on_top_weather_panel_gui_input")
+	if not top_weather_panel_group.gui_input.is_connected(weather_click):
+		top_weather_panel_group.gui_input.connect(weather_click)
+
+	if top_weather_panel_texture_rect == null:
+		top_weather_panel_texture_rect = TextureRect.new()
+		top_weather_panel_texture_rect.name = "TopWeatherTexture"
+		top_weather_panel_texture_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		top_weather_panel_texture_rect.texture = TOP_WEATHER_PANEL_TEXTURE
+		top_weather_panel_texture_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		top_weather_panel_texture_rect.stretch_mode = TextureRect.STRETCH_SCALE
+		top_weather_panel_group.add_child(top_weather_panel_texture_rect)
+	elif top_weather_panel_texture_rect.get_parent() != top_weather_panel_group:
+		_reparent_node(top_weather_panel_texture_rect, top_weather_panel_group)
+
+	top_weather_panel_texture_rect.texture = TOP_WEATHER_PANEL_TEXTURE
+	top_weather_panel_texture_rect.visible = true
+	top_weather_panel_texture_rect.z_index = 0
 
 
 func _ensure_top_hud_group(group: HBoxContainer, node_name: String) -> HBoxContainer:
@@ -1867,15 +2041,14 @@ func _ensure_depth_hud_controls() -> void:
 		depth_radial_control = FloatDepthRadialControlScript.new()
 		depth_radial_control.name = "FloatDepthRadialControl"
 		depth_radial_control.visible = false
-		depth_radial_control.z_index = 3
-		depth_radial_control.mouse_filter = Control.MOUSE_FILTER_PASS
+		depth_radial_control.z_index = 261
+		depth_radial_control.mouse_filter = Control.MOUSE_FILTER_STOP
 		depth_radial_control.depth_changed.connect(_on_depth_radial_control_changed)
 		depth_radial_control.depth_change_committed.connect(_on_depth_radial_control_committed)
+		depth_radial_control.center_down.connect(_on_cast_depth_control_center_down)
+		depth_radial_control.center_up.connect(_on_cast_depth_control_center_up)
 		depth_radial_control.set_hook_texture(DEPTH_HOOK_ICON)
-		if fish_button != null:
-			fish_button.add_child(depth_radial_control)
-		else:
-			ui_canvas_layer.add_child(depth_radial_control)
+		ui_canvas_layer.add_child(depth_radial_control)
 
 
 func _ensure_keepnet_hud_button() -> void:
@@ -1901,26 +2074,131 @@ func _ensure_player_xp_hud() -> void:
 
 	player_xp_hud = PlayerXpHudScript.new()
 	player_xp_hud.name = "PlayerXpHud"
-	player_xp_hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	player_xp_hud.mouse_filter = Control.MOUSE_FILTER_STOP
+	player_xp_hud.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	player_xp_hud.tooltip_text = "Таблица уровней"
 	player_xp_hud.visible = true
 	player_xp_hud.z_index = 270
 	ui_canvas_layer.add_child(player_xp_hud)
+	var level_click := Callable(self, "_on_player_xp_hud_gui_input")
+	if not player_xp_hud.gui_input.is_connected(level_click):
+		player_xp_hud.gui_input.connect(level_click)
 
 
-func _layout_player_xp_hud(screen_size: Vector2, ui_scale: float) -> void:
+func _layout_player_xp_hud(_screen_size: Vector2, ui_scale: float) -> void:
 	if player_xp_hud == null:
 		return
-	var hud_width := clampf(screen_size.x * 0.42, 360.0 * ui_scale, 520.0 * ui_scale)
-	var hud_height := clampf(36.0 * ui_scale, 32.0, 42.0)
-	var hud_x := (screen_size.x - hud_width) * 0.5
-	var hud_y := screen_size.y - hud_height - clampf(9.0 * ui_scale, 7.0, 12.0)
-	_anchor_control(player_xp_hud, 0.0, 0.0, 0.0, 0.0, hud_x, hud_y, hud_x + hud_width, hud_y + hud_height)
+	if top_hud_container != null and player_xp_hud.get_parent() != top_hud_container:
+		_reparent_node(player_xp_hud, top_hud_container)
+	var hud_height := clampf(48.0 * ui_scale, 44.0, 52.0)
+	var hud_width := hud_height * 124.0 / 50.0
 	player_xp_hud.custom_minimum_size = Vector2(hud_width, hud_height)
 	player_xp_hud.size = Vector2(hud_width, hud_height)
+	player_xp_hud.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	player_xp_hud.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	player_xp_hud.visible = true
-	player_xp_hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	player_xp_hud.z_index = 270
+	player_xp_hud.mouse_filter = Control.MOUSE_FILTER_STOP
+	player_xp_hud.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	player_xp_hud.z_index = 102
 	_update_player_xp_hud(false)
+
+
+func _layout_top_player_portrait_panel(ui_scale: float) -> void:
+	if top_player_portrait_panel == null:
+		return
+	var panel_height := clampf(48.0 * ui_scale, 44.0, 52.0)
+	var panel_size := Vector2(panel_height * 51.0 / 50.0, panel_height)
+	top_player_portrait_panel.visible = true
+	top_player_portrait_panel.custom_minimum_size = panel_size
+	top_player_portrait_panel.size = panel_size
+	top_player_portrait_panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	top_player_portrait_panel.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	top_player_portrait_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	if top_player_portrait_texture != null:
+		top_player_portrait_texture.custom_minimum_size = panel_size
+		top_player_portrait_texture.size = panel_size
+		top_player_portrait_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		top_player_portrait_texture.stretch_mode = TextureRect.STRETCH_SCALE
+		_anchor_control(top_player_portrait_texture, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, panel_size.x, panel_size.y)
+
+
+func _layout_top_money_panel(ui_scale: float) -> void:
+	if top_money_panel == null or top_hud_money_group == null:
+		return
+	var panel_height := clampf(48.0 * ui_scale, 44.0, 52.0)
+	var panel_size := Vector2(panel_height * 2.0, panel_height)
+	top_money_panel.visible = true
+	top_money_panel.custom_minimum_size = panel_size
+	top_money_panel.size = panel_size
+	top_money_panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	top_money_panel.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	top_money_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	if top_money_panel_texture != null:
+		top_money_panel_texture.custom_minimum_size = panel_size
+		top_money_panel_texture.size = panel_size
+		top_money_panel_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		top_money_panel_texture.stretch_mode = TextureRect.STRETCH_SCALE
+		_anchor_control(top_money_panel_texture, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, panel_size.x, panel_size.y)
+	top_hud_money_group.visible = true
+	top_hud_money_group.z_index = 1
+	top_hud_money_group.alignment = BoxContainer.ALIGNMENT_CENTER
+	top_hud_money_group.add_theme_constant_override("separation", int(clampf(5.0 * ui_scale, 4.0, 6.0)))
+	_anchor_control(top_hud_money_group, 0.0, 0.0, 0.0, 0.0, 10.0, 0.0, panel_size.x - 10.0, panel_size.y)
+	top_hud_money_group.custom_minimum_size = Vector2(maxf(panel_size.x - 20.0, 1.0), panel_size.y)
+	top_hud_money_group.size = top_hud_money_group.custom_minimum_size
+	if money_hud_icon != null:
+		var icon_edge := clampf(24.0 * ui_scale, 21.0, 28.0)
+		money_hud_icon.custom_minimum_size = Vector2(icon_edge, icon_edge)
+		money_hud_icon.size = Vector2(icon_edge, icon_edge)
+		money_hud_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		money_hud_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		money_hud_icon.visible = true
+	if money_label != null:
+		money_label.custom_minimum_size = Vector2(clampf(44.0 * ui_scale, 36.0, 54.0), panel_size.y)
+		money_label.size = money_label.custom_minimum_size
+		money_label.add_theme_font_size_override("font_size", int(clampf(15.0 * ui_scale, 13.0, 17.0)))
+
+func _is_primary_ui_press(event: InputEvent) -> bool:
+	if event is InputEventMouseButton:
+		var mouse_event := event as InputEventMouseButton
+		return mouse_event.button_index == MOUSE_BUTTON_LEFT and mouse_event.pressed
+	if event is InputEventScreenTouch:
+		return (event as InputEventScreenTouch).pressed
+	return false
+
+func _on_top_profile_panel_gui_input(event: InputEvent) -> void:
+	if not _is_primary_ui_press(event):
+		return
+	_on_profile_button_pressed()
+	get_viewport().set_input_as_handled()
+
+func _on_top_money_panel_gui_input(event: InputEvent) -> void:
+	if not _is_primary_ui_press(event):
+		return
+	_open_premium_store()
+	get_viewport().set_input_as_handled()
+
+func _on_top_weather_panel_gui_input(event: InputEvent) -> void:
+	if not _is_primary_ui_press(event):
+		return
+	_open_weather_forecast()
+	get_viewport().set_input_as_handled()
+
+func _on_player_xp_hud_gui_input(event: InputEvent) -> void:
+	if not _is_primary_ui_press(event):
+		return
+	_open_level_progress_popup()
+	get_viewport().set_input_as_handled()
+
+func _open_weather_forecast() -> void:
+	if _should_ignore_base_ui_press():
+		return
+	_close_quick_tackle_radial(false)
+	_hide_current_tackle_popup()
+	if system_menu_ui != null and system_menu_ui.has_method("open_forecast"):
+		system_menu_ui.open_forecast()
+	elif system_menu_ui != null and system_menu_ui.has_method("_on_forecast_pressed"):
+		system_menu_ui._on_forecast_pressed()
 
 
 func _make_reeling_color_rect(node_name: String, parent: Node, z: int) -> ColorRect:
@@ -2133,6 +2411,421 @@ func _layout_level_up_reward_popup(screen_size: Vector2) -> void:
 	level_up_confirm_button.custom_minimum_size = button_size
 	level_up_confirm_button.add_theme_font_size_override("font_size", 14)
 	_apply_button_style(level_up_confirm_button, STYLE_PRIMARY_BUTTON)
+
+func _ensure_level_progress_popup() -> void:
+	if modal_content_root == null:
+		_ensure_modal_layer()
+	var root := modal_content_root
+	if root == null:
+		return
+
+	if level_progress_backdrop == null:
+		level_progress_backdrop = ColorRect.new()
+		level_progress_backdrop.name = "LevelProgressBackdrop"
+		level_progress_backdrop.visible = false
+		level_progress_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+		level_progress_backdrop.color = Color(0.0, 0.0, 0.0, 0.68)
+		root.add_child(level_progress_backdrop)
+		var backdrop_click := Callable(self, "_on_level_progress_backdrop_gui_input")
+		if not level_progress_backdrop.gui_input.is_connected(backdrop_click):
+			level_progress_backdrop.gui_input.connect(backdrop_click)
+
+	if level_progress_panel == null:
+		level_progress_panel = Panel.new()
+		level_progress_panel.name = "LevelProgressPanel"
+		level_progress_panel.visible = false
+		level_progress_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		root.add_child(level_progress_panel)
+
+	if level_progress_title_label == null:
+		level_progress_title_label = _create_level_up_label("LevelProgressTitle", 22, Color(0.96, 1.0, 0.92, 1.0), true)
+		level_progress_title_label.text = "Таблица уровней"
+		level_progress_panel.add_child(level_progress_title_label)
+
+	if level_progress_rank_icon == null:
+		level_progress_rank_icon = TextureRect.new()
+		level_progress_rank_icon.name = "LevelProgressRankIcon"
+		level_progress_rank_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		level_progress_rank_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		level_progress_rank_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		level_progress_panel.add_child(level_progress_rank_icon)
+
+	if level_progress_summary_label == null:
+		level_progress_summary_label = _create_level_up_label("LevelProgressSummary", 14, Color(0.80, 0.94, 0.86, 0.96), true)
+		level_progress_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		level_progress_panel.add_child(level_progress_summary_label)
+
+	if level_progress_scroll == null:
+		level_progress_scroll = ScrollContainer.new()
+		level_progress_scroll.name = "LevelProgressScroll"
+		level_progress_scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+		level_progress_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		level_progress_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+		level_progress_panel.add_child(level_progress_scroll)
+
+	if level_progress_rows == null:
+		level_progress_rows = VBoxContainer.new()
+		level_progress_rows.name = "LevelProgressRows"
+		level_progress_rows.mouse_filter = Control.MOUSE_FILTER_PASS
+		level_progress_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		level_progress_rows.add_theme_constant_override("separation", 5)
+		level_progress_scroll.add_child(level_progress_rows)
+	elif level_progress_rows.get_parent() != level_progress_scroll:
+		_reparent_node(level_progress_rows, level_progress_scroll)
+
+	if level_progress_close_button == null:
+		level_progress_close_button = Button.new()
+		level_progress_close_button.name = "LevelProgressCloseButton"
+		level_progress_close_button.text = "Закрыть"
+		level_progress_close_button.focus_mode = Control.FOCUS_NONE
+		level_progress_close_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		level_progress_panel.add_child(level_progress_close_button)
+		var close_callback := Callable(self, "_on_level_progress_close_pressed")
+		if not level_progress_close_button.pressed.is_connected(close_callback):
+			level_progress_close_button.pressed.connect(close_callback)
+
+func _layout_level_progress_popup(screen_size: Vector2) -> void:
+	_ensure_level_progress_popup()
+	if level_progress_panel == null or level_progress_backdrop == null:
+		return
+
+	level_progress_backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	level_progress_backdrop.offset_left = 0.0
+	level_progress_backdrop.offset_top = 0.0
+	level_progress_backdrop.offset_right = 0.0
+	level_progress_backdrop.offset_bottom = 0.0
+	level_progress_backdrop.z_index = MENU_BACKDROP_Z
+	if ui_theme != null:
+		ui_theme.apply_modal_backdrop_style(level_progress_backdrop)
+
+	var popup_width: float = clampf(screen_size.x * 0.48, 360.0, 560.0)
+	var popup_height: float = clampf(screen_size.y * 0.68, 330.0, 470.0)
+	popup_width = min(popup_width, screen_size.x - 36.0)
+	popup_height = min(popup_height, screen_size.y - 38.0)
+	level_progress_panel.position = Vector2((screen_size.x - popup_width) * 0.5, (screen_size.y - popup_height) * 0.5)
+	level_progress_panel.size = Vector2(popup_width, popup_height)
+	level_progress_panel.custom_minimum_size = level_progress_panel.size
+	level_progress_panel.z_index = MENU_PANEL_Z
+	level_progress_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	level_progress_panel.add_theme_stylebox_override(
+		"panel",
+		_make_panel_style(Color(0.016, 0.044, 0.044, 0.97), Color(0.78, 1.0, 0.86, 0.38), 14, 8, Color(0.0, 0.0, 0.0, 0.32))
+	)
+
+	var padding := 22.0
+	var inner_width := popup_width - padding * 2.0
+	level_progress_title_label.position = Vector2(padding, 18.0)
+	level_progress_title_label.size = Vector2(inner_width, 30.0)
+	level_progress_title_label.add_theme_font_size_override("font_size", 22)
+
+	var rank_icon_size := 40.0
+	level_progress_rank_icon.position = Vector2(padding, 54.0)
+	level_progress_rank_icon.size = Vector2(rank_icon_size, rank_icon_size)
+	level_progress_rank_icon.custom_minimum_size = level_progress_rank_icon.size
+
+	level_progress_summary_label.position = Vector2(padding + rank_icon_size + 10.0, 54.0)
+	level_progress_summary_label.size = Vector2(maxf(inner_width - rank_icon_size - 10.0, 1.0), 44.0)
+	level_progress_summary_label.add_theme_font_size_override("font_size", 14)
+
+	var button_size := Vector2(132.0, 38.0)
+	level_progress_close_button.position = Vector2((popup_width - button_size.x) * 0.5, popup_height - button_size.y - 16.0)
+	level_progress_close_button.size = button_size
+	level_progress_close_button.custom_minimum_size = button_size
+	level_progress_close_button.add_theme_font_size_override("font_size", 14)
+	_apply_button_style(level_progress_close_button, STYLE_SECONDARY_BUTTON)
+
+	var scroll_top := 108.0
+	var scroll_bottom := popup_height - button_size.y - 28.0
+	level_progress_scroll.position = Vector2(padding, scroll_top)
+	level_progress_scroll.size = Vector2(inner_width, maxf(scroll_bottom - scroll_top, 120.0))
+	level_progress_scroll.custom_minimum_size = level_progress_scroll.size
+	level_progress_rows.custom_minimum_size = Vector2(inner_width - 8.0, 0.0)
+
+func _open_level_progress_popup() -> void:
+	if _should_ignore_base_ui_press():
+		return
+	_close_quick_tackle_radial(false)
+	_hide_current_tackle_popup()
+	_ensure_level_progress_popup()
+	_layout_level_progress_popup(_get_full_ui_viewport_size())
+	_update_level_progress_popup()
+	open_modal(LEVEL_PROGRESS_MODAL_NAME)
+	level_progress_backdrop.visible = true
+	level_progress_panel.visible = true
+	_refresh_modal_input_blocker()
+
+func _close_level_progress_popup() -> void:
+	if level_progress_panel != null:
+		level_progress_panel.visible = false
+	if level_progress_backdrop != null:
+		level_progress_backdrop.visible = false
+	close_modal(LEVEL_PROGRESS_MODAL_NAME)
+
+func _on_level_progress_close_pressed() -> void:
+	_arm_modal_tap_guard()
+	call_deferred("_close_level_progress_popup")
+
+func _on_level_progress_backdrop_gui_input(event: InputEvent) -> void:
+	if not _is_primary_ui_press(event):
+		return
+	_arm_modal_tap_guard()
+	call_deferred("_close_level_progress_popup")
+
+func _is_level_progress_popup_open() -> bool:
+	return level_progress_panel != null and level_progress_panel.visible
+
+func _update_level_progress_popup() -> void:
+	if level_progress_rows == null:
+		return
+
+	for child in level_progress_rows.get_children():
+		level_progress_rows.remove_child(child)
+		child.queue_free()
+
+	var current_level: int = max(PlayerData.level, 1)
+	var current_xp: int = max(PlayerData.current_xp, 0)
+	var current_required: int = max(PlayerData.xp_to_next_level, 1)
+	var remaining_xp: int = max(current_required - current_xp, 0)
+	if level_progress_rank_icon != null:
+		level_progress_rank_icon.texture = LevelRankData.get_icon_for_level(current_level)
+	level_progress_summary_label.text = "LVL %d | %s / %s XP | до следующего: %s XP" % [
+		current_level,
+		_format_level_progress_xp(current_xp),
+		_format_level_progress_xp(current_required),
+		_format_level_progress_xp(remaining_xp)
+	]
+
+	level_progress_rows.add_child(_create_level_progress_header_row())
+	var last_level: int = max(current_level + LEVEL_PROGRESS_LOOKAHEAD, 20)
+	for row_level in range(1, last_level + 1):
+		var xp_required: int = PlayerData.get_xp_to_next_level(row_level)
+		level_progress_rows.add_child(_create_level_progress_row(row_level, xp_required, current_level, current_xp))
+
+func _create_level_progress_header_row() -> Panel:
+	var row := _make_level_progress_row_panel(false)
+	row.custom_minimum_size = Vector2(1.0, 30.0)
+	var box := _make_level_progress_row_box(row)
+	box.add_child(_make_level_progress_level_cell(0, true))
+	box.add_child(_make_level_progress_cell("Опыт до следующего", 0.0, Color(0.74, 0.88, 0.82, 0.94), HORIZONTAL_ALIGNMENT_LEFT, true))
+	box.add_child(_make_level_progress_cell("Статус", 112.0, Color(0.74, 0.88, 0.82, 0.94), HORIZONTAL_ALIGNMENT_RIGHT, false))
+	return row
+
+func _create_level_progress_row(row_level: int, xp_required: int, current_level: int, current_xp: int) -> Panel:
+	var is_current := row_level == current_level
+	var row := _make_level_progress_row_panel(is_current)
+	var box := _make_level_progress_row_box(row)
+	var status_text := "будущий"
+	var status_color := Color(0.62, 0.72, 0.68, 0.82)
+	if row_level < current_level:
+		status_text = "пройден"
+		status_color = Color(0.58, 0.78, 0.64, 0.88)
+	elif is_current:
+		status_text = "ещё %s XP" % _format_level_progress_xp(max(xp_required - current_xp, 0))
+		status_color = Color(1.0, 0.76, 1.0, 0.98)
+
+	box.add_child(_make_level_progress_level_cell(row_level, false))
+	box.add_child(_make_level_progress_cell("%s XP до LVL %d" % [_format_level_progress_xp(xp_required), row_level + 1], 0.0, Color(0.86, 0.96, 0.90, 0.96), HORIZONTAL_ALIGNMENT_LEFT, true))
+	box.add_child(_make_level_progress_cell(status_text, 112.0, status_color, HORIZONTAL_ALIGNMENT_RIGHT, false))
+	return row
+
+func _make_level_progress_row_panel(active: bool) -> Panel:
+	var row := Panel.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.custom_minimum_size = Vector2(1.0, 34.0)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var bg := Color(0.030, 0.070, 0.066, 0.64)
+	var border := Color(0.62, 0.86, 0.74, 0.16)
+	if active:
+		bg = Color(0.080, 0.044, 0.096, 0.82)
+		border = Color(1.0, 0.52, 1.0, 0.44)
+	row.add_theme_stylebox_override("panel", _make_panel_style(bg, border, 8, 0, Color.TRANSPARENT))
+	return row
+
+func _make_level_progress_row_box(row: Panel) -> HBoxContainer:
+	var box := HBoxContainer.new()
+	box.name = "RowBox"
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_theme_constant_override("separation", 8)
+	box.set_anchors_preset(Control.PRESET_FULL_RECT)
+	box.offset_left = 18.0
+	box.offset_top = 0.0
+	box.offset_right = -10.0
+	box.offset_bottom = 0.0
+	row.add_child(box)
+	return box
+
+func _make_level_progress_level_cell(row_level: int, header: bool) -> HBoxContainer:
+	var cell := HBoxContainer.new()
+	cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cell.custom_minimum_size = Vector2(112.0, 1.0)
+	cell.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	cell.alignment = BoxContainer.ALIGNMENT_BEGIN
+	cell.add_theme_constant_override("separation", 6)
+
+	var icon_size := 26.0
+	if header:
+		var spacer := Control.new()
+		spacer.custom_minimum_size = Vector2(icon_size, 1.0)
+		spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cell.add_child(spacer)
+	else:
+		var icon := TextureRect.new()
+		icon.name = "RankIcon"
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon.texture = LevelRankData.get_icon_for_level(row_level)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.custom_minimum_size = Vector2(icon_size, icon_size)
+		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		cell.add_child(icon)
+
+	var label_text := "Уровень" if header else "LVL %d" % row_level
+	var label_color := Color(0.74, 0.88, 0.82, 0.94) if header else Color(0.94, 0.98, 0.92, 1.0)
+	var label := _make_level_progress_cell(label_text, 0.0, label_color, HORIZONTAL_ALIGNMENT_LEFT, true)
+	cell.add_child(label)
+	return cell
+
+
+func _make_level_progress_cell(text: String, width: float, color: Color, align: HorizontalAlignment, expand: bool) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.horizontal_alignment = align
+	label.clip_text = true
+	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	label.add_theme_font_size_override("font_size", 13)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.58))
+	label.add_theme_constant_override("shadow_offset_x", 0)
+	label.add_theme_constant_override("shadow_offset_y", 1)
+	if expand:
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	else:
+		label.custom_minimum_size = Vector2(width, 1.0)
+		label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	return label
+
+func _format_level_progress_xp(value: int) -> String:
+	return UIFormatters.format_money_amount(float(max(value, 0)))
+
+func _ensure_premium_store_popup() -> void:
+	if modal_content_root == null:
+		_ensure_modal_layer()
+	var root := modal_content_root
+	if root == null:
+		return
+
+	if premium_backdrop == null:
+		premium_backdrop = ColorRect.new()
+		premium_backdrop.name = "PremiumStoreBackdrop"
+		premium_backdrop.visible = false
+		premium_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+		premium_backdrop.color = Color(0.0, 0.0, 0.0, 0.58)
+		root.add_child(premium_backdrop)
+
+	if premium_panel == null:
+		premium_panel = Panel.new()
+		premium_panel.name = "PremiumStorePanel"
+		premium_panel.visible = false
+		premium_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		root.add_child(premium_panel)
+
+	if premium_title_label == null:
+		premium_title_label = Label.new()
+		premium_title_label.name = "PremiumStoreTitle"
+		premium_title_label.text = "Премиум"
+		premium_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		premium_title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		premium_title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		premium_title_label.add_theme_color_override("font_color", Color(0.96, 1.0, 0.92, 1.0))
+		premium_panel.add_child(premium_title_label)
+
+	if premium_body_label == null:
+		premium_body_label = Label.new()
+		premium_body_label.name = "PremiumStoreBody"
+		premium_body_label.text = "Здесь позже появятся премиум аккаунт и премиум валюта."
+		premium_body_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		premium_body_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		premium_body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		premium_body_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		premium_body_label.add_theme_color_override("font_color", Color(0.82, 0.94, 0.88, 0.96))
+		premium_panel.add_child(premium_body_label)
+
+	if premium_close_button == null:
+		premium_close_button = Button.new()
+		premium_close_button.name = "PremiumStoreCloseButton"
+		premium_close_button.text = "Закрыть"
+		premium_close_button.focus_mode = Control.FOCUS_NONE
+		premium_close_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		premium_panel.add_child(premium_close_button)
+		var callback := Callable(self, "_on_premium_store_close_pressed")
+		if not premium_close_button.pressed.is_connected(callback):
+			premium_close_button.pressed.connect(callback)
+
+func _layout_premium_store_popup(screen_size: Vector2) -> void:
+	_ensure_premium_store_popup()
+	if premium_panel == null or premium_backdrop == null:
+		return
+
+	premium_backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	premium_backdrop.offset_left = 0.0
+	premium_backdrop.offset_top = 0.0
+	premium_backdrop.offset_right = 0.0
+	premium_backdrop.offset_bottom = 0.0
+	premium_backdrop.z_index = MENU_BACKDROP_Z
+	if ui_theme != null:
+		ui_theme.apply_modal_backdrop_style(premium_backdrop)
+
+	var popup_size := Vector2(
+		clampf(screen_size.x * 0.46, 320.0, 460.0),
+		clampf(screen_size.y * 0.34, 210.0, 280.0)
+	)
+	premium_panel.position = (screen_size - popup_size) * 0.5
+	premium_panel.size = popup_size
+	premium_panel.custom_minimum_size = popup_size
+	premium_panel.z_index = MENU_PANEL_Z
+	premium_panel.add_theme_stylebox_override(
+		"panel",
+		_make_panel_style(Color(0.014, 0.034, 0.032, 0.96), Color(0.78, 1.0, 0.92, 0.36), 16, 8, Color(0.0, 0.0, 0.0, 0.34))
+	)
+
+	var padding := 24.0
+	premium_title_label.position = Vector2(padding, 18.0)
+	premium_title_label.size = Vector2(popup_size.x - padding * 2.0, 36.0)
+	premium_title_label.add_theme_font_size_override("font_size", 24)
+	premium_body_label.position = Vector2(padding, 68.0)
+	premium_body_label.size = Vector2(popup_size.x - padding * 2.0, maxf(72.0, popup_size.y - 136.0))
+	premium_body_label.add_theme_font_size_override("font_size", 15)
+	var close_size := Vector2(132.0, 40.0)
+	premium_close_button.position = Vector2((popup_size.x - close_size.x) * 0.5, popup_size.y - close_size.y - 18.0)
+	premium_close_button.size = close_size
+	premium_close_button.custom_minimum_size = close_size
+	premium_close_button.add_theme_font_size_override("font_size", 14)
+	_apply_button_style(premium_close_button, STYLE_SECONDARY_BUTTON)
+
+func _open_premium_store() -> void:
+	if _should_ignore_base_ui_press():
+		return
+	_close_quick_tackle_radial(false)
+	_hide_current_tackle_popup()
+	_ensure_premium_store_popup()
+	_layout_premium_store_popup(_get_full_ui_viewport_size())
+	open_modal("premium_store")
+	premium_backdrop.visible = true
+	premium_panel.visible = true
+	_refresh_modal_input_blocker()
+
+func _close_premium_store() -> void:
+	if premium_panel != null:
+		premium_panel.visible = false
+	if premium_backdrop != null:
+		premium_backdrop.visible = false
+	close_modal("premium_store")
+
+func _on_premium_store_close_pressed() -> void:
+	_arm_modal_tap_guard()
+	call_deferred("_close_premium_store")
 
 func _ensure_shop_ui_nodes() -> void:
 	shop_ui._ensure_shop_ui_nodes()
@@ -2349,6 +3042,153 @@ func _apply_weather_hud_text_style(ui_scale: float = 1.0) -> void:
 		wind_label.add_theme_font_size_override("font_size", int(clampf(14.0 * ui_scale, 12.0, 16.0)))
 		wind_label.add_theme_color_override("font_color", Color(0.88, 0.96, 1.0, 1.0))
 		_apply_hud_text_shadow(wind_label, 1)
+
+
+func _layout_top_weather_texture_panel(panel_size: Vector2, ui_scale: float) -> void:
+	if top_weather_panel_group == null:
+		return
+
+	top_weather_panel_group.visible = true
+	top_weather_panel_group.custom_minimum_size = panel_size
+	top_weather_panel_group.size = panel_size
+	top_weather_panel_group.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	top_weather_panel_group.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	top_weather_panel_group.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	if top_weather_panel_texture_rect != null:
+		top_weather_panel_texture_rect.visible = true
+		top_weather_panel_texture_rect.texture = TOP_WEATHER_PANEL_TEXTURE
+		top_weather_panel_texture_rect.z_index = 0
+		top_weather_panel_texture_rect.custom_minimum_size = panel_size
+		top_weather_panel_texture_rect.size = panel_size
+		top_weather_panel_texture_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		top_weather_panel_texture_rect.stretch_mode = TextureRect.STRETCH_SCALE
+		_anchor_control(top_weather_panel_texture_rect, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, panel_size.x, panel_size.y)
+
+	for hidden_group in [top_hud_time_group, top_hud_temperature_group, top_hud_wind_group]:
+		if hidden_group == null:
+			continue
+		hidden_group.visible = false
+		hidden_group.custom_minimum_size = Vector2.ZERO
+		hidden_group.size = Vector2.ZERO
+		hidden_group.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		hidden_group.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+
+	for obsolete_separator_name in ["TopWeatherTimeDivider", "TopWeatherWindDivider"]:
+		var obsolete_separator := top_weather_panel_group.get_node_or_null(obsolete_separator_name) as Control
+		if obsolete_separator != null:
+			obsolete_separator.queue_free()
+
+	var font_size := int(clampf(panel_size.y * 0.300, 13.0, 16.0))
+	var label_h := maxf(float(font_size) + 8.0, panel_size.y * 0.500)
+	var label_y := floorf((panel_size.y - label_h) * 0.5)
+	var icon_edge := clampf(panel_size.y * 0.460, 18.0, 24.0)
+	var icon_y := floorf((panel_size.y - icon_edge) * 0.5)
+	var weather_state := WeatherUIHelperScript.get_current_weather_state(_get_time_manager())
+	_layout_top_weather_texture_icon(
+		time_hud_icon,
+		_get_top_weather_condition_texture(weather_state),
+		Rect2(panel_size.x * 0.075, icon_y, icon_edge, icon_edge),
+		Color.WHITE
+	)
+	_layout_top_weather_texture_label(
+		clock_label,
+		Rect2(panel_size.x * 0.185, label_y, panel_size.x * 0.180, label_h),
+		font_size,
+		HORIZONTAL_ALIGNMENT_LEFT
+	)
+	_layout_top_weather_texture_icon(
+		weather_hud_icon,
+		CONDITION_TEMPERATURE_ICON,
+		Rect2(panel_size.x * 0.395, icon_y, icon_edge, icon_edge)
+	)
+	_layout_top_weather_texture_label(
+		weather_label,
+		Rect2(panel_size.x * 0.480, label_y, panel_size.x * 0.125, label_h),
+		font_size,
+		HORIZONTAL_ALIGNMENT_LEFT
+	)
+	_layout_top_weather_texture_icon(
+		wind_hud_icon,
+		_get_wind_hud_texture(),
+		Rect2(panel_size.x * 0.670, icon_y, icon_edge, icon_edge)
+	)
+	_layout_top_weather_texture_label(
+		wind_label,
+		Rect2(panel_size.x * 0.770, label_y, panel_size.x * 0.205, label_h),
+		font_size,
+		HORIZONTAL_ALIGNMENT_LEFT
+	)
+
+
+func _layout_top_weather_texture_icon(icon: TextureRect, texture: Texture2D, rect: Rect2, icon_modulate: Color = Color(0.88, 1.0, 0.98, 1.0)) -> void:
+	if icon == null:
+		return
+	if icon.get_parent() != top_weather_panel_group:
+		_reparent_node(icon, top_weather_panel_group)
+	icon.visible = true
+	icon.z_index = 1
+	icon.texture = texture
+	icon.modulate = icon_modulate
+	icon.custom_minimum_size = rect.size
+	icon.size = rect.size
+	icon.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_anchor_control(icon, 0.0, 0.0, 0.0, 0.0, rect.position.x, rect.position.y, rect.end.x, rect.end.y)
+
+
+func refresh_top_weather_condition_icon(weather_state: Dictionary = {}) -> void:
+	if time_hud_icon == null:
+		return
+	var state := weather_state
+	if state.is_empty():
+		state = WeatherUIHelperScript.get_current_weather_state(_get_time_manager())
+	time_hud_icon.texture = _get_top_weather_condition_texture(state)
+	time_hud_icon.modulate = Color.WHITE
+	time_hud_icon.visible = time_hud_icon.texture != null
+
+
+func _get_top_weather_condition_texture(weather_state: Dictionary) -> Texture2D:
+	var weather_type := str(weather_state.get("weather_type", "clear"))
+	var time_of_day := str(weather_state.get("time_of_day", "morning"))
+	var normalized := WeatherUIHelperScript.normalize_weather_type(weather_type)
+	var is_night := WeatherUIHelperScript.is_night(time_of_day)
+
+	match normalized:
+		"storm":
+			return TOP_WEATHER_THUNDERSTORM_ICON if is_night else TOP_WEATHER_THUNDERSTORM_DAY_ICON
+		"rain":
+			return TOP_WEATHER_RAIN_ICON if is_night else TOP_WEATHER_CLOUD_ICON
+		"cloudy":
+			return TOP_WEATHER_CLOUD_NIGHT_ICON if is_night else TOP_WEATHER_CLOUD_ICON
+		_:
+			return TOP_WEATHER_NIGHT_ICON if is_night else TOP_WEATHER_SUN_DAY_ICON
+
+
+func _layout_top_weather_texture_label(label: Label, rect: Rect2, font_size: int, alignment: HorizontalAlignment) -> void:
+	if label == null:
+		return
+	if label.get_parent() != top_weather_panel_group:
+		_reparent_node(label, top_weather_panel_group)
+	label.visible = true
+	label.z_index = 2
+	label.custom_minimum_size = rect.size
+	label.size = rect.size
+	label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	label.horizontal_alignment = alignment
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.clip_text = true
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", Color(0.96, 0.99, 0.98, 1.0))
+	_apply_hud_text_shadow(label, 2)
+	_anchor_control(label, 0.0, 0.0, 0.0, 0.0, rect.position.x, rect.position.y, rect.end.x, rect.end.y)
+
+
+func is_using_top_weather_panel_texture() -> bool:
+	return top_weather_panel_group != null and top_weather_panel_group.visible
 
 func _apply_label_style(label: Label, primary: bool = false) -> void:
 	ui_theme.apply_label_style(label, "title" if primary else "body")
@@ -2943,6 +3783,7 @@ func _setup_cinematic_environment_materials() -> void:
 
 func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	_ensure_compact_hud_panels()
+	_ensure_player_xp_hud()
 	_ensure_mobile_ui_containers()
 	_ensure_cast_button_visual()
 	_ensure_cast_power_indicator()
@@ -2950,7 +3791,6 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	_ensure_float_bite_preview()
 	_ensure_depth_hud_controls()
 	_ensure_keepnet_hud_button()
-	_ensure_player_xp_hud()
 	_ensure_hud_icons()
 	_ensure_condition_hud()
 	_ensure_current_tackle_hud_nodes()
@@ -2959,7 +3799,9 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	var sy: float = screen_size.y / BASE_SCREEN_SIZE.y
 	var ui_scale: float = min(sx, sy)
 	var top_height: float = clampf(40.0 * ui_scale, 34.0, 42.0)
-	var cast_button_edge: float = clampf(106.0 * ui_scale, 88.0, 116.0)
+	var top_weather_height := clampf(48.0 * ui_scale, 44.0, 52.0)
+	var top_weather_panel_size := Vector2(top_weather_height * 280.0 / 50.0, top_weather_height)
+	var cast_button_edge: float = clampf(265.0 * sx, 132.0, 265.0)
 	var cast_button_size := Vector2(cast_button_edge, cast_button_edge)
 	_water_surface_y = WATER_SURFACE_Y * sy
 	_water_zone_top = _water_surface_y - 12.0 * sy
@@ -2985,8 +3827,9 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	debug_panel.visible = BuildConfig.ENABLE_DEBUG_PANEL
 
 	var hud_rect := _scale_rect(Rect2(18.0, 14.0, 560.0, HUD_HEIGHT), screen_size)
-	hud_rect.size.x = clampf(560.0 * ui_scale, 470.0, max(470.0, screen_size.x - hud_rect.position.x - 250.0 * ui_scale))
-	hud_rect.size.y = top_height
+	var top_weather_row_width := top_weather_panel_size.x + 330.0
+	hud_rect.size.x = clampf(maxf(560.0 * ui_scale, top_weather_row_width), 470.0, max(470.0, screen_size.x - hud_rect.position.x - 78.0 * ui_scale))
+	hud_rect.size.y = maxf(top_height, top_weather_panel_size.y)
 	_anchor_control(top_hud_panel, 0.0, 0.0, 0.0, 0.0, hud_rect.position.x, hud_rect.position.y, hud_rect.end.x, hud_rect.end.y)
 	top_hud_panel.visible = false
 	top_hud_panel.custom_minimum_size = hud_rect.size
@@ -2996,7 +3839,7 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	top_hud_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	_anchor_control(top_hud_container, 0.0, 0.0, 0.0, 0.0, hud_rect.position.x, hud_rect.position.y, hud_rect.end.x, hud_rect.end.y)
 	top_hud_container.z_index = 100
-	top_hud_container.add_theme_constant_override("separation", int(clampf(18.0 * ui_scale, 14.0, 22.0)))
+	top_hud_container.add_theme_constant_override("separation", int(clampf(6.0 * ui_scale, 5.0, 8.0)))
 	top_hud_spacer.custom_minimum_size = Vector2(1.0, 1.0)
 
 	time_hud_panel.visible = false
@@ -3099,6 +3942,9 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 		wind_hud_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		wind_hud_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		wind_hud_icon.modulate = Color(1.0, 1.0, 1.0, 0.94)
+	_layout_top_player_portrait_panel(ui_scale)
+	_layout_top_money_panel(ui_scale)
+	_layout_top_weather_texture_panel(top_weather_panel_size, ui_scale)
 	_order_weather_hud_row_children()
 	_layout_condition_hud(screen_size, ui_scale)
 	_refresh_condition_hud()
@@ -3175,14 +4021,9 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	_layout_float_bite_preview(screen_size, ui_scale)
 
 	if keepnet_hud_button != null:
-		var keepnet_edge: float = clamp(cast_button_size.x * 0.68, 72.0, 92.0)
-		var keepnet_size := Vector2(keepnet_edge, keepnet_edge)
-		var quick_panel_button_edge: float = clamp(action_panel_rect.size.y - 8.0 * ui_scale, 88.0, 98.0)
-		var quick_panel_button_y: float = action_panel_rect.position.y + max((action_panel_rect.size.y - quick_panel_button_edge) * 0.5, 0.0)
-		var keepnet_gap: float = max(10.0, 12.0 * ui_scale)
-		var desired_keepnet_x: float = action_panel_rect.position.x - keepnet_gap - keepnet_size.x * 0.5
-		var desired_keepnet_y: float = quick_panel_button_y + quick_panel_button_edge * 0.5
-		var keepnet_center := Vector2(desired_keepnet_x, desired_keepnet_y)
+		var keepnet_height: float = clampf(80.0 * ui_scale, 104.0, 132.0)
+		var keepnet_size := Vector2(keepnet_height * 0.86, keepnet_height)
+		var keepnet_center := Vector2(214.0 * sx, 452.0 * sy)
 		var keepnet_min_x: float = keepnet_size.x * 0.5 + cast_margin
 		var keepnet_max_x: float = max(keepnet_min_x, screen_size.x - keepnet_size.x * 0.5 - cast_margin)
 		var keepnet_min_y: float = keepnet_size.y * 0.5 + cast_margin
@@ -3221,7 +4062,7 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	var side_menu_button_size := _scale_size(Vector2(LEFT_NAV_WIDTH, 48.0), screen_size)
 	_layout_side_menu_button(inventory_button, "Инвентарь", "inventory", side_menu_button_size, false)
 	_layout_side_menu_button(map_button, "Карта", "map", side_menu_button_size, false)
-	for node in [shop_button, harbor_button]:
+	for node in [shop_button, harbor_button, settings_button]:
 		node.visible = false
 		node.disabled = true
 		node.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -3234,9 +4075,39 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	inventory_button.mouse_filter = Control.MOUSE_FILTER_STOP
 	map_button.disabled = false
 	map_button.mouse_filter = Control.MOUSE_FILTER_STOP
-	encyclopedia_button.visible = true
+	var right_menu_button_size := Vector2(75.0, 69.0)
+	var right_menu_gap: float = clampf(1.0 * ui_scale, 0.0, 2.0)
+	var right_menu_margin_x: float = clampf(24.0 * sx, 18.0, 30.0)
+	var right_menu_top: float = clampf(20.0 * sy, 14.0, 30.0)
+	var right_menu_x: float = screen_size.x - right_menu_margin_x - right_menu_button_size.x
+	var nav_interactions_locked: bool = _fishing_ui_state == FishingUiState.WAITING or _fishing_ui_state == FishingUiState.FIGHTING or is_cast_animating
+	var right_menu_items: Array = [
+		{"button": shop_button, "label": "Магазин", "icon": "shop", "active": shop_panel != null and shop_panel.visible},
+		{"button": inventory_button, "label": "Инвентарь", "icon": "inventory", "active": inventory_panel != null and inventory_panel.visible},
+		{"button": map_button, "label": "Карта", "icon": "map", "active": waterbody_panel != null and waterbody_panel.visible}
+	]
+	right_menu_items.append({"button": encyclopedia_button, "label": "Атлас рыб", "icon": "atlas", "active": encyclopedia_ui != null and encyclopedia_ui.is_any_modal_open()})
+	right_menu_items.append({"button": harbor_button, "label": "Гавань", "icon": "harbor", "active": fish_harbor_ui != null and fish_harbor_ui.visible})
+	right_menu_items.append({"button": settings_button, "label": "Настройки", "icon": "settings", "active": system_menu_ui != null and system_menu_ui.is_settings_open(), "locks": false})
+	for index in range(right_menu_items.size()):
+		var item: Dictionary = right_menu_items[index]
+		var menu_button: Button = item.get("button") as Button
+		if menu_button == null:
+			continue
+		var menu_y: float = right_menu_top + float(index) * (right_menu_button_size.y + right_menu_gap)
+		var is_locked: bool = nav_interactions_locked and bool(item.get("locks", true))
+		_reparent_node(menu_button, ui_canvas_layer)
+		_anchor_control(menu_button, 0.0, 0.0, 0.0, 0.0, right_menu_x, menu_y, right_menu_x + right_menu_button_size.x, menu_y + right_menu_button_size.y)
+		menu_button.set_meta("_right_side_base_position", Vector2(right_menu_x, menu_y))
+		menu_button.pivot_offset = right_menu_button_size * 0.5
+		menu_button.disabled = is_locked
+		_layout_side_menu_button(menu_button, str(item.get("label", "")), str(item.get("icon", "")), right_menu_button_size, bool(item.get("active", false)))
+		menu_button.disabled = is_locked
+		menu_button.mouse_filter = Control.MOUSE_FILTER_STOP if not is_locked else Control.MOUSE_FILTER_IGNORE
+		_refresh_side_menu_button_state(menu_button, bool(item.get("active", false)))
+		_bind_right_side_button_feedback(menu_button)
+		_set_right_side_button_feedback(menu_button, bool(menu_button.get_meta("_right_side_hovered", false)) and not is_locked, false, true)
 	profile_button.visible = false
-	encyclopedia_button.disabled = false
 	profile_button.disabled = true
 	_layout_main_hud_v2_right_stack(screen_size, ui_scale, cast_button_size)
 
@@ -3334,7 +4205,7 @@ func _ensure_hud_icons() -> void:
 	var wind_icon_parent: Control = top_hud_wind_group if top_hud_wind_group != null else time_icon_parent
 	money_hud_icon = _ensure_hud_icon(money_hud_icon, "MoneyHudIcon", money_icon_parent, "money")
 	time_hud_icon = _ensure_hud_icon(time_hud_icon, "TimeHudIcon", time_icon_parent, "time")
-	weather_hud_icon = _ensure_hud_icon(weather_hud_icon, "WeatherHudIcon", weather_icon_parent, "weather")
+	weather_hud_icon = _ensure_hud_icon(weather_hud_icon, "WeatherHudIcon", weather_icon_parent, "temperature")
 	wind_hud_icon = _ensure_hud_texture_icon(wind_hud_icon, "WindHudIcon", wind_icon_parent, _get_wind_hud_texture())
 	if money_hud_icon != null:
 		money_hud_icon.visible = false
@@ -3575,16 +4446,26 @@ func _get_condition_hunger_color(value: float) -> Color:
 
 
 func _order_weather_hud_row_children() -> void:
-	if top_hud_container != null and top_hud_money_group != null:
-		top_hud_container.move_child(top_hud_money_group, 0)
-		top_hud_container.move_child(top_hud_time_group, min(1, top_hud_container.get_child_count() - 1))
-		top_hud_container.move_child(top_hud_temperature_group, min(2, top_hud_container.get_child_count() - 1))
-		top_hud_container.move_child(top_hud_wind_group, min(3, top_hud_container.get_child_count() - 1))
-		top_hud_container.move_child(top_hud_spacer, min(4, top_hud_container.get_child_count() - 1))
+	if top_hud_container != null:
+		if top_player_portrait_panel != null:
+			top_hud_container.move_child(top_player_portrait_panel, 0)
+		if player_xp_hud != null and player_xp_hud.get_parent() == top_hud_container:
+			top_hud_container.move_child(player_xp_hud, min(1, top_hud_container.get_child_count() - 1))
+		if top_money_panel != null:
+			top_hud_container.move_child(top_money_panel, min(2, top_hud_container.get_child_count() - 1))
+		if top_weather_panel_group != null:
+			top_hud_container.move_child(top_weather_panel_group, min(3, top_hud_container.get_child_count() - 1))
+		if top_hud_spacer != null:
+			top_hud_container.move_child(top_hud_spacer, min(4, top_hud_container.get_child_count() - 1))
+		for hidden_group in [top_hud_time_group, top_hud_temperature_group, top_hud_wind_group]:
+			if hidden_group != null and hidden_group.get_parent() == top_hud_container:
+				top_hud_container.move_child(hidden_group, top_hud_container.get_child_count() - 1)
 	if money_hud_icon != null and money_hud_icon.get_parent() == top_hud_money_group:
 		top_hud_money_group.move_child(money_hud_icon, 0)
 	if money_label != null and money_label.get_parent() == top_hud_money_group:
 		top_hud_money_group.move_child(money_label, min(1, top_hud_money_group.get_child_count() - 1))
+	if top_weather_panel_texture_rect != null and top_weather_panel_texture_rect.get_parent() == top_weather_panel_group:
+		top_weather_panel_group.move_child(top_weather_panel_texture_rect, 0)
 	if time_hud_icon != null and time_hud_icon.get_parent() == top_hud_time_group:
 		top_hud_time_group.move_child(time_hud_icon, 0)
 	if clock_label != null and clock_label.get_parent() == top_hud_time_group:
@@ -3744,11 +4625,19 @@ func _layout_side_menu_button(button: Button, label: String, icon_name: String, 
 	button.z_index = 102
 	button.visible = true
 	button.clip_text = false
+	button.clip_contents = true
 	button.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
 	button.add_theme_constant_override("h_separation", 0)
 	button.add_theme_constant_override("icon_max_width", 0)
 
+	var backplate := _ensure_right_side_button_backplate(button)
+	backplate.texture = RIGHT_SIDE_BUTTON_BACK_TEXTURE
+	backplate.position = Vector2.ZERO
+	backplate.size = button_size
+	backplate.visible = backplate.texture != null
+
 	var icon_rect := _ensure_side_menu_icon(button)
+	icon_rect.z_index = 1
 	var scale_factor: float = clamp(button_size.y / 48.0, 0.78, 1.22)
 	var icon_edge: float = clamp(min(button_size.x, button_size.y) * 0.86, 42.0 * scale_factor, 66.0 * scale_factor)
 	var icon_size := Vector2(icon_edge, icon_edge)
@@ -3770,46 +4659,7 @@ func _layout_side_menu_button(button: Button, label: String, icon_name: String, 
 
 	_refresh_side_menu_button_state(button, active)
 
-func _layout_main_hud_v2_right_stack(screen_size: Vector2, ui_scale: float, cast_button_size: Vector2) -> void:
-	var sx: float = screen_size.x / BASE_SCREEN_SIZE.x
-	var sy: float = screen_size.y / BASE_SCREEN_SIZE.y
-	var margin_x: float = clampf(24.0 * sx, 18.0, 30.0)
-	var margin_y: float = clampf(18.0 * sy, 14.0, 24.0)
-	var gap: float = clampf(8.0 * ui_scale, 7.0, 10.0)
-	var menu_button_size := Vector2(
-		clampf(62.0 * ui_scale, 56.0, 76.0),
-		clampf(54.0 * ui_scale, 48.0, 66.0)
-	)
-	var compact_size := Vector2(menu_button_size.y, menu_button_size.y)
-
-	if encyclopedia_button != null:
-		var encyclopedia_pos := Vector2(screen_size.x - margin_x - menu_button_size.x - gap - compact_size.x, margin_y)
-		_anchor_control(encyclopedia_button, 0.0, 0.0, 0.0, 0.0, encyclopedia_pos.x, encyclopedia_pos.y, encyclopedia_pos.x + compact_size.x, encyclopedia_pos.y + compact_size.y)
-		encyclopedia_button.text = ""
-		encyclopedia_button.tooltip_text = "Энциклопедия рыб"
-		encyclopedia_button.visible = true
-		encyclopedia_button.disabled = false
-		encyclopedia_button.mouse_filter = Control.MOUSE_FILTER_STOP
-		encyclopedia_button.custom_minimum_size = compact_size
-		encyclopedia_button.size = compact_size
-		encyclopedia_button.clip_contents = true
-		encyclopedia_button.z_index = 260
-		_apply_top_icon_button_style(encyclopedia_button)
-		encyclopedia_button.icon = null
-		encyclopedia_button.expand_icon = false
-		encyclopedia_button.add_theme_constant_override("icon_max_width", 0)
-		var encyclopedia_icon := _ensure_button_overlay_icon(encyclopedia_button, "EncyclopediaIcon")
-		var encyclopedia_icon_size := Vector2(
-			clampf(compact_size.x * 0.78, 40.0, 52.0),
-			clampf(compact_size.y * 0.64, 30.0, 42.0)
-		)
-		encyclopedia_icon.texture = ui_theme.get_icon("encyclopedia") if ui_theme != null else null
-		encyclopedia_icon.position = (compact_size - encyclopedia_icon_size) * 0.5
-		encyclopedia_icon.size = encyclopedia_icon_size
-		encyclopedia_icon.modulate = Color(0.90, 1.0, 0.94, 0.96)
-		encyclopedia_icon.visible = encyclopedia_icon.texture != null
-		encyclopedia_button.add_theme_constant_override("h_separation", 0)
-
+func _layout_main_hud_v2_right_stack(_screen_size: Vector2, _ui_scale: float, _cast_button_size: Vector2) -> void:
 	if current_tackle_button != null:
 		current_tackle_button.text = ""
 		current_tackle_button.tooltip_text = ""
@@ -3824,7 +4674,14 @@ func _refresh_side_menu_button_state(button: Button, active: bool) -> void:
 	if button == null or ui_theme == null:
 		return
 
-	ui_theme.apply_side_menu_button_style(button, active)
+	var backplate := button.get_node_or_null("RightSideButtonBackplate") as TextureRect
+	if backplate != null:
+		_apply_right_side_image_button_style(button)
+		backplate.modulate = Color(1.0, 1.0, 1.0, 1.0 if active else 0.92)
+		if button.disabled:
+			backplate.modulate.a = 0.48
+	else:
+		ui_theme.apply_side_menu_button_style(button, active)
 	button.modulate = Color(1.0, 1.0, 1.0, 1.0 if active else 0.92)
 	var icon_color := Color(1.0, 1.0, 0.94, 1.0) if active else Color(0.94, 0.96, 0.86, 0.92)
 
@@ -3840,6 +4697,89 @@ func _refresh_side_menu_button_state(button: Button, active: bool) -> void:
 	if arrow_label != null:
 		arrow_label.visible = false
 
+func _ensure_right_side_button_backplate(button: Button) -> TextureRect:
+	var backplate := button.get_node_or_null("RightSideButtonBackplate") as TextureRect
+	if backplate == null:
+		backplate = TextureRect.new()
+		backplate.name = "RightSideButtonBackplate"
+		backplate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		backplate.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		backplate.stretch_mode = TextureRect.STRETCH_SCALE
+		backplate.z_index = 0
+		button.add_child(backplate)
+		button.move_child(backplate, 0)
+	return backplate
+
+func _apply_right_side_image_button_style(button: Button) -> void:
+	var empty := StyleBoxEmpty.new()
+	for style_name in ["normal", "hover", "pressed", "disabled", "focus"]:
+		button.add_theme_stylebox_override(style_name, empty)
+	button.add_theme_color_override("font_color", Color.TRANSPARENT)
+	button.add_theme_color_override("font_hover_color", Color.TRANSPARENT)
+	button.add_theme_color_override("font_pressed_color", Color.TRANSPARENT)
+	button.add_theme_color_override("font_disabled_color", Color.TRANSPARENT)
+
+func _bind_right_side_button_feedback(button: Button) -> void:
+	if button == null or button.has_meta("_right_side_feedback_bound"):
+		return
+
+	button.set_meta("_right_side_feedback_bound", true)
+	button.mouse_entered.connect(func() -> void:
+		_set_right_side_button_feedback(button, true, false)
+	)
+	button.mouse_exited.connect(func() -> void:
+		_set_right_side_button_feedback(button, false, false)
+	)
+	button.button_down.connect(func() -> void:
+		_set_right_side_button_feedback(button, true, true)
+	)
+	button.button_up.connect(func() -> void:
+		var hovered := button.get_global_rect().has_point(get_viewport().get_mouse_position())
+		_set_right_side_button_feedback(button, hovered, false)
+	)
+
+func _set_right_side_button_feedback(button: Button, hovered: bool, pressed: bool, instant: bool = false) -> void:
+	if button == null:
+		return
+
+	if button.disabled:
+		hovered = false
+		pressed = false
+	button.set_meta("_right_side_hovered", hovered)
+	button.set_meta("_right_side_pressed", pressed)
+
+	var base_position := button.position
+	if button.has_meta("_right_side_base_position"):
+		var base_position_value = button.get_meta("_right_side_base_position")
+		if base_position_value is Vector2:
+			base_position = base_position_value
+	var target_position := base_position + (RIGHT_SIDE_BUTTON_HOVER_OFFSET if hovered and not pressed else Vector2.ZERO)
+	var target_scale := Vector2.ONE
+	if pressed:
+		target_scale = RIGHT_SIDE_BUTTON_PRESS_SCALE
+	elif hovered:
+		target_scale = RIGHT_SIDE_BUTTON_HOVER_SCALE
+
+	button.pivot_offset = button.size * 0.5
+	var previous_tween = null
+	if button.has_meta("_right_side_feedback_tween"):
+		previous_tween = button.get_meta("_right_side_feedback_tween")
+	if previous_tween is Tween and is_instance_valid(previous_tween):
+		(previous_tween as Tween).kill()
+
+	if instant:
+		button.position = target_position
+		button.scale = target_scale
+		return
+
+	var tween := button.create_tween()
+	button.set_meta("_right_side_feedback_tween", tween)
+	tween.set_parallel(true)
+	tween.set_trans(Tween.TRANS_SINE)
+	tween.set_ease(Tween.EASE_OUT)
+	tween.tween_property(button, "position", target_position, 0.08)
+	tween.tween_property(button, "scale", target_scale, 0.08)
+
 func _ensure_side_menu_icon(button: Button) -> TextureRect:
 	var icon_rect := button.get_node_or_null("SideMenuIcon") as TextureRect
 	if icon_rect == null:
@@ -3848,6 +4788,7 @@ func _ensure_side_menu_icon(button: Button) -> TextureRect:
 		icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon_rect.z_index = 1
 		button.add_child(icon_rect)
 	return icon_rect
 
@@ -4014,7 +4955,7 @@ func _is_depth_hud_control_out_of_sync(should_show: bool) -> bool:
 		return false
 	if fish_button == null or not fish_button.visible or not fish_button.is_visible_in_tree():
 		return true
-	if depth_radial_control.get_parent() != fish_button:
+	if depth_radial_control.get_parent() != ui_canvas_layer:
 		return true
 	if not depth_radial_control.is_visible_in_tree():
 		return true
@@ -4028,7 +4969,8 @@ func _is_depth_hud_control_out_of_sync(should_show: bool) -> bool:
 func _get_depth_radial_control_size() -> Vector2:
 	if fish_button == null:
 		return Vector2.ZERO
-	return Vector2(fish_button.size.x, fish_button.size.y * 1.36)
+	var edge: float = maxf(fish_button.size.x, fish_button.size.y)
+	return Vector2(edge, edge)
 
 
 func _refresh_depth_hud_controls() -> void:
@@ -4043,26 +4985,50 @@ func _refresh_depth_hud_controls() -> void:
 
 	var should_show: bool = _should_show_depth_hud_controls()
 	depth_radial_control.visible = should_show
-	depth_radial_control.mouse_filter = Control.MOUSE_FILTER_PASS if should_show else Control.MOUSE_FILTER_IGNORE
+	depth_radial_control.mouse_filter = Control.MOUSE_FILTER_STOP if should_show else Control.MOUSE_FILTER_IGNORE
 	if not should_show:
+		fish_button.modulate = Color.WHITE
+		fish_button.mouse_filter = Control.MOUSE_FILTER_STOP
 		if ui_theme != null:
 			var restore_icon_size: float = clampf(min(fish_button.size.x, fish_button.size.y) * 0.72, 58.0, 82.0)
 			_set_primary_fishing_button_icon(fish_button, _get_primary_fishing_action_icon(), restore_icon_size)
 		return
 
-	if depth_radial_control.get_parent() != fish_button:
-		_reparent_node(depth_radial_control, fish_button)
+	if depth_radial_control.get_parent() != ui_canvas_layer:
+		_reparent_node(depth_radial_control, ui_canvas_layer)
+	if cast_button_visual != null:
+		cast_button_visual.visible = false
+	_apply_primary_fishing_action_style(fish_button, fish_button.size)
+	fish_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fish_button.modulate = Color(1.0, 1.0, 1.0, 0.0)
 	var depth_control_size := _get_depth_radial_control_size()
-	_anchor_control(depth_radial_control, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, depth_control_size.x, depth_control_size.y)
+	_anchor_control(
+		depth_radial_control,
+		0.0,
+		0.0,
+		0.0,
+		0.0,
+		fish_button.position.x,
+		fish_button.position.y,
+		fish_button.position.x + depth_control_size.x,
+		fish_button.position.y + depth_control_size.y
+	)
 	depth_radial_control.size = depth_control_size
-	depth_radial_control.z_index = 3
+	depth_radial_control.z_index = 261
 	var depth_range := PlayerData.get_current_spot_depth_range()
 	depth_radial_control.set_depth_range(float(depth_range.get("min", 0.2)), float(depth_range.get("max", 6.0)))
 	depth_radial_control.set_depth_value(PlayerData.fishing_depth, false)
 	depth_radial_control.set_hook_texture(DEPTH_HOOK_ICON)
+	if depth_radial_control.has_method("set_center_icon_texture") and ui_theme != null:
+		depth_radial_control.call("set_center_icon_texture", ui_theme.get_icon(_get_primary_fishing_action_icon()))
+	if depth_radial_control.has_method("set_button_state"):
+		depth_radial_control.call("set_button_state", _get_cast_depth_control_state())
+	if depth_radial_control.has_method("set_depth_adjust_enabled"):
+		depth_radial_control.call("set_depth_adjust_enabled", _can_adjust_depth_from_cast_control())
 	if depth_radial_control.has_method("set_draw_depth_text"):
-		depth_radial_control.call("set_draw_depth_text", false)
-	_layout_depth_hud_value_label()
+		depth_radial_control.call("set_draw_depth_text", true)
+	if depth_radial_control.has_method("set_pressed_visual"):
+		depth_radial_control.call("set_pressed_visual", _cast_button_pressed)
 	fish_button.icon = null
 	return
 
@@ -4139,11 +5105,34 @@ func _update_depth_hud_value_label() -> void:
 func _should_show_depth_hud_controls() -> bool:
 	if is_cast_animating or _is_catch_reward_open() or _is_menu_overlay_open():
 		return false
-	if _fishing_ui_state != FishingUiState.IDLE:
-		return false
-	if not _is_current_tackle_depth_adjustable():
-		return false
-	return true
+	return _fishing_ui_state in [
+		FishingUiState.IDLE,
+		FishingUiState.WAITING,
+		FishingUiState.FIGHTING,
+		FishingUiState.CAUGHT,
+		FishingUiState.FAILED
+	]
+
+
+func _can_adjust_depth_from_cast_control() -> bool:
+	return (
+		_fishing_ui_state == FishingUiState.IDLE
+		and not is_cast_animating
+		and not _is_menu_overlay_open()
+		and _is_current_tackle_depth_adjustable()
+	)
+
+
+func _get_cast_depth_control_state() -> int:
+	if fish_button != null and fish_button.disabled:
+		return FloatDepthRadialControl.CastButtonState.DISABLED
+	match _fishing_ui_state:
+		FishingUiState.WAITING:
+			return FloatDepthRadialControl.CastButtonState.CASTED_WAITING
+		FishingUiState.FIGHTING, FishingUiState.CAUGHT, FishingUiState.FAILED:
+			return FloatDepthRadialControl.CastButtonState.HOOKED_REELING
+		_:
+			return FloatDepthRadialControl.CastButtonState.READY_TO_CAST
 
 
 func _is_current_tackle_depth_adjustable() -> bool:
@@ -4297,6 +5286,8 @@ func _can_cancel_current_fishing_wait() -> bool:
 		return true
 	if fighting_ui and (bool(FishingManager.get("is_fishing")) or bool(FishingManager.get("is_reeling"))):
 		return true
+	if bool(FishingManager.get("is_fishing")) and not bool(FishingManager.get("is_reeling")):
+		return true
 	if (waiting_ui or fighting_ui) and FishingManager.has_method("can_cancel_current_fishing"):
 		return bool(FishingManager.can_cancel_current_fishing())
 	if FishingManager.has_method("can_cancel_current_fishing_wait"):
@@ -4307,6 +5298,15 @@ func _update_cast_button_visual() -> void:
 	if cast_button_visual == null or ui_theme == null:
 		return
 	_apply_primary_action_press_scale()
+	if depth_radial_control != null and depth_radial_control.has_method("set_pressed_visual"):
+		depth_radial_control.call("set_pressed_visual", _cast_button_pressed)
+	if depth_radial_control != null and depth_radial_control.visible:
+		if depth_radial_control.has_method("set_center_icon_texture"):
+			depth_radial_control.call("set_center_icon_texture", ui_theme.get_icon(_get_primary_fishing_action_icon()))
+		if depth_radial_control.has_method("set_button_state"):
+			depth_radial_control.call("set_button_state", _get_cast_depth_control_state())
+		if depth_radial_control.has_method("set_depth_adjust_enabled"):
+			depth_radial_control.call("set_depth_adjust_enabled", _can_adjust_depth_from_cast_control())
 
 	var active_hook_input: bool = _fishing_ui_state == FishingUiState.WAITING and bool(FishingManager.get("use_new_bite_system"))
 	var use_cast_texture := _use_cast_png_button and (_fishing_ui_state == FishingUiState.IDLE or (_fishing_ui_state == FishingUiState.WAITING and not active_hook_input))
@@ -4345,6 +5345,9 @@ func _apply_primary_action_press_scale() -> void:
 	if cast_button_visual != null:
 		cast_button_visual.pivot_offset = cast_button_visual.size * 0.5
 		cast_button_visual.scale = Vector2.ONE * target_scale
+	if depth_radial_control != null:
+		depth_radial_control.pivot_offset = depth_radial_control.size * 0.5
+		depth_radial_control.scale = Vector2.ONE * target_scale
 
 
 func _layout_cast_power_indicator() -> void:
@@ -4435,6 +5438,8 @@ func _release_cast_charge() -> void:
 func _is_fish_button_pointer_event(event: InputEvent) -> bool:
 	if is_modal_open:
 		return false
+	if _is_cast_depth_control_active():
+		return false
 	if fish_button == null or not fish_button.visible or not fish_button.is_visible_in_tree():
 		return false
 	if not (event is InputEventMouseButton):
@@ -4451,19 +5456,98 @@ func _is_fish_button_pointer_event(event: InputEvent) -> bool:
 	return fish_button.get_global_rect().has_point(mouse_event.position)
 
 
-func _is_depth_radial_pointer_event(event: InputEvent) -> bool:
+func _is_cast_depth_control_active() -> bool:
+	return (
+		depth_radial_control != null
+		and depth_radial_control.visible
+		and depth_radial_control.is_visible_in_tree()
+		and depth_radial_control.mouse_filter == Control.MOUSE_FILTER_STOP
+	)
+
+
+func _on_cast_depth_control_center_down() -> void:
+	if _should_ignore_base_ui_press():
+		return
+
+	_cast_button_pressed = true
+	_update_cast_button_visual()
+	_on_reel_button_down()
+	if not _cast_charge_active and fish_button != null and not fish_button.disabled:
+		_fish_button_pointer_action_active = true
+		_trigger_fish_button_action(true)
+
+
+func _on_cast_depth_control_center_up() -> void:
+	_cast_button_pressed = false
+	_update_cast_button_visual()
+	_on_reel_button_up()
+	call_deferred("_clear_fish_button_pointer_action_active")
+
+
+func _handle_depth_radial_pointer_event(event: InputEvent) -> bool:
 	if depth_radial_control == null or not depth_radial_control.visible or not depth_radial_control.is_visible_in_tree():
+		_depth_radial_pointer_active = false
 		return false
 	if not _should_show_depth_hud_controls():
+		_depth_radial_pointer_active = false
 		return false
 	if event is InputEventMouseButton:
 		var mouse_event := event as InputEventMouseButton
 		if mouse_event.button_index != MOUSE_BUTTON_LEFT:
 			return false
-		if depth_radial_control.is_adjusting_depth():
+		if mouse_event.pressed:
+			if not depth_radial_control.is_depth_gesture_global_point(mouse_event.position):
+				return false
+			_depth_radial_pointer_active = true
+			_update_depth_radial_from_global_point(mouse_event.position)
 			return true
-		return mouse_event.pressed and depth_radial_control.is_depth_gesture_global_point(mouse_event.position)
+		if _depth_radial_pointer_active:
+			_depth_radial_pointer_active = false
+			_commit_depth_radial_pointer_value()
+			return true
+		return false
+	if event is InputEventMouseMotion:
+		if not _depth_radial_pointer_active:
+			return false
+		_update_depth_radial_from_global_point((event as InputEventMouseMotion).position)
+		return true
+	if event is InputEventScreenTouch:
+		var touch_event := event as InputEventScreenTouch
+		if touch_event.pressed:
+			if not depth_radial_control.is_depth_gesture_global_point(touch_event.position):
+				return false
+			_depth_radial_pointer_active = true
+			_update_depth_radial_from_global_point(touch_event.position)
+			return true
+		if _depth_radial_pointer_active:
+			_depth_radial_pointer_active = false
+			_commit_depth_radial_pointer_value()
+			return true
+		return false
+	if event is InputEventScreenDrag:
+		if not _depth_radial_pointer_active:
+			return false
+		_update_depth_radial_from_global_point((event as InputEventScreenDrag).position)
+		return true
 	return false
+
+
+func _update_depth_radial_from_global_point(global_point: Vector2) -> void:
+	if depth_radial_control == null:
+		return
+	var edge := minf(depth_radial_control.size.x, depth_radial_control.size.y)
+	if edge <= 1.0:
+		return
+	var local_point := global_point - depth_radial_control.global_position
+	var center := Vector2(depth_radial_control.size.x * 0.5, edge * 0.5)
+	var angle := atan2(local_point.y - center.y, local_point.x - center.x)
+	depth_radial_control.update_depth_from_angle(angle, true)
+
+
+func _commit_depth_radial_pointer_value() -> void:
+	if depth_radial_control == null:
+		return
+	_on_depth_radial_control_committed(float(depth_radial_control.get("depth_value")))
 
 func _arm_modal_tap_guard() -> void:
 	_ensure_modal_input_shield()
@@ -4480,6 +5564,8 @@ func _update_modal_tap_guard() -> void:
 		return
 	if not _is_modal_tap_guard_active():
 		_refresh_modal_input_blocker()
+		if not is_modal_open:
+			call_deferred("_restore_gameplay_hud_after_modal_close")
 
 func _is_visible_ui_control(control: CanvasItem) -> bool:
 	return control != null and control.visible
@@ -4488,6 +5574,8 @@ func _is_menu_overlay_open() -> bool:
 	if _is_catch_reward_open():
 		return true
 	if _is_level_up_reward_popup_open():
+		return true
+	if _is_level_progress_popup_open():
 		return true
 	if _is_visible_ui_control(basket_panel) or _is_visible_ui_control(inventory_panel):
 		return true
@@ -4601,6 +5689,8 @@ func _update_fishing_presence(delta: float) -> void:
 func _setup_layout() -> void:
 	_ensure_modal_layer()
 	_ensure_level_up_reward_popup()
+	_ensure_level_progress_popup()
+	_ensure_premium_store_popup()
 	_move_modal_roots_to_layer()
 	_layout_modal_layer()
 	var screen_size := get_viewport_rect().size
@@ -4656,9 +5746,11 @@ func _setup_layout() -> void:
 		inventory_button,
 		tackle_button,
 		shop_button,
+		harbor_button,
 		map_button,
 		profile_button,
 		encyclopedia_button,
+		settings_button,
 		feed_button,
 		bait_button,
 		quick_tackle_panel,
@@ -4680,7 +5772,9 @@ func _setup_layout() -> void:
 		catch_popup_backdrop,
 		catch_popup_panel,
 		level_up_backdrop,
-		level_up_panel
+		level_up_panel,
+		level_progress_backdrop,
+		level_progress_panel
 	]:
 		node.set_anchors_preset(Control.PRESET_TOP_LEFT)
 
@@ -4783,7 +5877,12 @@ func _setup_layout() -> void:
 		level_up_unlocks_label,
 		level_up_rewards_label,
 		level_up_warning_label,
-		level_up_confirm_button
+		level_up_confirm_button,
+		level_progress_title_label,
+		level_progress_summary_label,
+		level_progress_scroll,
+		level_progress_rows,
+		level_progress_close_button
 	]:
 		node.set_anchors_preset(Control.PRESET_TOP_LEFT)
 
@@ -4917,6 +6016,8 @@ func _setup_layout() -> void:
 	catch_popup_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	ui_theme.apply_popup_window_style(catch_popup_panel)
 	_layout_level_up_reward_popup(screen_size)
+	_layout_level_progress_popup(screen_size)
+	_layout_premium_store_popup(screen_size)
 
 	water_panel.position = Vector2(margin, content_top)
 	water_panel.size = Vector2(screen_size.x - margin * 2.0, content_height)
@@ -5190,7 +6291,7 @@ func _setup_layout() -> void:
 	nav_fish_button.visible = false
 	nav_fish_button.disabled = true
 	nav_fish_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	for node in [shop_button, harbor_button]:
+	for node in [shop_button, harbor_button, settings_button]:
 		node.visible = false
 		node.disabled = true
 		node.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -6236,6 +7337,8 @@ func _connect_signals() -> void:
 	shop_button.pressed.connect(_on_shop_button_pressed)
 	harbor_button.pressed.connect(_on_harbor_button_pressed)
 	encyclopedia_button.pressed.connect(_on_encyclopedia_button_pressed)
+	if settings_button != null:
+		settings_button.pressed.connect(_open_settings)
 	if current_tackle_button != null:
 		current_tackle_button.pressed.connect(_on_current_tackle_button_pressed)
 		current_tackle_button.button_down.connect(_on_current_tackle_button_down)
@@ -6322,6 +7425,7 @@ func _connect_signals() -> void:
 
 func _update_ui() -> void:
 	fishing_hud_ui._update_ui()
+	_refresh_fish_button_presentation()
 	_update_player_xp_hud()
 	if quick_tackle_panel != null:
 		if quick_tackle_panel.has_method("refresh"):
@@ -6378,7 +7482,8 @@ func _update_time_hud() -> void:
 		return
 
 	clock_label.text = _get_clock_text()
-	weather_label.text = _get_time_of_day_title()
+	var weather_state := WeatherUIHelperScript.get_current_weather_state(_get_time_manager())
+	weather_label.text = str(weather_state.get("temperature_text", "18°C"))
 	_apply_water_animation_weather()
 
 func _apply_time_atmosphere() -> void:
@@ -7744,7 +8849,13 @@ func _open_inventory() -> void:
 	inventory_ui.open()
 
 func can_quick_change_tackle() -> bool:
-	return not _should_ignore_base_ui_press() and _fishing_ui_state == FishingUiState.IDLE and not is_cast_animating and not _cast_charge_active
+	return (
+		not _is_menu_overlay_open()
+		and not _has_pending_catch_reward()
+		and _fishing_ui_state == FishingUiState.IDLE
+		and not is_cast_animating
+		and not _cast_charge_active
+	)
 
 func refresh_after_quick_tackle_change() -> void:
 	_update_ui()
