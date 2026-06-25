@@ -101,6 +101,12 @@ func set_pressed_visual(enabled: bool) -> void:
 	queue_redraw()
 
 
+func cancel_press() -> void:
+	_center_pointer_down = false
+	_is_pressed_visual = false
+	queue_redraw()
+
+
 func set_depth_range(min_value: float, max_value: float) -> void:
 	min_depth = minf(min_value, max_value)
 	max_depth = maxf(min_value, max_value)
@@ -287,7 +293,8 @@ func _is_center_action_point(point: Vector2) -> bool:
 	var rect := _get_visual_rect()
 	if rect.size.x <= 1.0:
 		return false
-	return point.distance_to(_get_visual_center()) <= rect.size.x * 0.265
+	var hit_radius_ratio := 0.265 if depth_adjust_enabled else 0.455
+	return point.distance_to(_get_visual_center()) <= rect.size.x * hit_radius_ratio
 
 
 func _is_center_action_enabled() -> bool:

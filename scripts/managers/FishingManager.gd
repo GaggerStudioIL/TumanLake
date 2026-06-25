@@ -143,6 +143,7 @@ const BITE_PHASE_INTEREST_MAX := 1.45
 const BITE_DECISION_MIN := 0.18
 const BITE_DECISION_MAX := 0.55
 const HOOK_INPUT_GUARD_MSEC := 260
+const BITE_WINDOW_EARLY_GRACE_SECONDS := 0.35
 const PLAYER_PULL_FORCE := 1.18
 const PLAYER_RELEASE_FORCE := -0.92
 const PLAYER_FORCE_RESPONSE := 3.05
@@ -445,7 +446,7 @@ func try_hook() -> void:
 	var perfect_start := float(_pending_bite_data.get("perfect_start", 0.35))
 	var perfect_end := float(_pending_bite_data.get("perfect_end", 1.05))
 
-	if elapsed < perfect_start:
+	if elapsed < maxf(perfect_start - BITE_WINDOW_EARLY_GRACE_SECONDS, 0.0):
 		_fail_hook("early_hook", {
 			"elapsed": elapsed,
 			"perfect_start": perfect_start,

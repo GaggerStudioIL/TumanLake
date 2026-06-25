@@ -1166,9 +1166,11 @@ func _apply_settings_slider_style(slider: HSlider) -> void:
 	slider.add_theme_stylebox_override("grabber_area_highlight", fill)
 
 func _apply_settings_toggle_style(toggle: CheckBox) -> void:
+	toggle.focus_mode = Control.FOCUS_NONE
 	toggle.add_theme_stylebox_override("normal", _make_menu_row_style(Color(0.052, 0.074, 0.068, 0.54), Color(0.78, 1.0, 0.86, 0.20), 12, 1, Color.TRANSPARENT, 1))
 	toggle.add_theme_stylebox_override("hover", _make_menu_row_style(Color(0.070, 0.118, 0.098, 0.82), Color(1.0, 0.84, 0.42, 0.42), 12, 3, Color(0.16, 0.66, 0.48, 0.10), 1))
 	toggle.add_theme_stylebox_override("pressed", _make_menu_row_style(Color(0.056, 0.142, 0.112, 0.90), Color(1.0, 0.84, 0.42, 0.48), 12, 1, Color.TRANSPARENT, 1))
+	toggle.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	toggle.add_theme_color_override("font_color", Color(0.94, 1.0, 0.92, 1.0))
 	toggle.add_theme_color_override("font_hover_color", Color(1.0, 0.94, 0.72, 1.0))
 	toggle.add_theme_color_override("font_pressed_color", Color(1.0, 0.84, 0.52, 1.0))
@@ -1176,6 +1178,7 @@ func _apply_settings_toggle_style(toggle: CheckBox) -> void:
 
 
 func _apply_menu_button_style() -> void:
+	menu_button.focus_mode = Control.FOCUS_NONE
 	var normal := _make_style(Color(0.026, 0.044, 0.044, 0.78), Color(0.74, 0.96, 0.86, 0.32), 15, 5, Color(0.0, 0.0, 0.0, 0.22))
 	var hover := _make_style(Color(0.046, 0.082, 0.076, 0.88), Color(0.84, 1.0, 0.88, 0.54), 15, 7, Color(0.18, 0.66, 0.48, 0.13))
 	var pressed := _make_style(Color(0.038, 0.112, 0.092, 0.94), Color(0.82, 1.0, 0.86, 0.62), 15, 3, Color(0.0, 0.0, 0.0, 0.16))
@@ -1184,7 +1187,7 @@ func _apply_menu_button_style() -> void:
 	menu_button.add_theme_stylebox_override("hover", hover)
 	menu_button.add_theme_stylebox_override("pressed", pressed)
 	menu_button.add_theme_stylebox_override("disabled", disabled)
-	menu_button.add_theme_stylebox_override("focus", hover)
+	menu_button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	menu_button.add_theme_color_override("font_color", Color(0.88, 1.0, 0.94, 1.0))
 	menu_button.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 0.94, 1.0))
 	menu_button.add_theme_color_override("font_pressed_color", Color(0.80, 1.0, 0.92, 1.0))

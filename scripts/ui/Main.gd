@@ -83,6 +83,10 @@ const ROD_TARGET_POS := Vector2(480.0, 210.0)
 const CAST_CONTROL_CENTER_BASE := Vector2(720.0, 280.0)
 const CAST_CHARGE_TIME := 1.5
 const CURRENT_TACKLE_LONG_PRESS_MSEC := 560
+const FLOAT_BITE_PREVIEW_ENABLED := true
+const FLOAT_IDLE_PREVIEW_WAITING_ENABLED := true
+const FLOAT_IDLE_PREVIEW_DELAY_SECONDS := 0.55
+const WAITING_FOR_BITE_UI_FINISH_ENABLED := false
 const MIN_CAST_POWER := 0.05
 const MAX_CAST_POWER := 1.0
 const MIN_SHORE_DEPTH := 0.16
@@ -526,6 +530,8 @@ var _rod_anchor_pos := Vector2.ZERO
 var _rod_target_pos := Vector2.ZERO
 var _depth_hud_refresh_queued := false
 var _depth_hud_visibility_check_accumulator := 0.0
+var _float_idle_preview_ready := false
+var _float_idle_preview_request_id := 0
 var _last_detailed_failure_msec := -100000
 var _first_run_hints_active := false
 var _first_run_hints_shown: Dictionary = {}
@@ -637,27 +643,9 @@ func _input(event: InputEvent) -> void:
 		_cast_button_pressed = false
 		_update_cast_button_visual()
 		_on_reel_button_up()
+		call_deferred("_reset_primary_action_press_state")
 		get_viewport().set_input_as_handled()
 		return
-
-	if not _is_fish_button_pointer_event(event):
-		return
-
-	var mouse_event := event as InputEventMouseButton
-	if mouse_event.pressed:
-		_cast_button_pressed = true
-		_update_cast_button_visual()
-		_on_reel_button_down()
-		if not _cast_charge_active and not fish_button.disabled:
-			_fish_button_pointer_action_active = true
-			_trigger_fish_button_action(true)
-	else:
-		_cast_button_pressed = false
-		_update_cast_button_visual()
-		_on_reel_button_up()
-		call_deferred("_clear_fish_button_pointer_action_active")
-
-	get_viewport().set_input_as_handled()
 
 func _is_cast_charge_release_event(event: InputEvent) -> bool:
 	if event is InputEventMouseButton:
@@ -1578,6 +1566,15 @@ func _refresh_modal_input_blocker() -> void:
 		modal_input_shield.mouse_filter = Control.MOUSE_FILTER_STOP
 	_request_depth_hud_refresh()
 
+func _close_open_modals_before_cast() -> void:
+	if _is_any_modal_visible():
+		_hide_modal_roots_except("")
+		_refresh_modal_input_blocker()
+		return
+	_current_modal_name = ""
+	if is_modal_open or (modal_input_shield != null and modal_input_shield.visible):
+		_refresh_modal_input_blocker()
+
 func _is_any_modal_visible() -> bool:
 	for control in [
 		basket_panel,
@@ -1953,6 +1950,11 @@ func _layout_float_bite_preview(screen_size: Vector2, ui_scale: float) -> void:
 
 
 func _show_float_bite_preview_idle() -> void:
+	if not FLOAT_BITE_PREVIEW_ENABLED or not FLOAT_IDLE_PREVIEW_WAITING_ENABLED:
+		_hide_float_bite_preview()
+		return
+	if not _float_idle_preview_ready:
+		return
 	if _is_reel_tackle_mode() or _is_menu_overlay_open():
 		_hide_float_bite_preview()
 		return
@@ -1979,6 +1981,9 @@ func _hide_float_bite_preview() -> void:
 
 
 func _refresh_float_bite_preview_visibility() -> void:
+	if not FLOAT_BITE_PREVIEW_ENABLED:
+		_hide_float_bite_preview()
+		return
 	_ensure_float_bite_preview()
 	if float_bite_preview == null or not is_instance_valid(float_bite_preview):
 		return
@@ -1990,9 +1995,10 @@ func _refresh_float_bite_preview_visibility() -> void:
 		and not _is_menu_overlay_open()
 	)
 	if should_show:
-		if not float_bite_preview.visible:
+		if FLOAT_IDLE_PREVIEW_WAITING_ENABLED and _float_idle_preview_ready and not float_bite_preview.visible:
 			_show_float_bite_preview_idle()
 	else:
+		_float_idle_preview_ready = false
 		_hide_float_bite_preview()
 
 
@@ -2912,6 +2918,7 @@ func _get_button_style(style_name: String, state: String = "normal") -> StyleBox
 			return ui_theme.get_button_style("secondary", state)
 
 func _apply_button_style(button: Button, style_name: String = STYLE_SECONDARY_BUTTON) -> void:
+	button.focus_mode = Control.FOCUS_NONE
 	match style_name:
 		STYLE_PRIMARY_BUTTON:
 			ui_theme.apply_primary_button_style(button)
@@ -2921,6 +2928,7 @@ func _apply_button_style(button: Button, style_name: String = STYLE_SECONDARY_BU
 			ui_theme.apply_nav_button_style(button, false)
 		_:
 			ui_theme.apply_secondary_button_style(button)
+	button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 
 func _apply_top_icon_button_style(button: Button) -> void:
 	if button == null or ui_theme == null:
@@ -4934,6 +4942,17 @@ func _refresh_depth_hud_after_ui_state_change() -> void:
 		_refresh_depth_hud_controls()
 
 
+func _hide_depth_radial_for_primary_action() -> void:
+	if depth_radial_control != null:
+		depth_radial_control.visible = false
+		depth_radial_control.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if depth_radial_control.has_method("cancel_press"):
+			depth_radial_control.call("cancel_press")
+	if fish_button != null:
+		fish_button.modulate = Color.WHITE
+		fish_button.mouse_filter = Control.MOUSE_FILTER_STOP
+
+
 func _update_depth_hud_visibility_watchdog(delta: float) -> void:
 	if depth_radial_control == null:
 		return
@@ -5431,6 +5450,7 @@ func _release_cast_charge() -> void:
 	var hold_time := _cast_charge_hold_time
 	var cast_power: float = clamp(hold_time / CAST_CHARGE_TIME, MIN_CAST_POWER, MAX_CAST_POWER)
 	_cancel_cast_charge()
+	_reset_primary_action_press_state()
 	_cast_release_action_guard_msec = Time.get_ticks_msec() + 220
 	_on_fish_button_pressed(cast_power, hold_time)
 
@@ -5472,9 +5492,6 @@ func _on_cast_depth_control_center_down() -> void:
 	_cast_button_pressed = true
 	_update_cast_button_visual()
 	_on_reel_button_down()
-	if not _cast_charge_active and fish_button != null and not fish_button.disabled:
-		_fish_button_pointer_action_active = true
-		_trigger_fish_button_action(true)
 
 
 func _on_cast_depth_control_center_up() -> void:
@@ -5620,6 +5637,13 @@ func _trigger_fish_button_action(from_pointer_event: bool = false) -> void:
 
 func _clear_fish_button_pointer_action_active() -> void:
 	_fish_button_pointer_action_active = false
+
+func _reset_primary_action_press_state() -> void:
+	_cast_button_pressed = false
+	_fish_button_pointer_action_active = false
+	if depth_radial_control != null and depth_radial_control.has_method("cancel_press"):
+		depth_radial_control.call("cancel_press")
+	_update_cast_button_visual()
 
 func _layout_float_visuals(center: Vector2, scene_scale: float) -> void:
 	var surface_y: float = clamp(center.y, _water_zone_top, _water_zone_bottom)
@@ -8601,20 +8625,23 @@ func _on_fish_button_pressed(cast_power: float = MIN_CAST_POWER, cast_hold_time:
 	var cast_depth_context := _build_cast_depth_context(cast_power, cast_hold_time)
 	_debug_log_cast_depth(cast_depth_context)
 
-	_hide_modal_roots_except("")
-	_refresh_modal_input_blocker()
+	_close_open_modals_before_cast()
 	SaveManager.save_game()
 
 	_pending_cast_spot_id = PlayerData.current_spot
 	_pending_cast_valid = bool(cast_depth_context.get("valid", true))
 	_pending_cast_depth_context = cast_depth_context
+	_float_idle_preview_request_id += 1
+	_float_idle_preview_ready = false
+	_hide_float_bite_preview()
 	is_cast_animating = true
+	_hide_depth_radial_for_primary_action()
 	timer_label.text = "Заброс..."
 	result_label.text = "Снасть летит к воде..."
 	_call_audio_manager("play_cast")
 	if fishing_presence_ui != null:
 		fishing_presence_ui.start_cast_visual(float(cast_depth_context.get("cast_power", cast_power)))
-	_update_ui()
+	call_deferred("_update_ui")
 	_show_first_run_hint("wait_bite")
 
 
@@ -8657,8 +8684,16 @@ func _cancel_current_fishing_wait() -> void:
 
 
 func _on_reel_button_down() -> void:
+	if fish_button != null and fish_button.disabled:
+		return
+	_cast_button_pressed = true
+	_update_cast_button_visual()
 	if _can_begin_cast_charge():
 		_start_cast_charge()
+		return
+	if _fishing_ui_state == FishingUiState.WAITING and bool(FishingManager.get("use_new_bite_system")):
+		_fish_button_pointer_action_active = true
+		_trigger_fish_button_action(true)
 		return
 	if _fishing_ui_state == FishingUiState.WAITING and _is_reel_tackle_mode():
 		FishingManager.set_reel_input(true)
@@ -8670,7 +8705,10 @@ func _on_reel_button_up() -> void:
 	if _cast_charge_active:
 		_release_cast_charge()
 		return
+	_cast_button_pressed = false
+	_update_cast_button_visual()
 	FishingManager.set_reel_input(false)
+	call_deferred("_clear_fish_button_pointer_action_active")
 
 func _on_sell_all_button_pressed() -> void:
 	if _is_catch_reward_open():
@@ -9402,6 +9440,12 @@ func _is_reel_tackle_mode() -> bool:
 func _on_cast_visual_finished() -> void:
 	if not is_cast_animating:
 		return
+	is_cast_animating = false
+	if _pending_cast_spot_id != "" and _pending_cast_valid:
+		_fishing_ui_state = FishingUiState.WAITING
+	await get_tree().process_frame
+	if not is_inside_tree():
+		return
 
 	var reel_tackle_mode := _is_reel_tackle_mode()
 	var spot_id := _pending_cast_spot_id
@@ -9433,13 +9477,17 @@ func _on_cast_visual_finished() -> void:
 		return
 
 	_fishing_ui_state = FishingUiState.WAITING
-	if not reel_tackle_mode and fishing_presence_ui != null and fishing_presence_ui.has_method("set_float_in_water"):
-		fishing_presence_ui.set_float_in_water(true)
 	result_label.text = "Туман сгущается. Ждем клев..."
+	await get_tree().process_frame
+	if not is_inside_tree():
+		return
 	FishingManager.start_fishing(spot_id)
-	_update_ui()
+	if not bool(FishingManager.get("use_new_bite_system")):
+		_update_ui()
 
 func _on_fishing_started(seconds: int) -> void:
+	if bool(FishingManager.get("use_new_bite_system")) and seconds <= 0:
+		return
 	_presence_bite_timer = 0.0
 	_presence_caught_timer = 0.0
 	_fishing_ui_state = FishingUiState.WAITING
@@ -9465,9 +9513,47 @@ func _on_waiting_for_bite_started() -> void:
 	_presence_bite_timer = 0.0
 	_presence_caught_timer = 0.0
 	_fishing_ui_state = FishingUiState.WAITING
+	_schedule_float_idle_preview_after_waiting()
+	call_deferred("_refresh_waiting_action_controls_after_start")
+	call_deferred("_finish_waiting_for_bite_started_ui")
+
+func _refresh_waiting_action_controls_after_start() -> void:
+	await get_tree().process_frame
+	if not is_inside_tree():
+		return
+	if _fishing_ui_state != FishingUiState.WAITING or not bool(FishingManager.get("is_fishing")):
+		return
+	if fish_button != null:
+		fish_button.disabled = false
+		fish_button.visible = true
+	_refresh_fish_button_presentation()
+	_update_cast_button_visual()
+
+func _schedule_float_idle_preview_after_waiting() -> void:
+	_float_idle_preview_request_id += 1
+	var request_id := _float_idle_preview_request_id
+	_float_idle_preview_ready = false
+	_hide_float_bite_preview()
+	await get_tree().create_timer(FLOAT_IDLE_PREVIEW_DELAY_SECONDS).timeout
+	if request_id != _float_idle_preview_request_id:
+		return
+	if not is_inside_tree():
+		return
+	if _fishing_ui_state != FishingUiState.WAITING or not bool(FishingManager.get("is_fishing")) or bool(FishingManager.get("is_reeling")):
+		return
+	if _is_reel_tackle_mode() or _is_menu_overlay_open():
+		return
+	_float_idle_preview_ready = true
+	_show_float_bite_preview_idle()
+
+func _finish_waiting_for_bite_started_ui() -> void:
+	if not WAITING_FOR_BITE_UI_FINISH_ENABLED:
+		return
+	if not is_inside_tree():
+		return
+	if _fishing_ui_state != FishingUiState.WAITING or not bool(FishingManager.get("is_fishing")):
+		return
 	var reel_tackle_mode := _is_reel_tackle_mode()
-	if not reel_tackle_mode and fishing_presence_ui != null and fishing_presence_ui.has_method("set_float_in_water"):
-		fishing_presence_ui.set_float_in_water(true)
 	if reel_tackle_mode:
 		_hide_float_bite_preview()
 	else:
@@ -9494,6 +9580,9 @@ func _on_float_nudge(nudge_data: Dictionary) -> void:
 		fight_status_label.text = "Поплавок подозрительно качнулся..."
 
 func _on_bite_preview_event(event_data: Dictionary) -> void:
+	if not FLOAT_BITE_PREVIEW_ENABLED:
+		_hide_float_bite_preview()
+		return
 	if _is_reel_tackle_mode() or _is_menu_overlay_open():
 		_hide_float_bite_preview()
 		return
@@ -9528,6 +9617,8 @@ func _on_bite_preview_event(event_data: Dictionary) -> void:
 
 
 func _play_float_bite_preview_take(style: String, data: Dictionary) -> void:
+	if not FLOAT_BITE_PREVIEW_ENABLED:
+		return
 	if float_bite_preview == null or not is_instance_valid(float_bite_preview):
 		return
 	match style:
@@ -9589,9 +9680,9 @@ func _apply_lure_retrieve_state(state: Dictionary) -> void:
 func _on_bite_started(bite_data: Dictionary) -> void:
 	_fishing_ui_state = FishingUiState.WAITING
 	_presence_bite_timer = max(float(bite_data.get("bite_window_seconds", 1.4)), 0.8)
-	if float_bite_preview != null and is_instance_valid(float_bite_preview) and float_bite_preview.has_method("play_hook_ready"):
+	if FLOAT_BITE_PREVIEW_ENABLED and float_bite_preview != null and is_instance_valid(float_bite_preview) and float_bite_preview.has_method("play_hook_ready"):
 		float_bite_preview.call("play_hook_ready", bite_data)
-	else:
+	elif FLOAT_BITE_PREVIEW_ENABLED:
 		_play_float_bite_preview_take(str(bite_data.get("visual_style", "submerge")), bite_data)
 	timer_label.text = "Клюёт! Подсекай!"
 	result_label.text = "Поклёвка: %s\nЖми “Подсечь” в момент рывка." % str(bite_data.get("fish_name", "рыба"))
@@ -9634,7 +9725,8 @@ func _on_hook_failed(reason: String, data: Dictionary) -> void:
 	fight_status_label.text = "Ожидание продолжается"
 	if fishing_presence_ui != null and fishing_presence_ui.has_method("play_hook_result"):
 		fishing_presence_ui.play_hook_result(false, reason)
-	_show_float_bite_preview_idle()
+	if FLOAT_BITE_PREVIEW_ENABLED:
+		_show_float_bite_preview_idle()
 	_update_ui()
 
 func _on_reeling_started(catch_data: Dictionary, state: Dictionary) -> void:
@@ -9644,6 +9736,8 @@ func _on_reeling_started(catch_data: Dictionary, state: Dictionary) -> void:
 	_presence_bite_timer = 0.95
 	_presence_caught_timer = 0.0
 	_fishing_ui_state = FishingUiState.FIGHTING
+	if _cast_button_pressed or _fish_button_pointer_action_active:
+		FishingManager.set_reel_input(true)
 	if fishing_presence_ui != null and fishing_presence_ui.has_method("set_rod_visual_state"):
 		fishing_presence_ui.set_rod_visual_state("reeling")
 	timer_label.text = "Удар по приманке!" if str(state.get("fight_mode", "pole")) == "reel" else "Поклевка!"

@@ -130,10 +130,12 @@ static func apply_button_states(
 ) -> void:
 	if button == null:
 		return
+	button.focus_mode = Control.FOCUS_NONE
 	button.add_theme_stylebox_override("normal", style(normal_asset, margins))
 	button.add_theme_stylebox_override("hover", style(hover_asset, margins))
 	button.add_theme_stylebox_override("pressed", style(pressed_asset, margins))
 	button.add_theme_stylebox_override("disabled", style(disabled_asset, margins))
+	button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	button.add_theme_color_override("font_color", TEXT_PRIMARY)
 	button.add_theme_color_override("font_hover_color", TEXT_PRIMARY)
 	button.add_theme_color_override("font_pressed_color", Color(0.86, 0.98, 0.82, 1.0))

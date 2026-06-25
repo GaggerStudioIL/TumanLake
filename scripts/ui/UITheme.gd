@@ -595,11 +595,13 @@ func get_side_menu_button_style(state: String = "normal") -> StyleBoxFlat:
 	return style
 
 func apply_side_menu_button_style(button: Button, active := false) -> void:
+	var empty_style := StyleBoxEmpty.new()
+	button.focus_mode = Control.FOCUS_NONE
 	button.add_theme_stylebox_override("normal", get_side_menu_button_style("active" if active else "normal"))
 	button.add_theme_stylebox_override("hover", get_side_menu_button_style("hover"))
 	button.add_theme_stylebox_override("pressed", get_side_menu_button_style("pressed"))
 	button.add_theme_stylebox_override("disabled", get_side_menu_button_style("disabled"))
-	button.add_theme_stylebox_override("focus", get_side_menu_button_style("active" if active else "hover"))
+	button.add_theme_stylebox_override("focus", empty_style)
 	button.add_theme_color_override("font_color", Color.TRANSPARENT)
 	button.add_theme_color_override("font_hover_color", Color.TRANSPARENT)
 	button.add_theme_color_override("font_pressed_color", Color.TRANSPARENT)
@@ -668,10 +670,11 @@ func apply_window_v1_section_style(control, variant: String = "default") -> void
 func apply_item_card_v1_style(control, active := false, equipped := false, dimmed := false, rarity := "common") -> void:
 	if control is Button:
 		var button := control as Button
+		button.focus_mode = Control.FOCUS_NONE
 		button.add_theme_stylebox_override("normal", get_item_card_v1_style(active, equipped, dimmed, rarity))
 		button.add_theme_stylebox_override("hover", _brighten_card_style(get_item_card_v1_style(active, equipped, dimmed, rarity)))
 		button.add_theme_stylebox_override("pressed", _press_card_style(get_item_card_v1_style(active, equipped, dimmed, rarity)))
-		button.add_theme_stylebox_override("focus", get_item_card_v1_style(true, equipped, dimmed, rarity))
+		button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 		button.add_theme_color_override("font_color", Color.TRANSPARENT)
 		button.add_theme_color_override("font_hover_color", Color.TRANSPARENT)
 		button.add_theme_color_override("font_pressed_color", Color.TRANSPARENT)
@@ -764,11 +767,12 @@ func apply_tackle_panel_style(control, strong := false) -> void:
 		control.color = Color(0.022, 0.060, 0.082, 0.90) if strong else Color(0.028, 0.083, 0.110, 0.72)
 
 func apply_tackle_slot_button_style(button: Button, state: String = "empty") -> void:
+	button.focus_mode = Control.FOCUS_NONE
 	button.add_theme_stylebox_override("normal", get_tackle_slot_style(state))
 	button.add_theme_stylebox_override("hover", get_tackle_slot_style("hover" if state != "locked" else "locked"))
 	button.add_theme_stylebox_override("pressed", get_tackle_slot_style("pressed" if state != "locked" else "locked"))
 	button.add_theme_stylebox_override("disabled", get_tackle_slot_style("locked"))
-	button.add_theme_stylebox_override("focus", get_tackle_slot_style("selected"))
+	button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	button.add_theme_color_override("font_color", TEXT_PRIMARY if state != "locked" else Color(0.58, 0.64, 0.66, 0.88))
 	button.add_theme_color_override("font_hover_color", Color(1.0, 0.91, 0.66, 1.0))
 	button.add_theme_color_override("font_pressed_color", Color(0.92, 0.78, 0.46, 1.0))
@@ -888,6 +892,7 @@ func _get_rarity_slot_resource(rarity: String) -> StyleBoxFlat:
 			return make_style(SLOT_BG, BORDER_FAINT, 10, 4, Color(0.0, 0.0, 0.0, 0.16))
 
 func _bind_button_feedback(button: BaseButton) -> void:
+	button.focus_mode = Control.FOCUS_NONE
 	if button.has_meta("_tuman_feedback_bound"):
 		return
 
