@@ -42,6 +42,7 @@ var _active_spot: Dictionary = {}
 var _active_spot_id: String = ""
 var _active_available_fish: Array = []
 var _active_spot_depth_modifier: float = 1.0
+var _active_cast_context: Dictionary = {}
 var _bite_check_timer: float = 0.0
 var _bite_window_elapsed: float = 0.0
 var _bite_window_seconds: float = 0.0
@@ -77,6 +78,15 @@ var _reel_wear_pressure: float = 0.0
 var _lure_retrieve_progress: float = 0.0
 var _lure_retrieve_speed: float = 0.0
 var _lure_retrieve_update_timer: float = 0.0
+var _lure_retrieve_active_time: float = 0.0
+var _lure_pause_timer: float = 0.0
+var _lure_pause_attack_timer: float = 0.0
+var _lure_jerk_attack_timer: float = 0.0
+var _lure_jerk_impulse_timer: float = 0.0
+var _last_retrieve_speed_setting: int = 25
+var _spin_feedback_cooldown: float = 0.0
+var _spin_focus_fish_id: String = ""
+var _spin_focus_state: String = "Idle"
 var _fight_power: float = 1.0
 var _fish_stamina: float = 1.0
 var _fish_strength: float = 1.0
@@ -157,10 +167,18 @@ const REEL_LINE_OUT_START_RATIO := 0.16
 const REEL_LINE_OUT_PULL_SCALE := 5.4
 const REEL_HANDLE_FORWARD_SPEED := 7.5
 const REEL_HANDLE_BACKWARD_SPEED := -5.4
-const LURE_RETRIEVE_CHECK_INTERVAL := 0.48
+const LURE_RETRIEVE_CHECK_INTERVAL := 0.50
 const LURE_RETRIEVE_UPDATE_INTERVAL := 0.10
 const LURE_RETRIEVE_MIN_PROGRESS_FOR_BITE := 0.08
 const LURE_RETRIEVE_MAX_PROGRESS_FOR_BITE := 0.94
+const SPINNING_BASE_BITE_CHANCE := 0.018
+const SPINNING_SPEED_NEAR_MARGIN := 8
+const SPINNING_JERK_SPEED_DELTA := 12
+const SPINNING_JERK_ATTACK_SECONDS := 0.85
+const SPINNING_JERK_IMPULSE_SECONDS := 0.32
+const SPINNING_PAUSE_MIN_SECONDS := 0.50
+const SPINNING_PAUSE_MAX_SECONDS := 2.00
+const SPINNING_PAUSE_ATTACK_SECONDS := 0.55
 const TENSION_FIGHT_DEBUG := false
 const MIN_FIGHT_DURATION := 6.5
 const MAX_FIGHT_DURATION := 36.0
@@ -193,6 +211,7 @@ const FAILURE_FISH_TOO_STRONG := "FISH_TOO_STRONG"
 const FAILURE_CONDITION_CRITICAL := "CONDITION_CRITICAL"
 const FAILURE_UNKNOWN := "UNKNOWN"
 const WeatherUIHelperScript := preload("res://scripts/ui/helpers/WeatherUIHelper.gd")
+const SpinningFishRulesScript := preload("res://scripts/data/SpinningFishRules.gd")
 const SHOW_WEATHER_BITE_DEBUG := false
 
 func get_bite_candidates(spot_id: String) -> Array:
@@ -230,7 +249,7 @@ func _get_condition_fishing_modifiers() -> Dictionary:
 		"reaction_multiplier": 1.0
 	}
 
-func start_fishing(spot_id: String) -> void:
+func start_fishing(spot_id: String, cast_context: Dictionary = {}) -> void:
 	if is_fishing:
 		return
 
@@ -270,6 +289,7 @@ func start_fishing(spot_id: String) -> void:
 	_reel_input_active = false
 	_last_hook_attempt_msec = 0
 	_clear_active_bite_data()
+	_active_cast_context = cast_context.duplicate(true)
 	_tackle_stats = PlayerData.get_tackle_stats()
 	_fight_mode = _get_effective_fight_mode_from_stats(_tackle_stats)
 	if not BuildConfig.ENABLE_SPINNING_FEATURES:
@@ -549,6 +569,15 @@ func _initialize_lure_retrieve() -> void:
 	_lure_retrieve_progress = 0.0
 	_lure_retrieve_speed = 0.0
 	_lure_retrieve_update_timer = 0.0
+	_lure_retrieve_active_time = 0.0
+	_lure_pause_timer = 0.0
+	_lure_pause_attack_timer = 0.0
+	_lure_jerk_attack_timer = 0.0
+	_lure_jerk_impulse_timer = 0.0
+	_last_retrieve_speed_setting = _get_spinning_retrieve_speed_setting()
+	_spin_feedback_cooldown = 0.0
+	_spin_focus_fish_id = ""
+	_spin_focus_state = "Idle"
 	_bite_check_timer = LURE_RETRIEVE_CHECK_INTERVAL
 	_hook_cooldown_timer = 0.0
 	_spool_capacity = max(float(_tackle_stats.get("spool_capacity", 0.0)), 10.0)
@@ -558,24 +587,109 @@ func _initialize_lure_retrieve() -> void:
 	_feedback_message = "Веди приманку подмоткой."
 
 
-func _update_lure_retrieve(delta: float) -> void:
-	var retrieve_speed: float = max(float(_tackle_stats.get("retrieve_speed", 0.0)), 0.35)
-	var target_speed: float = retrieve_speed if _reel_input_active else 0.0
-	_lure_retrieve_speed = lerp(_lure_retrieve_speed, target_speed, clamp(delta * 7.0, 0.0, 1.0))
+func _get_spinning_retrieve_speed_setting() -> int:
+	if PlayerData != null and PlayerData.has_method("get_spinning_retrieve_speed"):
+		return int(PlayerData.get_spinning_retrieve_speed())
+	return 25
+
+
+func _get_spinning_retrieve_speed_ratio() -> float:
+	if PlayerData != null and PlayerData.has_method("get_spinning_retrieve_speed_ratio"):
+		return clampf(float(PlayerData.get_spinning_retrieve_speed_ratio()), 0.0, 1.0)
+	return clampf(float(_get_spinning_retrieve_speed_setting() - 1) / 49.0, 0.0, 1.0)
+
+
+func _get_effective_lure_retrieve_speed() -> float:
+	var base_speed: float = max(float(_tackle_stats.get("retrieve_speed", 0.0)), 0.35)
+	var player_speed_ratio := _get_spinning_retrieve_speed_ratio()
+	return base_speed * lerpf(0.35, 1.65, player_speed_ratio)
+
+
+func trigger_lure_jerk() -> bool:
+	if not _is_reel_fight_mode_active() or not is_fishing or is_reeling:
+		return false
+	if fishing_state != FishingState.WAITING_FOR_BITE:
+		return false
+
+	_activate_lure_jerk("button")
+	_set_spinning_feedback("Рывок!", "Following", true, 0.35)
+	lure_retrieve_updated.emit(_get_lure_retrieve_state())
+	return true
+
+
+func _activate_lure_jerk(_source: String = "") -> void:
+	_lure_jerk_attack_timer = maxf(_lure_jerk_attack_timer, SPINNING_JERK_ATTACK_SECONDS)
+	_lure_jerk_impulse_timer = maxf(_lure_jerk_impulse_timer, SPINNING_JERK_IMPULSE_SECONDS)
+	_lure_pause_attack_timer = 0.0
+	_lure_pause_timer = 0.0
+
+
+func _update_lure_action_state(delta: float) -> void:
+	var current_speed := _get_spinning_retrieve_speed_setting()
+	if abs(current_speed - _last_retrieve_speed_setting) >= SPINNING_JERK_SPEED_DELTA:
+		_activate_lure_jerk("speed_change")
+	_last_retrieve_speed_setting = current_speed
 
 	if _reel_input_active:
-		var retrieve_duration: float = clamp(10.5 / clamp(retrieve_speed, 0.55, 1.85), 6.2, 14.5)
+		_lure_retrieve_active_time += delta
+		_lure_pause_timer = 0.0
+		_lure_pause_attack_timer = 0.0
+	else:
+		if _lure_retrieve_active_time >= 1.0:
+			_lure_pause_timer += delta
+			if _lure_pause_timer >= SPINNING_PAUSE_MIN_SECONDS and _lure_pause_timer <= SPINNING_PAUSE_MAX_SECONDS:
+				_lure_pause_attack_timer = maxf(_lure_pause_attack_timer, SPINNING_PAUSE_ATTACK_SECONDS)
+		else:
+			_lure_pause_timer = 0.0
+
+	_lure_pause_attack_timer = maxf(_lure_pause_attack_timer - delta, 0.0)
+	_lure_jerk_attack_timer = maxf(_lure_jerk_attack_timer - delta, 0.0)
+	_lure_jerk_impulse_timer = maxf(_lure_jerk_impulse_timer - delta, 0.0)
+	_spin_feedback_cooldown = maxf(_spin_feedback_cooldown - delta, 0.0)
+
+
+func _set_spinning_feedback(message: String, state: String = "Interested", force: bool = false, cooldown: float = 1.4) -> void:
+	if message == "":
+		return
+	if not force and _spin_feedback_cooldown > 0.0:
+		return
+	_feedback_message = message
+	_spin_focus_state = state
+	_spin_feedback_cooldown = cooldown
+
+
+func _update_lure_retrieve(delta: float) -> void:
+	_update_lure_action_state(delta)
+	var retrieve_speed: float = _get_effective_lure_retrieve_speed()
+	var target_speed: float = retrieve_speed if _reel_input_active else 0.0
+	_lure_retrieve_speed = lerp(_lure_retrieve_speed, target_speed, clamp(delta * 7.0, 0.0, 1.0))
+	var jerk_impulse_active := _lure_jerk_impulse_timer > 0.0
+
+	if _reel_input_active or jerk_impulse_active:
+		var retrieve_duration: float = clamp(10.5 / clamp(retrieve_speed, 0.25, 2.75), 4.2, 24.0)
 		var previous_progress := _lure_retrieve_progress
-		_lure_retrieve_progress = clamp(_lure_retrieve_progress + delta / retrieve_duration, 0.0, 1.0)
+		var progress_delta := delta / retrieve_duration
+		if jerk_impulse_active:
+			progress_delta *= 1.45
+		if not _reel_input_active:
+			progress_delta *= 0.34
+		_lure_retrieve_progress = clamp(_lure_retrieve_progress + progress_delta, 0.0, 1.0)
 		_reel_line_out_speed = (_lure_retrieve_progress - previous_progress) / max(delta, 0.001)
 		_line_out = lerp(max(_spool_capacity * 0.22, 8.0), 0.0, _lure_retrieve_progress)
-		_reel_handle_speed = REEL_HANDLE_FORWARD_SPEED * clamp(_lure_retrieve_speed / retrieve_speed, 0.25, 1.35)
-		_feedback_message = "Проводка: приманка идёт к берегу."
+		var handle_speed_scale := lerpf(0.55, 1.55, _get_spinning_retrieve_speed_ratio())
+		_reel_handle_speed = REEL_HANDLE_FORWARD_SPEED * handle_speed_scale * clamp(_lure_retrieve_speed / max(retrieve_speed, 0.001), 0.25, 1.35)
+		if _spin_feedback_cooldown <= 0.0:
+			_feedback_message = "Проводка: приманка идёт к берегу."
 		_update_lure_retrieve_bite_check(delta)
 	else:
 		_reel_line_out_speed = 0.0
 		_reel_handle_speed = lerp(_reel_handle_speed, 0.0, clamp(delta * 6.0, 0.0, 1.0))
-		_feedback_message = "Зажми кнопку, чтобы вести приманку."
+
+	if not (_reel_input_active or jerk_impulse_active):
+		if _spin_feedback_cooldown <= 0.0:
+			_feedback_message = "Пауза: приманка тонет." if _lure_retrieve_active_time >= 1.0 else "Зажми кнопку, чтобы вести приманку."
+		if _lure_pause_attack_timer > 0.0 or _lure_jerk_attack_timer > 0.0:
+			_update_lure_retrieve_bite_check(delta)
 
 	_lure_retrieve_update_timer -= delta
 	if _lure_retrieve_update_timer <= 0.0:
@@ -598,15 +712,23 @@ func _update_lure_retrieve_bite_check(delta: float) -> void:
 
 
 func _try_start_lure_retrieve_bite() -> void:
+	if _is_reel_fight_mode_active():
+		_try_start_spinning_lure_retrieve_bite()
+		return
+
 	if _active_available_fish.is_empty() or _active_spot.is_empty():
 		_finish_lure_retrieve_no_bite()
 		return
 
 	var bite_data := _get_active_bite_balance_data()
 	var middle_water_bonus: float = sin(clamp(_lure_retrieve_progress, 0.0, 1.0) * PI)
-	var retrieve_speed: float = max(float(_tackle_stats.get("retrieve_speed", 0.0)), 0.35)
-	var motion_bonus: float = clamp(_lure_retrieve_speed / retrieve_speed, 0.25, 1.20)
-	var bite_chance: float = clamp(float(bite_data.get("bite_chance", 0.08)) * (0.72 + middle_water_bonus * 0.78) * (0.72 + motion_bonus * 0.30), 0.025, 0.24)
+	var retrieve_speed: float = _get_effective_lure_retrieve_speed()
+	var motion_bonus: float = clamp(_lure_retrieve_speed / max(retrieve_speed, 0.001), 0.25, 1.20)
+	var base_bite_chance: float = float(bite_data.get("bite_chance", 0.08))
+	var min_bite_chance := 0.0 if base_bite_chance < 0.025 else 0.025
+	var bite_chance: float = clamp(base_bite_chance * (0.72 + middle_water_bonus * 0.78) * (0.72 + motion_bonus * 0.30), min_bite_chance, 0.24)
+	if bite_chance <= 0.0:
+		return
 	if randf() > bite_chance:
 		return
 
@@ -648,6 +770,354 @@ func _try_start_lure_retrieve_bite() -> void:
 	_start_reeling(catch_data)
 
 
+func _try_start_spinning_lure_retrieve_bite() -> void:
+	if _active_available_fish.is_empty() or _active_spot.is_empty():
+		_finish_lure_retrieve_no_bite()
+		return
+
+	var context := _get_spinning_retrieve_context()
+	var candidates := _get_spinning_attack_candidates(context)
+	if candidates.is_empty():
+		return
+
+	_maybe_emit_spinning_follow_feedback(candidates)
+	var total_chance := 0.0
+	for candidate in candidates:
+		total_chance += float(candidate.get("chance", 0.0))
+	var roll_chance: float = clampf(total_chance, 0.0, 0.28)
+	if roll_chance <= 0.0:
+		return
+
+	if randf() > roll_chance:
+		_maybe_emit_spinning_miss_feedback(candidates)
+		return
+
+	var selected := _pick_spinning_candidate(candidates)
+	var fish_id := str(selected.get("fish_id", ""))
+	if fish_id == "":
+		return
+
+	if not PlayerData.consume_current_terminal_tackle_for_bite(1):
+		is_fishing = false
+		fishing_state = FishingState.FAILED
+		_emit_fishing_failure(
+			FAILURE_WEAK_TACKLE,
+			"Нет приманки",
+			"Приманка потеряна до поклёвки.",
+			"Проверьте оснащение спиннинга.",
+			{"severity": "low", "spot_id": _active_spot_id}
+		)
+		return
+
+	var bite_data := _get_active_bite_balance_data()
+	var catch_data := _prepare_catch_data_for_bite(fish_id, bite_data)
+	if catch_data.is_empty():
+		is_fishing = false
+		fishing_state = FishingState.FAILED
+		_emit_fishing_failure(
+			FAILURE_FISH_ESCAPED_HOOK,
+			"",
+			"Рыба ударила по приманке и сорвалась.",
+			"Проверьте приманку, поводок и состояние снасти.",
+			{"severity": "medium", "fish_id": fish_id, "spot_id": _active_spot_id}
+		)
+		return
+
+	catch_data["lure_retrieve_progress"] = _lure_retrieve_progress
+	catch_data["spinning_context"] = context.duplicate(true)
+	catch_data["spinning_bite_chance"] = float(selected.get("chance", 0.0))
+	fishing_state = FishingState.HOOKED
+	_spin_focus_fish_id = fish_id
+	_spin_focus_state = "Hooked"
+	_set_spinning_feedback("Есть!", "Hooked", true, 0.8)
+	_start_reeling(catch_data)
+
+
+func _get_spinning_retrieve_context() -> Dictionary:
+	var weather_type := _get_current_weather_type()
+	var weather_modifiers := _get_weather_bite_modifiers(weather_type)
+	var wind_effects := _get_wind_effects(_active_spot)
+	var condition_modifiers := _get_condition_fishing_modifiers()
+	var speed := _get_spinning_retrieve_speed_setting()
+	var pause_active := _lure_pause_attack_timer > 0.0
+	var jerk_active := _lure_jerk_attack_timer > 0.0
+	var lure_type := _get_current_lure_type()
+	var lure_layer := _get_current_lure_depth_layer(lure_type, speed, pause_active, jerk_active)
+	return {
+		"speed": speed,
+		"lure_type": lure_type,
+		"lure_layer": lure_layer,
+		"pause_active": pause_active,
+		"jerk_active": jerk_active,
+		"retrieve_progress": _lure_retrieve_progress,
+		"weather_type": weather_type,
+		"weather_modifiers": weather_modifiers,
+		"wind_effects": wind_effects,
+		"condition_modifiers": condition_modifiers,
+		"cast_bite_multiplier": _get_cast_bite_chance_multiplier()
+	}
+
+
+func _get_current_lure_type() -> String:
+	var lure_type := str(_tackle_stats.get("lure_type", "")).strip_edges().to_lower()
+	if lure_type == "":
+		lure_type = "spinner"
+	return lure_type
+
+
+func _get_spinning_attack_candidates(context: Dictionary) -> Array:
+	var candidates: Array = []
+	for fish_id_value in _active_available_fish:
+		var fish_id := str(fish_id_value)
+		var fish := FishDatabase.get_fish(fish_id)
+		if fish.is_empty():
+			continue
+		var chance := _calculate_spinning_bite_chance(fish_id, fish, context)
+		if chance <= 0.0:
+			continue
+		candidates.append({
+			"fish_id": fish_id,
+			"chance": chance,
+			"fish": fish,
+			"rule": SpinningFishRulesScript.get_rule(fish_id)
+		})
+	return candidates
+
+
+func _calculate_spinning_bite_chance(fish_id: String, fish: Dictionary, context: Dictionary) -> float:
+	var rule := SpinningFishRulesScript.get_rule(fish_id)
+	var spin_modifier := float(rule.get("spin_bite_modifier", 0.0))
+	if spin_modifier <= 0.0:
+		return 0.0
+
+	var lure_multiplier := _get_spinning_lure_match_multiplier(rule, str(context.get("lure_type", "")))
+	if lure_multiplier <= 0.0:
+		return 0.0
+
+	var speed_multiplier := _get_spinning_speed_match_multiplier(rule, int(context.get("speed", 1)))
+	var depth_multiplier := _get_spinning_depth_match_multiplier(rule, fish, context)
+	var activity_modifier := _get_time_activity_modifier(fish)
+	var pause_multiplier := _get_spinning_pause_multiplier(rule, bool(context.get("pause_active", false)))
+	var jerk_multiplier := _get_spinning_jerk_multiplier(rule, bool(context.get("jerk_active", false)))
+	var rarity_multiplier := _get_spinning_rarity_multiplier(fish)
+	var wind_effects: Dictionary = context.get("wind_effects", {})
+	var condition_modifiers: Dictionary = context.get("condition_modifiers", {})
+	var weather_modifiers: Dictionary = context.get("weather_modifiers", {})
+	var environment_multiplier: float = (
+		float(weather_modifiers.get("bite_chance", 1.0))
+		* float(wind_effects.get("bite_chance_multiplier", 1.0))
+		* float(condition_modifiers.get("bite_chance_multiplier", 1.0))
+	)
+	var cast_multiplier := float(context.get("cast_bite_multiplier", 1.0))
+	if cast_multiplier <= 0.0:
+		return 0.0
+
+	var chance := (
+		SPINNING_BASE_BITE_CHANCE
+		* spin_modifier
+		* lure_multiplier
+		* speed_multiplier
+		* depth_multiplier
+		* activity_modifier
+		* pause_multiplier
+		* jerk_multiplier
+		* rarity_multiplier
+		* environment_multiplier
+		* cast_multiplier
+	)
+	return clampf(chance, 0.0, 0.18)
+
+
+func _get_spinning_lure_match_multiplier(rule: Dictionary, lure_type: String) -> float:
+	var lure_types: Array = rule.get("lure_types", [])
+	if lure_type == "" or lure_types.is_empty() or not lure_types.has(lure_type):
+		return 0.0
+	match str(rule.get("spinning_role", "none")):
+		"predator":
+			return 1.28
+		"semi_predator":
+			return 1.08
+		"accidental":
+			return 0.82
+	return 0.0
+
+
+func _get_spinning_speed_match_multiplier(rule: Dictionary, speed: int) -> float:
+	var ideal_min := int(rule.get("ideal_speed_min", 1))
+	var ideal_max := int(rule.get("ideal_speed_max", 1))
+	var acceptable_min := int(rule.get("acceptable_speed_min", ideal_min))
+	var acceptable_max := int(rule.get("acceptable_speed_max", ideal_max))
+	if speed >= min(ideal_min, ideal_max) and speed <= max(ideal_min, ideal_max):
+		return 1.5
+	if speed >= min(acceptable_min, acceptable_max) and speed <= max(acceptable_min, acceptable_max):
+		return 1.0
+	if speed >= acceptable_min - SPINNING_SPEED_NEAR_MARGIN and speed <= acceptable_max + SPINNING_SPEED_NEAR_MARGIN:
+		return 0.35
+	return 0.05
+
+
+func _get_current_lure_depth_layer(lure_type: String, speed: int, pause_active: bool, jerk_active: bool) -> String:
+	var layer := "mid"
+	match lure_type:
+		"topwater":
+			layer = "surface"
+		"spinner", "wobbler", "crank":
+			layer = "upper" if speed >= 29 else "mid"
+		"spoon":
+			layer = "upper" if speed >= 36 else "mid"
+		"jig", "soft_lure":
+			layer = "mid" if speed >= 24 else "bottom"
+		"micro_lure":
+			if speed >= 34:
+				layer = "surface"
+			elif speed >= 17:
+				layer = "upper"
+			else:
+				layer = "mid"
+	if pause_active:
+		layer = _shift_lure_layer(layer, 1)
+	if jerk_active:
+		layer = _shift_lure_layer(layer, -1)
+	return layer
+
+
+func _shift_lure_layer(layer: String, direction: int) -> String:
+	var layers := ["surface", "upper", "mid", "bottom"]
+	var index := layers.find(layer)
+	if index < 0:
+		index = 2
+	return str(layers[clampi(index + direction, 0, layers.size() - 1)])
+
+
+func _get_spinning_depth_match_multiplier(rule: Dictionary, fish: Dictionary, context: Dictionary) -> float:
+	var fish_layer := str(rule.get("depth_layer", "mid"))
+	var lure_layer := str(context.get("lure_layer", "mid"))
+	var layer_delta: int = _spinning_layer_index(fish_layer) - _spinning_layer_index(lure_layer)
+	var layer_distance: int = layer_delta if layer_delta >= 0 else -layer_delta
+	var layer_multiplier := 1.3 if layer_distance == 0 else (0.8 if layer_distance == 1 else 0.3)
+	return clampf(layer_multiplier * _get_spinning_physical_depth_match(fish, lure_layer), 0.12, 1.45)
+
+
+func _spinning_layer_index(layer: String) -> int:
+	match layer:
+		"surface":
+			return 0
+		"upper":
+			return 1
+		"mid":
+			return 2
+		"bottom":
+			return 3
+	return 2
+
+
+func _get_spinning_physical_depth_match(fish: Dictionary, lure_layer: String) -> float:
+	var spot_depth: float = max(float(_active_spot.get("max_depth", _active_spot.get("depth", 3.0))), 0.6)
+	var layer_ratio: float = 0.55
+	match lure_layer:
+		"surface":
+			layer_ratio = 0.08
+		"upper":
+			layer_ratio = 0.26
+		"mid":
+			layer_ratio = 0.55
+		"bottom":
+			layer_ratio = 0.86
+	var lure_depth: float = clampf(spot_depth * layer_ratio, 0.15, spot_depth)
+	var min_depth: float = float(fish.get("min_depth", 0.2))
+	var max_depth: float = float(fish.get("max_depth", spot_depth))
+	var preferred_depth: float = clampf(float(fish.get("preferred_depth", (min_depth + max_depth) * 0.5)), min_depth, max_depth)
+	if lure_depth >= min_depth and lure_depth <= max_depth:
+		var half_range: float = maxf((max_depth - min_depth) * 0.5, 0.25)
+		var distance: float = absf(lure_depth - preferred_depth) / half_range
+		return clampf(1.12 - distance * 0.24, 0.76, 1.12)
+	var edge_distance: float = minf(absf(lure_depth - min_depth), absf(lure_depth - max_depth))
+	return clampf(0.62 - edge_distance / maxf(spot_depth, 0.6) * 0.50, 0.28, 0.62)
+
+
+func _get_spinning_pause_multiplier(rule: Dictionary, pause_active: bool) -> float:
+	if not pause_active:
+		return 1.0 if _reel_input_active else 0.72
+	if bool(rule.get("can_bite_on_pause", false)):
+		return maxf(float(rule.get("pause_bonus", 1.0)), 0.0)
+	return 0.6
+
+
+func _get_spinning_jerk_multiplier(rule: Dictionary, jerk_active: bool) -> float:
+	if not jerk_active:
+		return 1.0
+	if bool(rule.get("can_bite_on_jerk", false)):
+		return maxf(float(rule.get("jerk_bonus", 1.0)), 0.0)
+	return 0.85
+
+
+func _get_spinning_rarity_multiplier(fish: Dictionary) -> float:
+	var rarity := str(fish.get("rarity", "common")).to_lower()
+	var rarity_type := str(fish.get("rarityType", "")).to_lower()
+	if rarity_type.find("legendary") >= 0:
+		return 0.12
+	match rarity:
+		"common":
+			return 1.0
+		"uncommon":
+			return 0.86
+		"rare":
+			return 0.52
+		"very_rare":
+			return 0.30
+		"legendary":
+			return 0.16
+	return 0.80
+
+
+func _pick_spinning_candidate(candidates: Array) -> Dictionary:
+	var total := 0.0
+	for candidate in candidates:
+		total += float(candidate.get("chance", 0.0))
+	var roll := randf() * maxf(total, 0.001)
+	var cursor := 0.0
+	for candidate in candidates:
+		cursor += float(candidate.get("chance", 0.0))
+		if roll <= cursor:
+			return candidate
+	return candidates.back() if not candidates.is_empty() else {}
+
+
+func _maybe_emit_spinning_follow_feedback(candidates: Array) -> void:
+	if _spin_feedback_cooldown > 0.0 or candidates.is_empty():
+		return
+	var best := _get_best_spinning_candidate(candidates)
+	var best_chance := float(best.get("chance", 0.0))
+	if best_chance >= 0.035 and randf() < 0.22:
+		_spin_focus_fish_id = str(best.get("fish_id", ""))
+		_set_spinning_feedback("Рыба провожает приманку...", "Following", false, 1.8)
+	elif best_chance >= 0.024 and randf() < 0.12:
+		_spin_focus_fish_id = str(best.get("fish_id", ""))
+		_set_spinning_feedback("Всплеск рядом.", "Interested", false, 1.6)
+
+
+func _maybe_emit_spinning_miss_feedback(candidates: Array) -> void:
+	if _spin_feedback_cooldown > 0.0 or candidates.is_empty():
+		return
+	var best := _get_best_spinning_candidate(candidates)
+	var best_chance := float(best.get("chance", 0.0))
+	if best_chance >= 0.045 and randf() < 0.16:
+		_set_spinning_feedback("Промах!", "Miss", false, 1.6)
+	elif (_lure_jerk_attack_timer > 0.0 or _lure_pause_attack_timer > 0.0) and best_chance >= 0.030 and randf() < 0.18:
+		_set_spinning_feedback("Лёгкий удар!", "Attack", false, 1.5)
+
+
+func _get_best_spinning_candidate(candidates: Array) -> Dictionary:
+	var best: Dictionary = {}
+	var best_chance := -1.0
+	for candidate in candidates:
+		var chance := float(candidate.get("chance", 0.0))
+		if chance > best_chance:
+			best = candidate
+			best_chance = chance
+	return best
+
+
 func _finish_lure_retrieve_no_bite() -> void:
 	if not is_fishing or is_reeling or _fight_mode != "reel":
 		return
@@ -668,7 +1138,15 @@ func _get_lure_retrieve_state() -> Dictionary:
 		"phase": "retrieve",
 		"retrieve_progress": _lure_retrieve_progress,
 		"retrieve_speed": _lure_retrieve_speed,
+		"retrieve_speed_setting": _get_spinning_retrieve_speed_setting(),
+		"target_retrieve_speed": _get_effective_lure_retrieve_speed(),
 		"input_active": _reel_input_active,
+		"pause_attack_window": _lure_pause_attack_timer > 0.0,
+		"jerk_attack_window": _lure_jerk_attack_timer > 0.0,
+		"jerk_impulse": _lure_jerk_impulse_timer > 0.0,
+		"lure_layer": _get_current_lure_depth_layer(_get_current_lure_type(), _get_spinning_retrieve_speed_setting(), _lure_pause_attack_timer > 0.0, _lure_jerk_attack_timer > 0.0),
+		"spin_focus_state": _spin_focus_state,
+		"spin_focus_fish_id": _spin_focus_fish_id,
 		"line_out": _line_out,
 		"spool_capacity": _spool_capacity,
 		"reel_handle_speed": _reel_handle_speed,
@@ -700,8 +1178,12 @@ func _get_effective_fight_mode_from_stats(stats: Dictionary) -> String:
 	return "pole"
 
 
+func _is_reel_fight_mode_active() -> bool:
+	return _fight_mode == "reel" or str(_tackle_stats.get("fight_mode", "pole")).strip_edges().to_lower() == "reel"
+
+
 func _update_false_nudge(delta: float) -> void:
-	if _fight_mode == "reel":
+	if _is_reel_fight_mode_active():
 		return
 
 	_false_nudge_timer -= delta
@@ -1111,7 +1593,7 @@ func _roll_next_approach_delay(balance_data: Dictionary = {}, outcome: String = 
 	if balance_data.is_empty():
 		balance_data = _get_active_bite_balance_data()
 
-	var bite_chance: float = clampf(float(balance_data.get("bite_chance", 0.08)), 0.02, 0.28)
+	var bite_chance: float = clampf(float(balance_data.get("bite_chance", 0.08)), 0.0, 0.28)
 	var score: float = clampf((bite_chance - 0.04) / 0.20, 0.0, 1.0)
 	var min_delay := APPROACH_POOR_MIN
 	var max_delay := APPROACH_POOR_MAX
@@ -1146,6 +1628,19 @@ func _reset_bite_preview_phase() -> void:
 	_bite_phase_nibble_count = 0
 
 
+func _get_cast_bite_chance_multiplier() -> float:
+	if not _is_reel_fight_mode_active():
+		return 1.0
+	var cast_power: float = clampf(
+		float(_active_cast_context.get("cast_power", _active_cast_context.get("raw_cast_power", 1.0))),
+		0.0,
+		1.0
+	)
+	if cast_power <= 0.08:
+		return 0.0
+	return clampf((cast_power - 0.08) / 0.32, 0.0, 1.0)
+
+
 func _get_phase_wind_effects() -> Dictionary:
 	var balance_data: Dictionary = _bite_phase_data.get("balance_data", {})
 	if balance_data.has("wind_effects") and balance_data.get("wind_effects") is Dictionary:
@@ -1173,7 +1668,8 @@ func _get_active_bite_balance_data() -> Dictionary:
 	var wind_effects := _get_wind_effects(_active_spot)
 	var condition_modifiers := _get_condition_fishing_modifiers()
 	var rig_bite_multiplier: float = clampf(float(_tackle_stats.get("rig_bite_chance_multiplier", 1.0)), 0.82, 1.05)
-	var bite_chance: float = clamp(
+	var cast_bite_multiplier := _get_cast_bite_chance_multiplier()
+	var base_bite_chance: float = clamp(
 		(
 			0.115
 			+ float(_tackle_stats.get("bite_detection_bonus", 0.0)) * 0.10
@@ -1185,6 +1681,7 @@ func _get_active_bite_balance_data() -> Dictionary:
 		0.075,
 		0.30
 	)
+	var bite_chance: float = clamp(base_bite_chance * cast_bite_multiplier, 0.0, 0.30)
 
 	if SHOW_WEATHER_BITE_DEBUG and BuildConfig.ENABLE_VERBOSE_LOGS:
 		print("[WeatherBite] weather=%s bite_x=%.2f final=%.3f modifiers=%s" % [
@@ -1200,6 +1697,7 @@ func _get_active_bite_balance_data() -> Dictionary:
 		"bait_bonus": bait_bonus,
 		"time_activity_modifier": time_activity_modifier,
 		"spot_bite_modifier": spot_bite_modifier,
+		"cast_bite_multiplier": cast_bite_multiplier,
 		"weather_type": weather_type,
 		"weather_bite_multiplier": weather_bite_multiplier,
 		"weather_modifiers": weather_modifiers,
@@ -1604,11 +2102,24 @@ func _fail_hook(reason: String, data: Dictionary = {}) -> void:
 	failure_data["reason"] = reason
 	failure_data["bite_data"] = _pending_bite_data.duplicate(true)
 	failure_data["bite_phase"] = _bite_phase
-	hook_failed.emit(reason, failure_data)
+	var ends_fishing := _does_hook_failure_end_wait(reason)
+	failure_data["ends_fishing"] = ends_fishing
 	_pending_catch.clear()
 	_pending_bite_data.clear()
 	_bite_window_elapsed = 0.0
 	_bite_window_seconds = 0.0
+	if ends_fishing:
+		_fishing_cycle_id += 1
+		is_fishing = false
+		is_reeling = false
+		fishing_state = FishingState.IDLE
+		_reel_input_active = false
+		_last_hook_attempt_msec = 0
+		_clear_active_bite_data()
+		hook_failed.emit(reason, failure_data)
+		return
+
+	hook_failed.emit(reason, failure_data)
 	fishing_state = FishingState.WAITING_FOR_BITE
 	var next_approach_outcome := reason
 	if reason == "too_early" or reason == "early_hook":
@@ -1620,6 +2131,10 @@ func _fail_hook(reason: String, data: Dictionary = {}) -> void:
 	_false_nudge_timer = randf_range(FALSE_NUDGE_MIN_DELAY, FALSE_NUDGE_MAX_DELAY)
 
 
+func _does_hook_failure_end_wait(reason: String) -> bool:
+	return reason == "missed_bite" or reason == "late_hook"
+
+
 func _clear_active_bite_data() -> void:
 	_pending_catch.clear()
 	_pending_bite_data.clear()
@@ -1628,6 +2143,7 @@ func _clear_active_bite_data() -> void:
 	_active_spot_id = ""
 	_active_available_fish.clear()
 	_active_spot_depth_modifier = 1.0
+	_active_cast_context.clear()
 	_bite_check_timer = 0.0
 	_bite_window_elapsed = 0.0
 	_bite_window_seconds = 0.0
@@ -1636,6 +2152,14 @@ func _clear_active_bite_data() -> void:
 	_lure_retrieve_progress = 0.0
 	_lure_retrieve_speed = 0.0
 	_lure_retrieve_update_timer = 0.0
+	_lure_retrieve_active_time = 0.0
+	_lure_pause_timer = 0.0
+	_lure_pause_attack_timer = 0.0
+	_lure_jerk_attack_timer = 0.0
+	_lure_jerk_impulse_timer = 0.0
+	_spin_feedback_cooldown = 0.0
+	_spin_focus_fish_id = ""
+	_spin_focus_state = "Idle"
 
 
 func reset_after_result() -> void:
@@ -1694,6 +2218,13 @@ func _is_fishing_cycle_current(cycle_id: int) -> bool:
 	return is_fishing and cycle_id == _fishing_cycle_id
 
 
+func _is_spinning_fish_candidate(fish_id: String) -> bool:
+	var rule := SpinningFishRulesScript.get_rule(fish_id)
+	if float(rule.get("spin_bite_modifier", 0.0)) <= 0.0:
+		return false
+	return _get_spinning_lure_match_multiplier(rule, _get_current_lure_type()) > 0.0
+
+
 func _get_tackle_available_fish(spot_fish: Array) -> Array:
 	var filtered_fish: Array = []
 	var allowed_rarities: Array = _tackle_stats.get("allowed_rarities", [])
@@ -1704,6 +2235,14 @@ func _get_tackle_available_fish(spot_fish: Array) -> Array:
 	for fish_id in spot_fish:
 		var fish: Dictionary = FishDatabase.get_fish(str(fish_id))
 		if fish.is_empty():
+			continue
+
+		if _is_reel_fight_mode_active():
+			if not _is_spinning_fish_candidate(str(fish_id)):
+				continue
+			if float(fish.get("min_weight", 0.0)) > tackle_weight_limit:
+				continue
+			filtered_fish.append(fish_id)
 			continue
 
 		if _get_depth_match_multiplier(fish) <= 0.0:
@@ -1893,7 +2432,7 @@ func _get_random_tackle_fish_id(available_fish: Array, rare_chance_modifier: flo
 		var time_multiplier: float = _get_time_activity_modifier(fish)
 		var peak_multiplier: float = 1.0 + _get_time_peak_modifier(fish) * 0.45
 		var weather_weight_multiplier: float = _get_weather_fish_weight_multiplier(fish, weather_modifiers)
-		var float_depth_multiplier: float = clamp(float(_tackle_stats.get("float_depth_match", 1.0)), 0.58, 1.05)
+		var float_depth_multiplier: float = 1.0 if _is_reel_fight_mode_active() else clamp(float(_tackle_stats.get("float_depth_match", 1.0)), 0.58, 1.05)
 		var final_weight: int = max(roundi(float(weight) * depth_multiplier * bait_multiplier * hook_multiplier * line_multiplier * time_multiplier * peak_multiplier * weather_weight_multiplier * float_depth_multiplier), 1)
 
 		for i in final_weight:
@@ -1913,6 +2452,8 @@ func _get_random_tackle_fish_id(available_fish: Array, rare_chance_modifier: flo
 	return selected_fish_id
 
 func _get_depth_match_multiplier(fish: Dictionary) -> float:
+	if _is_reel_fight_mode_active():
+		return 1.0
 	var depth: float = float(_tackle_stats.get("fishing_depth", 1.2))
 	var min_depth: float = float(fish.get("min_depth", 0.2))
 	var max_depth: float = float(fish.get("max_depth", 6.0))
@@ -1932,6 +2473,8 @@ func _get_depth_match_multiplier(fish: Dictionary) -> float:
 	return clamp(1.18 - distance * falloff, 0.48, 1.20)
 
 func _get_spot_depth_match_multiplier(spot: Dictionary) -> float:
+	if _is_reel_fight_mode_active():
+		return 1.0
 	var depth: float = float(_tackle_stats.get("fishing_depth", PlayerData.fishing_depth))
 	var float_depth_match: float = clamp(float(_tackle_stats.get("float_depth_match", 1.0)), 0.58, 1.0)
 	# spot.min_depth / effective_min_depth = рабочая глубина рыбы, not physical shore depth.

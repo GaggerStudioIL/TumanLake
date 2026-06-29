@@ -100,6 +100,9 @@ offset_bottom = 360.0
 [node name="FishingPresenceLayer" type="Node2D" parent="." unique_id=2086809076]
 z_index = 4
 
+[node name="TackleView" type="Node2D" parent="FishingPresenceLayer"]
+z_index = 4
+
 [node name="RodShadow" type="Line2D" parent="FishingPresenceLayer" unique_id=999977799]
 width = 11.0
 default_color = Color(0, 0, 0, 0.28)

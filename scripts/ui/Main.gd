@@ -101,6 +101,22 @@ const FIRST_RUN_HINT_TEXTS := {
 	"sell_fish": "Рыба в садке. Её можно продать"
 }
 
+@export_group("TackleView Debug")
+@export var tackle_offset_x := 0.0
+@export var tackle_offset_y := 0.0
+@export var tackle_scale := 1.0
+@export var tackle_rotation := 0.0
+
+@export_group("3D Reel Visual")
+@export var use_3d_reel := true
+@export var use_animated_sprite_reel := false
+@export var reel_offset := Vector2.ZERO
+@export var reel_scale := 0.92
+@export var reel_rotation_degrees := -8.0
+@export var viewport_size := Vector2i(192, 192)
+@export var reel_mount_pivot := Vector2(104.0, 94.0)
+@export_group("")
+
 @onready var background: ColorRect = $Background
 @onready var scene_gradient: ColorRect = $SceneGradient
 @onready var noise_layer: ColorRect = $NoiseLayer
@@ -386,6 +402,8 @@ var cast_button_visual: TextureRect
 var cast_power_indicator_track: Panel
 var cast_power_indicator_fill: ColorRect
 var stop_fishing_button: Button
+var spinning_speed_button: Button
+var spinning_jerk_button: Button
 var depth_hud_minus_button: Button
 var depth_hud_plus_button: Button
 var depth_hud_label: Label
@@ -394,6 +412,7 @@ var keepnet_hud_button: Button
 var player_xp_hud: Control
 var quick_tackle_panel: Control
 var tuman_fm_hud: Control
+var tackle_view: Node2D
 var rod_sprite: Sprite2D
 var rod_shadow_sprite: Sprite2D
 var top_hud_container: HBoxContainer
@@ -1911,6 +1930,34 @@ func _ensure_stop_fishing_button() -> void:
 	ui_canvas_layer.add_child(stop_fishing_button)
 
 
+func _ensure_spinning_action_buttons() -> void:
+	if spinning_speed_button == null:
+		spinning_speed_button = Button.new()
+		spinning_speed_button.name = "SpinningSpeedButton"
+		spinning_speed_button.text = ">>"
+		spinning_speed_button.tooltip_text = "Ускорить проводку"
+		spinning_speed_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		spinning_speed_button.focus_mode = Control.FOCUS_NONE
+		spinning_speed_button.visible = false
+		spinning_speed_button.z_index = 263
+		spinning_speed_button.add_theme_constant_override("h_separation", 0)
+		spinning_speed_button.pressed.connect(_on_spinning_speed_button_pressed)
+		ui_canvas_layer.add_child(spinning_speed_button)
+
+	if spinning_jerk_button == null:
+		spinning_jerk_button = Button.new()
+		spinning_jerk_button.name = "SpinningJerkButton"
+		spinning_jerk_button.text = "↗"
+		spinning_jerk_button.tooltip_text = "Рывок приманки"
+		spinning_jerk_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		spinning_jerk_button.focus_mode = Control.FOCUS_NONE
+		spinning_jerk_button.visible = false
+		spinning_jerk_button.z_index = 263
+		spinning_jerk_button.add_theme_constant_override("h_separation", 0)
+		spinning_jerk_button.pressed.connect(_on_spinning_jerk_button_pressed)
+		ui_canvas_layer.add_child(spinning_jerk_button)
+
+
 func _ensure_float_bite_preview() -> void:
 	if float_bite_preview != null and is_instance_valid(float_bite_preview):
 		return
@@ -1924,6 +1971,12 @@ func _ensure_float_bite_preview() -> void:
 	float_bite_preview.z_index = 103
 	ui_canvas_layer.add_child(float_bite_preview)
 	_layout_float_bite_preview(get_viewport_rect().size, min(get_viewport_rect().size.x / BASE_SCREEN_SIZE.x, get_viewport_rect().size.y / BASE_SCREEN_SIZE.y))
+	_sync_float_bite_preview_texture()
+
+
+func _sync_float_bite_preview_texture() -> void:
+	if float_bite_preview != null and is_instance_valid(float_bite_preview) and float_bite_preview.has_method("refresh_current_float_texture"):
+		float_bite_preview.call("refresh_current_float_texture")
 
 
 func _layout_float_bite_preview(screen_size: Vector2, ui_scale: float) -> void:
@@ -1962,6 +2015,7 @@ func _show_float_bite_preview_idle() -> void:
 	if float_bite_preview == null:
 		return
 	_layout_float_bite_preview(get_viewport_rect().size, min(get_viewport_rect().size.x / BASE_SCREEN_SIZE.x, get_viewport_rect().size.y / BASE_SCREEN_SIZE.y))
+	_sync_float_bite_preview_texture()
 	float_bite_preview.visible = true
 	float_bite_preview.modulate = Color.WHITE
 	float_bite_preview.move_to_front()
@@ -3796,6 +3850,7 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 	_ensure_cast_button_visual()
 	_ensure_cast_power_indicator()
 	_ensure_stop_fishing_button()
+	_ensure_spinning_action_buttons()
 	_ensure_float_bite_preview()
 	_ensure_depth_hud_controls()
 	_ensure_keepnet_hud_button()
@@ -4026,6 +4081,7 @@ func _apply_gameplay_screen_composition(screen_size: Vector2) -> void:
 		stop_fishing_button.size = stop_size
 		_apply_primary_fishing_action_style(stop_fishing_button, stop_size)
 		_apply_stop_fishing_button_symbol_style(stop_fishing_button, stop_edge)
+	_layout_spinning_action_buttons(cast_rect, screen_size, ui_scale)
 	_layout_float_bite_preview(screen_size, ui_scale)
 
 	if keepnet_hud_button != null:
@@ -4862,7 +4918,9 @@ func _get_primary_fishing_action_icon() -> String:
 func _get_primary_fishing_action_label() -> String:
 	match _fishing_ui_state:
 		FishingUiState.WAITING:
-			if bool(FishingManager.get("use_new_bite_system")) and _presence_bite_timer > 0.0 and not _is_reel_tackle_mode():
+			if _is_reel_tackle_mode():
+				return "Мотать"
+			if bool(FishingManager.get("use_new_bite_system")) and _presence_bite_timer > 0.0:
 				return "Подсечь"
 			return "Ждать"
 		FishingUiState.FIGHTING:
@@ -5003,6 +5061,7 @@ func _refresh_depth_hud_controls() -> void:
 		return
 
 	var should_show: bool = _should_show_depth_hud_controls()
+	var show_depth_controls := _is_cast_radial_value_adjustable()
 	depth_radial_control.visible = should_show
 	depth_radial_control.mouse_filter = Control.MOUSE_FILTER_STOP if should_show else Control.MOUSE_FILTER_IGNORE
 	if not should_show:
@@ -5034,18 +5093,24 @@ func _refresh_depth_hud_controls() -> void:
 	)
 	depth_radial_control.size = depth_control_size
 	depth_radial_control.z_index = 261
-	var depth_range := PlayerData.get_current_spot_depth_range()
+	var depth_range := _get_cast_radial_value_range()
+	if depth_radial_control.has_method("set_depth_step"):
+		depth_radial_control.call("set_depth_step", _get_cast_radial_value_step())
 	depth_radial_control.set_depth_range(float(depth_range.get("min", 0.2)), float(depth_range.get("max", 6.0)))
-	depth_radial_control.set_depth_value(PlayerData.fishing_depth, false)
+	depth_radial_control.set_depth_value(_get_cast_radial_value(), false)
 	depth_radial_control.set_hook_texture(DEPTH_HOOK_ICON)
 	if depth_radial_control.has_method("set_center_icon_texture") and ui_theme != null:
 		depth_radial_control.call("set_center_icon_texture", ui_theme.get_icon(_get_primary_fishing_action_icon()))
+	if depth_radial_control.has_method("set_depth_controls_visible"):
+		depth_radial_control.call("set_depth_controls_visible", show_depth_controls)
 	if depth_radial_control.has_method("set_button_state"):
 		depth_radial_control.call("set_button_state", _get_cast_depth_control_state())
 	if depth_radial_control.has_method("set_depth_adjust_enabled"):
 		depth_radial_control.call("set_depth_adjust_enabled", _can_adjust_depth_from_cast_control())
 	if depth_radial_control.has_method("set_draw_depth_text"):
-		depth_radial_control.call("set_draw_depth_text", true)
+		depth_radial_control.call("set_draw_depth_text", show_depth_controls)
+	if depth_radial_control.has_method("set_integer_value_display"):
+		depth_radial_control.call("set_integer_value_display", _is_spinning_retrieve_speed_adjustable())
 	if depth_radial_control.has_method("set_pressed_visual"):
 		depth_radial_control.call("set_pressed_visual", _cast_button_pressed)
 	fish_button.icon = null
@@ -5118,18 +5183,21 @@ func _layout_depth_hud_value_label() -> void:
 func _update_depth_hud_value_label() -> void:
 	if depth_hud_label == null:
 		return
+	if _is_spinning_retrieve_speed_adjustable() and PlayerData.has_method("get_spinning_retrieve_speed"):
+		depth_hud_label.text = "%d" % PlayerData.get_spinning_retrieve_speed()
+		return
 	depth_hud_label.text = "%.1f м" % PlayerData.fishing_depth
 
 
 func _should_show_depth_hud_controls() -> bool:
 	if is_cast_animating or _is_catch_reward_open() or _is_menu_overlay_open():
 		return false
+	if _fishing_ui_state == FishingUiState.CAUGHT or _fishing_ui_state == FishingUiState.FAILED:
+		return false
 	return _fishing_ui_state in [
 		FishingUiState.IDLE,
 		FishingUiState.WAITING,
-		FishingUiState.FIGHTING,
-		FishingUiState.CAUGHT,
-		FishingUiState.FAILED
+		FishingUiState.FIGHTING
 	]
 
 
@@ -5138,8 +5206,35 @@ func _can_adjust_depth_from_cast_control() -> bool:
 		_fishing_ui_state == FishingUiState.IDLE
 		and not is_cast_animating
 		and not _is_menu_overlay_open()
-		and _is_current_tackle_depth_adjustable()
+		and _is_cast_radial_value_adjustable()
 	)
+
+
+func _is_cast_radial_value_adjustable() -> bool:
+	return _is_current_tackle_depth_adjustable() or _is_spinning_retrieve_speed_adjustable()
+
+
+func _is_spinning_retrieve_speed_adjustable() -> bool:
+	return _is_reel_tackle_mode()
+
+
+func _get_cast_radial_value_range() -> Dictionary:
+	if _is_spinning_retrieve_speed_adjustable():
+		return {
+			"min": float(PlayerData.SPINNING_RETRIEVE_SPEED_MIN),
+			"max": float(PlayerData.SPINNING_RETRIEVE_SPEED_MAX)
+		}
+	return PlayerData.get_current_spot_depth_range()
+
+
+func _get_cast_radial_value() -> float:
+	if _is_spinning_retrieve_speed_adjustable() and PlayerData.has_method("get_spinning_retrieve_speed"):
+		return float(PlayerData.get_spinning_retrieve_speed())
+	return PlayerData.fishing_depth
+
+
+func _get_cast_radial_value_step() -> float:
+	return 1.0 if _is_spinning_retrieve_speed_adjustable() else 0.1
 
 
 func _get_cast_depth_control_state() -> int:
@@ -5155,6 +5250,10 @@ func _get_cast_depth_control_state() -> int:
 
 
 func _is_current_tackle_depth_adjustable() -> bool:
+	if PlayerData == null:
+		return false
+	if PlayerData.has_method("get_current_tackle_type") and str(PlayerData.call("get_current_tackle_type")) != "float":
+		return false
 	var rod: Dictionary = PlayerData.current_tackle.get("rod", {})
 	if rod.is_empty():
 		return false
@@ -5202,11 +5301,14 @@ func _build_cast_depth_context(cast_power: float, hold_time: float) -> Dictionar
 	var safe_power: float = clamp(raw_power + float(cast_modifiers.get("cast_distance_bonus", 0.0)) * 0.55 + float(cast_modifiers.get("long_range_accuracy_bonus", 0.0)) * far_cast_factor * 0.12 - float(cast_modifiers.get("wind_cast_penalty", 0.0)) * 0.20, 0.0, 1.0)
 	var water_depth_at_cast := get_physical_depth_at_cast_power(safe_power, spot_max_depth)
 	var float_depth := float(PlayerData.fishing_depth)
-	var valid := is_float_depth_valid_for_cast(float_depth, water_depth_at_cast)
+	var reel_tackle_mode := _is_reel_tackle_mode()
+	var valid := true if reel_tackle_mode else is_float_depth_valid_for_cast(float_depth, water_depth_at_cast)
 	return {
 		"hold_time": hold_time,
 		"raw_cast_power": raw_power,
 		"cast_power": safe_power,
+		"reel_tackle_mode": reel_tackle_mode,
+		"spinning_retrieve_speed": PlayerData.get_spinning_retrieve_speed() if PlayerData.has_method("get_spinning_retrieve_speed") else 25,
 		"shore_depth": MIN_SHORE_DEPTH,
 		"spot_min_depth": spot_min_depth,
 		"spot_max_depth": max(spot_max_depth, MIN_SHORE_DEPTH),
@@ -5214,7 +5316,7 @@ func _build_cast_depth_context(cast_power: float, hold_time: float) -> Dictionar
 		"water_depth_at_cast": water_depth_at_cast,
 		"float_depth": float_depth,
 		"valid": valid,
-		"effective_depth_ok": is_depth_in_effective_fish_range(float_depth, spot),
+		"effective_depth_ok": true if reel_tackle_mode else is_depth_in_effective_fish_range(float_depth, spot),
 		"cast_distance_bonus": float(cast_modifiers.get("cast_distance_bonus", 0.0)),
 		"long_range_accuracy_bonus": float(cast_modifiers.get("long_range_accuracy_bonus", 0.0)),
 		"wind_cast_penalty": float(cast_modifiers.get("wind_cast_penalty", 0.0)),
@@ -5295,6 +5397,80 @@ func _apply_depth_hud_button_style(button: Button) -> void:
 	button.add_theme_color_override("font_pressed_color", Color(1.0, 0.78, 0.32, 1.0))
 
 
+func _layout_spinning_action_buttons(_cast_rect: Rect2, screen_size: Vector2, ui_scale: float) -> void:
+	if spinning_speed_button == null or spinning_jerk_button == null:
+		return
+	var speed_edge: float = clampf(62.0 * ui_scale, 54.0, 72.0)
+	var jerk_edge: float = clampf(82.0 * ui_scale, 70.0, 92.0)
+	var gap: float = clampf(12.0 * ui_scale, 9.0, 16.0)
+	var margin: float = clampf(14.0 * ui_scale, 10.0, 20.0)
+	var center_x: float = clampf(screen_size.x * 0.115, margin + jerk_edge * 0.5, screen_size.x * 0.34)
+	var jerk_center_y: float = clampf(
+		screen_size.y - margin - jerk_edge * 0.58,
+		margin + speed_edge + gap + jerk_edge * 0.5,
+		screen_size.y - margin - jerk_edge * 0.5
+	)
+	var speed_center_y: float = jerk_center_y - jerk_edge * 0.5 - gap - speed_edge * 0.5
+	var speed_x: float = center_x - speed_edge * 0.5
+	var speed_y: float = speed_center_y - speed_edge * 0.5
+	var jerk_x: float = center_x - jerk_edge * 0.5
+	var jerk_y: float = jerk_center_y - jerk_edge * 0.5
+
+	_anchor_control(spinning_speed_button, 0.0, 0.0, 0.0, 0.0, speed_x, speed_y, speed_x + speed_edge, speed_y + speed_edge)
+	_anchor_control(spinning_jerk_button, 0.0, 0.0, 0.0, 0.0, jerk_x, jerk_y, jerk_x + jerk_edge, jerk_y + jerk_edge)
+
+	spinning_speed_button.custom_minimum_size = Vector2(speed_edge, speed_edge)
+	spinning_speed_button.size = Vector2(speed_edge, speed_edge)
+	spinning_speed_button.z_index = 263
+	spinning_speed_button.add_theme_font_size_override("font_size", int(clampf(speed_edge * 0.34, 17.0, 24.0)))
+	_apply_spinning_action_button_style(spinning_speed_button, speed_edge)
+
+	spinning_jerk_button.custom_minimum_size = Vector2(jerk_edge, jerk_edge)
+	spinning_jerk_button.size = Vector2(jerk_edge, jerk_edge)
+	spinning_jerk_button.z_index = 264
+	spinning_jerk_button.add_theme_font_size_override("font_size", int(clampf(jerk_edge * 0.42, 24.0, 34.0)))
+	_apply_spinning_action_button_style(spinning_jerk_button, jerk_edge)
+	_refresh_spinning_action_buttons()
+
+
+func _apply_spinning_action_button_style(button: Button, edge: float) -> void:
+	var radius := int(edge * 0.5)
+	var normal := _make_primary_action_circle_style(Color(0.012, 0.032, 0.040, 0.74), Color(0.58, 0.92, 1.0, 0.38), radius, 4, Color(0.0, 0.0, 0.0, 0.22))
+	var hover := _make_primary_action_circle_style(Color(0.026, 0.076, 0.092, 0.86), Color(0.74, 1.0, 1.0, 0.58), radius, 6, Color(0.24, 0.86, 1.0, 0.16))
+	var pressed := _make_primary_action_circle_style(Color(0.032, 0.112, 0.128, 0.94), Color(0.86, 1.0, 1.0, 0.72), radius, 2, Color(0.0, 0.0, 0.0, 0.18))
+	var disabled := _make_primary_action_circle_style(Color(0.018, 0.026, 0.030, 0.32), Color(0.64, 0.76, 0.82, 0.22), radius, 1, Color.TRANSPARENT)
+	button.add_theme_stylebox_override("normal", normal)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("pressed", pressed)
+	button.add_theme_stylebox_override("disabled", disabled)
+	button.add_theme_stylebox_override("focus", hover)
+	button.add_theme_color_override("font_color", Color(0.90, 1.0, 1.0, 0.98))
+	button.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 0.92, 1.0))
+	button.add_theme_color_override("font_pressed_color", Color(0.72, 1.0, 1.0, 1.0))
+	button.add_theme_color_override("font_disabled_color", Color(0.64, 0.74, 0.78, 0.48))
+
+
+func _should_show_spinning_action_buttons() -> bool:
+	return (
+		_fishing_ui_state == FishingUiState.WAITING
+		and _is_reel_tackle_mode()
+		and bool(FishingManager.get("is_fishing"))
+		and not bool(FishingManager.get("is_reeling"))
+		and not is_cast_animating
+		and not _is_menu_overlay_open()
+	)
+
+
+func _refresh_spinning_action_buttons() -> void:
+	if spinning_speed_button == null or spinning_jerk_button == null:
+		return
+	var should_show := _should_show_spinning_action_buttons()
+	for button in [spinning_speed_button, spinning_jerk_button]:
+		button.visible = should_show
+		button.disabled = not should_show
+		button.mouse_filter = Control.MOUSE_FILTER_STOP if should_show else Control.MOUSE_FILTER_IGNORE
+
+
 func _can_cancel_current_fishing_wait() -> bool:
 	if is_cast_animating or _is_catch_reward_open():
 		return false
@@ -5322,14 +5498,22 @@ func _update_cast_button_visual() -> void:
 	if depth_radial_control != null and depth_radial_control.visible:
 		if depth_radial_control.has_method("set_center_icon_texture"):
 			depth_radial_control.call("set_center_icon_texture", ui_theme.get_icon(_get_primary_fishing_action_icon()))
+		if depth_radial_control.has_method("set_depth_controls_visible"):
+			depth_radial_control.call("set_depth_controls_visible", _is_cast_radial_value_adjustable())
+		if depth_radial_control.has_method("set_draw_depth_text"):
+			depth_radial_control.call("set_draw_depth_text", _is_cast_radial_value_adjustable())
+		if depth_radial_control.has_method("set_integer_value_display"):
+			depth_radial_control.call("set_integer_value_display", _is_spinning_retrieve_speed_adjustable())
 		if depth_radial_control.has_method("set_button_state"):
 			depth_radial_control.call("set_button_state", _get_cast_depth_control_state())
 		if depth_radial_control.has_method("set_depth_adjust_enabled"):
 			depth_radial_control.call("set_depth_adjust_enabled", _can_adjust_depth_from_cast_control())
 
-	var active_hook_input: bool = _fishing_ui_state == FishingUiState.WAITING and bool(FishingManager.get("use_new_bite_system"))
-	var use_cast_texture := _use_cast_png_button and (_fishing_ui_state == FishingUiState.IDLE or (_fishing_ui_state == FishingUiState.WAITING and not active_hook_input))
+	var reel_tackle_waiting: bool = _fishing_ui_state == FishingUiState.WAITING and _is_reel_tackle_mode()
+	var active_hook_input: bool = _fishing_ui_state == FishingUiState.WAITING and bool(FishingManager.get("use_new_bite_system")) and not reel_tackle_waiting
+	var use_cast_texture := _use_cast_png_button and (_fishing_ui_state == FishingUiState.IDLE or (_fishing_ui_state == FishingUiState.WAITING and not active_hook_input and not reel_tackle_waiting))
 	var use_pull_texture := _use_pull_png_button and (
+		reel_tackle_waiting or
 		_fishing_ui_state == FishingUiState.FIGHTING
 		or _fishing_ui_state == FishingUiState.CAUGHT
 		or _fishing_ui_state == FishingUiState.FAILED
@@ -7457,6 +7641,7 @@ func _update_ui() -> void:
 	_refresh_current_tackle_hud()
 	_refresh_condition_hud()
 	_refresh_stop_fishing_button_presentation()
+	_refresh_spinning_action_buttons()
 	_refresh_float_bite_preview_visibility()
 
 
@@ -8333,6 +8518,19 @@ func _on_tackle_depth_button_pressed(delta: float) -> void:
 		_update_tackle_ui()
 		return
 
+	if _is_spinning_retrieve_speed_adjustable() and PlayerData.has_method("adjust_spinning_retrieve_speed"):
+		PlayerData.adjust_spinning_retrieve_speed(delta * 10.0)
+		var speed_value := PlayerData.get_spinning_retrieve_speed() if PlayerData.has_method("get_spinning_retrieve_speed") else 25
+		var speed_message := "Скорость подмотки: %d" % speed_value
+		result_label.text = "Выставлена скорость подмотки: %d" % speed_value
+		if depth_radial_control != null:
+			depth_radial_control.set_depth_value(float(speed_value), false)
+		_update_depth_hud_value_label()
+		_show_toast(speed_message, true)
+		SaveManager.save_game()
+		_update_ui()
+		return
+
 	PlayerData.adjust_fishing_depth(delta)
 	var depth_message := "Глубина: %.1f м" % PlayerData.fishing_depth
 	result_label.text = "Выставлена глубина снасти: %.1f м" % PlayerData.fishing_depth
@@ -8344,6 +8542,12 @@ func _on_tackle_depth_button_pressed(delta: float) -> void:
 func _on_depth_radial_control_changed(value: float) -> void:
 	if _fishing_ui_state != FishingUiState.IDLE:
 		return
+	if _is_spinning_retrieve_speed_adjustable() and PlayerData.has_method("set_spinning_retrieve_speed"):
+		PlayerData.set_spinning_retrieve_speed(value)
+		if depth_radial_control != null:
+			depth_radial_control.set_depth_value(float(PlayerData.get_spinning_retrieve_speed()), false)
+		_update_depth_hud_value_label()
+		return
 	PlayerData.set_fishing_depth(value)
 	if depth_radial_control != null:
 		depth_radial_control.set_depth_value(PlayerData.fishing_depth, false)
@@ -8352,6 +8556,18 @@ func _on_depth_radial_control_changed(value: float) -> void:
 
 func _on_depth_radial_control_committed(value: float) -> void:
 	if _fishing_ui_state != FishingUiState.IDLE:
+		return
+	if _is_spinning_retrieve_speed_adjustable() and PlayerData.has_method("set_spinning_retrieve_speed"):
+		PlayerData.set_spinning_retrieve_speed(value)
+		var speed_value := PlayerData.get_spinning_retrieve_speed()
+		if depth_radial_control != null:
+			depth_radial_control.set_depth_value(float(speed_value), false)
+		_update_depth_hud_value_label()
+		var speed_message := "Скорость подмотки: %d" % speed_value
+		result_label.text = "Выставлена скорость подмотки: %d" % speed_value
+		_show_toast(speed_message, true)
+		SaveManager.save_game()
+		_update_ui()
 		return
 	PlayerData.set_fishing_depth(value)
 	if depth_radial_control != null:
@@ -8626,7 +8842,6 @@ func _on_fish_button_pressed(cast_power: float = MIN_CAST_POWER, cast_hold_time:
 	_debug_log_cast_depth(cast_depth_context)
 
 	_close_open_modals_before_cast()
-	SaveManager.save_game()
 
 	_pending_cast_spot_id = PlayerData.current_spot
 	_pending_cast_valid = bool(cast_depth_context.get("valid", true))
@@ -8647,6 +8862,30 @@ func _on_fish_button_pressed(cast_power: float = MIN_CAST_POWER, cast_hold_time:
 
 func _on_stop_fishing_button_pressed() -> void:
 	_cancel_current_fishing_wait()
+
+
+func _on_spinning_speed_button_pressed() -> void:
+	if not _should_show_spinning_action_buttons():
+		return
+	if PlayerData.has_method("adjust_spinning_retrieve_speed"):
+		PlayerData.adjust_spinning_retrieve_speed(5.0)
+	var speed_value := PlayerData.get_spinning_retrieve_speed() if PlayerData.has_method("get_spinning_retrieve_speed") else 50
+	if depth_radial_control != null:
+		depth_radial_control.set_depth_value(float(speed_value), false)
+	_update_depth_hud_value_label()
+	result_label.text = "Скорость подмотки: %d" % speed_value
+	_show_toast("Скорость подмотки: %d" % speed_value, true)
+	SaveManager.save_game()
+	_update_cast_button_visual()
+
+
+func _on_spinning_jerk_button_pressed() -> void:
+	if not _should_show_spinning_action_buttons():
+		return
+	if FishingManager.has_method("trigger_lure_jerk") and FishingManager.trigger_lure_jerk():
+		result_label.text = "Рывок приманки."
+		_show_toast("Рывок!", true)
+	_update_cast_button_visual()
 
 
 func _cancel_current_fishing_wait() -> void:
@@ -8691,12 +8930,13 @@ func _on_reel_button_down() -> void:
 	if _can_begin_cast_charge():
 		_start_cast_charge()
 		return
+	if _fishing_ui_state == FishingUiState.WAITING and _is_reel_tackle_mode():
+		_fish_button_pointer_action_active = true
+		FishingManager.set_reel_input(true)
+		return
 	if _fishing_ui_state == FishingUiState.WAITING and bool(FishingManager.get("use_new_bite_system")):
 		_fish_button_pointer_action_active = true
 		_trigger_fish_button_action(true)
-		return
-	if _fishing_ui_state == FishingUiState.WAITING and _is_reel_tackle_mode():
-		FishingManager.set_reel_input(true)
 		return
 	if _fishing_ui_state == FishingUiState.FIGHTING and FishingManager.is_reeling:
 		FishingManager.set_reel_input(true)
@@ -8896,6 +9136,7 @@ func can_quick_change_tackle() -> bool:
 	)
 
 func refresh_after_quick_tackle_change() -> void:
+	_sync_float_bite_preview_texture()
 	_update_ui()
 	if tackle_panel != null and tackle_panel.visible:
 		_update_tackle_ui()
@@ -9424,6 +9665,10 @@ func _return_to_idle_after_result() -> void:
 	_reset_reeling_ui()
 	_update_ui()
 
+func _on_failure_popup_acknowledged() -> void:
+	if _fishing_ui_state == FishingUiState.FAILED:
+		_return_to_idle_after_result()
+
 func _is_reel_tackle_mode() -> bool:
 	if not BuildConfig.ENABLE_SPINNING_FEATURES:
 		return false
@@ -9481,7 +9726,7 @@ func _on_cast_visual_finished() -> void:
 	await get_tree().process_frame
 	if not is_inside_tree():
 		return
-	FishingManager.start_fishing(spot_id)
+	FishingManager.start_fishing(spot_id, cast_depth_context)
 	if not bool(FishingManager.get("use_new_bite_system")):
 		_update_ui()
 
@@ -9590,6 +9835,7 @@ func _on_bite_preview_event(event_data: Dictionary) -> void:
 	_ensure_float_bite_preview()
 	if float_bite_preview == null:
 		return
+	_sync_float_bite_preview_texture()
 	if not float_bite_preview.visible and float_bite_preview.has_method("show_preview"):
 		float_bite_preview.call("show_preview")
 
@@ -9619,6 +9865,11 @@ func _on_bite_preview_event(event_data: Dictionary) -> void:
 func _play_float_bite_preview_take(style: String, data: Dictionary) -> void:
 	if not FLOAT_BITE_PREVIEW_ENABLED:
 		return
+	if _is_reel_tackle_mode():
+		_hide_float_bite_preview()
+		return
+	_ensure_float_bite_preview()
+	_sync_float_bite_preview_texture()
 	if float_bite_preview == null or not is_instance_valid(float_bite_preview):
 		return
 	match style:
@@ -9652,9 +9903,17 @@ func _on_lure_retrieve_updated(state: Dictionary) -> void:
 	_apply_lure_retrieve_state(state)
 	var progress: float = clamp(float(state.get("retrieve_progress", 0.0)), 0.0, 1.0)
 	var input_active: bool = bool(state.get("input_active", false))
+	var feedback_message := str(state.get("feedback_message", ""))
+	var speed_value := int(state.get("retrieve_speed_setting", 0))
 	timer_label.text = "Проводка %.0f%%" % (progress * 100.0)
 	fight_status_label.text = "Катушка мотает. Приманка идёт к берегу." if input_active else "Зажми кнопку, чтобы продолжить проводку."
-	_update_ui()
+	if feedback_message != "":
+		fight_status_label.text = "%s | Скорость %d" % [feedback_message, speed_value]
+	else:
+		fight_status_label.text = "Катушка мотает. Скорость %d." % speed_value if input_active else "Пауза проводки. Скорость %d." % speed_value
+	_refresh_spinning_action_buttons()
+	_refresh_fish_button_presentation()
+	_update_cast_button_visual()
 
 func _on_lure_retrieve_finished(state: Dictionary) -> void:
 	_hide_float_bite_preview()
@@ -9680,7 +9939,9 @@ func _apply_lure_retrieve_state(state: Dictionary) -> void:
 func _on_bite_started(bite_data: Dictionary) -> void:
 	_fishing_ui_state = FishingUiState.WAITING
 	_presence_bite_timer = max(float(bite_data.get("bite_window_seconds", 1.4)), 0.8)
-	if FLOAT_BITE_PREVIEW_ENABLED and float_bite_preview != null and is_instance_valid(float_bite_preview) and float_bite_preview.has_method("play_hook_ready"):
+	if _is_reel_tackle_mode():
+		_hide_float_bite_preview()
+	elif FLOAT_BITE_PREVIEW_ENABLED and float_bite_preview != null and is_instance_valid(float_bite_preview) and float_bite_preview.has_method("play_hook_ready"):
 		float_bite_preview.call("play_hook_ready", bite_data)
 	elif FLOAT_BITE_PREVIEW_ENABLED:
 		_play_float_bite_preview_take(str(bite_data.get("visual_style", "submerge")), bite_data)
@@ -9689,7 +9950,8 @@ func _on_bite_started(bite_data: Dictionary) -> void:
 	fight_status_label.text = "Окно подсечки открыто"
 	if fishing_presence_ui != null and fishing_presence_ui.has_method("play_bite_signal"):
 		fishing_presence_ui.play_bite_signal(bite_data)
-	_update_ui()
+	_refresh_fish_button_presentation()
+	_update_cast_button_visual()
 	_show_first_run_hint("hook")
 
 func _on_bite_window_updated(bite_data: Dictionary) -> void:
@@ -9707,7 +9969,8 @@ func _on_hook_success(catch_data: Dictionary) -> void:
 		fishing_presence_ui.play_hook_result(true)
 
 func _on_hook_failed(reason: String, data: Dictionary) -> void:
-	_fishing_ui_state = FishingUiState.WAITING
+	var ends_fishing := bool(data.get("ends_fishing", false))
+	_fishing_ui_state = FishingUiState.IDLE if ends_fishing else FishingUiState.WAITING
 	_presence_bite_timer = 0.0
 	var message := str(data.get("message", "Рыба сорвалась!"))
 	match reason:
@@ -9721,11 +9984,24 @@ func _on_hook_failed(reason: String, data: Dictionary) -> void:
 			message = "Рыба сорвалась!"
 
 	timer_label.text = message
-	result_label.text = "%s\nСнасть всё ещё в воде. Жди следующую поклёвку." % message
-	fight_status_label.text = "Ожидание продолжается"
+	if ends_fishing:
+		result_label.text = "%s\nСнасть вытащена. Можно заменить наживку или забросить снова." % message
+		fight_status_label.text = ""
+	else:
+		result_label.text = "%s\nСнасть всё ещё в воде. Жди следующую поклёвку." % message
+		fight_status_label.text = "Ожидание продолжается"
 	if fishing_presence_ui != null and fishing_presence_ui.has_method("play_hook_result"):
 		fishing_presence_ui.play_hook_result(false, reason)
-	if FLOAT_BITE_PREVIEW_ENABLED:
+	if ends_fishing:
+		_hide_float_bite_preview()
+		if fishing_presence_ui != null:
+			if fishing_presence_ui.has_method("set_rod_uncasted"):
+				fishing_presence_ui.set_rod_uncasted()
+			else:
+				fishing_presence_ui.stop_cast_visual()
+		_reset_reeling_ui()
+		SaveManager.save_game()
+	elif FLOAT_BITE_PREVIEW_ENABLED and not _is_reel_tackle_mode():
 		_show_float_bite_preview_idle()
 	_update_ui()
 

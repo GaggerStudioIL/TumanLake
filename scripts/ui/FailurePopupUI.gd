@@ -121,8 +121,15 @@ func _ensure_nodes() -> void:
 	close_button.mouse_filter = Control.MOUSE_FILTER_STOP
 	close_button.custom_minimum_size = Vector2(0.0, 36.0)
 	close_button.visible = false
-	close_button.pressed.connect(close)
+	close_button.pressed.connect(_on_close_button_pressed)
 	content.add_child(close_button)
+
+
+func _on_close_button_pressed() -> void:
+	var was_acknowledgement := _requires_acknowledgement
+	close()
+	if was_acknowledgement and main != null and main.has_method("_on_failure_popup_acknowledged"):
+		main.call("_on_failure_popup_acknowledged")
 
 
 func _apply_failure_style(severity: String) -> void:

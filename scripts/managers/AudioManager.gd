@@ -120,9 +120,14 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_music_rng.randomize()
 	_ensure_players()
+	_preload_sfx_streams()
 	_apply_volumes()
 	_connect_time_manager()
 	start_music_for_current_period()
+
+func _preload_sfx_streams() -> void:
+	for sfx_name in SFX_PATHS.keys():
+		_get_sfx_stream(str(sfx_name))
 
 func play_water_ambient_loop() -> void:
 	play_ambient_loop(WATER_AMBIENT_PATH)

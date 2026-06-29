@@ -1136,7 +1136,7 @@ func _get_build_version_label() -> String:
 		version_node = main.get_node_or_null("/root/GameVersion")
 	if version_node != null and version_node.has_method("get_version_label"):
 		return str(version_node.call("get_version_label"))
-	return "v0.1.0-beta.3"
+	return "v0.1.0-beta.4"
 
 
 func _clear_children(node: Node) -> void:

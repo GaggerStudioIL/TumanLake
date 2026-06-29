@@ -1376,7 +1376,10 @@ func _on_tackle_auto_button_pressed() -> void:
 		main._show_toast("Снасть можно менять только перед забросом.", false)
 		return
 	var tackle_type := PlayerData.get_current_tackle_type()
-	if tackle_type != PlayerData.DEFAULT_TACKLE_TYPE:
+	var supported_auto_types := [PlayerData.DEFAULT_TACKLE_TYPE]
+	if BuildConfig.ENABLE_SPINNING_FEATURES:
+		supported_auto_types.append("spinning")
+	if not supported_auto_types.has(tackle_type):
 		main._show_toast("Автосборка для этого типа пока не готова.", false)
 		return
 

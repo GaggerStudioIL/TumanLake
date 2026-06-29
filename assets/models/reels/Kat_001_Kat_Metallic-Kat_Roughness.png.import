@@ -2,16 +2,19 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dih70rhdfl05g"
-path="res://.godot/imported/rod_with_reel_no_handle.png-3a5cc2b312cc7938eb520d6c4fb07a5a.ctex"
+uid="uid://dohy5l88bpmab"
+path="res://.godot/imported/Kat_001_Kat_Metallic-Kat_Roughness.png-cda39e7545f1af0675789377da7d89b9.ctex"
 metadata={
 "vram_texture": false
+}
+generator_parameters={
+"md5": "b8bc3c2cd8e0359b285d97dd1385dc39"
 }
 
 [deps]
 
-source_file="res://assets/art/fishing/rod_with_reel_no_handle.png"
-dest_files=["res://.godot/imported/rod_with_reel_no_handle.png-3a5cc2b312cc7938eb520d6c4fb07a5a.ctex"]
+source_file="res://assets/models/reels/Kat_001_Kat_Metallic-Kat_Roughness.png"
+dest_files=["res://.godot/imported/Kat_001_Kat_Metallic-Kat_Roughness.png-cda39e7545f1af0675789377da7d89b9.ctex"]
 
 [params]
 
@@ -23,7 +26,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=false
+mipmaps/generate=true
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

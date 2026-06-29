@@ -6,7 +6,7 @@
 ## Текущий статус
 
 Статус: Closed Beta preparation
-Текущая версия: v0.1.0-beta.3
+Текущая версия: v0.1.0-beta.4
 Основной рабочий водоём: Озеро Агамим
 
 В текущем beta scope:
@@ -15,6 +15,7 @@
 - заброс;
 - поклёвка;
 - вываживание;
+- спиннинг: заброс, проводка, скорость подмотки, пауза и рывок;
 - садок как просмотр улова;
 - продажа рыбы через Рыбную гавань;
 - инвентарь;
@@ -84,6 +85,7 @@ scripts/core/GameVersion.gd
 Пример:
 v0.1.0-beta.2
 v0.1.0-beta.3
+v0.1.0-beta.4
 v0.1.1-beta.1
 
 ## BuildConfig
@@ -106,8 +108,8 @@ scripts/core/BuildConfig.gd
 - ENABLE_DEBUG_PANEL = false
 - ENABLE_VERBOSE_LOGS = false
 - ENABLE_WATER_DEBUG_VISUALS = false
-- SPINNING_ENABLED = false
-- ENABLE_SPINNING_TEST_MODE = false
+- SPINNING_ENABLED = true
+- ENABLE_SPINNING_TEST_MODE = true
 
 ## Перед отправкой билда тестерам
 

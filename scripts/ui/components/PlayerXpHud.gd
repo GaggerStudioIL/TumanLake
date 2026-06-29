@@ -127,12 +127,16 @@ func _ensure_children() -> void:
 
 func _layout_children() -> void:
 	_ensure_children()
-	var padding_x: float = 8.0
-	var icon_size: float = clampf(size.y - 16.0, 28.0, 36.0)
+	var fill_margin_x: float = roundf(size.x * 0.078)
+	var fill_top_margin: float = roundf(size.y * 0.08)
+	var fill_bottom_margin: float = roundf(size.y * 0.16)
+	var fill_height: float = maxf(size.y - fill_top_margin - fill_bottom_margin, 1.0)
+	var icon_size: float = clampf(fill_height - 4.0, 28.0, 36.0)
+	var icon_center := Vector2(fill_margin_x + fill_height * 0.5, fill_top_margin + fill_height * 0.5)
 	if level_icon != null:
-		level_icon.position = Vector2(padding_x, (size.y - icon_size) * 0.5)
+		level_icon.position = icon_center - Vector2(icon_size, icon_size) * 0.5
 		level_icon.size = Vector2(icon_size, icon_size)
-	var text_x: float = padding_x + icon_size + 7.0
+	var text_x: float = icon_center.x + icon_size * 0.5 + 7.0
 	var text_w: float = maxf(size.x - text_x - 8.0, 1.0)
 	level_label.position = Vector2(text_x, 6.0)
 	level_label.size = Vector2(text_w, 17.0)
@@ -174,26 +178,26 @@ func _make_style(
 
 
 func _draw_progress_fill(fill_bounds: Rect2, ratio: float) -> void:
-	var fill_width: float = floorf(fill_bounds.size.x * ratio)
+	var safe_bounds := fill_bounds.grow(-1.0)
+	var fill_width: float = clampf(safe_bounds.size.x * ratio, 0.0, safe_bounds.size.x)
 	if fill_width <= 0.0 or fill_bounds.size.y <= 0.0:
 		return
 
-	var radius: float = fill_bounds.size.y * 0.5
+	var radius: float = minf(safe_bounds.size.y * 0.5, fill_width * 0.5)
 	var column_count: int = int(ceilf(fill_width))
-	var full_fill := fill_width >= fill_bounds.size.x - 1.0
 	for column_index in range(column_count):
-		var local_x := float(column_index) + 0.5
+		var local_x: float = float(column_index) + 0.5
 		var column_width := minf(1.0, fill_width - float(column_index))
-		var top := fill_bounds.position.y
-		var bottom := fill_bounds.position.y + fill_bounds.size.y
+		var top := safe_bounds.position.y
+		var bottom := safe_bounds.position.y + safe_bounds.size.y
 
 		if local_x < radius:
 			var dx := radius - local_x
 			var clip := radius - sqrt(maxf(radius * radius - dx * dx, 0.0))
 			top += clip
 			bottom -= clip
-		elif full_fill and local_x > fill_bounds.size.x - radius:
-			var dx := local_x - (fill_bounds.size.x - radius)
+		elif local_x > fill_width - radius:
+			var dx := local_x - (fill_width - radius)
 			var clip := radius - sqrt(maxf(radius * radius - dx * dx, 0.0))
 			top += clip
 			bottom -= clip
@@ -202,6 +206,7 @@ func _draw_progress_fill(fill_bounds: Rect2, ratio: float) -> void:
 		if height <= 0.0:
 			continue
 
-		var color_t := clampf((float(column_index) / fill_bounds.size.x) * 0.55 + ratio * 0.45, 0.0, 1.0)
-		var fill_color := Color(0.42, 0.02, 0.56, 0.70).lerp(Color(0.90, 0.16, 1.0, 0.84), color_t)
-		draw_rect(Rect2(Vector2(fill_bounds.position.x + float(column_index), top), Vector2(column_width, height)), fill_color, true)
+		var color_t: float = clampf(float(column_index) / maxf(safe_bounds.size.x - 1.0, 1.0), 0.0, 1.0)
+		color_t = color_t * color_t * (3.0 - 2.0 * color_t)
+		var fill_color := Color(0.28, 0.82, 0.28, 0.78).lerp(Color(0.90, 0.16, 1.0, 0.84), color_t)
+		draw_rect(Rect2(Vector2(safe_bounds.position.x + float(column_index), top), Vector2(column_width, height)), fill_color, true)
