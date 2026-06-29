@@ -4018,6 +4018,9 @@ const RESCUE_KIT_FALLBACK_HOOK_ID := "small_hook_12"
 const REPAIR_COST_MULTIPLIER := 0.35
 const REPAIR_BLOCK_WEAR_PERCENT := 90
 const BROKEN_WEAR_PERCENT := 100
+const SPINNING_RETRIEVE_SPEED_MIN := 1
+const SPINNING_RETRIEVE_SPEED_MAX := 50
+const DEFAULT_SPINNING_RETRIEVE_SPEED := 25
 
 var money: float = 0.0
 var alpha_tester_bonus_claimed := false
@@ -4035,6 +4038,7 @@ var current_spot: String = "old_oak_pier"
 var unlocked_spots: Array = ["old_oak_pier"]
 var upgrades: Array = []
 var fishing_depth: float = 0.8
+var spinning_retrieve_speed: int = DEFAULT_SPINNING_RETRIEVE_SPEED
 var owned_items: Array = get_default_owned_items()
 var current_tackle: Dictionary = get_default_tackle()
 var recent_tackle_items: Dictionary = get_default_recent_tackle_items()
@@ -5218,6 +5222,19 @@ func adjust_fishing_depth(delta: float) -> void:
 
 func clamp_fishing_depth_to_current_spot() -> void:
 	set_fishing_depth(fishing_depth)
+
+func set_spinning_retrieve_speed(value: float) -> void:
+	spinning_retrieve_speed = clampi(roundi(value), SPINNING_RETRIEVE_SPEED_MIN, SPINNING_RETRIEVE_SPEED_MAX)
+
+func adjust_spinning_retrieve_speed(delta: float) -> void:
+	set_spinning_retrieve_speed(float(spinning_retrieve_speed) + delta)
+
+func get_spinning_retrieve_speed() -> int:
+	return clampi(spinning_retrieve_speed, SPINNING_RETRIEVE_SPEED_MIN, SPINNING_RETRIEVE_SPEED_MAX)
+
+func get_spinning_retrieve_speed_ratio() -> float:
+	var span := maxf(float(SPINNING_RETRIEVE_SPEED_MAX - SPINNING_RETRIEVE_SPEED_MIN), 1.0)
+	return clampf(float(get_spinning_retrieve_speed() - SPINNING_RETRIEVE_SPEED_MIN) / span, 0.0, 1.0)
 
 func get_current_spot_depth_range() -> Dictionary:
 	var spot := SpotDatabase.get_spot(current_spot)
@@ -7848,6 +7865,8 @@ func get_tackle_stats() -> Dictionary:
 		"target_fish_ids": target_fish_ids,
 		"secondary_fish_ids": secondary_fish_ids,
 		"fishing_depth": fishing_depth,
+		"spinning_retrieve_speed": get_spinning_retrieve_speed(),
+		"spinning_retrieve_speed_ratio": get_spinning_retrieve_speed_ratio(),
 		"fish_attraction": fish_attraction,
 		"fish_attraction_by_id": fish_attraction_by_id,
 		"allowed_rarities": allowed_rarities,

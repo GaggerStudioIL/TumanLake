@@ -44,6 +44,7 @@ const RADIAL_STATE_CLOSING := "closing"
 const RADIAL_STATE_DISABLED := "disabled"
 const RADIAL_ANIMATION_SECONDS := 0.22
 const TOGGLE_LONG_PRESS_MSEC := 520
+const ROW_LEFT_BIAS := -92.0
 
 var main
 var is_tackle_radial_open := false
@@ -106,7 +107,8 @@ func layout(_rect: Rect2, ui_scale: float) -> void:
 	var row_width: float = _button_edge * float(button_count) + gap * float(button_count - 1)
 	var side_margin: float = max(10.0 * _ui_scale, 8.0)
 	row_width = min(row_width, max(viewport_size.x - side_margin * 2.0, _button_edge))
-	var row_left: float = clamp((viewport_size.x - row_width) * 0.5, side_margin, max(side_margin, viewport_size.x - row_width - side_margin))
+	var row_left_centered := (viewport_size.x - row_width) * 0.5
+	var row_left: float = clamp(row_left_centered + ROW_LEFT_BIAS * _ui_scale, side_margin, max(side_margin, viewport_size.x - row_width - side_margin))
 	var row_top: float = viewport_size.y - clamp(44.0 * _ui_scale, 42.0, 68.0) - _button_edge
 	row_top = clamp(row_top, side_margin, max(side_margin, viewport_size.y - _button_edge - side_margin))
 	var row_origin := Vector2(row_left, row_top)

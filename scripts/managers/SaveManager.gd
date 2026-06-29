@@ -48,6 +48,7 @@ func save_game() -> void:
 		"unlocked_spots": PlayerData.unlocked_spots,
 		"upgrades": PlayerData.upgrades,
 		"fishing_depth": PlayerData.fishing_depth,
+		"spinning_retrieve_speed": PlayerData.get_spinning_retrieve_speed() if PlayerData.has_method("get_spinning_retrieve_speed") else 25,
 		"owned_items": PlayerData.owned_items,
 		"current_tackle": PlayerData.current_tackle,
 		"recent_tackle_items": PlayerData.get_recent_tackle_items_save_data(),
@@ -140,6 +141,8 @@ func load_game() -> void:
 	PlayerData.unlocked_spots = save_data.get("unlocked_spots", ["old_oak_pier"])
 	PlayerData.upgrades = save_data.get("upgrades", [])
 	PlayerData.set_fishing_depth(float(save_data.get("fishing_depth", PlayerData.fishing_depth)))
+	if PlayerData.has_method("set_spinning_retrieve_speed"):
+		PlayerData.set_spinning_retrieve_speed(float(save_data.get("spinning_retrieve_speed", PlayerData.get_spinning_retrieve_speed())))
 	PlayerData.set_owned_items(save_data.get("owned_items", []))
 	var missing_survival_state := not (save_data as Dictionary).has("starter_survival_kit_granted") or not (save_data as Dictionary).has("equipped_clothing")
 	var migrated_survival_state := false

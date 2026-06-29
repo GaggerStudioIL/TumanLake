@@ -175,7 +175,45 @@ Pre-release package id note:
 - `aapt2 dump badging` показывает `versionName='0.1.0-beta.3'` и `versionCode='547'`.
 - Установка на устройство и короткий tap-through остаются обязательной ручной проверкой перед отправкой тестерам.
 
-## 11. Blocker для отправки
+## 11. 2026-06-30 beta.4 cast freeze hotfix export
+
+Команда:
+
+```bash
+Godot_v4.6.2-stable_win64_console.exe --display-driver windows --rendering-driver opengl3 --path . --export-debug Android build/RybnoeMesto_0.1.0-beta.4.apk
+```
+
+Перед экспортом проверено:
+
+- `GameVersion.VERSION="0.1.0-beta.4"`.
+- `GameVersion.BUILD_NAME="Cast Freeze & Spinning Hotfix"`.
+- `GameVersion.BUILD_DATE="2026-06-30"`.
+- `BuildConfig.IS_BETA_BUILD = true`.
+- `BuildConfig.ENABLE_ALPHA_TESTER_BONUS = false`.
+- `BuildConfig.ENABLE_DEBUG_PANEL = false`.
+- `BuildConfig.ENABLE_VERBOSE_LOGS = false`.
+- `BuildConfig.SPINNING_ENABLED = true`.
+- `BuildConfig.ENABLE_SPINNING_TEST_MODE = true`.
+- Android preset обновлён на `version/name="0.1.0-beta.4"` и `version/code=548`.
+- Android preset экспортирует `build/RybnoeMesto_0.1.0-beta.4.apk`.
+
+Результат:
+
+- APK собран: `build/RybnoeMesto_0.1.0-beta.4.apk`.
+- Размер: `346581235` bytes.
+- SHA-256: `21470A9F3725B7AB7221D43E638D338AA99E659501341C1B3272BC7B67DE59A1`.
+- `aapt2 dump badging` показывает package `com.tumanlake.game`, `versionName='0.1.0-beta.4'`, `versionCode='548'`, `minSdkVersion='24'`, `targetSdkVersion='35'`.
+- После экспорта выполнен `tools/patch_android_themed_icon.ps1 -ApkPath build/RybnoeMesto_0.1.0-beta.4.apk`.
+- В APK присутствуют `res/mipmap-anydpi-v26/icon.xml` и `res/mipmap-anydpi-v26/themed_icon.xml`.
+- `apksigner verify --verbose --print-certs` проходит без ошибок; подпись валидна по APK Signature Scheme v2/v3.
+
+Ручная проверка перед отправкой:
+
+- Установить APK на тестовое устройство.
+- Проверить поплавочную ловлю: увеличенный поплавок, уход под воду, потерю крючка и длительную поклёвку без зависания нижнего меню.
+- Проверить спиннинг: заброс, скорость подмотки 1-50, паузу, рывок, завершение поимки без старой окружности заброса и без отрыва катушки от удилища.
+
+## 12. Blocker для отправки
 
 Не отправлять билд, если:
 

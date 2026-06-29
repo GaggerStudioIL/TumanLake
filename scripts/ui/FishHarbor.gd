@@ -369,11 +369,14 @@ func _create_sale_row(fish: Dictionary, fish_index: int) -> Panel:
 	row.add_theme_constant_override("separation", 10)
 	card.add_child(row)
 
-	var checkbox := CheckBox.new()
-	checkbox.button_pressed = selected
-	checkbox.custom_minimum_size = Vector2(36.0, 48.0)
-	checkbox.toggled.connect(_on_fish_selection_toggled.bind(fish_index))
-	row.add_child(checkbox)
+	var selection_button := Button.new()
+	selection_button.toggle_mode = true
+	selection_button.button_pressed = selected
+	selection_button.text = "✓" if selected else ""
+	selection_button.custom_minimum_size = Vector2(38.0, 48.0)
+	_apply_selection_toggle_style(selection_button, selected)
+	selection_button.toggled.connect(_on_sale_selection_button_toggled.bind(fish_index, selection_button))
+	row.add_child(selection_button)
 
 	var fish_slot := Panel.new()
 	fish_slot.custom_minimum_size = Vector2(76.0, 68.0)
@@ -579,6 +582,13 @@ func _on_fish_selection_toggled(pressed: bool, fish_index: int) -> void:
 	_hide_buyer_popup()
 	selected_fish[fish_index] = pressed
 	_refresh_sale_footer()
+
+
+func _on_sale_selection_button_toggled(pressed: bool, fish_index: int, button: Button) -> void:
+	if button != null:
+		button.text = "✓" if pressed else ""
+		_apply_selection_toggle_style(button, pressed)
+	_on_fish_selection_toggled(pressed, fish_index)
 
 
 func _refresh_sale_footer() -> void:
@@ -2387,21 +2397,23 @@ func _apply_button(button: BaseButton, active: bool) -> void:
 	else:
 		var normal := _make_style(Color(0.045, 0.095, 0.092, 0.92), Color(0.50, 0.86, 0.82, 0.34), 8, 3, Color(0.0, 0.0, 0.0, 0.18))
 		button.add_theme_stylebox_override("normal", normal)
+	_disable_menu_focus(button)
 	button.add_theme_font_size_override("font_size", 13)
 	button.add_theme_color_override("font_color", Color(0.94, 1.0, 0.92, 1.0))
 
 
 func _apply_buyer_button_style(button: Button, best: bool) -> void:
+	_disable_menu_focus(button)
 	var accent := Color(0.48, 1.0, 0.88, 1.0) if best else Color(0.58, 0.86, 0.80, 0.94)
 	button.add_theme_stylebox_override("normal", _make_style(Color(0.024, 0.050, 0.052, 0.82), Color(accent.r, accent.g, accent.b, 0.34), 9, 4, Color(0.0, 0.0, 0.0, 0.18)))
 	button.add_theme_stylebox_override("hover", _make_style(Color(0.040, 0.095, 0.086, 0.94), Color(accent.r, accent.g, accent.b, 0.58), 9, 7, Color(accent.r, accent.g, accent.b, 0.12)))
 	button.add_theme_stylebox_override("pressed", _make_style(Color(0.032, 0.130, 0.112, 0.98), Color(accent.r, accent.g, accent.b, 0.68), 9, 2, Color.TRANSPARENT))
-	button.add_theme_stylebox_override("focus", _make_style(Color(0.044, 0.110, 0.096, 0.94), Color(accent.r, accent.g, accent.b, 0.70), 9, 5, Color(accent.r, accent.g, accent.b, 0.10)))
 	button.add_theme_font_size_override("font_size", 12)
 	button.add_theme_color_override("font_color", Color(0.94, 1.0, 0.92, 1.0))
 
 
 func _apply_buyer_option_style(button: Button, accepted: bool, best: bool, selected: bool) -> void:
+	_disable_menu_focus(button)
 	var accent := Color(0.45, 0.98, 0.88, 1.0) if best else Color(0.62, 0.82, 0.78, 0.94)
 	if selected:
 		accent = Color(0.88, 1.0, 0.70, 1.0)
@@ -2418,10 +2430,26 @@ func _apply_buyer_option_style(button: Button, accepted: bool, best: bool, selec
 
 
 func _apply_market_card_style(button: Button, accent: Color) -> void:
+	_disable_menu_focus(button)
 	button.add_theme_stylebox_override("normal", _make_style(Color(0.020, 0.046, 0.050, 0.72), Color(accent.r, accent.g, accent.b, 0.24), 8, 4, Color(0.0, 0.0, 0.0, 0.18)))
 	button.add_theme_stylebox_override("hover", _make_style(Color(0.034, 0.074, 0.074, 0.86), Color(accent.r, accent.g, accent.b, 0.46), 8, 6, Color(accent.r, accent.g, accent.b, 0.10)))
 	button.add_theme_stylebox_override("pressed", _make_style(Color(0.028, 0.108, 0.096, 0.92), Color(accent.r, accent.g, accent.b, 0.56), 8, 2, Color.TRANSPARENT))
-	button.add_theme_stylebox_override("focus", _make_style(Color(0.034, 0.086, 0.082, 0.90), Color(accent.r, accent.g, accent.b, 0.54), 8, 4, Color(accent.r, accent.g, accent.b, 0.08)))
+
+
+func _apply_selection_toggle_style(button: Button, selected: bool) -> void:
+	_disable_menu_focus(button)
+	var accent := Color(0.62, 1.0, 0.82, 0.96) if selected else Color(0.50, 0.76, 0.72, 0.58)
+	var bg := Color(0.080, 0.170, 0.125, 0.92) if selected else Color(0.018, 0.044, 0.046, 0.78)
+	button.add_theme_stylebox_override("normal", _make_style(bg, Color(accent.r, accent.g, accent.b, 0.34), 7, 2, Color.TRANSPARENT))
+	button.add_theme_stylebox_override("hover", _make_style(Color(bg.r + 0.018, bg.g + 0.030, bg.b + 0.026, min(bg.a + 0.05, 1.0)), Color(accent.r, accent.g, accent.b, 0.52), 7, 4, Color(accent.r, accent.g, accent.b, 0.08)))
+	button.add_theme_stylebox_override("pressed", _make_style(Color(0.052, 0.150, 0.116, 0.96), Color(accent.r, accent.g, accent.b, 0.62), 7, 1, Color.TRANSPARENT))
+	button.add_theme_font_size_override("font_size", 18)
+	button.add_theme_color_override("font_color", Color(0.88, 1.0, 0.88, 0.96) if selected else Color(0.62, 0.78, 0.74, 0.92))
+
+
+func _disable_menu_focus(button: BaseButton) -> void:
+	button.focus_mode = Control.FOCUS_NONE
+	button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 
 
 func _apply_progress_bar_style(progress_bar: ProgressBar, accent: Color) -> void:

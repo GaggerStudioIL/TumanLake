@@ -2,16 +2,19 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c37covy4kqfxr"
-path="res://.godot/imported/reel_handle_full_canvas.png-d178fe701f3193726bedec2ac4ce2fa0.ctex"
+uid="uid://ck8m4t51lua0c"
+path="res://.godot/imported/Kat_001_Kat_Normal.png-3537d3d22c5799b975a96cf7bebe4d9a.ctex"
 metadata={
 "vram_texture": false
+}
+generator_parameters={
+"md5": "ddabe5702d9986a892b07b215d816252"
 }
 
 [deps]
 
-source_file="res://assets/art/fishing/reel_handle_full_canvas.png"
-dest_files=["res://.godot/imported/reel_handle_full_canvas.png-d178fe701f3193726bedec2ac4ce2fa0.ctex"]
+source_file="res://assets/models/reels/Kat_001_Kat_Normal.png"
+dest_files=["res://.godot/imported/Kat_001_Kat_Normal.png-3537d3d22c5799b975a96cf7bebe4d9a.ctex"]
 
 [params]
 
@@ -23,7 +26,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=false
+mipmaps/generate=true
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

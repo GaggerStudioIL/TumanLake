@@ -17,6 +17,9 @@ var _phase := "hidden"
 var _time := 0.0
 var _base_float_pos := Vector2.ZERO
 var _rings: Array[Dictionary] = []
+var _float_texture_path := ""
+var _float_texture_uses_custom := false
+var _texture_cache: Dictionary = {}
 
 
 func _ready() -> void:
@@ -26,7 +29,7 @@ func _ready() -> void:
 	_layout_nodes()
 	reset_float()
 	hide_preview()
-	set_process(true)
+	set_process(false)
 
 
 func _notification(what: int) -> void:
@@ -37,6 +40,8 @@ func _notification(what: int) -> void:
 
 
 func _process(delta: float) -> void:
+	if not visible:
+		return
 	_time += delta
 	_update_rings(delta)
 	if visible and (_phase == "idle" or _phase == "interest"):
@@ -108,6 +113,7 @@ func show_preview() -> void:
 	if _panel == null:
 		return
 	visible = true
+	set_process(true)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if _fade_tween != null:
 		_fade_tween.kill()
@@ -122,8 +128,10 @@ func hide_preview() -> void:
 		_fade_tween.kill()
 	_phase = "hidden"
 	visible = false
+	set_process(false)
 	modulate.a = 0.0
 	_rings.clear()
+	queue_redraw()
 
 
 func reset_float() -> void:
@@ -146,6 +154,28 @@ func set_idle() -> void:
 	_float_texture_rect.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	_ripple_texture_rect.modulate = Color(1.0, 1.0, 1.0, 0.32)
 	_add_ring(0.12, 0.70)
+
+
+func refresh_current_float_texture() -> void:
+	if _float_texture_rect == null:
+		return
+
+	var desired_path := _get_current_float_texture_path()
+	if desired_path == _float_texture_path and _float_texture_rect.texture != null:
+		return
+
+	var texture := _load_texture_resource(desired_path)
+	_float_texture_uses_custom = desired_path != FLOAT_TEXTURE_PATH and texture != null
+	if _float_texture_uses_custom:
+		_float_texture_path = desired_path
+		_float_texture_rect.texture = texture
+	else:
+		_float_texture_path = FLOAT_TEXTURE_PATH
+		_float_texture_rect.texture = _make_atlas_texture(FLOAT_TEXTURE_PATH, FLOAT_TEXTURE_REGION)
+
+	_layout_nodes()
+	reset_float()
+	queue_redraw()
 
 
 func play_wind_nudge(data: Dictionary = {}) -> void:
@@ -269,7 +299,9 @@ func _build_nodes() -> void:
 	_float_texture_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_float_texture_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_float_texture_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_float_texture_rect.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	_float_texture_rect.texture = _make_atlas_texture(FLOAT_TEXTURE_PATH, FLOAT_TEXTURE_REGION)
+	_float_texture_path = FLOAT_TEXTURE_PATH
 	_panel.add_child(_float_texture_rect)
 	_panel.move_child(_ripple_texture_rect, _panel.get_child_count() - 1)
 
@@ -286,7 +318,16 @@ func _layout_nodes() -> void:
 	_ripple_texture_rect.size = Vector2(view_size.x * 0.50, view_size.y * 0.20)
 	_ripple_texture_rect.position = Vector2((view_size.x - _ripple_texture_rect.size.x) * 0.5, waterline - _ripple_texture_rect.size.y * 0.52)
 	var float_height: float = clampf(view_size.y * 0.49, 52.0, 68.0)
-	_float_texture_rect.size = Vector2(float_height * 0.24, float_height)
+	if _float_texture_uses_custom:
+		var texture_size := _get_float_texture_size()
+		var max_float_size := Vector2(view_size.x * 0.42, view_size.y * 0.58)
+		var texture_scale: float = minf(
+			max_float_size.x / maxf(texture_size.x, 1.0),
+			max_float_size.y / maxf(texture_size.y, 1.0)
+		)
+		_float_texture_rect.size = texture_size * maxf(texture_scale, 0.01)
+	else:
+		_float_texture_rect.size = Vector2(float_height * 0.24, float_height)
 	_float_texture_rect.pivot_offset = _float_texture_rect.size * 0.5
 	_base_float_pos = _get_float_base_position()
 
@@ -314,6 +355,12 @@ func _get_float_center() -> Vector2:
 	if _float_texture_rect == null:
 		return _get_view_size() * 0.5
 	return _float_texture_rect.position + _float_texture_rect.size * 0.5
+
+
+func _get_float_texture_size() -> Vector2:
+	if _float_texture_rect != null and _float_texture_rect.texture != null:
+		return _float_texture_rect.texture.get_size()
+	return FLOAT_TEXTURE_REGION.size
 
 
 func _get_waterline_y() -> float:
@@ -411,12 +458,53 @@ func _update_rings(delta: float) -> void:
 
 
 func _make_atlas_texture(path: String, region: Rect2) -> Texture2D:
-	var texture := load(path)
+	var texture := _load_texture_resource(path)
 	if texture is Texture2D:
 		var atlas := AtlasTexture.new()
 		atlas.atlas = texture
 		atlas.region = region
 		return atlas
+	return null
+
+
+func _get_current_float_texture_path() -> String:
+	var float_data := _get_current_float_data()
+	var path := str(float_data.get("image_path", ""))
+	if path != "" and (ResourceLoader.exists(path) or FileAccess.file_exists(path)):
+		return path
+	return FLOAT_TEXTURE_PATH
+
+
+func _get_current_float_data() -> Dictionary:
+	if PlayerData != null and PlayerData.has_method("get_current_float_data"):
+		var data = PlayerData.call("get_current_float_data")
+		if data is Dictionary:
+			return (data as Dictionary).duplicate(true)
+	return {}
+
+
+func _load_texture_resource(path: String) -> Texture2D:
+	if path == "":
+		return null
+	if _texture_cache.has(path):
+		return _texture_cache[path]
+	if not ResourceLoader.exists(path) and not FileAccess.file_exists(path):
+		_texture_cache[path] = null
+		return null
+
+	if ResourceLoader.exists(path):
+		var resource := load(path)
+		if resource is Texture2D:
+			_texture_cache[path] = resource
+			return resource
+
+	var image := Image.load_from_file(path)
+	if image != null and not image.is_empty():
+		var texture := ImageTexture.create_from_image(image)
+		_texture_cache[path] = texture
+		return texture
+
+	_texture_cache[path] = null
 	return null
 
 

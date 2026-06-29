@@ -50,6 +50,8 @@ var hook_texture: Texture2D
 var center_icon_texture: Texture2D
 var draw_depth_text := true
 var depth_adjust_enabled := true
+var depth_controls_visible := true
+var integer_value_display := false
 var button_state: int = CastButtonState.READY_TO_CAST
 
 var _dragging_depth := false
@@ -81,6 +83,18 @@ func set_draw_depth_text(enabled: bool) -> void:
 	queue_redraw()
 
 
+func set_integer_value_display(enabled: bool) -> void:
+	integer_value_display = enabled
+	queue_redraw()
+
+
+func set_depth_controls_visible(enabled: bool) -> void:
+	depth_controls_visible = enabled
+	if not enabled:
+		_dragging_depth = false
+	queue_redraw()
+
+
 func set_depth_adjust_enabled(enabled: bool) -> void:
 	depth_adjust_enabled = enabled
 	if not enabled:
@@ -101,9 +115,20 @@ func set_pressed_visual(enabled: bool) -> void:
 	queue_redraw()
 
 
+func cancel_press() -> void:
+	_center_pointer_down = false
+	_is_pressed_visual = false
+	queue_redraw()
+
+
 func set_depth_range(min_value: float, max_value: float) -> void:
 	min_depth = minf(min_value, max_value)
 	max_depth = maxf(min_value, max_value)
+	set_depth_value(depth_value, false)
+
+
+func set_depth_step(value: float) -> void:
+	depth_step = maxf(value, 0.0)
 	set_depth_value(depth_value, false)
 
 
@@ -137,7 +162,7 @@ func is_depth_gesture_global_point(global_point: Vector2) -> bool:
 
 
 func is_depth_gesture_point(point: Vector2) -> bool:
-	if not depth_adjust_enabled:
+	if not depth_controls_visible or not depth_adjust_enabled:
 		return false
 	return _is_depth_handle_point(point)
 
@@ -210,9 +235,10 @@ func _draw() -> void:
 
 	var control_alpha := 0.48 if button_state == CastButtonState.DISABLED else 1.0
 	_draw_canvas_texture(CAST_BUTTON_BASE, rect, Color(1.0, 1.0, 1.0, control_alpha))
-	_draw_meter_fill_layer(rect, control_alpha)
-	_draw_depth_text_layer(rect, control_alpha)
-	_draw_handle_layer(rect, control_alpha)
+	if depth_controls_visible:
+		_draw_meter_fill_layer(rect, control_alpha)
+		_draw_depth_text_layer(rect, control_alpha)
+		_draw_handle_layer(rect, control_alpha)
 	if _is_pressed_visual:
 		_draw_pressed_overlay(rect)
 
@@ -244,7 +270,7 @@ func _draw_depth_text_layer(rect: Rect2, control_alpha: float) -> void:
 	var font := get_theme_default_font()
 	var edge := rect.size.x
 	var font_size := int(clampf(edge * 0.130, 16.0, 26.0))
-	var text := "%.1f" % depth_value
+	var text := str(roundi(depth_value)) if integer_value_display else "%.1f" % depth_value
 	var text_size := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size)
 	var text_pos := rect.position + Vector2((edge - text_size.x) * 0.5, edge * 0.385)
 	for shadow_offset in [Vector2(-1.0, 0.0), Vector2(1.0, 0.0), Vector2(0.0, -1.0), Vector2(0.0, 1.0), Vector2(1.0, 1.0)]:
@@ -287,7 +313,8 @@ func _is_center_action_point(point: Vector2) -> bool:
 	var rect := _get_visual_rect()
 	if rect.size.x <= 1.0:
 		return false
-	return point.distance_to(_get_visual_center()) <= rect.size.x * 0.265
+	var hit_radius_ratio := 0.265 if depth_controls_visible and depth_adjust_enabled else 0.455
+	return point.distance_to(_get_visual_center()) <= rect.size.x * hit_radius_ratio
 
 
 func _is_center_action_enabled() -> bool:
