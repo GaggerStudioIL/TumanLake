@@ -213,7 +213,52 @@ Godot_v4.6.2-stable_win64_console.exe --display-driver windows --rendering-drive
 - Проверить поплавочную ловлю: увеличенный поплавок, уход под воду, потерю крючка и длительную поклёвку без зависания нижнего меню.
 - Проверить спиннинг: заброс, скорость подмотки 1-50, паузу, рывок, завершение поимки без старой окружности заброса и без отрыва катушки от удилища.
 
-## 12. Blocker для отправки
+## 12. 2026-06-30 beta.5 catch reward layout hotfix export
+
+Команда:
+
+```bash
+Godot_v4.6.2-stable_win64_console.exe --display-driver windows --rendering-driver opengl3 --path . --export-debug Android build/RybnoeMesto_0.1.0-beta.5.apk
+```
+
+Перед экспортом проверено:
+
+- `GameVersion.VERSION="0.1.0-beta.5"`.
+- `GameVersion.BUILD_NAME="Catch Reward Layout Hotfix"`.
+- `GameVersion.BUILD_DATE="2026-06-30"`.
+- `BuildConfig.IS_BETA_BUILD = true`.
+- `BuildConfig.ENABLE_ALPHA_TESTER_BONUS = false`.
+- `BuildConfig.ENABLE_DEBUG_PANEL = false`.
+- `BuildConfig.ENABLE_VERBOSE_LOGS = false`.
+- `BuildConfig.SPINNING_ENABLED = true`.
+- `BuildConfig.ENABLE_SPINNING_TEST_MODE = true`.
+- Android preset обновлён на `version/name="0.1.0-beta.5"` и `version/code=549`.
+- Android preset экспортирует `build/RybnoeMesto_0.1.0-beta.5.apk`.
+
+Результат:
+
+- APK собран: `build/RybnoeMesto_0.1.0-beta.5.apk`.
+- Размер: `359989623` bytes.
+- SHA-256: `BF919974ABBB2248A9F87A1D025BE805067782E6B352FED5B091F61D79BC08C6`.
+- `aapt2 dump badging` показывает package `com.tumanlake.game`, `versionName='0.1.0-beta.5'`, `versionCode='549'`, `minSdkVersion='24'`, `targetSdkVersion='35'`.
+- После экспорта выполнен `tools/patch_android_themed_icon.ps1 -ApkPath build/RybnoeMesto_0.1.0-beta.5.apk`.
+- В APK присутствуют `res/mipmap-anydpi-v26/icon.xml` и `res/mipmap-anydpi-v26/themed_icon.xml`.
+- `apksigner verify --verbose --print-certs` проходит без ошибок; подпись валидна по APK Signature Scheme v2/v3.
+- APK загружен в Vercel Blob: `https://82soys46zdxg7yh3.public.blob.vercel-storage.com/RybnoeMesto_0.1.0-beta.5.apk`.
+- Лендинг собран через `npm run build` и задеплоен в production на Vercel; production bundle `https://fishingspotgame.com` содержит ссылку на APK beta.5.
+
+Ограничения проверки:
+
+- `adb devices -l` не показал подключённых Android-устройств, поэтому физическая установка APK и ручной tap-through в этом проходе не выполнялись.
+- Godot smoke test завершился с кодом 0 без `SCRIPT ERROR`, но старые warnings про anchors и RID/resource leaks на выходе остаются.
+
+Ручная проверка перед отправкой:
+
+- Установить APK на Android-устройство.
+- Проверить карточку пойманной рыбы на 960x540 и широком экране: пропорции 4:3, кнопки зачёта/отпускания, отсутствие перекрытий текста.
+- Пройти короткий маршрут: запуск -> заброс -> поклёвка -> вываживание -> карточка улова -> зачёт или отпускание.
+
+## 13. Blocker для отправки
 
 Не отправлять билд, если:
 

@@ -7401,15 +7401,16 @@ func _setup_layout() -> void:
 	if toast_label != null:
 		popup_manager.layout(screen_size, margin)
 
-	var reward_width: float = min(screen_size.x - margin * 4.0, 700.0)
-	var reward_height: float = min(screen_size.y - margin * 3.0, 486.0)
+	var reward_max_height: float = min(screen_size.y - margin * 3.0, 525.0)
+	var reward_width: float = minf(minf(screen_size.x - margin * 4.0, 700.0), reward_max_height * 4.0 / 3.0)
+	var reward_height: float = reward_width * 0.75
 	var reward_x: float = (screen_size.x - reward_width) * 0.5
 	var reward_y: float = (screen_size.y - reward_height) * 0.5
 	var reward_padding := 18.0
 	var reward_inner_width: float = reward_width - reward_padding * 2.0
-	var reward_button_gap := 12.0
-	var reward_button_width: float = min(max(reward_inner_width * 0.18, 116.0), 128.0)
-	var reward_button_height := 38.0
+	var reward_button_gap := 18.0
+	var reward_button_width: float = min(max(reward_inner_width * 0.28, 160.0), 190.0)
+	var reward_button_height := 42.0
 	var reward_buttons_width: float = reward_button_width * 2.0 + reward_button_gap
 	var reward_button_x: float = (reward_width - reward_buttons_width) * 0.5
 	var reward_button_y: float = reward_height - 18.0 - reward_button_height
@@ -7500,6 +7501,9 @@ func _setup_layout() -> void:
 	catch_release_button.custom_minimum_size = Vector2(reward_button_width, reward_button_height)
 	catch_release_button.size = Vector2(reward_button_width, reward_button_height)
 	catch_release_button.add_theme_font_size_override("font_size", 12)
+
+	if catch_popup_ui != null and catch_popup_panel.visible:
+		catch_popup_ui.refresh()
 
 	_update_reeling_ui(_last_reeling_state)
 	_update_basket_ui()

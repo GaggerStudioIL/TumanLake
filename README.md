@@ -6,7 +6,7 @@
 ## Текущий статус
 
 Статус: Closed Beta preparation
-Текущая версия: v0.1.0-beta.4
+Текущая версия: v0.1.0-beta.5
 Основной рабочий водоём: Озеро Агамим
 
 В текущем beta scope:
@@ -86,6 +86,7 @@ scripts/core/GameVersion.gd
 v0.1.0-beta.2
 v0.1.0-beta.3
 v0.1.0-beta.4
+v0.1.0-beta.5
 v0.1.1-beta.1
 
 ## BuildConfig

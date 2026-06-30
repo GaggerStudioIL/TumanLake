@@ -1,7 +1,7 @@
 extends Node
 
-const VERSION := "0.1.0-beta.4"
-const BUILD_NAME := "Cast Freeze & Spinning Hotfix"
+const VERSION := "0.1.0-beta.5"
+const BUILD_NAME := "Catch Reward Layout Hotfix"
 const BUILD_DATE := "2026-06-30"
 
 func get_version_label() -> String:

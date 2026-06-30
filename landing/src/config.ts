@@ -4,7 +4,7 @@ const withFallback = (value: string | undefined, fallback = "#zbt") =>
   value && value.trim().length > 0 ? value : fallback;
 
 const defaultApkUrl =
-  "https://82soys46zdxg7yh3.public.blob.vercel-storage.com/RybnoeMesto_0.1.0-beta.4.apk";
+  "https://82soys46zdxg7yh3.public.blob.vercel-storage.com/RybnoeMesto_0.1.0-beta.5.apk";
 const defaultTelegramUrl = "https://t.me/+6jhVn0EWIPE0MzE8";
 
 export const links = {
