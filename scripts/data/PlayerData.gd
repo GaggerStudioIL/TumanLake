@@ -1,5 +1,7 @@
 extends Node
 
+const PlayerAvatarData := preload("res://scripts/data/PlayerAvatarData.gd")
+
 const PHYSICAL_SHORE_MIN_DEPTH := 0.16
 const BASIC_FLOAT_ID := "float_drop_basic"
 const BASIC_LEADER_ID := "nylon_leader_20cm_1kg"
@@ -4032,6 +4034,7 @@ var skill_points: int = 0
 var total_skill_points_earned: int = 0
 var learned_skills: Dictionary = {}
 var player_name: String = "Рыбак"
+var selected_avatar_id: String = PlayerAvatarData.DEFAULT_AVATAR_ID
 var current_waterbody: String = "agamin_lake"
 var unlocked_waterbodies: Array = ["agamin_lake"]
 var current_spot: String = "old_oak_pier"
@@ -4786,6 +4789,27 @@ func _safe_saved_array(value) -> Array:
 
 func _get_skill_database() -> Node:
 	return get_node_or_null("/root/SkillDatabase")
+
+
+func get_selected_avatar_id() -> String:
+	selected_avatar_id = PlayerAvatarData.normalize_avatar_id(selected_avatar_id)
+	return selected_avatar_id
+
+
+func set_selected_avatar_id(avatar_id: String) -> bool:
+	var normalized_id := PlayerAvatarData.normalize_avatar_id(avatar_id)
+	var changed := selected_avatar_id != normalized_id
+	selected_avatar_id = normalized_id
+	return changed
+
+
+func get_selected_avatar_small_texture() -> Texture2D:
+	return PlayerAvatarData.get_small_texture(get_selected_avatar_id())
+
+
+func get_selected_avatar_big_texture() -> Texture2D:
+	return PlayerAvatarData.get_big_texture(get_selected_avatar_id())
+
 
 func set_progression(saved_level: int, saved_xp: int) -> void:
 	level = max(saved_level, 1)

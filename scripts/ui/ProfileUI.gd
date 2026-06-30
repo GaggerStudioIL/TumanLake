@@ -2,7 +2,7 @@
 extends RefCounted
 
 const SkillTreeUIScript := preload("res://scripts/ui/SkillTreeUI.gd")
-const LevelRankData := preload("res://scripts/data/LevelRankData.gd")
+const PlayerAvatarData := preload("res://scripts/data/PlayerAvatarData.gd")
 
 const TAB_INFO := "info"
 const TAB_SKILLS := "skills"
@@ -18,8 +18,16 @@ var close_button: Button
 var tabs: HBoxContainer
 var scroll: ScrollContainer
 var content: VBoxContainer
+var avatar_picker_backdrop: ColorRect
+var avatar_picker_panel: Panel
+var avatar_picker_title_label: Label
+var avatar_picker_scroll: ScrollContainer
+var avatar_picker_grid: GridContainer
+var avatar_picker_save_button: Button
+var avatar_picker_exit_button: Button
 var skill_tree_ui
 var _active_tab := TAB_INFO
+var _pending_avatar_id := ""
 
 func setup(main_ref) -> void:
 	main = main_ref
@@ -50,6 +58,7 @@ func close(reset_nav: bool = true) -> void:
 
 	panel.visible = false
 	backdrop.visible = false
+	_close_avatar_picker()
 	if skill_tree_ui != null:
 		skill_tree_ui.close()
 	main.close_modal("profile")
@@ -63,7 +72,11 @@ func is_open() -> bool:
 
 
 func is_any_modal_open() -> bool:
-	return is_open() or (skill_tree_ui != null and skill_tree_ui.is_open())
+	return is_open() or _is_avatar_picker_open() or (skill_tree_ui != null and skill_tree_ui.is_open())
+
+
+func _is_avatar_picker_open() -> bool:
+	return avatar_picker_panel != null and avatar_picker_panel.visible
 
 
 func refresh() -> void:
@@ -166,6 +179,8 @@ func _ensure_profile_ui_nodes() -> void:
 	content.add_theme_constant_override("separation", 12)
 	scroll.add_child(content)
 
+	_ensure_avatar_picker_nodes(parent)
+
 
 func _refresh_tabs() -> void:
 	_clear_children(tabs)
@@ -197,25 +212,8 @@ func _add_info_section() -> void:
 	top.add_theme_constant_override("separation", 18)
 	content.add_child(top)
 
-	var avatar := Panel.new()
-	avatar.custom_minimum_size = Vector2(124.0, 124.0)
-	avatar.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	avatar.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	theme.apply_card_style(avatar)
+	var avatar := _make_profile_avatar_panel()
 	top.add_child(avatar)
-
-	var rank_icon := TextureRect.new()
-	rank_icon.name = "ProfileRankIcon"
-	rank_icon.texture = LevelRankData.get_icon_for_level(PlayerData.level)
-	rank_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	rank_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	rank_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	rank_icon.set_anchors_preset(Control.PRESET_FULL_RECT)
-	rank_icon.offset_left = 14.0
-	rank_icon.offset_top = 10.0
-	rank_icon.offset_right = -14.0
-	rank_icon.offset_bottom = -10.0
-	avatar.add_child(rank_icon)
 
 	var grid := _make_grid(3)
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -230,6 +228,200 @@ func _add_info_section() -> void:
 	_add_stat_card(grid, "Самый дорогой улов", _format_short_record(_get_most_expensive_catch(), true))
 	_add_stat_card(grid, "Самая крупная рыба", _format_short_record(PlayerData.biggest_fish))
 	_add_stat_card(grid, "Трофеи", "%d" % PlayerData.total_trophies_caught)
+
+
+func _make_profile_avatar_panel() -> VBoxContainer:
+	var wrapper := VBoxContainer.new()
+	wrapper.custom_minimum_size = Vector2(156.0, 204.0)
+	wrapper.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	wrapper.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	wrapper.add_theme_constant_override("separation", 8)
+
+	var avatar := Panel.new()
+	avatar.custom_minimum_size = Vector2(156.0, 156.0)
+	avatar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	avatar.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	theme.apply_card_style(avatar)
+	wrapper.add_child(avatar)
+
+	var portrait := TextureRect.new()
+	portrait.name = "ProfileAvatarImage"
+	portrait.texture = PlayerData.get_selected_avatar_big_texture() if PlayerData.has_method("get_selected_avatar_big_texture") else PlayerAvatarData.get_big_texture(PlayerAvatarData.DEFAULT_AVATAR_ID)
+	portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	portrait.set_anchors_preset(Control.PRESET_FULL_RECT)
+	portrait.offset_left = 8.0
+	portrait.offset_top = 8.0
+	portrait.offset_right = -8.0
+	portrait.offset_bottom = -8.0
+	avatar.add_child(portrait)
+
+	var change_button := Button.new()
+	change_button.text = "Изменить"
+	change_button.custom_minimum_size = Vector2(156.0, 38.0)
+	change_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	change_button.focus_mode = Control.FOCUS_NONE
+	main._apply_button_style(change_button, main.STYLE_SECONDARY_BUTTON)
+	change_button.pressed.connect(_open_avatar_picker)
+	wrapper.add_child(change_button)
+
+	return wrapper
+
+
+func _ensure_avatar_picker_nodes(parent: Node) -> void:
+	if avatar_picker_panel != null:
+		return
+
+	avatar_picker_backdrop = ColorRect.new()
+	avatar_picker_backdrop.name = "AvatarPickerBackdrop"
+	avatar_picker_backdrop.visible = false
+	avatar_picker_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	avatar_picker_backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	avatar_picker_backdrop.z_index = main.MENU_BACKDROP_Z + 44
+	avatar_picker_backdrop.color = Color(0.0, 0.0, 0.0, 0.72)
+	parent.add_child(avatar_picker_backdrop)
+
+	avatar_picker_panel = Panel.new()
+	avatar_picker_panel.name = "AvatarPickerPanel"
+	avatar_picker_panel.visible = false
+	avatar_picker_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	avatar_picker_panel.set_anchors_preset(Control.PRESET_CENTER)
+	avatar_picker_panel.custom_minimum_size = Vector2(620.0, 430.0)
+	avatar_picker_panel.size = Vector2(620.0, 430.0)
+	avatar_picker_panel.position = Vector2(-310.0, -215.0)
+	avatar_picker_panel.z_index = main.MENU_PANEL_Z + 44
+	theme.apply_panel_style(avatar_picker_panel)
+	parent.add_child(avatar_picker_panel)
+
+	avatar_picker_title_label = _make_label("Выбор аватара", 23, Color(0.94, 1.0, 0.90, 1.0))
+	avatar_picker_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	avatar_picker_title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	avatar_picker_title_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	avatar_picker_title_label.offset_left = 24.0
+	avatar_picker_title_label.offset_top = 16.0
+	avatar_picker_title_label.offset_right = -24.0
+	avatar_picker_title_label.offset_bottom = 54.0
+	avatar_picker_panel.add_child(avatar_picker_title_label)
+
+	avatar_picker_scroll = ScrollContainer.new()
+	avatar_picker_scroll.name = "AvatarPickerScroll"
+	avatar_picker_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	avatar_picker_scroll.offset_left = 28.0
+	avatar_picker_scroll.offset_top = 72.0
+	avatar_picker_scroll.offset_right = -28.0
+	avatar_picker_scroll.offset_bottom = -82.0
+	avatar_picker_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	avatar_picker_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	avatar_picker_scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+	avatar_picker_panel.add_child(avatar_picker_scroll)
+
+	avatar_picker_grid = GridContainer.new()
+	avatar_picker_grid.name = "AvatarPickerGrid"
+	avatar_picker_grid.columns = 4
+	avatar_picker_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	avatar_picker_grid.add_theme_constant_override("h_separation", 12)
+	avatar_picker_grid.add_theme_constant_override("v_separation", 12)
+	avatar_picker_scroll.add_child(avatar_picker_grid)
+
+	avatar_picker_save_button = Button.new()
+	avatar_picker_save_button.text = "Сохранить"
+	avatar_picker_save_button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	avatar_picker_save_button.offset_left = -300.0
+	avatar_picker_save_button.offset_top = -60.0
+	avatar_picker_save_button.offset_right = -164.0
+	avatar_picker_save_button.offset_bottom = -20.0
+	main._apply_button_style(avatar_picker_save_button, main.STYLE_PRIMARY_BUTTON)
+	avatar_picker_save_button.pressed.connect(_save_avatar_picker_selection)
+	avatar_picker_panel.add_child(avatar_picker_save_button)
+
+	avatar_picker_exit_button = Button.new()
+	avatar_picker_exit_button.text = "Выйти"
+	avatar_picker_exit_button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	avatar_picker_exit_button.offset_left = -148.0
+	avatar_picker_exit_button.offset_top = -60.0
+	avatar_picker_exit_button.offset_right = -24.0
+	avatar_picker_exit_button.offset_bottom = -20.0
+	main._apply_button_style(avatar_picker_exit_button, main.STYLE_SECONDARY_BUTTON)
+	avatar_picker_exit_button.pressed.connect(_close_avatar_picker)
+	avatar_picker_panel.add_child(avatar_picker_exit_button)
+
+
+func _open_avatar_picker() -> void:
+	_ensure_avatar_picker_nodes(main.get_modal_content_root() if main.has_method("get_modal_content_root") else main)
+	_pending_avatar_id = PlayerData.get_selected_avatar_id() if PlayerData.has_method("get_selected_avatar_id") else PlayerAvatarData.DEFAULT_AVATAR_ID
+	_refresh_avatar_picker_grid()
+	avatar_picker_backdrop.visible = true
+	avatar_picker_panel.visible = true
+
+
+func _refresh_avatar_picker_grid() -> void:
+	if avatar_picker_grid == null:
+		return
+	_clear_children(avatar_picker_grid)
+	for avatar in PlayerAvatarData.get_avatars():
+		if typeof(avatar) != TYPE_DICTIONARY:
+			continue
+		var avatar_data: Dictionary = avatar
+		_add_avatar_picker_button(avatar_picker_grid, avatar_data)
+
+
+func _add_avatar_picker_button(parent: Control, avatar: Dictionary) -> void:
+	var avatar_id := str(avatar.get("id", PlayerAvatarData.DEFAULT_AVATAR_ID))
+	var selected := avatar_id == _pending_avatar_id
+	var button := Button.new()
+	button.text = ""
+	button.tooltip_text = str(avatar.get("title", avatar_id))
+	button.custom_minimum_size = Vector2(128.0, 128.0)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.focus_mode = Control.FOCUS_NONE
+	button.clip_text = true
+	main._apply_button_style(button, main.STYLE_PRIMARY_BUTTON if selected else main.STYLE_SECONDARY_BUTTON)
+	button.pressed.connect(_select_avatar_picker_option.bind(avatar_id))
+	parent.add_child(button)
+
+	var image := TextureRect.new()
+	image.name = "AvatarPickerImage"
+	image.texture = PlayerAvatarData.get_big_texture(avatar_id)
+	image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	image.set_anchors_preset(Control.PRESET_FULL_RECT)
+	image.offset_left = 8.0
+	image.offset_top = 8.0
+	image.offset_right = -8.0
+	image.offset_bottom = -8.0
+	button.add_child(image)
+
+
+func _select_avatar_picker_option(avatar_id: String) -> void:
+	_pending_avatar_id = PlayerAvatarData.normalize_avatar_id(avatar_id)
+	_refresh_avatar_picker_grid()
+
+
+func _save_avatar_picker_selection() -> void:
+	if not PlayerData.has_method("set_selected_avatar_id"):
+		_close_avatar_picker()
+		return
+	var changed := bool(PlayerData.set_selected_avatar_id(_pending_avatar_id))
+	if changed:
+		SaveManager.save_game()
+		if main != null:
+			if main.has_method("_refresh_player_avatar_texture"):
+				main._refresh_player_avatar_texture()
+			if main.has_method("_update_ui"):
+				main._update_ui()
+			if main.has_method("_show_toast"):
+				main._show_toast("Аватар сохранён", true)
+		refresh()
+	_close_avatar_picker()
+
+
+func _close_avatar_picker() -> void:
+	if avatar_picker_panel != null:
+		avatar_picker_panel.visible = false
+	if avatar_picker_backdrop != null:
+		avatar_picker_backdrop.visible = false
 
 
 func _add_skills_section() -> void:

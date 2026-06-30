@@ -29,6 +29,7 @@ func save_game() -> void:
 		"learned_skills": PlayerData.get_skill_ranks_save_data() if PlayerData.has_method("get_skill_ranks_save_data") else PlayerData.learned_skills,
 		"skill_tree_points": PlayerData.get_skill_tree_points_save_data() if PlayerData.has_method("get_skill_tree_points_save_data") else {},
 		"player_name": PlayerData.player_name,
+		"selected_avatar_id": PlayerData.get_selected_avatar_id() if PlayerData.has_method("get_selected_avatar_id") else str(PlayerData.selected_avatar_id),
 		"total_fish_caught": PlayerData.total_fish_caught,
 		"total_fish_weight": PlayerData.total_fish_weight,
 		"daily_catch_day": PlayerData.daily_catch_day,
@@ -134,6 +135,9 @@ func load_game() -> void:
 		save_data.get("skill_tree_points", {})
 	)
 	PlayerData.set_catch_stats_from_save(save_data)
+	var missing_avatar_state := not (save_data as Dictionary).has("selected_avatar_id")
+	if PlayerData.has_method("set_selected_avatar_id"):
+		PlayerData.set_selected_avatar_id(str(save_data.get("selected_avatar_id", "")))
 	PlayerData.rescue_kit_claims_total = max(int(save_data.get("rescue_kit_claims_total", 0)), 0)
 	PlayerData.rescue_kit_last_claim_day = int(save_data.get("rescue_kit_last_claim_day", -1))
 	PlayerData.set_unlocked_waterbodies(save_data.get("unlocked_waterbodies", ["agamin_lake"]))
@@ -186,7 +190,7 @@ func load_game() -> void:
 
 	if BuildConfig.ENABLE_VERBOSE_LOGS:
 		print("Game loaded")
-	if should_save_after_time_load or migrated_freshness or migrated_save or removed_zero_value_fish or missing_recent_tackle_items or missing_ranked_skill_state or missing_level_rewards or missing_condition_state or repaired_condition_state or repaired_location or missing_survival_state or migrated_survival_state:
+	if should_save_after_time_load or migrated_freshness or migrated_save or removed_zero_value_fish or missing_recent_tackle_items or missing_ranked_skill_state or missing_level_rewards or missing_condition_state or repaired_condition_state or repaired_location or missing_survival_state or migrated_survival_state or missing_avatar_state:
 		save_game()
 
 func delete_save() -> void:

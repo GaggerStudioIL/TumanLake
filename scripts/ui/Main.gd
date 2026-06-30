@@ -1773,7 +1773,7 @@ func _ensure_top_player_portrait_panel() -> void:
 	elif top_player_portrait_texture.get_parent() != top_player_portrait_panel:
 		_reparent_node(top_player_portrait_texture, top_player_portrait_panel)
 
-	top_player_portrait_texture.texture = PLAYER_PORTRAIT_ICON
+	_refresh_player_avatar_texture()
 	top_player_portrait_texture.visible = true
 
 
@@ -2178,7 +2178,7 @@ func _layout_top_player_portrait_panel(ui_scale: float) -> void:
 		top_player_portrait_texture.custom_minimum_size = panel_size
 		top_player_portrait_texture.size = panel_size
 		top_player_portrait_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		top_player_portrait_texture.stretch_mode = TextureRect.STRETCH_SCALE
+		top_player_portrait_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		_anchor_control(top_player_portrait_texture, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, panel_size.x, panel_size.y)
 
 
@@ -7634,6 +7634,7 @@ func _connect_signals() -> void:
 func _update_ui() -> void:
 	fishing_hud_ui._update_ui()
 	_refresh_fish_button_presentation()
+	_refresh_player_avatar_texture()
 	_update_player_xp_hud()
 	if quick_tackle_panel != null:
 		if quick_tackle_panel.has_method("refresh"):
@@ -7672,6 +7673,23 @@ func _update_player_xp_hud(animate := true) -> void:
 		return
 	if player_xp_hud.has_method("set_progress"):
 		player_xp_hud.call("set_progress", PlayerData.level, PlayerData.current_xp, PlayerData.xp_to_next_level, animate)
+
+
+func _refresh_player_avatar_texture() -> void:
+	if top_player_portrait_texture == null:
+		return
+	var texture := _get_selected_player_avatar_small_texture()
+	top_player_portrait_texture.texture = texture
+	top_player_portrait_texture.visible = texture != null
+
+
+func _get_selected_player_avatar_small_texture() -> Texture2D:
+	if PlayerData.has_method("get_selected_avatar_small_texture"):
+		var texture = PlayerData.call("get_selected_avatar_small_texture")
+		if texture is Texture2D:
+			return texture
+	return PLAYER_PORTRAIT_ICON
+
 
 func _on_global_time_changed(_time_state: Dictionary) -> void:
 	_update_time_hud()
