@@ -2,13 +2,22 @@
 extends RefCounted
 
 const StatusBadgeScript := preload("res://scripts/ui/components/StatusBadge.gd")
+const CATCH_CARD_TEXTURE := preload("res://assets/ui/catch_popup/kartochka.png")
+const CATCH_MARKER_YOUR_TEXTURE := preload("res://assets/ui/catch_popup/your.png")
+const CATCH_MARKER_KEEPER_TEXTURE := preload("res://assets/ui/catch_popup/standart.png")
+const CATCH_MARKER_TROPHY_TEXTURE := preload("res://assets/ui/catch_popup/trophy.png")
+const CATCH_MARKER_RARE_TEXTURE := preload("res://assets/ui/catch_popup/rare.png")
+const CARD_BUTTON_TEXT_SHIFT_RATIO := -0.065
 
 var main
 var theme
+var card_background: TextureRect
 var progress_label: Label
 var progress_track: Panel
-var progress_fill: ColorRect
+var progress_fill: Panel
 var reward_badge_row: HBoxContainer
+var keep_button_text_label: Label
+var release_button_text_label: Label
 var _species_texture_cache: Dictionary = {}
 signal catch_keep_requested
 signal catch_release_requested
@@ -61,6 +70,16 @@ func _ensure_progress_nodes() -> void:
 	if progress_label != null:
 		return
 
+	card_background = TextureRect.new()
+	card_background.name = "CatchCardBackground"
+	card_background.z_index = -4
+	card_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card_background.texture = CATCH_CARD_TEXTURE
+	card_background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	card_background.stretch_mode = TextureRect.STRETCH_SCALE
+	main.catch_popup_panel.add_child(card_background)
+	main.catch_popup_panel.move_child(card_background, 0)
+
 	reward_badge_row = HBoxContainer.new()
 	reward_badge_row.name = "CatchRewardBadgeRow"
 	reward_badge_row.z_index = 6
@@ -89,11 +108,13 @@ func _ensure_progress_nodes() -> void:
 	)
 	main.catch_popup_panel.add_child(progress_track)
 
-	progress_fill = ColorRect.new()
+	progress_fill = Panel.new()
 	progress_fill.name = "CatchRankProgressFill"
 	progress_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	progress_fill.color = Color(0.42, 0.72, 0.22, 0.72)
+	progress_fill.add_theme_stylebox_override("panel", _make_progress_fill_style(Color(0.42, 0.72, 0.22, 1.0)))
 	progress_track.add_child(progress_fill)
+
+	_ensure_card_button_text_labels()
 
 func open(catch_data: Dictionary = {}) -> void:
 	if not catch_data.is_empty():
@@ -302,36 +323,31 @@ func _update_catch_reward_popup(catch_data: Dictionary) -> void:
 	var length_cm = _get_catch_length_cm(catch_data)
 	var catch_rank := str(catch_data.get("catch_rank", "normal"))
 	var fish_status := _get_catch_status(catch_data, catch_rank)
-	var rarity := str(catch_data.get("species_rarity", catch_data.get("rarityType", catch_data.get("rarity", "common"))))
 	var price := int(catch_data.get("price", 0))
 	var trophy_weight := float(catch_data.get("trophy_weight", 0.0))
 	var rarity_weight := float(catch_data.get("rarity_weight", 0.0))
-	var record_messages: Array = []
-	if bool(catch_data.get("is_new_personal_record", false)):
-		record_messages.append("Новый личный рекорд!")
-	if bool(catch_data.get("is_new_species_record", false)):
-		record_messages.append("Новый рекорд вида!")
+	var keeper_weight := _get_keeper_weight(catch_data)
+	var record_weight := _get_record_scale_weight(catch_data, rarity_weight)
+	var missing_text := _get_missing_threshold_text(weight, keeper_weight, trophy_weight, record_weight)
+	var status_text := _get_card_status_text(fish_status, catch_rank)
 	_set_reward_fish_texture(str(catch_data.get("id", "")))
 
-	main.catch_popup_title_label.text = "Поймана рыба"
-	main.catch_popup_badge_label.visible = false
-	main.catch_popup_badge_label.text = ""
+	_layout_catch_card()
+	main.catch_popup_title_label.text = "Поймана Рыба"
+	main.catch_popup_badge_label.visible = status_text != ""
+	main.catch_popup_badge_label.text = status_text
 	main.catch_popup_name_label.text = str(catch_data.get("name", "-"))
 	main.catch_trophy_banner_label.visible = false
 	main.catch_trophy_banner_label.text = ""
-	_update_reward_badges(catch_rank, record_messages, colors, fish_status, rarity)
-	main.catch_popup_stats_label.text = _build_catch_info_text(weight, length_cm, gained_xp, price)
-	_update_rank_progress(catch_data, weight, trophy_weight, rarity_weight, catch_rank, colors)
+	_clear_reward_badges()
+	main.catch_popup_stats_label.text = _build_catch_info_text(weight, length_cm, gained_xp, price, missing_text)
+	_set_card_button_text(main.catch_keep_button, keep_button_text_label, "В садок")
+	_set_card_button_text(main.catch_release_button, release_button_text_label, "Отпустить +5% хр")
+	_update_rank_progress(catch_data, weight, keeper_weight, trophy_weight, record_weight, colors)
 
 	main.catch_popup_badge_label.add_theme_color_override("font_color", colors["text"])
-	main.catch_popup_badge_label.add_theme_stylebox_override(
-		"normal",
-		main._make_panel_style(colors["badge_bg"], colors["border"], 14, 6, colors["shadow"])
-	)
-	main.catch_popup_panel.add_theme_stylebox_override(
-		"panel",
-		main._make_panel_style(colors["panel_bg"], colors["border"], 22, 18, Color(0.0, 0.0, 0.0, 0.36))
-	)
+	main.catch_popup_badge_label.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
+	main.catch_popup_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 
 	var backdrop_material = main.catch_popup_backdrop.material as ShaderMaterial
 	if backdrop_material:
@@ -360,13 +376,25 @@ func _update_catch_reward_popup(catch_data: Dictionary) -> void:
 		fish_material.set_shader_parameter("shimmer_speed", float(feedback["shimmer_speed"]))
 
 
-func _build_catch_info_text(weight: float, length_cm: float, gained_xp: int, price: int) -> String:
-	return "Вес: %s (%s)\nЦена: %s\nXP: +%d" % [
+func _build_catch_info_text(weight: float, length_cm: float, gained_xp: int, price: int, missing_text: String) -> String:
+	var xp_line := "хр: +%d" % gained_xp
+	if missing_text != "":
+		xp_line = "%s · %s" % [xp_line, missing_text]
+	return "Вес: %s (%s)\nЦена: %s\n%s" % [
 		UIFormatters.format_weight_kg(weight),
 		UIFormatters.format_length_cm(length_cm),
 		UIFormatters.format_money(float(price)),
-		gained_xp
+		xp_line
 	]
+
+
+func _clear_reward_badges() -> void:
+	if reward_badge_row == null:
+		return
+	for child in reward_badge_row.get_children():
+		reward_badge_row.remove_child(child)
+		child.queue_free()
+	reward_badge_row.visible = false
 
 
 func _update_reward_badges(catch_rank: String, record_messages: Array, _colors: Dictionary, fish_status: String, rarity: String) -> void:
@@ -377,8 +405,9 @@ func _update_reward_badges(catch_rank: String, record_messages: Array, _colors: 
 		child.queue_free()
 
 	var panel_width: float = main.catch_popup_panel.size.x
+	var panel_height: float = main.catch_popup_panel.size.y
 	var row_width: float = min(panel_width - 72.0, 430.0)
-	reward_badge_row.position = Vector2((panel_width - row_width) * 0.5, 90.0)
+	reward_badge_row.position = Vector2((panel_width - row_width) * 0.5, panel_height * 0.165)
 	reward_badge_row.size = Vector2(row_width, 24.0)
 
 	_add_reward_badge(_get_status_badge_label(fish_status), Color(0.0, 0.0, 0.0, 0.0), Color(0.0, 0.0, 0.0, 0.0), Color(1.0, 1.0, 1.0, 1.0), _get_status_badge_type(fish_status))
@@ -437,6 +466,239 @@ func _get_status_badge_type(status: String) -> String:
 	return StatusBadgeScript.type_for_fish_status(status)
 
 
+func _get_card_status_text(fish_status: String, catch_rank: String) -> String:
+	if catch_rank == "rarity":
+		return "Редкий"
+	match fish_status:
+		"trophy":
+			return "Трофей"
+		"keeper":
+			return "Зачет"
+		"undersized":
+			return "Незачет"
+		_:
+			return UIFormatters.format_fish_status(fish_status)
+
+
+func _layout_catch_card() -> void:
+	var panel_size: Vector2 = main.catch_popup_panel.size
+	if panel_size.x <= 0.0 or panel_size.y <= 0.0:
+		return
+
+	if card_background != null:
+		card_background.position = Vector2.ZERO
+		card_background.size = panel_size
+
+	var padding: float = maxf(panel_size.x * 0.045, 20.0)
+	var inner_width: float = panel_size.x - padding * 2.0
+
+	main.catch_popup_particles.position = Vector2.ZERO
+	main.catch_popup_particles.size = panel_size
+	main.catch_popup_particles.z_index = 0
+	main.catch_popup_particles.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	main.catch_popup_particles.visible = false
+	main.catch_popup_particles.modulate = Color(1.0, 1.0, 1.0, 0.0)
+
+	var glow_width: float = minf(panel_size.x * 0.62, 460.0)
+	var glow_height: float = minf(panel_size.y * 0.30, 160.0)
+	main.catch_popup_glow.position = Vector2((panel_size.x - glow_width) * 0.5, panel_size.y * 0.25)
+	main.catch_popup_glow.size = Vector2(glow_width, glow_height)
+	main.catch_popup_glow.z_index = 1
+	main.catch_popup_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	main.catch_popup_title_label.position = Vector2(padding, panel_size.y * 0.074)
+	main.catch_popup_title_label.size = Vector2(inner_width, 22.0)
+	main.catch_popup_title_label.z_index = 6
+	main.catch_popup_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	main.catch_popup_title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	main.catch_popup_title_label.add_theme_font_size_override("font_size", 12)
+	main.catch_popup_title_label.add_theme_color_override("font_color", Color(0.82, 0.96, 0.86, 0.96))
+
+	var badge_width: float = minf(panel_size.x * 0.17, 118.0)
+	main.catch_popup_badge_label.position = Vector2((panel_size.x - badge_width) * 0.5, panel_size.y * 0.136)
+	main.catch_popup_badge_label.size = Vector2(badge_width, panel_size.y * 0.046)
+	main.catch_popup_badge_label.z_index = 6
+	main.catch_popup_badge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	main.catch_popup_badge_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	main.catch_popup_badge_label.add_theme_font_size_override("font_size", 11)
+	main.catch_popup_badge_label.add_theme_color_override("font_color", Color(0.84, 1.0, 0.86, 1.0))
+	main.catch_popup_badge_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.62))
+	main.catch_popup_badge_label.add_theme_constant_override("shadow_offset_x", 0)
+	main.catch_popup_badge_label.add_theme_constant_override("shadow_offset_y", 1)
+	main.catch_popup_badge_label.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
+
+	main.catch_popup_name_label.position = Vector2(padding, panel_size.y * 0.182)
+	main.catch_popup_name_label.size = Vector2(inner_width, 36.0)
+	main.catch_popup_name_label.z_index = 6
+	main.catch_popup_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	main.catch_popup_name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	main.catch_popup_name_label.add_theme_font_size_override("font_size", 25)
+	main.catch_popup_name_label.add_theme_color_override("font_color", Color(0.98, 1.0, 0.94, 1.0))
+
+	if reward_badge_row != null:
+		var row_width: float = minf(inner_width, 430.0)
+		reward_badge_row.position = Vector2((panel_size.x - row_width) * 0.5, panel_size.y * 0.165)
+		reward_badge_row.size = Vector2(row_width, 24.0)
+		reward_badge_row.visible = false
+
+	var fish_visual_width: float = minf(inner_width * 0.82, 540.0)
+	var fish_visual_height: float = minf(panel_size.y * 0.27, 150.0)
+	var fish_y: float = panel_size.y * 0.270
+	main.catch_fish_shadow.position = Vector2((panel_size.x - fish_visual_width) * 0.5 + 8.0, fish_y + 8.0)
+	main.catch_fish_shadow.size = Vector2(fish_visual_width, fish_visual_height)
+	main.catch_fish_shadow.z_index = 2
+	main.catch_fish_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	main._catch_shadow_base_position = main.catch_fish_shadow.position
+
+	main.catch_fish_visual.position = Vector2((panel_size.x - fish_visual_width) * 0.5, fish_y)
+	main.catch_fish_visual.size = Vector2(fish_visual_width, fish_visual_height)
+	main.catch_fish_visual.z_index = 3
+	main.catch_fish_visual.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	main._catch_fish_base_position = main.catch_fish_visual.position
+
+	main.catch_popup_stats_label.position = Vector2(padding, panel_size.y * 0.508)
+	main.catch_popup_stats_label.size = Vector2(inner_width, panel_size.y * 0.125)
+	main.catch_popup_stats_label.z_index = 6
+	main.catch_popup_stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	main.catch_popup_stats_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	main.catch_popup_stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	main.catch_popup_stats_label.add_theme_font_size_override("font_size", 12)
+	main.catch_popup_stats_label.add_theme_color_override("font_color", Color(0.90, 1.0, 0.92, 0.98))
+
+	var button_width: float = panel_size.x * 0.232
+	var button_height: float = panel_size.y * 0.087
+	var left_button_x: float = panel_size.x * 0.248
+	var right_button_x: float = panel_size.x * 0.518
+	var button_y: float = panel_size.y * 0.820
+
+	main.catch_keep_button.position = Vector2(left_button_x, button_y)
+	main.catch_keep_button.size = Vector2(button_width, button_height)
+	main.catch_keep_button.custom_minimum_size = Vector2(button_width, button_height)
+	main.catch_keep_button.z_index = 7
+	main.catch_keep_button.add_theme_font_size_override("font_size", 14)
+	_apply_card_button_style(main.catch_keep_button, 14)
+
+	main.catch_release_button.position = Vector2(right_button_x, button_y)
+	main.catch_release_button.size = Vector2(button_width, button_height)
+	main.catch_release_button.custom_minimum_size = Vector2(button_width, button_height)
+	main.catch_release_button.z_index = 7
+	_apply_card_button_style(main.catch_release_button, 12)
+	_layout_card_button_text_label(keep_button_text_label, main.catch_keep_button)
+	_layout_card_button_text_label(release_button_text_label, main.catch_release_button)
+
+
+func _apply_card_button_style(button: Button, font_size: int) -> void:
+	if button == null:
+		return
+	var empty_style := StyleBoxEmpty.new()
+	for style_name in ["normal", "hover", "pressed", "focus", "disabled"]:
+		button.add_theme_stylebox_override(style_name, empty_style)
+	button.flat = true
+	button.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	button.clip_text = true
+	button.text = ""
+	button.add_theme_font_size_override("font_size", font_size)
+	button.add_theme_color_override("font_color", Color(0.98, 1.0, 0.94, 1.0))
+	button.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 1.0, 1.0))
+	button.add_theme_color_override("font_pressed_color", Color(0.82, 1.0, 0.76, 1.0))
+	button.add_theme_color_override("font_focus_color", Color(0.98, 1.0, 0.94, 1.0))
+	button.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.50))
+	button.add_theme_constant_override("shadow_offset_x", 0)
+	button.add_theme_constant_override("shadow_offset_y", 1)
+	_ensure_card_button_text_labels()
+
+
+func _ensure_card_button_text_labels() -> void:
+	if main == null:
+		return
+	keep_button_text_label = _ensure_card_button_text_label(main.catch_keep_button, "CatchKeepButtonCenteredText", 14)
+	release_button_text_label = _ensure_card_button_text_label(main.catch_release_button, "CatchReleaseButtonCenteredText", 12)
+
+
+func _ensure_card_button_text_label(button: Button, node_name: String, font_size: int) -> Label:
+	if button == null:
+		return null
+
+	var label := main.catch_popup_panel.get_node_or_null(node_name) as Label
+	if label == null:
+		label = button.get_node_or_null(node_name) as Label
+	if label == null:
+		label = Label.new()
+		label.name = node_name
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		label.z_index = 8
+	if label.get_parent() != main.catch_popup_panel:
+		if label.get_parent() != null:
+			label.get_parent().remove_child(label)
+		main.catch_popup_panel.add_child(label)
+
+	label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	label.offset_left = 0.0
+	label.offset_top = 0.0
+	label.offset_right = 0.0
+	label.offset_bottom = 0.0
+	label.z_index = 8
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.clip_text = true
+	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", Color(0.98, 1.0, 0.94, 1.0))
+	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.50))
+	label.add_theme_constant_override("shadow_offset_x", 0)
+	label.add_theme_constant_override("shadow_offset_y", 1)
+	_layout_card_button_text_label(label, button)
+	return label
+
+
+func _layout_card_button_text_label(label: Label, button: Button) -> void:
+	if label == null or button == null:
+		return
+	label.position = button.position + Vector2(button.size.x * CARD_BUTTON_TEXT_SHIFT_RATIO, 1.0)
+	label.size = button.size
+
+
+func _set_card_button_text(button: Button, label: Label, text: String) -> void:
+	if button != null:
+		button.text = ""
+	if label == null:
+		_ensure_card_button_text_labels()
+		if button == main.catch_keep_button:
+			label = keep_button_text_label
+		elif button == main.catch_release_button:
+			label = release_button_text_label
+	if label != null:
+		label.text = text
+
+
+func _get_keeper_weight(catch_data: Dictionary) -> float:
+	var direct_weight: float = float(catch_data.get("keeper_weight", catch_data.get("keeperWeight", 0.0)))
+	if direct_weight > 0.0:
+		return direct_weight
+
+	var fish := FishDatabase.get_fish(str(catch_data.get("id", catch_data.get("fish_id", ""))))
+	if fish.is_empty():
+		return 0.0
+
+	var status_system: Node = main.get_node_or_null("/root/FishStatusSystem")
+	if status_system != null and status_system.has_method("get_keeper_weight"):
+		return float(status_system.call("get_keeper_weight", fish))
+	return maxf(float(fish.get("keeperWeight", fish.get("keeper_weight", fish.get("min_weight", 0.0)))), 0.0)
+
+
+func _get_missing_threshold_text(weight: float, keeper_weight: float, trophy_weight: float, record_weight: float) -> String:
+	if keeper_weight > 0.0 and weight < keeper_weight:
+		return "До зачета: %s" % _format_weight(keeper_weight - weight)
+	if trophy_weight > 0.0 and weight < trophy_weight:
+		return "До трофея: %s" % _format_weight(trophy_weight - weight)
+	if record_weight > 0.0 and weight < record_weight:
+		return "До редкого вида: %s" % _format_weight(record_weight - weight)
+	if record_weight > 0.0 and weight >= record_weight:
+		return "Редкий вид достигнут"
+	return ""
+
+
 func _get_personal_best_weight(catch_data: Dictionary, current_weight: float) -> float:
 	var previous_weight := float(catch_data.get("previous_species_record_weight", 0.0))
 	if previous_weight <= 0.0 or bool(catch_data.get("is_new_species_record", false)):
@@ -453,7 +715,7 @@ func _get_record_scale_weight(catch_data: Dictionary, rarity_weight: float) -> f
 	return maxf(float(catch_data.get("recordWeight", catch_data.get("record_weight", 0.0))), rarity_weight)
 
 
-func _update_weight_progress_track(weight: float, personal_best_weight: float, trophy_weight: float, record_weight: float, accent: Color) -> void:
+func _update_weight_progress_track(weight: float, keeper_weight: float, trophy_weight: float, record_weight: float, accent: Color) -> void:
 	if progress_track == null or progress_fill == null:
 		return
 	for child in progress_track.get_children():
@@ -461,81 +723,157 @@ func _update_weight_progress_track(weight: float, personal_best_weight: float, t
 			progress_track.remove_child(child)
 			child.queue_free()
 
-	var max_weight: float = maxf(maxf(weight, personal_best_weight), maxf(trophy_weight, record_weight))
+	var max_weight: float = maxf(maxf(weight, keeper_weight), maxf(trophy_weight, record_weight))
 	max_weight = maxf(max_weight * 1.1, 0.1)
 	var usable_width: float = maxf(progress_track.size.x, 1.0)
 	var center_y: float = progress_track.size.y * 0.5
 	var track_height := 6.0
+	var fill_inset := 2.0
+	var fill_width: float = maxf(usable_width - fill_inset * 2.0, 1.0)
 	var caught_pos := clampf(weight / max_weight, 0.0, 1.0)
+	var caught_x := usable_width * caught_pos
+	var keeper_x := usable_width * clampf(keeper_weight / max_weight, 0.0, 1.0) if keeper_weight > 0.0 else -1.0
+	var trophy_x := usable_width * clampf(trophy_weight / max_weight, 0.0, 1.0) if trophy_weight > 0.0 else -1.0
+	var record_x := usable_width * clampf(record_weight / max_weight, 0.0, 1.0) if record_weight > 0.0 else -1.0
+	var caught_title_y := -30.0
+	var keeper_label_nudge := 0.0
 
-	progress_fill.position = Vector2(0.0, center_y - track_height * 0.5)
-	progress_fill.size = Vector2(usable_width * caught_pos, track_height)
-	progress_fill.color = Color(accent.r, accent.g, accent.b, 0.50)
+	for threshold_x in [keeper_x, trophy_x, record_x]:
+		if threshold_x >= 0.0 and absf(threshold_x - caught_x) < 62.0:
+			caught_title_y = -50.0
+			break
+	if keeper_weight > 0.0 and absf(keeper_x - caught_x) < 46.0:
+		keeper_label_nudge = 18.0
 
-	if record_weight > 0.0:
-		_add_weight_marker("RecordMarker", usable_width * clampf(record_weight / max_weight, 0.0, 1.0), Color(0.86, 0.52, 1.0, 0.82), "✦", 16)
+	progress_fill.position = Vector2(fill_inset, center_y - track_height * 0.5)
+	progress_fill.size = Vector2(fill_width * caught_pos, track_height)
+	progress_fill.visible = progress_fill.size.x > 1.0
+	progress_fill.add_theme_stylebox_override("panel", _make_progress_fill_style(accent))
+
+	_add_weight_marker(
+		"CaughtMarker",
+		caught_x,
+		CATCH_MARKER_YOUR_TEXTURE,
+		"Ваш улов",
+		_format_weight(weight),
+		Color(0.74, 1.0, 0.70, 1.0),
+		0.0,
+		caught_title_y
+	)
+	if keeper_weight > 0.0:
+		_add_weight_marker(
+			"KeeperMarker",
+			keeper_x,
+			CATCH_MARKER_KEEPER_TEXTURE,
+			"Зачет",
+			_format_weight(keeper_weight),
+			Color(1.0, 0.88, 0.52, 1.0),
+			keeper_label_nudge
+		)
 	if trophy_weight > 0.0:
-		_add_weight_marker("TrophyMarker", usable_width * clampf(trophy_weight / max_weight, 0.0, 1.0), Color(1.0, 0.78, 0.34, 0.86), "★", 16)
-	if personal_best_weight > 0.0:
-		_add_weight_marker("PersonalMarker", usable_width * clampf(personal_best_weight / max_weight, 0.0, 1.0), Color(0.38, 0.86, 1.0, 0.80), "◆", 15)
-	_add_caught_weight_marker(usable_width * caught_pos)
+		_add_weight_marker(
+			"TrophyMarker",
+			trophy_x,
+			CATCH_MARKER_TROPHY_TEXTURE,
+			"Трофей",
+			_format_weight(trophy_weight),
+			Color(0.68, 0.92, 1.0, 1.0)
+		)
+	if record_weight > 0.0:
+		_add_weight_marker(
+			"RecordMarker",
+			record_x,
+			CATCH_MARKER_RARE_TEXTURE,
+			"Редкий вид",
+			_format_weight(record_weight),
+			Color(0.94, 0.68, 1.0, 1.0)
+		)
 
 
-func _add_weight_marker(marker_name: String, center_x: float, color: Color, marker_text: String, font_size: int) -> void:
-	var marker := Label.new()
-	marker.name = marker_name
-	marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	marker.text = marker_text
-	marker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	marker.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	marker.add_theme_font_size_override("font_size", font_size)
-	marker.add_theme_color_override("font_color", color)
-	var marker_size := float(font_size + 8)
-	marker.size = Vector2(marker_size, marker_size)
-	marker.position = Vector2(
-		clampf(center_x - marker_size * 0.5, 0.0, maxf(progress_track.size.x - marker_size, 0.0)),
-		progress_track.size.y * 0.5 - marker_size * 0.5
+func _add_weight_marker(marker_name: String, center_x: float, texture: Texture2D, title: String, weight_text: String, color: Color, label_nudge_x: float = 0.0, title_y: float = -30.0) -> void:
+	var group := Control.new()
+	group.name = marker_name
+	group.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	group.z_index = 7
+	var label_width := 104.0 if title.length() > 8 else 78.0
+	var group_width: float = maxf(label_width + absf(label_nudge_x) * 2.0, 78.0)
+	group.size = Vector2(group_width, 70.0)
+	group.position = Vector2(
+		clampf(center_x - group_width * 0.5, -group_width * 0.18, maxf(progress_track.size.x - group_width * 0.82, 0.0)),
+		0.0
 	)
-	progress_track.add_child(marker)
+	var local_center_x: float = center_x - group.position.x
+
+	var marker_size := 34.0
+	var marker_icon := TextureRect.new()
+	marker_icon.name = "Icon"
+	marker_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	marker_icon.texture = texture
+	marker_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	marker_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	marker_icon.size = Vector2(marker_size, marker_size)
+	marker_icon.position = Vector2(local_center_x - marker_size * 0.5, progress_track.size.y * 0.5 - marker_size * 0.5)
+	group.add_child(marker_icon)
+
+	var label_x: float = local_center_x + label_nudge_x - label_width * 0.5
+	var title_label := Label.new()
+	title_label.name = "Title"
+	title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title_label.text = title
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title_label.add_theme_font_size_override("font_size", 10)
+	title_label.add_theme_color_override("font_color", color)
+	title_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.62))
+	title_label.add_theme_constant_override("shadow_offset_x", 0)
+	title_label.add_theme_constant_override("shadow_offset_y", 1)
+	title_label.position = Vector2(label_x, title_y)
+	title_label.size = Vector2(label_width, 16.0)
+	group.add_child(title_label)
+
+	var value_label := Label.new()
+	value_label.name = "Value"
+	value_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	value_label.text = weight_text
+	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	value_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	value_label.add_theme_font_size_override("font_size", 10)
+	value_label.add_theme_color_override("font_color", Color(0.92, 1.0, 0.92, 0.96))
+	value_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.64))
+	value_label.add_theme_constant_override("shadow_offset_x", 0)
+	value_label.add_theme_constant_override("shadow_offset_y", 1)
+	value_label.position = Vector2(label_x, 26.0)
+	value_label.size = Vector2(label_width, 16.0)
+	group.add_child(value_label)
+
+	progress_track.add_child(group)
 
 
-func _add_caught_weight_marker(center_x: float) -> void:
-	var marker := Panel.new()
-	marker.name = "CaughtMarker"
-	marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var marker_size := 10.0
-	var marker_style := StyleBoxFlat.new()
-	marker_style.bg_color = Color(0.94, 1.0, 0.88, 1.0)
-	marker_style.border_color = Color(0.04, 0.10, 0.07, 0.70)
-	marker_style.set_border_width_all(1)
-	marker_style.set_corner_radius_all(roundi(marker_size * 0.5))
-	marker.add_theme_stylebox_override("panel", marker_style)
-	marker.size = Vector2(marker_size, marker_size)
-	marker.position = Vector2(
-		clampf(center_x - marker_size * 0.5, 0.0, maxf(progress_track.size.x - marker_size, 0.0)),
-		progress_track.size.y * 0.5 - marker_size * 0.5
-	)
-	progress_track.add_child(marker)
+func _make_progress_fill_style(accent: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(accent.r, accent.g, accent.b, 0.56)
+	style.border_color = Color(accent.r, minf(accent.g + 0.08, 1.0), accent.b, 0.30)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(4)
+	return style
 
 
-func _update_rank_progress(catch_data: Dictionary, weight: float, trophy_weight: float, rarity_weight: float, _catch_rank: String, colors: Dictionary) -> void:
+func _update_rank_progress(_catch_data: Dictionary, weight: float, keeper_weight: float, trophy_weight: float, record_weight: float, colors: Dictionary) -> void:
 	if progress_label == null or progress_track == null:
 		return
 
-	var personal_best_weight := _get_personal_best_weight(catch_data, weight)
-	var record_weight := _get_record_scale_weight(catch_data, rarity_weight)
 	var panel_size: Vector2 = main.catch_popup_panel.size
-	var track_width: float = min(panel_size.x - 120.0, 430.0)
+	var track_width: float = min(panel_size.x - 86.0, 520.0)
 	var track_height := 8.0
 	var track_x: float = (panel_size.x - track_width) * 0.5
-	var track_y: float = panel_size.y - 116.0
+	var track_y: float = panel_size.y * 0.705
 
 	progress_label.visible = false
 	progress_track.visible = true
 	progress_label.text = ""
 	progress_track.position = Vector2(track_x, track_y)
 	progress_track.size = Vector2(track_width, track_height)
-	_update_weight_progress_track(weight, personal_best_weight, trophy_weight, record_weight, colors.get("glow", Color(0.55, 0.95, 0.78, 1.0)))
+	_update_weight_progress_track(weight, keeper_weight, trophy_weight, record_weight, colors.get("glow", Color(0.55, 0.95, 0.78, 1.0)))
 
 
 func _format_weight(value: float) -> String:

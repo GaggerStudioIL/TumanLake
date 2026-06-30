@@ -1298,39 +1298,6 @@ func _try_start_active_bite() -> void:
 	})
 	return
 
-	if not PlayerData.consume_current_terminal_tackle_for_bite(1):
-		is_fishing = false
-		fishing_state = FishingState.FAILED
-		_emit_fishing_failure(
-			FAILURE_WEAK_TACKLE,
-			"Нет наживки",
-			"Наживка закончилась до поклёвки.",
-			"Пополните наживку или экипируйте другую.",
-			{"severity": "low", "spot_id": _active_spot_id}
-		)
-		return
-
-	var catch_data := _prepare_catch_data_for_bite(fish_id, bite_data)
-	if catch_data.is_empty():
-		is_fishing = false
-		fishing_state = FishingState.FAILED
-		_emit_fishing_failure(
-			FAILURE_FISH_ESCAPED_HOOK,
-			"",
-			"Рыба сорвалась до подсечки.",
-			"Проверьте размер крючка, наживку и состояние снасти.",
-			{"severity": "medium", "fish_id": fish_id, "spot_id": _active_spot_id}
-		)
-		return
-
-	_pending_catch = catch_data
-	_pending_bite_data = _build_bite_window_data(fish_id, catch_data, bite_data)
-	_bite_window_seconds = float(_pending_bite_data.get("bite_window_seconds", BASE_BITE_WINDOW_SECONDS))
-	_bite_window_elapsed = 0.0
-	fishing_state = FishingState.BITE_WINDOW
-	bite_started.emit(_pending_bite_data.duplicate(true))
-
-
 func _update_float_bite_phase(delta: float) -> void:
 	if _bite_phase == "idle" or _bite_phase == "approach_wait":
 		return
