@@ -2,6 +2,7 @@ extends Node
 
 const PlayerAvatarData := preload("res://scripts/data/PlayerAvatarData.gd")
 const SpinningLureDatabaseScript := preload("res://scripts/data/SpinningLureDatabase.gd")
+const ReelDatabaseScript := preload("res://scripts/data/ReelDatabase.gd")
 
 const PHYSICAL_SHORE_MIN_DEPTH := 0.16
 const BASIC_FLOAT_ID := "float_drop_basic"
@@ -10,7 +11,6 @@ const BASIC_REEL_ID := "river_reel_1000"
 const BASIC_LURE_ID := "silver_spinner_5g"
 const STARTER_REEL_TACKLE_ITEM_IDS := ["river_spin_210", BASIC_REEL_ID, BASIC_LURE_ID]
 const BETA_HIDDEN_TACKLE_CATEGORIES := {
-	"reel": true,
 	"lure": true,
 	"spoon": true,
 	"wobbler": true,
@@ -5494,6 +5494,9 @@ func _get_raw_tackle_catalog_item(item_id: String) -> Dictionary:
 		return TACKLE_CATALOG[item_id]
 	if ADDITIONAL_BAIT_CATALOG.has(item_id):
 		return ADDITIONAL_BAIT_CATALOG[item_id]
+	var reel_catalog := ReelDatabaseScript.get_reel_catalog()
+	if reel_catalog.has(item_id):
+		return reel_catalog[item_id]
 	var spinning_lure_catalog := SpinningLureDatabaseScript.get_lure_catalog()
 	if spinning_lure_catalog.has(item_id):
 		return spinning_lure_catalog[item_id]
@@ -5536,7 +5539,7 @@ func get_tackle_catalog_item(item_id: String) -> Dictionary:
 func get_tackle_catalog_items(type_filter: String = "all") -> Array:
 	var items: Array = []
 
-	for catalog in [TACKLE_CATALOG, ADDITIONAL_BAIT_CATALOG, SpinningLureDatabaseScript.get_lure_catalog()]:
+	for catalog in [TACKLE_CATALOG, ADDITIONAL_BAIT_CATALOG, ReelDatabaseScript.get_reel_catalog(), SpinningLureDatabaseScript.get_lure_catalog()]:
 		for item_id in catalog.keys():
 			var item: Dictionary = _normalize_catalog_item(catalog[item_id])
 			var item_type := str(item.get("type", item.get("category", "misc")))
@@ -5996,6 +5999,20 @@ func _normalize_equipment_stats(stats: Dictionary, category: String, item_id: St
 			normalized["recommended_spots"] = _to_string_array(normalized["recommended_spots"])
 			normalized["bonus_tags"] = _to_string_array(normalized["bonus_tags"])
 		"reel":
+			if normalized.has("size") and not normalized.has("reel_size"):
+				normalized["reel_size"] = int(normalized["size"])
+			if normalized.has("max_drag_kg") and not normalized.has("max_drag"):
+				normalized["max_drag"] = float(normalized["max_drag_kg"])
+			if normalized.has("weight_g") and not normalized.has("weight"):
+				normalized["weight"] = float(normalized["weight_g"])
+			if normalized.has("line_capacity") and not normalized.has("spool_capacity"):
+				var capacity_parts := str(normalized["line_capacity"]).split("/")
+				if capacity_parts.size() >= 2:
+					normalized["spool_capacity"] = float(capacity_parts[1].replace("м", "").strip_edges())
+			if normalized.has("gear_ratio") and not normalized.has("retrieve_speed"):
+				var ratio_parts := str(normalized["gear_ratio"]).split(":")
+				var ratio_value := float(ratio_parts[0]) if ratio_parts.size() > 0 else 5.2
+				normalized["retrieve_speed"] = clampf(ratio_value / 5.2, 0.45, 1.45)
 			if not normalized.has("reel_size"):
 				normalized["reel_size"] = 2000
 			if not normalized.has("reel_type"):
@@ -6012,6 +6029,30 @@ func _normalize_equipment_stats(stats: Dictionary, category: String, item_id: St
 				normalized["weight"] = 250.0
 			if not normalized.has("wear_rate"):
 				normalized["wear_rate"] = 0.008
+			if not normalized.has("gear_ratio"):
+				normalized["gear_ratio"] = "5.2:1"
+			if not normalized.has("line_capacity"):
+				normalized["line_capacity"] = "0.20 мм / %d м" % roundi(float(normalized["spool_capacity"]))
+			if not normalized.has("max_drag_kg"):
+				normalized["max_drag_kg"] = float(normalized["max_drag"])
+			if not normalized.has("weight_g"):
+				normalized["weight_g"] = float(normalized["weight"])
+			if not normalized.has("durability_points"):
+				normalized["durability_points"] = roundi(float(normalized["durability"]) * 100.0)
+			if not normalized.has("wear_resistance"):
+				normalized["wear_resistance"] = clampf(1.0 - float(normalized["wear_rate"]) * 60.0, 0.0, 1.0)
+			if not normalized.has("compatible_methods"):
+				normalized["compatible_methods"] = []
+			if not normalized.has("bonus_type"):
+				normalized["bonus_type"] = ""
+			if not normalized.has("bonus_value"):
+				normalized["bonus_value"] = 0.0
+			if not normalized.has("bonus_text"):
+				normalized["bonus_text"] = ""
+			if not normalized.has("icon_path"):
+				normalized["icon_path"] = ""
+			if not normalized.has("image_path"):
+				normalized["image_path"] = ""
 			if not normalized.has("body_texture"):
 				normalized["body_texture"] = ""
 			if not normalized.has("spool_texture"):
@@ -6021,11 +6062,23 @@ func _normalize_equipment_stats(stats: Dictionary, category: String, item_id: St
 			normalized["reel_size"] = clampi(int(normalized["reel_size"]), 1000, 10000)
 			normalized["reel_type"] = str(normalized["reel_type"])
 			normalized["max_drag"] = clamp(float(normalized["max_drag"]), 0.5, 30.0)
+			normalized["max_drag_kg"] = float(normalized["max_drag"])
 			normalized["retrieve_speed"] = clamp(float(normalized["retrieve_speed"]), 0.20, 2.0)
 			normalized["spool_capacity"] = clamp(float(normalized["spool_capacity"]), 25.0, 650.0)
 			normalized["durability"] = clamp(float(normalized["durability"]), 0.0, 1.0)
+			normalized["durability_points"] = max(float(normalized["durability_points"]), 1.0)
 			normalized["weight"] = clamp(float(normalized["weight"]), 80.0, 1200.0)
+			normalized["weight_g"] = float(normalized["weight"])
+			normalized["wear_resistance"] = clampf(float(normalized["wear_resistance"]), 0.0, 1.0)
 			normalized["wear_rate"] = clamp(float(normalized["wear_rate"]), 0.001, 0.040)
+			normalized["gear_ratio"] = str(normalized["gear_ratio"])
+			normalized["line_capacity"] = str(normalized["line_capacity"])
+			normalized["compatible_methods"] = _to_string_array(normalized["compatible_methods"])
+			normalized["bonus_type"] = str(normalized["bonus_type"])
+			normalized["bonus_value"] = float(normalized["bonus_value"])
+			normalized["bonus_text"] = str(normalized["bonus_text"])
+			normalized["icon_path"] = str(normalized["icon_path"])
+			normalized["image_path"] = str(normalized["image_path"])
 			normalized["body_texture"] = str(normalized["body_texture"])
 			normalized["spool_texture"] = str(normalized["spool_texture"])
 			normalized["handle_texture"] = str(normalized["handle_texture"])

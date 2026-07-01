@@ -251,6 +251,7 @@ var shop_bait_category_button: Button
 var shop_consumable_category_button: Button
 var shop_clothing_category_button: Button
 var shop_tackle_category_button: Button
+var shop_reel_category_button: Button
 var shop_lure_category_button: Button
 var shop_line_category_button: Button
 var shop_leader_category_button: Button
@@ -6030,6 +6031,7 @@ func _setup_layout() -> void:
 		shop_consumable_category_button,
 		shop_clothing_category_button,
 		shop_tackle_category_button,
+		shop_reel_category_button,
 		shop_lure_category_button,
 		shop_line_category_button,
 		shop_leader_category_button,
@@ -7307,7 +7309,7 @@ func _setup_layout() -> void:
 	var shop_inner_width: float = shop_width - shop_padding * 2.0
 	var shop_category_y := 64.0
 	var shop_category_gap := 9.0
-	var shop_category_columns := 9
+	var shop_category_columns := 10
 	var shop_category_width: float = (shop_inner_width - shop_category_gap * float(shop_category_columns - 1)) / float(shop_category_columns)
 	var shop_category_height := 42.0
 	var shop_items_y := 124.0
@@ -7343,24 +7345,29 @@ func _setup_layout() -> void:
 	shop_tackle_category_button.size = Vector2(shop_category_width, shop_category_height)
 	shop_tackle_category_button.add_theme_font_size_override("font_size", 12)
 
+	if shop_reel_category_button != null:
+		shop_reel_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 4.0, shop_category_y)
+		shop_reel_category_button.size = Vector2(shop_category_width, shop_category_height)
+		shop_reel_category_button.add_theme_font_size_override("font_size", 12)
+
 	if shop_lure_category_button != null:
-		shop_lure_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 4.0, shop_category_y)
+		shop_lure_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 5.0, shop_category_y)
 		shop_lure_category_button.size = Vector2(shop_category_width, shop_category_height)
 		shop_lure_category_button.add_theme_font_size_override("font_size", 12)
 
-	shop_line_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 5.0, shop_category_y)
+	shop_line_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 6.0, shop_category_y)
 	shop_line_category_button.size = Vector2(shop_category_width, shop_category_height)
 	shop_line_category_button.add_theme_font_size_override("font_size", 12)
 
-	shop_leader_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 6.0, shop_category_y)
+	shop_leader_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 7.0, shop_category_y)
 	shop_leader_category_button.size = Vector2(shop_category_width, shop_category_height)
 	shop_leader_category_button.add_theme_font_size_override("font_size", 12)
 
-	shop_hook_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 7.0, shop_category_y)
+	shop_hook_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 8.0, shop_category_y)
 	shop_hook_category_button.size = Vector2(shop_category_width, shop_category_height)
 	shop_hook_category_button.add_theme_font_size_override("font_size", 12)
 
-	shop_float_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 8.0, shop_category_y)
+	shop_float_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 9.0, shop_category_y)
 	shop_float_category_button.size = Vector2(shop_category_width, shop_category_height)
 	shop_float_category_button.add_theme_font_size_override("font_size", 12)
 
@@ -7594,6 +7601,8 @@ func _connect_signals() -> void:
 	if shop_clothing_category_button != null:
 		shop_clothing_category_button.pressed.connect(_set_shop_category.bind("clothing"))
 	shop_tackle_category_button.pressed.connect(_set_shop_category.bind("rod"))
+	if shop_reel_category_button != null:
+		shop_reel_category_button.pressed.connect(_set_shop_category.bind("reel"))
 	if shop_lure_category_button != null:
 		shop_lure_category_button.pressed.connect(_set_shop_category.bind("lure"))
 	shop_line_category_button.pressed.connect(_set_shop_category.bind("line"))

@@ -1,6 +1,6 @@
 extends Node
 
-const MAX_BETA_LEVEL := 15
+const MAX_BETA_LEVEL := 30
 
 const AGAMIM_SPOT_UNLOCK_LEVELS := {
 	"old_oak_pier": 1,
@@ -53,6 +53,78 @@ const ITEM_REQUIRED_LEVELS := {
 	"carp_cast_360": 14,
 	"reinforced_leader_40cm_12kg": 14,
 	"steel_leader_40cm_20kg": 15
+}
+
+const REEL_REQUIRED_LEVELS := {
+	"fishpoint_start_2000": 8,
+	"fishpoint_start_3000": 10,
+	"nordlake_basic_2000": 9,
+	"nordlake_basic_3000": 12,
+	"aerospin_swift_1000": 8,
+	"aerospin_swift_2000": 10,
+	"aerospin_swift_3000": 14,
+	"riverfox_blade_1000": 11,
+	"riverfox_blade_2000": 13,
+	"riverfox_blade_3000": 17,
+	"silvercast_prospin_1000": 15,
+	"silvercast_prospin_2000": 18,
+	"silvercast_prospin_3000": 22,
+	"lakemaster_balance_1000": 10,
+	"lakemaster_balance_2000": 12,
+	"lakemaster_balance_3000": 15,
+	"lakemaster_balance_4000": 18,
+	"lakemaster_balance_5000": 22,
+	"lakemaster_balance_6000": 26,
+	"fjordline_universal_1000": 12,
+	"fjordline_universal_2000": 14,
+	"fjordline_universal_3000": 17,
+	"fjordline_universal_4000": 20,
+	"fjordline_universal_5000": 24,
+	"fjordline_universal_6000": 28,
+	"blackriver_control_1000": 14,
+	"blackriver_control_2000": 16,
+	"blackriver_control_3000": 19,
+	"blackriver_control_4000": 22,
+	"blackriver_control_5000": 25,
+	"blackriver_control_6000": 28,
+	"goldenfish_allround_1000": 16,
+	"goldenfish_allround_2000": 18,
+	"goldenfish_allround_3000": 21,
+	"goldenfish_allround_4000": 24,
+	"goldenfish_allround_5000": 27,
+	"goldenfish_allround_6000": 29,
+	"clearwater_flex_1000": 11,
+	"clearwater_flex_2000": 13,
+	"clearwater_flex_3000": 16,
+	"clearwater_flex_4000": 19,
+	"clearwater_flex_5000": 23,
+	"clearwater_flex_6000": 27,
+	"reedline_picker_1000": 12,
+	"reedline_picker_2000": 14,
+	"reedline_picker_3000": 17,
+	"reedline_picker_4000": 20,
+	"reedline_picker_5000": 24,
+	"reedline_picker_6000": 28,
+	"stormway_match_1000": 13,
+	"stormway_match_2000": 15,
+	"stormway_match_3000": 18,
+	"stormway_match_4000": 21,
+	"stormway_match_5000": 25,
+	"stormway_match_6000": 29,
+	"bluepeak_river_1000": 14,
+	"bluepeak_river_2000": 16,
+	"bluepeak_river_3000": 19,
+	"bluepeak_river_4000": 22,
+	"bluepeak_river_5000": 26,
+	"bluepeak_river_6000": 29,
+	"wildcarp_lite_1000": 16,
+	"wildcarp_lite_2000": 18,
+	"wildcarp_lite_3000": 21,
+	"wildcarp_lite_4000": 24,
+	"wildcarp_lite_5000": 27,
+	"wildcarp_lite_6000": 29,
+	"irondrag_titan_8000": 29,
+	"oceanbull_force_8000": 30
 }
 
 const LEVEL_REWARDS := {
@@ -202,6 +274,8 @@ func get_item_required_level(item_id: String, item_data: Dictionary = {}) -> int
 		required_level = max(required_level, int(item_data.get("required_level", 1)))
 	if ITEM_REQUIRED_LEVELS.has(item_id):
 		required_level = max(required_level, int(ITEM_REQUIRED_LEVELS[item_id]))
+	if REEL_REQUIRED_LEVELS.has(item_id):
+		required_level = max(required_level, int(REEL_REQUIRED_LEVELS[item_id]))
 
 	var category := str(item_data.get("category", item_data.get("type", ""))).strip_edges().to_lower()
 	var stats := _get_item_stats(item_data)
@@ -320,14 +394,18 @@ func _get_rod_required_level(item_data: Dictionary, stats: Dictionary) -> int:
 
 
 func _get_reel_required_level(stats: Dictionary) -> int:
-	var reel_size := int(stats.get("reel_size", 1000))
+	var reel_size := int(stats.get("reel_size", stats.get("size", 1000)))
 	if reel_size >= 8000:
-		return 15
+		return 29
 	if reel_size >= 6000:
-		return 14
+		return 26
+	if reel_size >= 5000:
+		return 22
 	if reel_size >= 4000:
-		return 12
-	if reel_size >= 2500:
+		return 18
+	if reel_size >= 3000:
+		return 14
+	if reel_size >= 2000:
 		return 10
 	return 8
 
