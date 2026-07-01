@@ -15,7 +15,9 @@ var subtitle_label: Label
 var details_scroll: ScrollContainer
 var details_label: Label
 var select_button: Button
+var info_button: Button
 var close_button: Button
+var detail_mode := false
 
 func setup_panel() -> void:
 	_ensure_nodes()
@@ -24,7 +26,7 @@ func setup_panel() -> void:
 	z_index = 50
 	add_theme_stylebox_override("panel", _make_panel_style(Color(0.025, 0.045, 0.040, 0.94), Color(0.70, 0.95, 0.72, 0.46), 12, 2))
 
-func show_spot(new_waterbody: Dictionary, new_spot: Dictionary, is_unlocked: bool, new_lock_reason: String = "") -> void:
+func show_spot(new_waterbody: Dictionary, new_spot: Dictionary, is_unlocked: bool, new_lock_reason: String = "", show_details: bool = false) -> void:
 	_ensure_nodes()
 	waterbody_data = new_waterbody.duplicate(true)
 	spot_data = new_spot.duplicate(true)
@@ -32,32 +34,60 @@ func show_spot(new_waterbody: Dictionary, new_spot: Dictionary, is_unlocked: boo
 	spot_id = str(spot_data.get("id", ""))
 	unlocked = is_unlocked
 	lock_reason = new_lock_reason
+	detail_mode = show_details
 
 	title_label.text = str(spot_data.get("name", spot_id))
-	subtitle_label.text = str(waterbody_data.get("name", waterbody_id))
-	details_label.text = _build_details_text()
+	subtitle_label.text = _build_subtitle_text()
+	details_label.text = _build_details_text() if detail_mode else _build_card_text()
 	select_button.disabled = not unlocked
-	select_button.text = "Выбрать точку" if unlocked else "Недоступно"
+	select_button.text = "Рыбачить" if unlocked else "Закрыто"
+	info_button.visible = not detail_mode
+	close_button.text = "К карточке" if detail_mode else "Закрыть"
 	visible = true
 
 func layout_panel(view_size: Vector2) -> void:
 	var panel_width: float = minf(view_size.x * 0.78, 720.0)
 	var panel_height: float = minf(view_size.y * 0.78, 410.0)
+	if not detail_mode:
+		panel_width = minf(view_size.x - 32.0, 660.0)
+		panel_height = clampf(view_size.y * 0.30, 148.0, 176.0)
 	size = Vector2(panel_width, panel_height)
-	position = (view_size - size) * 0.5
+	if detail_mode:
+		position = (view_size - size) * 0.5
+	else:
+		position = Vector2((view_size.x - panel_width) * 0.5, view_size.y - panel_height - 14.0)
 
-	var padding := 18.0
-	title_label.position = Vector2(padding, 14.0)
+	var padding := 18.0 if detail_mode else 16.0
+	title_label.position = Vector2(padding, 12.0 if detail_mode else 10.0)
 	title_label.size = Vector2(panel_width - padding * 2.0, 30.0)
-	subtitle_label.position = Vector2(padding, 45.0)
+	subtitle_label.position = Vector2(padding, 43.0 if detail_mode else 38.0)
 	subtitle_label.size = Vector2(panel_width - padding * 2.0, 22.0)
-	details_scroll.position = Vector2(padding, 76.0)
-	details_scroll.size = Vector2(panel_width - padding * 2.0, panel_height - 142.0)
+	details_scroll.position = Vector2(padding, 74.0 if detail_mode else 64.0)
+	details_scroll.size = Vector2(panel_width - padding * 2.0, panel_height - (140.0 if detail_mode else 114.0))
 	details_label.custom_minimum_size = Vector2(details_scroll.size.x - 10.0, 0.0)
-	select_button.position = Vector2(panel_width - padding - 176.0, panel_height - 54.0)
-	select_button.size = Vector2(176.0, 42.0)
-	close_button.position = Vector2(padding, panel_height - 51.0)
-	close_button.size = Vector2(132.0, 38.0)
+	var button_height := 42.0 if detail_mode else 38.0
+	var button_y := panel_height - padding - button_height
+	var button_gap := 10.0
+	var close_width := 132.0 if detail_mode else 112.0
+	var info_width := 142.0
+	var select_width := 176.0 if detail_mode else 148.0
+	info_button.visible = not detail_mode
+	if detail_mode:
+		select_button.position = Vector2(panel_width - padding - select_width, button_y)
+		select_button.size = Vector2(select_width, button_height)
+		close_button.position = Vector2(padding, button_y + 2.0)
+		close_button.size = Vector2(close_width, button_height - 4.0)
+		info_button.position = Vector2.ZERO
+		info_button.size = Vector2.ZERO
+	else:
+		var actions_width := close_width + button_gap + info_width + button_gap + select_width
+		var actions_x := maxf(padding, panel_width - padding - actions_width)
+		close_button.position = Vector2(actions_x, button_y)
+		close_button.size = Vector2(close_width, button_height)
+		info_button.position = Vector2(actions_x + close_width + button_gap, button_y)
+		info_button.size = Vector2(info_width, button_height)
+		select_button.position = Vector2(actions_x + close_width + button_gap + info_width + button_gap, button_y)
+		select_button.size = Vector2(select_width, button_height)
 
 func _ensure_nodes() -> void:
 	if title_label != null:
@@ -97,6 +127,13 @@ func _ensure_nodes() -> void:
 	select_button.pressed.connect(_on_select_pressed)
 	add_child(select_button)
 
+	info_button = Button.new()
+	info_button.name = "SpotInfoDetailsButton"
+	info_button.text = "Информация"
+	info_button.focus_mode = Control.FOCUS_NONE
+	info_button.pressed.connect(_on_info_pressed)
+	add_child(info_button)
+
 	close_button = Button.new()
 	close_button.name = "SpotInfoCloseButton"
 	close_button.text = "Закрыть"
@@ -105,7 +142,30 @@ func _ensure_nodes() -> void:
 	add_child(close_button)
 
 	_apply_button_style(select_button, true)
+	_apply_button_style(info_button, false)
 	_apply_button_style(close_button, false)
+
+func _build_subtitle_text() -> String:
+	var required_level := int(spot_data.get("required_level", spot_data.get("unlock_level", 1)))
+	if not unlocked:
+		return "%s · откроется на LVL %d" % [
+			str(spot_data.get("spot_type", spot_data.get("type", "-"))),
+			required_level
+		]
+	return "%s · %.1f-%.1f м" % [
+		str(spot_data.get("spot_type", spot_data.get("type", "-"))),
+		float(spot_data.get("min_depth", spot_data.get("depth", 0.0))),
+		float(spot_data.get("max_depth", spot_data.get("depth", 0.0)))
+	]
+
+func _build_card_text() -> String:
+	var features := _array_to_text(spot_data.get("special_features", []))
+	var text := str(spot_data.get("description", ""))
+	if features != "-":
+		text += "\nОсобенности: %s" % features
+	if not unlocked:
+		text += "\n%s" % (lock_reason if lock_reason != "" else "Откроется позже.")
+	return text
 
 func _build_details_text() -> String:
 	var fish_names := _get_fish_names(7)
@@ -114,17 +174,20 @@ func _build_details_text() -> String:
 	var bait := _array_to_text(spot_data.get("recommended_bait", []))
 	var locked_text := ""
 	if not unlocked:
-		locked_text = "\n\n%s" % (lock_reason if lock_reason != "" else "Эта точка пока закрыта.")
+		locked_text = "\nМинимальный уровень: LVL %d\n%s" % [
+			int(spot_data.get("required_level", spot_data.get("unlock_level", 1))),
+			lock_reason if lock_reason != "" else "Эта точка пока закрыта."
+		]
 
-	return "%s\n\nГлубина: %.1f-%.1f м, рабочая %.1f м\nТип места: %s\nРыба: %s\nРекомендуемые поплавки: %s\nНаживка: %s\nОсобенности: %s%s" % [
+	return "%s\n\nТип места: %s\nГлубина: %.1f-%.1f м, рабочая %.1f м\nРекомендуемая снасть: %s\nНаживка: %s\nРыба: %s\nОсобенности: %s%s" % [
 		str(spot_data.get("description", "")),
+		str(spot_data.get("spot_type", spot_data.get("type", "-"))),
 		float(spot_data.get("min_depth", spot_data.get("depth", 0.0))),
 		float(spot_data.get("max_depth", spot_data.get("depth", 0.0))),
 		float(spot_data.get("preferred_depth", spot_data.get("depth", 0.0))),
-		str(spot_data.get("spot_type", spot_data.get("type", "-"))),
-		fish_names,
 		tackle,
 		bait,
+		fish_names,
 		features,
 		locked_text
 	]
@@ -179,6 +242,28 @@ func _make_panel_style(fill: Color, border: Color, radius: int, border_width: in
 func _on_select_pressed() -> void:
 	select_requested.emit(waterbody_id, spot_id)
 
+func _on_info_pressed() -> void:
+	detail_mode = true
+	details_label.text = _build_details_text()
+	info_button.visible = false
+	close_button.text = "К карточке"
+	var view_size := get_viewport_rect().size
+	var parent_control: Control = get_parent() as Control
+	if parent_control != null:
+		view_size = parent_control.size
+	layout_panel(view_size)
+
 func _on_close_pressed() -> void:
+	if detail_mode:
+		detail_mode = false
+		details_label.text = _build_card_text()
+		info_button.visible = true
+		close_button.text = "Закрыть"
+		var view_size := get_viewport_rect().size
+		var parent_control: Control = get_parent() as Control
+		if parent_control != null:
+			view_size = parent_control.size
+		layout_panel(view_size)
+		return
 	visible = false
 	close_requested.emit()

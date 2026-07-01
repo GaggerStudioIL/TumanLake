@@ -480,7 +480,7 @@ func _on_global_waterbody_selected(waterbody_id: String) -> void:
 		main._show_toast(reason, false)
 		return
 	if not PlayerData.can_use_waterbody(waterbody_id):
-		main._show_toast("Водоём откроется на %d уровне" % int(waterbody.get("required_level", 1)), false)
+		main._show_toast("Водоём откроется на LVL %d" % int(waterbody.get("required_level", 1)), false)
 		return
 	_show_waterbody_map(waterbody_id)
 
@@ -492,8 +492,8 @@ func _get_world_waterbody_unavailable_reason(waterbody: Dictionary) -> String:
 	if not PlayerData.can_use_waterbody(waterbody_id):
 		var required_level := int(waterbody.get("required_level", 1))
 		if status == "locked":
-			return "Водоём закрыт: требуется уровень %d" % required_level
-		return "Водоём откроется на %d уровне" % required_level
+			return "Водоём закрыт: требуется LVL %d" % required_level
+		return "Водоём откроется на LVL %d" % required_level
 	var spots := SpotDatabase.get_spots_for_waterbody(waterbody_id)
 	if spots.is_empty() or str(waterbody.get("map_asset", "")) == "":
 		return "Карта водоёма в разработке"
@@ -505,7 +505,7 @@ func _on_visual_spot_selected(waterbody_id: String, spot_id: String) -> void:
 	if waterbody.is_empty() or spot.is_empty():
 		return
 	if not PlayerData.can_use_waterbody(waterbody_id):
-		main._show_toast("Водоём откроется на %d уровне" % int(waterbody.get("required_level", 1)), false)
+		main._show_toast("Водоём откроется на LVL %d" % int(waterbody.get("required_level", 1)), false)
 		return
 	if PlayerData.has_method("can_use_spot") and not bool(PlayerData.call("can_use_spot", spot_id)):
 		main._show_toast(_get_spot_lock_reason(spot), false)
@@ -658,7 +658,7 @@ func _get_waterbody_spot_button_text(spot: Dictionary) -> String:
 func _get_spot_lock_reason(spot: Dictionary) -> String:
 	var required_level := int(spot.get("required_level", spot.get("unlock_level", 1)))
 	if PlayerData.level < required_level:
-		return "Точка откроется на %d уровне" % required_level
+		return "Точка откроется на LVL %d" % required_level
 	return "Точка пока закрыта"
 
 func _on_waterbody_item_selected(index: int) -> void:

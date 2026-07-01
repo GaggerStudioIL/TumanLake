@@ -251,6 +251,7 @@ var shop_bait_category_button: Button
 var shop_consumable_category_button: Button
 var shop_clothing_category_button: Button
 var shop_tackle_category_button: Button
+var shop_lure_category_button: Button
 var shop_line_category_button: Button
 var shop_leader_category_button: Button
 var shop_hook_category_button: Button
@@ -505,6 +506,7 @@ var _map_return_spot_id := ""
 var _pending_reward_catch: Dictionary = {}
 var _level_up_reward_queue: Array = []
 var _current_level_up_reward: Dictionary = {}
+var _pending_level_up_redirect: String = ""
 var _level_up_popup_tween: Tween
 var _catch_popup_tween: Tween
 var _catch_fish_tween: Tween
@@ -5332,7 +5334,7 @@ func _get_cast_float_wind_modifiers(spot: Dictionary) -> Dictionary:
 	var setup_comfort: float = clamp(float(float_data.get("setup_comfort", 0.0)), 0.0, 0.20)
 	var wind_resistance: float = clamp(float(float_data.get("wind_resistance", 0.65)), 0.0, 1.0)
 	var rig_cast_accuracy_multiplier: float = clamp(float(tackle_stats.get("rig_cast_accuracy_multiplier", 1.0)), 0.72, 1.02)
-	var rig_cast_distance_bonus: float = clamp(float(tackle_stats.get("rig_cast_distance_bonus", 0.0)), -0.10, 0.0)
+	var rig_cast_distance_bonus: float = clamp(float(tackle_stats.get("rig_cast_distance_bonus", 0.0)), -0.25, 0.0)
 	cast_distance_bonus = clamp(cast_distance_bonus + rig_cast_distance_bonus, -0.30, 0.25)
 	var wind_state: Dictionary = _get_effective_wind_state_for_spot(str(spot.get("id", PlayerData.current_spot)))
 	var wind_speed: float = max(float(wind_state.get("speed_mps", 0.0)), 0.0)
@@ -6028,6 +6030,7 @@ func _setup_layout() -> void:
 		shop_consumable_category_button,
 		shop_clothing_category_button,
 		shop_tackle_category_button,
+		shop_lure_category_button,
 		shop_line_category_button,
 		shop_leader_category_button,
 		shop_hook_category_button,
@@ -7304,7 +7307,7 @@ func _setup_layout() -> void:
 	var shop_inner_width: float = shop_width - shop_padding * 2.0
 	var shop_category_y := 64.0
 	var shop_category_gap := 9.0
-	var shop_category_columns := 8
+	var shop_category_columns := 9
 	var shop_category_width: float = (shop_inner_width - shop_category_gap * float(shop_category_columns - 1)) / float(shop_category_columns)
 	var shop_category_height := 42.0
 	var shop_items_y := 124.0
@@ -7340,19 +7343,24 @@ func _setup_layout() -> void:
 	shop_tackle_category_button.size = Vector2(shop_category_width, shop_category_height)
 	shop_tackle_category_button.add_theme_font_size_override("font_size", 12)
 
-	shop_line_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 4.0, shop_category_y)
+	if shop_lure_category_button != null:
+		shop_lure_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 4.0, shop_category_y)
+		shop_lure_category_button.size = Vector2(shop_category_width, shop_category_height)
+		shop_lure_category_button.add_theme_font_size_override("font_size", 12)
+
+	shop_line_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 5.0, shop_category_y)
 	shop_line_category_button.size = Vector2(shop_category_width, shop_category_height)
 	shop_line_category_button.add_theme_font_size_override("font_size", 12)
 
-	shop_leader_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 5.0, shop_category_y)
+	shop_leader_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 6.0, shop_category_y)
 	shop_leader_category_button.size = Vector2(shop_category_width, shop_category_height)
 	shop_leader_category_button.add_theme_font_size_override("font_size", 12)
 
-	shop_hook_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 6.0, shop_category_y)
+	shop_hook_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 7.0, shop_category_y)
 	shop_hook_category_button.size = Vector2(shop_category_width, shop_category_height)
 	shop_hook_category_button.add_theme_font_size_override("font_size", 12)
 
-	shop_float_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 7.0, shop_category_y)
+	shop_float_category_button.position = Vector2(shop_padding + (shop_category_width + shop_category_gap) * 8.0, shop_category_y)
 	shop_float_category_button.size = Vector2(shop_category_width, shop_category_height)
 	shop_float_category_button.add_theme_font_size_override("font_size", 12)
 
@@ -7516,7 +7524,8 @@ func _setup_layout() -> void:
 func _setup_spots() -> void:
 	spot_option_button.clear()
 
-	var selected_index := 0
+	var selected_index := -1
+	var first_usable_index := -1
 	var spots := SpotDatabase.get_spots_for_waterbody(PlayerData.current_waterbody)
 
 	if spots.is_empty():
@@ -7524,15 +7533,29 @@ func _setup_spots() -> void:
 		spots = SpotDatabase.get_spots_for_waterbody(PlayerData.current_waterbody)
 
 	for spot in spots:
-		spot_option_button.add_item(spot["name"])
+		var spot_id := str(spot.get("id", ""))
+		var can_use_spot := PlayerData.can_use_spot(spot_id)
+		var spot_name := str(spot.get("name", spot_id))
+		if not can_use_spot:
+			var lock_text := PlayerData.get_spot_lock_reason(spot_id) if PlayerData.has_method("get_spot_lock_reason") else str(spot.get("lock_reason", "Закрыто"))
+			spot_name = "%s - %s" % [spot_name, lock_text]
+		spot_option_button.add_item(spot_name)
 		var index := spot_option_button.item_count - 1
-		spot_option_button.set_item_metadata(index, spot["id"])
+		spot_option_button.set_item_metadata(index, spot_id)
+		spot_option_button.set_item_disabled(index, not can_use_spot)
 
-		if spot["id"] == PlayerData.current_spot:
+		if can_use_spot and first_usable_index < 0:
+			first_usable_index = index
+		if can_use_spot and spot_id == PlayerData.current_spot:
 			selected_index = index
 
+	if spot_option_button.item_count <= 0:
+		return
+	if selected_index < 0:
+		selected_index = first_usable_index if first_usable_index >= 0 else 0
 	spot_option_button.select(selected_index)
-	PlayerData.set_current_spot(str(spot_option_button.get_item_metadata(selected_index)))
+	if selected_index >= 0 and selected_index < spot_option_button.item_count and not spot_option_button.is_item_disabled(selected_index):
+		PlayerData.set_current_spot(str(spot_option_button.get_item_metadata(selected_index)))
 	_apply_current_water_profile()
 
 func _connect_signals() -> void:
@@ -7571,6 +7594,8 @@ func _connect_signals() -> void:
 	if shop_clothing_category_button != null:
 		shop_clothing_category_button.pressed.connect(_set_shop_category.bind("clothing"))
 	shop_tackle_category_button.pressed.connect(_set_shop_category.bind("rod"))
+	if shop_lure_category_button != null:
+		shop_lure_category_button.pressed.connect(_set_shop_category.bind("lure"))
 	shop_line_category_button.pressed.connect(_set_shop_category.bind("line"))
 	shop_leader_category_button.pressed.connect(_set_shop_category.bind("leader"))
 	shop_hook_category_button.pressed.connect(_set_shop_category.bind("hook"))
@@ -8289,7 +8314,7 @@ func _update_level_up_reward_popup(reward: Dictionary) -> void:
 	var skipped_items: Array = reward.get("skipped_items", [])
 	level_up_warning_label.visible = not skipped_items.is_empty()
 	level_up_warning_label.text = "Часть наград пропущена, подробности в warning log." if not skipped_items.is_empty() else ""
-	level_up_confirm_button.text = "Забрать"
+	level_up_confirm_button.text = str(reward.get("cta", "Забрать"))
 
 func _format_level_up_unlocks_text(reward: Dictionary) -> String:
 	var unlocks: Array = reward.get("unlocks", [])
@@ -8308,6 +8333,9 @@ func _format_level_up_rewards_text(reward: Dictionary) -> String:
 	var silver := int(reward.get("silver", 0))
 	if silver > 0:
 		lines.append("- %d серебра" % silver)
+	var skill_points := int(reward.get("skill_points", 0))
+	if skill_points > 0:
+		lines.append("- Очки навыков: +%d" % skill_points)
 
 	var items: Array = reward.get("items", [])
 	for item in items:
@@ -8367,6 +8395,9 @@ func _on_level_up_confirm_pressed() -> void:
 		return
 
 	var completed_level := int(_current_level_up_reward.get("level", PlayerData.level))
+	var redirect := str(_current_level_up_reward.get("redirect_to", "")).strip_edges()
+	if redirect != "":
+		_pending_level_up_redirect = redirect
 	result_label.text = "Награда за LVL %d получена." % completed_level
 	_current_level_up_reward = {}
 	SaveManager.save_game()
@@ -8376,7 +8407,26 @@ func _on_level_up_confirm_pressed() -> void:
 		_show_next_level_up_reward()
 		return
 
-	_hide_level_up_reward_popup()
+	_hide_level_up_reward_popup(false)
+	call_deferred("_execute_pending_level_up_redirect")
+
+func _execute_pending_level_up_redirect() -> void:
+	var redirect := _pending_level_up_redirect
+	_pending_level_up_redirect = ""
+	if redirect == "":
+		return
+
+	match redirect:
+		"skill_tree":
+			_open_profile()
+			if profile_ui != null and profile_ui.has_method("open_skill_tree"):
+				profile_ui.call_deferred("open_skill_tree")
+			_show_toast("Открылось дерево навыков", true)
+		"spinning_tutorial":
+			open_tackle_category_from_quick_panel("rod")
+			_show_toast("Открылся спиннинг. Базовый комплект выдан.", true)
+		_:
+			pass
 
 func _block_level_up_reward_close_attempt() -> bool:
 	if _current_modal_name != LEVEL_UP_MODAL_NAME:
@@ -8752,8 +8802,17 @@ func _on_resized() -> void:
 func _on_spot_selected(index: int) -> void:
 	if _is_catch_reward_open():
 		return
+	if index < 0 or index >= spot_option_button.item_count:
+		_setup_spots()
+		return
 
-	PlayerData.set_current_spot(str(spot_option_button.get_item_metadata(index)))
+	var spot_id := str(spot_option_button.get_item_metadata(index))
+	if not PlayerData.set_current_spot(spot_id):
+		var lock_text := PlayerData.get_spot_lock_reason(spot_id) if PlayerData.has_method("get_spot_lock_reason") else "Точка пока недоступна."
+		result_label.text = lock_text
+		_show_toast(lock_text, false)
+		_setup_spots()
+		return
 	_apply_current_water_profile()
 	var spot := SpotDatabase.get_spot(PlayerData.current_spot)
 	result_label.text = "Выбрано: %s\nГлубина воды: до %.1f м | снасть %.1f м" % [
@@ -8830,7 +8889,20 @@ func _on_fish_button_pressed(cast_power: float = MIN_CAST_POWER, cast_hold_time:
 		return
 
 	var selected_index := spot_option_button.selected
-	PlayerData.set_current_spot(str(spot_option_button.get_item_metadata(selected_index)))
+	if selected_index < 0 or selected_index >= spot_option_button.item_count:
+		_setup_spots()
+		result_label.text = "Точка ловли недоступна."
+		_show_toast(result_label.text, false)
+		timer_label.text = "Готов к забросу"
+		return
+	var selected_spot_id := str(spot_option_button.get_item_metadata(selected_index))
+	if not PlayerData.set_current_spot(selected_spot_id):
+		var spot_lock_text := PlayerData.get_spot_lock_reason(selected_spot_id) if PlayerData.has_method("get_spot_lock_reason") else "Точка пока недоступна."
+		result_label.text = spot_lock_text
+		_show_toast(spot_lock_text, false)
+		_setup_spots()
+		timer_label.text = "Готов к забросу"
+		return
 
 	var condition_block_reason := _get_player_condition_cast_block_reason()
 	if condition_block_reason != "":
@@ -9462,6 +9534,14 @@ func _on_shop_buy_pressed(item_id: String) -> void:
 	var price := float(shop_item.get("price", 0.0))
 	var quantity := int(shop_item.get("quantity", 1))
 
+	if PlayerData.has_method("is_item_unlocked_for_player") and not bool(PlayerData.call("is_item_unlocked_for_player", shop_item)):
+		var lock_text := str(PlayerData.call("get_item_lock_reason", shop_item)) if PlayerData.has_method("get_item_lock_reason") else "Предмет пока недоступен."
+		_show_shop_notice(lock_text, false)
+		_show_toast(lock_text, false)
+		_play_audio_hook(shop_error_audio)
+		_play_shop_card_feedback(item_id, false)
+		return
+
 	if PlayerData.money < price:
 		_show_shop_notice("Недостаточно монет", false)
 		_play_audio_hook(shop_error_audio)
@@ -9469,12 +9549,25 @@ func _on_shop_buy_pressed(item_id: String) -> void:
 		return
 
 	PlayerData.money -= price
-	PlayerData.add_owned_item(_get_shop_inventory_item(shop_item), quantity)
-
 	var purchased_category := str(shop_item.get("category", ""))
-	if ["rod", "line", "leader", "float", "hook", "bait"].has(purchased_category):
+	var selected_tackle_item_id := item_id
+	if purchased_category == "lure_pack":
+		var pack_item_ids: Array = shop_item.get("pack_item_ids", [])
+		for pack_item_id_value in pack_item_ids:
+			var pack_item_id := str(pack_item_id_value)
+			var catalog_item := PlayerData.get_tackle_catalog_item(pack_item_id)
+			if catalog_item.is_empty():
+				continue
+			PlayerData.add_owned_item(catalog_item, 1)
+			if selected_tackle_item_id == item_id:
+				selected_tackle_item_id = pack_item_id
+		purchased_category = "lure"
+	else:
+		PlayerData.add_owned_item(_get_shop_inventory_item(shop_item), quantity)
+
+	if ["rod", "line", "leader", "float", "hook", "bait", "lure"].has(purchased_category):
 		_tackle_category = purchased_category
-		_selected_tackle_item_id = item_id
+		_selected_tackle_item_id = selected_tackle_item_id
 
 	SaveManager.save_game()
 	_update_ui()

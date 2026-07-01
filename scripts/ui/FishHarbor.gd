@@ -1435,14 +1435,17 @@ func _build_contracts_section() -> void:
 	_add_section_subtitle("Активные контракты")
 	var active := _get_active_contracts()
 	if active.is_empty():
-		_add_empty_card(section_content, "Нет активных контрактов", "Новые заявки появятся после обновления игрового дня.")
+		var empty_text := _get_contract_progression_hint()
+		if empty_text == "":
+			empty_text = "Новые заявки появятся после обновления игрового дня."
+		_add_empty_card(section_content, "Нет активных контрактов", empty_text)
 	else:
 		for contract in active:
 			if typeof(contract) == TYPE_DICTIONARY:
 				section_content.add_child(_create_contract_card(contract, false))
 
 	_add_section_subtitle("Доступные контракты")
-	_add_empty_card(section_content, "Доступные заявки", "Новые заявки появляются автоматически. Выполняйте активные через продажу улова.")
+	_add_empty_card(section_content, "Доступные заявки", _get_contract_progression_hint("Новые заявки появляются автоматически. Выполняйте активные через продажу улова."))
 
 	_add_section_subtitle("Выполненные контракты")
 	var completed := _get_completed_contracts()
@@ -1846,6 +1849,38 @@ func _get_active_contracts() -> Array:
 		if value is Array:
 			return value
 	return []
+
+
+func _get_contract_progression_hint(fallback: String = "") -> String:
+	var contract_manager: Node = get_node_or_null("/root/ContractManager")
+	if contract_manager == null:
+		return fallback
+	if not contract_manager.has_method("get_contract_slots_for_current_level"):
+		return fallback
+
+	var slots_value = contract_manager.call("get_contract_slots_for_current_level")
+	if not (slots_value is Dictionary):
+		return fallback
+	var slots: Dictionary = slots_value
+	var total_slots := int(slots.get("easy", 0)) + int(slots.get("medium", 0)) + int(slots.get("hard", 0))
+	if total_slots <= 0:
+		if contract_manager.has_method("get_contract_lock_text"):
+			return str(contract_manager.call("get_contract_lock_text", "easy"))
+		return "Контракты откроются на LVL 3"
+
+	var lines: Array = []
+	lines.append("Открыто слотов: лёгкие %d / средние %d / сложные %d." % [
+		int(slots.get("easy", 0)),
+		int(slots.get("medium", 0)),
+		int(slots.get("hard", 0))
+	])
+	if int(slots.get("medium", 0)) <= 0 and contract_manager.has_method("get_contract_lock_text"):
+		lines.append(str(contract_manager.call("get_contract_lock_text", "medium")))
+	if int(slots.get("hard", 0)) <= 0 and contract_manager.has_method("get_contract_lock_text"):
+		lines.append(str(contract_manager.call("get_contract_lock_text", "hard")))
+	if lines.is_empty():
+		return fallback
+	return "\n".join(lines)
 
 
 func _get_completed_contracts() -> Array:

@@ -54,7 +54,7 @@ func update_condition(elapsed_game_minutes: float) -> bool:
 	_tick_condition_bonus(elapsed_game_minutes)
 
 	PlayerData.hunger = clampf(
-		float(PlayerData.hunger) - HUNGER_LOSS_PER_GAME_HOUR * elapsed_game_hours,
+		float(PlayerData.hunger) - HUNGER_LOSS_PER_GAME_HOUR * elapsed_game_hours * _get_progression_survival_multiplier("hunger_loss_multiplier", 1.0),
 		0.0,
 		100.0
 	)
@@ -179,7 +179,9 @@ func get_condition_quality() -> float:
 
 
 func get_fishing_modifiers() -> Dictionary:
-	var quality := get_condition_quality()
+	var raw_quality := get_condition_quality()
+	var penalty_multiplier := _get_progression_survival_multiplier("condition_penalty_multiplier", 1.0)
+	var quality := clampf(1.0 - (1.0 - raw_quality) * penalty_multiplier, 0.12, 1.0)
 	return {
 		"condition_quality": quality,
 		"bite_chance_multiplier": lerpf(0.60, 1.0, quality),
@@ -355,6 +357,20 @@ func _get_fallback_game_minutes_per_real_second() -> float:
 	return 0.8
 
 
+func _get_progression_survival_multiplier(key: String, fallback: float) -> float:
+	var progression_db := get_node_or_null("/root/ProgressionDatabase")
+	if progression_db == null or not progression_db.has_method("get_survival_multiplier_for_level"):
+		return fallback
+	var player_data := get_node_or_null("/root/PlayerData")
+	var player_level: int = 1
+	if player_data != null:
+		player_level = maxi(int(player_data.get("level")), 1)
+	var value = progression_db.call("get_survival_multiplier_for_level", player_level)
+	if value is Dictionary:
+		return clampf(float((value as Dictionary).get(key, fallback)), 0.0, 2.0)
+	return fallback
+
+
 func _get_target_body_temperature(environment: Dictionary) -> float:
 	var air_temperature := float(environment.get("air_temperature", 20.0))
 	var weather_type := str(environment.get("weather_type", "clear"))
@@ -389,6 +405,8 @@ func _get_target_body_temperature(environment: Dictionary) -> float:
 		target += 0.15
 
 	target = _apply_clothing_temperature_modifier(target, environment)
+	var impact_multiplier := _get_progression_survival_multiplier("temperature_impact_multiplier", 1.0)
+	target = DEFAULT_BODY_TEMPERATURE + (target - DEFAULT_BODY_TEMPERATURE) * impact_multiplier
 	return clampf(target, 33.4, 39.2)
 
 
@@ -433,7 +451,7 @@ func _get_body_temperature_rate(environment: Dictionary, target_temperature: flo
 		rate += 0.002
 	if wind_speed > 3.0:
 		rate += minf((wind_speed - 3.0) * 0.0006, 0.003)
-	return rate
+	return rate * _get_progression_survival_multiplier("temperature_impact_multiplier", 1.0)
 
 
 func _get_wellbeing_delta_per_game_hour() -> float:

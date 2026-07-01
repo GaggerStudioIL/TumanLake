@@ -64,6 +64,99 @@ const VOICE_FILE_ALIASES := {
 }
 
 const JINGLE_DIR := "res://assets/audio/radio/jingles/"
+const RADIO_AUDIO_FILES_BY_DIR := {
+	"res://assets/audio/radio/jingles/": [
+		"TumanFM_radio_u_vody.mp3"
+	],
+	"res://assets/audio/radio/music/morning/": [
+		"3 Doors Down — Circle of Days _ AI Reimagine (Emotional Rock Anthem).ogg",
+		"Берег — Туман 🌫️ _ Атмосферная песня о душе и одиночестве _ Artis x Sasha.ogg",
+		"В Ожидании 🌅 _ Тёплая песня о жизни, свете и надежде _ Artis x Sasha.ogg",
+		"Невидимые нити _ Русская рок-баллада о судьбе.ogg"
+	],
+	"res://assets/audio/radio/music/day/": [
+		"What if Земфира пела в стиле Depeche Mode _ Ai Gen Tribute.ogg",
+		"Вампиры Средней Полосы - Стоянов.ogg",
+		"Современный “Кино” — новая песня в духе Цоя - Цель - Жизнь.ogg",
+		"Что если бы Иван Дорн спел “Город Золотой” _ AI Tribute _ Voices Reimagined.ogg"
+	],
+	"res://assets/audio/radio/music/evening/": [
+		"A. Vasiliev – I Still Miss You _ A Soul Ballad You’ll Feel in Your Bones.ogg",
+		"Beyond-the-Light-Copyright-free-music-_-post-grunge.ogg",
+		"Shape of My Heart – What if Sting was Evanescence _ Rock Ballad Tribute (AI).ogg",
+		"Моя-звезда-Copyright-free-music-_-slow-romantic-_-R_B-_-chill-pop-_.ogg"
+	],
+	"res://assets/audio/radio/music/night/": [
+		"Agata-Kristi-—-Опиум-для-никого-_-Gothic-Rock-_-Darkwave-_AI-Tribute_.ogg",
+		"Music-Inside-Copyright-free-music.ogg",
+		"Uninvited-Copyright-free-music-_-Alternative-Rock.ogg",
+		"ГОЛОС-СКВОЗЬ-ТЬМУ-_-Official-Track-_AI-Music_.ogg"
+	],
+	"res://assets/audio/radio/voice/generic/": [
+		"ostavaytes_s_nami_vperedi_novosti.mp3",
+		"privet_vsem_s_vami_dj_artis.mp3",
+		"vy_slushaete_tumanfm_radio_uvody.mp3"
+	],
+	"res://assets/audio/radio/voice/weather/": [
+		"dozhd_smenitsa_solncem_ura.mp3",
+		"na_agamim_legkiy_tuman.mp3",
+		"pogoda_menyaetsa_zavtra_dozhdi.mp3"
+	],
+	"res://assets/audio/radio/voice/weather/temperature/": [
+		"blizhe_k_obedu_ozhidaetsa.mp3",
+		"number_0.mp3",
+		"number_1.mp3",
+		"number_2.mp3",
+		"number_3.mp3",
+		"number_4.mp3",
+		"number_5.mp3",
+		"number_6.mp3",
+		"number_7.mp3",
+		"number_8.mp3",
+		"number_9.mp3",
+		"number_10.mp3",
+		"number_11.mp3",
+		"number_12.mp3",
+		"number_13.mp3",
+		"number_14.mp3",
+		"number_15.mp3",
+		"number_16.mp3",
+		"number_17.mp3",
+		"number_18.mp3",
+		"number_19.mp3",
+		"number_20.mp3",
+		"number_21.mp3",
+		"number_22.mp3",
+		"number_23.mp3",
+		"number_24.mp3",
+		"number_25.mp3",
+		"number_26.mp3",
+		"number_27.mp3",
+		"number_28.mp3",
+		"number_29.mp3",
+		"number_30.mp3",
+		"number_31.mp3",
+		"number_32.mp3",
+		"number_33.mp3",
+		"number_34.mp3",
+		"number_35.mp3",
+		"number_36.mp3",
+		"opustitsa.mp3",
+		"podnimetsa.mp3",
+		"poholodanie.mp3",
+		"poteplenie.mp3",
+		"segodnya_temperatura.mp3",
+		"utrom_temperatura.mp3",
+		"vecherom_i_k_nochi_temperatura.mp3"
+	],
+	"res://assets/audio/radio/voice/market/": [
+		"kontrakti_v_gavani_obnovilis.mp3",
+		"Postavshiki_obnovili_obmen_snastey.mp3"
+	],
+	"res://assets/audio/radio/voice/rare_fish/": [
+		"U_temnoy_yami_vspleski.mp3"
+	]
+}
 
 var radio_enabled: bool = true
 var current_station: String = STATION_TUMAN_FM
@@ -326,23 +419,43 @@ func play_next_music_track() -> void:
 	var candidates := pool.duplicate()
 	if candidates.size() > 1 and current_track != "":
 		candidates.erase(current_track)
-	var path := str(candidates[_rng.randi_range(0, candidates.size() - 1)])
-	var stream := _get_audio_stream(path)
-	if stream == null:
-		_report_missing_audio(path)
-		current_track = ""
-		if pool.size() > 1:
-			pool.erase(path)
+	var attempted_paths: Dictionary = {}
+	if _play_first_loadable_music_candidate(candidates, attempted_paths):
 		return
 
-	current_track = path
-	music_player.stop()
-	music_player.stream = stream
-	_set_stream_loop(stream, false)
-	_apply_music_volume()
-	music_player.play()
-	if BuildConfig.ENABLE_VERBOSE_LOGS:
-		print("[TumanFM] music: %s" % current_track)
+	var fallback_candidates: Array = []
+	for directory_path in MUSIC_DIRS.values():
+		for file_path_value in _list_audio_files(str(directory_path)):
+			var fallback_path := str(file_path_value)
+			if not attempted_paths.has(fallback_path) and not fallback_candidates.has(fallback_path):
+				fallback_candidates.append(fallback_path)
+	if _play_first_loadable_music_candidate(fallback_candidates, attempted_paths):
+		return
+
+	current_track = ""
+	_report_empty_music_pool("loadable")
+
+
+func _play_first_loadable_music_candidate(candidates: Array, attempted_paths: Dictionary) -> bool:
+	while not candidates.is_empty():
+		var path := str(candidates[_rng.randi_range(0, candidates.size() - 1)])
+		attempted_paths[path] = true
+		var stream: AudioStream = _get_audio_stream(path)
+		if stream == null:
+			_report_missing_audio(path)
+			candidates.erase(path)
+			continue
+
+		current_track = path
+		music_player.stop()
+		music_player.stream = stream
+		_set_stream_loop(stream, false)
+		_apply_music_volume()
+		music_player.play()
+		if BuildConfig.ENABLE_VERBOSE_LOGS:
+			print("[TumanFM] music: %s" % current_track)
+		return true
+	return false
 
 
 func choose_music_pool_by_time_and_weather() -> Array:
@@ -1357,7 +1470,7 @@ func _find_audio_file(directory_path: String, basename: String) -> String:
 		var path := directory_path.path_join("%s.%s" % [basename, extension])
 		if FileAccess.file_exists(path) or ResourceLoader.exists(path):
 			return path
-	return ""
+	return _find_audio_file_in_manifest(directory_path, basename)
 
 
 func _list_audio_files(directory_path: String) -> Array:
@@ -1367,7 +1480,9 @@ func _list_audio_files(directory_path: String) -> Array:
 
 	var dir := DirAccess.open(directory_path)
 	if dir == null:
-		_report_missing_directory(directory_path)
+		_append_manifest_audio_files(directory_path, files)
+		if files.is_empty():
+			_report_missing_directory(directory_path)
 		return files
 
 	dir.list_dir_begin()
@@ -1386,7 +1501,35 @@ func _list_audio_files(directory_path: String) -> Array:
 						files.append(imported_path)
 		file_name = dir.get_next()
 	dir.list_dir_end()
+	_append_manifest_audio_files(directory_path, files)
 	return files
+
+
+func _find_audio_file_in_manifest(directory_path: String, basename: String) -> String:
+	var normalized_basename := basename.strip_edges().to_lower()
+	if normalized_basename == "":
+		return ""
+	var manifest_files: Array = _get_manifest_audio_files(directory_path)
+	for file_name_value in manifest_files:
+		var file_name := str(file_name_value)
+		if file_name.get_basename().to_lower() == normalized_basename:
+			return directory_path.path_join(file_name)
+	return ""
+
+
+func _append_manifest_audio_files(directory_path: String, files: Array) -> void:
+	var manifest_files: Array = _get_manifest_audio_files(directory_path)
+	for file_name_value in manifest_files:
+		var file_path := directory_path.path_join(str(file_name_value))
+		if not files.has(file_path):
+			files.append(file_path)
+
+
+func _get_manifest_audio_files(directory_path: String) -> Array:
+	if not RADIO_AUDIO_FILES_BY_DIR.has(directory_path):
+		return []
+	var manifest_files: Array = RADIO_AUDIO_FILES_BY_DIR[directory_path] as Array
+	return manifest_files.duplicate()
 
 
 func _get_audio_stream(path: String) -> AudioStream:
@@ -1394,8 +1537,11 @@ func _get_audio_stream(path: String) -> AudioStream:
 		return _audio_stream_cache[path] as AudioStream
 
 	var stream: AudioStream = null
-	if ResourceLoader.exists(path):
-		stream = load(path) as AudioStream
+	var resource: Resource = null
+	if ResourceLoader.exists(path) or path.begins_with("res://"):
+		resource = ResourceLoader.load(path)
+	if resource is AudioStream:
+		stream = resource as AudioStream
 
 	if stream == null:
 		match path.get_extension().to_lower():
@@ -1403,6 +1549,8 @@ func _get_audio_stream(path: String) -> AudioStream:
 				stream = AudioStreamOggVorbis.load_from_file(path)
 			"mp3":
 				stream = AudioStreamMP3.load_from_file(path)
+			"wav":
+				stream = AudioStreamWAV.load_from_file(path)
 
 	if stream != null:
 		_audio_stream_cache[path] = stream

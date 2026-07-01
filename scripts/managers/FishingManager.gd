@@ -309,6 +309,9 @@ func start_fishing(spot_id: String, cast_context: Dictionary = {}) -> void:
 		)
 		return
 
+	if _fight_mode == "reel":
+		_apply_spinning_lure_cast_wear()
+
 	var available_fish: Array = _get_tackle_available_fish(spot["available_fish"])
 	var spot_depth_modifier: float = _get_spot_depth_match_multiplier(spot)
 
@@ -930,8 +933,19 @@ func _calculate_spinning_bite_chance(fish_id: String, fish: Dictionary, context:
 
 func _get_spinning_lure_match_multiplier(rule: Dictionary, lure_type: String) -> float:
 	var lure_types: Array = rule.get("lure_types", [])
-	if lure_type == "" or lure_types.is_empty() or not lure_types.has(lure_type):
+	if lure_type == "" or lure_types.is_empty():
 		return 0.0
+	var matched_lure_type := lure_type
+	if not lure_types.has(matched_lure_type):
+		if lure_type == "spinner_bait":
+			if lure_types.has("spinner"):
+				matched_lure_type = "spinner"
+			elif lure_types.has("spoon"):
+				matched_lure_type = "spoon"
+			elif lure_types.has("topwater"):
+				matched_lure_type = "topwater"
+		if not lure_types.has(matched_lure_type):
+			return 0.0
 	match str(rule.get("spinning_role", "none")):
 		"predator":
 			return 1.28
@@ -963,6 +977,8 @@ func _get_current_lure_depth_layer(lure_type: String, speed: int, pause_active: 
 			layer = "surface"
 		"spinner", "wobbler", "crank":
 			layer = "upper" if speed >= 29 else "mid"
+		"spinner_bait":
+			layer = "upper" if speed >= 28 else "mid"
 		"spoon":
 			layer = "upper" if speed >= 36 else "mid"
 		"jig", "soft_lure":
@@ -3696,6 +3712,19 @@ func _update_critical_break(delta: float) -> void:
 		var break_kind := _get_weakest_line_break_kind()
 		_finish_reeling_failed("Критическое натяжение. %s" % ("Поводок лопнул." if break_kind == "leader_break" else "Леска лопнула."), break_kind, _get_failure_reason_for_fail_kind(break_kind))
 
+func _apply_spinning_lure_cast_wear() -> void:
+	var lure_id := str(_tackle_stats.get("lure_id", ""))
+	if lure_id == "":
+		return
+	var lure_wear_rate := maxf(float(_tackle_stats.get("lure_wear_rate", 0.0)), 0.0)
+	if lure_wear_rate <= 0.0:
+		return
+	var lure_wear_multiplier := clampf(float(_tackle_stats.get("lure_wear_multiplier", 1.0)), 0.5, 2.5)
+	PlayerData.apply_tackle_wear({
+		"lure": lure_wear_rate * lure_wear_multiplier,
+		"lure_lost": false
+	})
+
 func _apply_reeling_wear(outcome: String) -> Dictionary:
 	if _current_catch.is_empty():
 		return {}
@@ -3719,25 +3748,34 @@ func _apply_reeling_wear(outcome: String) -> Dictionary:
 		"leader_lost": false,
 		"float_lost": false,
 		"rod_broken": outcome == "rod_break",
-		"hook_lost": false
+		"hook_lost": false,
+		"lure_lost": false
 	}
 
 	if outcome == "line_break":
 		wear["leader_lost"] = randf() < 0.82
 		wear["hook_lost"] = randf() < 0.82
+		wear["lure_lost"] = _fight_mode == "reel" and randf() < 0.82
 		wear["float_lost"] = randf() < 0.55
 	elif outcome == "leader_break":
 		wear["leader_lost"] = true
 		wear["hook_lost"] = true
+		wear["lure_lost"] = _fight_mode == "reel"
 	elif outcome == "escape":
 		wear["hook_lost"] = randf() < clamp(_escape_risk * 0.10, 0.02, 0.12)
+		wear["lure_lost"] = _fight_mode == "reel" and randf() < clamp(_escape_risk * 0.08, 0.01, 0.10)
 
 	if _fight_mode == "reel":
+		var rod_wear_multiplier := clampf(float(_tackle_stats.get("rod_wear_multiplier", 1.0)), 0.5, 2.5)
+		var lure_wear_multiplier := clampf(float(_tackle_stats.get("lure_wear_multiplier", 1.0)), 0.5, 2.5)
 		var reel_pressure: float = clamp(max(_reel_wear_pressure, max(_line_load_ratio, _rod_load_ratio) * 0.45), 0.25, 3.0)
+		wear["rod"] = float(wear.get("rod", 0.0)) * rod_wear_multiplier
+		wear["lure"] = base_wear * 1.10 * float(_tackle_stats.get("lure_wear_rate", _tackle_stats.get("hook_wear_rate", 0.026))) / 0.026 * lure_wear_multiplier
 		wear["reel"] = base_wear * reel_pressure * float(_tackle_stats.get("reel_wear_rate", 0.008)) / 0.008
 		wear["reel_broken"] = outcome == "spool_empty" and randf() < clamp(reel_pressure * 0.08, 0.03, 0.22)
 		if outcome == "spool_empty":
 			wear["line_broken"] = true
+			wear["lure_lost"] = randf() < 0.72
 
 	return PlayerData.apply_tackle_wear(wear)
 
@@ -3791,6 +3829,8 @@ func _finish_reeling_failed(message: String, fail_kind: String = "escape", reaso
 		final_message += "\nКатушка повреждена!"
 	if bool(wear_result.get("hook_lost", false)):
 		final_message += "\nКрючок потерян."
+	if bool(wear_result.get("lure_lost", false)):
+		final_message += "\nПриманка потеряна."
 	if bool(wear_result.get("float_lost", false)):
 		final_message += "\nПоплавок потерян."
 

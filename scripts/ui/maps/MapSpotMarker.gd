@@ -8,7 +8,9 @@ var spot_id := ""
 var spot_data: Dictionary = {}
 var unlocked := true
 var current := false
+var selected := false
 var baked_map_controls := false
+var map_order := 0
 
 var marker_button: Button
 var info_button: Button
@@ -18,21 +20,32 @@ var current_label: Label
 const BAKED_INFO_TOUCH_MIN_SIZE := 72.0
 const BAKED_INFO_TOUCH_MAX_SIZE := 98.0
 const BAKED_INFO_TOUCH_SCALE := 2.7
+const TAP_DRAG_THRESHOLD := 14.0
 
 var _current_arrow_start := Vector2.ZERO
 var _current_arrow_tip := Vector2.ZERO
 var _current_marker_position := Vector2.ZERO
 var _current_marker_radius := 0.0
+var _tap_tracking := false
+var _tap_cancelled := false
+var _tap_press_position := Vector2.ZERO
 
 func set_baked_map_controls(value: bool) -> void:
 	baked_map_controls = value
 	if marker_button != null:
 		_refresh_state()
 
+func set_selected(value: bool) -> void:
+	selected = value
+	if marker_button != null:
+		_refresh_state()
+		queue_redraw()
+
 func setup_marker(new_waterbody_id: String, new_spot: Dictionary, is_unlocked: bool, is_current: bool) -> void:
 	waterbody_id = new_waterbody_id
 	spot_data = new_spot.duplicate(true)
 	spot_id = str(spot_data.get("id", ""))
+	map_order = int(spot_data.get("map_order", 0))
 	unlocked = is_unlocked
 	current = is_current
 	_ensure_nodes()
@@ -44,16 +57,20 @@ func layout_marker(map_rect: Rect2, marker_size: float, info_size: float) -> voi
 
 	var marker_position := _get_normalized_position("map_position", Vector2(0.5, 0.5)) * map_rect.size
 	var info_position := _get_normalized_position("info_position", _get_default_info_position()) * map_rect.size
+	_current_marker_position = marker_position
+	_current_marker_radius = marker_size * 0.5
 	if baked_map_controls:
 		var marker_hitbox_edge := clampf(marker_size * 0.95, 42.0, 58.0)
 		var marker_hitbox_size := Vector2(marker_hitbox_edge, marker_hitbox_edge)
 		marker_button.position = marker_position + Vector2(0.0, marker_size * 0.28) - marker_hitbox_size * 0.5
 		marker_button.size = marker_hitbox_size
 	else:
-		marker_button.position = marker_position - Vector2(marker_size, marker_size) * 0.5
-		marker_button.size = Vector2(marker_size, marker_size)
-	lock_badge.position = marker_button.position + Vector2(marker_size - 15.0, -3.0)
-	lock_badge.size = Vector2(18.0, 18.0)
+		var marker_edge := clampf(marker_size, 72.0, 84.0)
+		var marker_hitbox_size := Vector2(marker_edge, marker_edge)
+		marker_button.position = marker_position - marker_hitbox_size * 0.5
+		marker_button.size = marker_hitbox_size
+	lock_badge.position = marker_button.position + Vector2(marker_button.size.x - 25.0, -2.0)
+	lock_badge.size = Vector2(27.0, 20.0)
 	var info_hitbox_size := Vector2(info_size, info_size)
 	if baked_map_controls:
 		var info_hitbox_edge := clampf(info_size * BAKED_INFO_TOUCH_SCALE, BAKED_INFO_TOUCH_MIN_SIZE, BAKED_INFO_TOUCH_MAX_SIZE)
@@ -71,10 +88,11 @@ func _ensure_nodes() -> void:
 		marker_button = Button.new()
 		marker_button.name = "MarkerButton"
 		marker_button.focus_mode = Control.FOCUS_NONE
-		marker_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		marker_button.mouse_filter = Control.MOUSE_FILTER_PASS
 		marker_button.text = ""
 		marker_button.z_index = 0
 		add_child(marker_button)
+		marker_button.gui_input.connect(_on_marker_button_gui_input)
 		marker_button.pressed.connect(_on_marker_pressed)
 
 	if info_button == null:
@@ -90,7 +108,7 @@ func _ensure_nodes() -> void:
 	if lock_badge == null:
 		lock_badge = Label.new()
 		lock_badge.name = "LockBadge"
-		lock_badge.text = "!"
+		lock_badge.text = "🔒"
 		lock_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		lock_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		lock_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -114,17 +132,20 @@ func _refresh_state() -> void:
 	info_button.tooltip_text = "Информация: %s" % spot_name
 	lock_badge.visible = not unlocked and not baked_map_controls
 	current_label.visible = current and not baked_map_controls
-	z_index = 5 if current else 0
+	z_index = 10 if selected else (6 if current else 0)
 
-	# The lake map already contains the marker art, so this button is only a touch target.
 	var transparent_style := _make_transparent_style()
-	marker_button.add_theme_stylebox_override("normal", transparent_style)
-	marker_button.add_theme_stylebox_override("hover", transparent_style)
-	marker_button.add_theme_stylebox_override("pressed", transparent_style)
-	marker_button.add_theme_stylebox_override("disabled", transparent_style)
-
 	if baked_map_controls:
+		# The legacy map already contains marker art, so these controls are only touch targets.
+		marker_button.text = ""
+		marker_button.add_theme_stylebox_override("normal", transparent_style)
+		marker_button.add_theme_stylebox_override("hover", transparent_style)
+		marker_button.add_theme_stylebox_override("pressed", transparent_style)
+		marker_button.add_theme_stylebox_override("disabled", transparent_style)
+		marker_button.add_theme_font_size_override("font_size", 1)
+		marker_button.add_theme_color_override("font_color", Color.TRANSPARENT)
 		info_button.text = ""
+		info_button.visible = true
 		info_button.add_theme_font_size_override("font_size", 1)
 		info_button.add_theme_color_override("font_color", Color.TRANSPARENT)
 		info_button.add_theme_color_override("font_hover_color", Color.TRANSPARENT)
@@ -134,16 +155,26 @@ func _refresh_state() -> void:
 		info_button.add_theme_stylebox_override("pressed", transparent_style)
 		info_button.add_theme_stylebox_override("disabled", transparent_style)
 	else:
-		info_button.text = "i"
-		info_button.add_theme_font_size_override("font_size", 14)
-		info_button.add_theme_color_override("font_color", Color(0.90, 1.0, 0.90, 1.0))
-		info_button.add_theme_stylebox_override("normal", _make_circle_style(Color(0.02, 0.05, 0.05, 0.80), Color(0.74, 0.98, 0.78, 0.70), 1))
-		info_button.add_theme_stylebox_override("hover", _make_circle_style(Color(0.06, 0.16, 0.10, 0.96), Color(0.92, 1.0, 0.78, 0.90), 2))
-		info_button.add_theme_stylebox_override("pressed", _make_circle_style(Color(0.03, 0.10, 0.06, 0.98), Color(0.70, 0.92, 0.66, 0.88), 1))
+		var label := str(map_order) if map_order > 0 else ""
+		marker_button.text = label
+		marker_button.disabled = false
+		marker_button.add_theme_font_size_override("font_size", 22 if label.length() <= 1 else 19)
+		marker_button.add_theme_color_override("font_color", Color(1.0, 0.90, 0.58, 1.0) if unlocked else Color(0.78, 0.72, 0.62, 0.82))
+		marker_button.add_theme_color_override("font_hover_color", Color(1.0, 0.96, 0.72, 1.0))
+		marker_button.add_theme_color_override("font_pressed_color", Color(1.0, 0.82, 0.38, 1.0))
+		marker_button.add_theme_color_override("font_disabled_color", Color(0.58, 0.58, 0.54, 0.70))
+		var base_fill := Color(0.055, 0.045, 0.030, 0.96) if unlocked else Color(0.030, 0.032, 0.030, 0.72)
+		var base_border := Color(1.0, 0.74, 0.30, 0.95) if selected or current else Color(0.78, 0.58, 0.28, 0.88)
+		var base_shadow := Color(1.0, 0.65, 0.20, 0.34) if selected else Color(0.0, 0.0, 0.0, 0.40)
+		marker_button.add_theme_stylebox_override("normal", _make_circle_style(base_fill, base_border, 3, 12 if selected else 6, base_shadow))
+		marker_button.add_theme_stylebox_override("hover", _make_circle_style(Color(0.105, 0.080, 0.038, 1.0), Color(1.0, 0.86, 0.44, 1.0), 4, 14, Color(1.0, 0.70, 0.20, 0.38)))
+		marker_button.add_theme_stylebox_override("pressed", _make_circle_style(Color(0.035, 0.030, 0.022, 0.98), Color(1.0, 0.64, 0.22, 1.0), 2, 8, Color(1.0, 0.58, 0.16, 0.30)))
+		marker_button.add_theme_stylebox_override("disabled", _make_circle_style(Color(0.030, 0.032, 0.030, 0.66), Color(0.50, 0.44, 0.34, 0.56), 2, 4, Color(0.0, 0.0, 0.0, 0.28)))
+		info_button.visible = false
 
 	lock_badge.add_theme_font_size_override("font_size", 12)
 	lock_badge.add_theme_color_override("font_color", Color(1.0, 0.86, 0.58, 1.0))
-	lock_badge.add_theme_stylebox_override("normal", _make_circle_style(Color(0.24, 0.09, 0.05, 0.92), Color(1.0, 0.74, 0.54, 0.78), 1))
+	lock_badge.add_theme_stylebox_override("normal", _make_circle_style(Color(0.15, 0.08, 0.05, 0.94), Color(1.0, 0.74, 0.36, 0.86), 1, 4, Color(0.0, 0.0, 0.0, 0.36)))
 
 	current_label.add_theme_font_size_override("font_size", 13)
 	current_label.add_theme_color_override("font_color", Color(1.0, 0.96, 0.70, 1.0))
@@ -175,9 +206,6 @@ func _layout_current_indicator(marker_position: Vector2, marker_size: float) -> 
 	current_label.visible = current and not baked_map_controls
 	if not current or baked_map_controls:
 		return
-
-	_current_marker_position = marker_position
-	_current_marker_radius = marker_size * 0.5
 
 	var label_size := Vector2(clampf(marker_size * 1.52, 66.0, 84.0), clampf(marker_size * 0.52, 22.0, 28.0))
 	var margin := maxf(8.0, marker_size * 0.16)
@@ -224,7 +252,7 @@ func _get_default_info_position() -> Vector2:
 	var marker_position := _get_normalized_position("map_position", Vector2(0.5, 0.5))
 	return Vector2(clampf(marker_position.x + 0.035, 0.04, 0.96), clampf(marker_position.y - 0.040, 0.04, 0.96))
 
-func _make_circle_style(fill: Color, border: Color, border_width: int) -> StyleBoxFlat:
+func _make_circle_style(fill: Color, border: Color, border_width: int, shadow_size: int = 5, shadow_color: Color = Color(0.0, 0.0, 0.0, 0.32)) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = fill
 	style.border_color = border
@@ -236,8 +264,8 @@ func _make_circle_style(fill: Color, border: Color, border_width: int) -> StyleB
 	style.corner_radius_top_right = 64
 	style.corner_radius_bottom_left = 64
 	style.corner_radius_bottom_right = 64
-	style.shadow_color = Color(0.0, 0.0, 0.0, 0.32)
-	style.shadow_size = 5
+	style.shadow_color = shadow_color
+	style.shadow_size = shadow_size
 	return style
 
 func _make_transparent_style() -> StyleBoxFlat:
@@ -269,7 +297,39 @@ func _make_current_label_style() -> StyleBoxFlat:
 	return style
 
 func _on_marker_pressed() -> void:
+	if _tap_cancelled:
+		_tap_tracking = false
+		_tap_cancelled = false
+		return
 	spot_pressed.emit(waterbody_id, spot_id)
 
 func _on_info_pressed() -> void:
 	info_pressed.emit(waterbody_id, spot_id)
+
+func _on_marker_button_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mouse_event: InputEventMouseButton = event as InputEventMouseButton
+		if mouse_event.button_index != MOUSE_BUTTON_LEFT:
+			return
+		if mouse_event.pressed:
+			_tap_tracking = true
+			_tap_cancelled = false
+			_tap_press_position = mouse_event.position
+		else:
+			_tap_tracking = false
+	elif event is InputEventMouseMotion and _tap_tracking:
+		var motion_event: InputEventMouseMotion = event as InputEventMouseMotion
+		if motion_event.position.distance_to(_tap_press_position) > TAP_DRAG_THRESHOLD:
+			_tap_cancelled = true
+	elif event is InputEventScreenTouch:
+		var touch_event: InputEventScreenTouch = event as InputEventScreenTouch
+		if touch_event.pressed:
+			_tap_tracking = true
+			_tap_cancelled = false
+			_tap_press_position = touch_event.position
+		else:
+			_tap_tracking = false
+	elif event is InputEventScreenDrag and _tap_tracking:
+		var drag_event: InputEventScreenDrag = event as InputEventScreenDrag
+		if drag_event.position.distance_to(_tap_press_position) > TAP_DRAG_THRESHOLD:
+			_tap_cancelled = true

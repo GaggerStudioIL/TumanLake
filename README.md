@@ -110,7 +110,7 @@ scripts/core/BuildConfig.gd
 - ENABLE_VERBOSE_LOGS = false
 - ENABLE_WATER_DEBUG_VISUALS = false
 - SPINNING_ENABLED = true
-- ENABLE_SPINNING_TEST_MODE = true
+- ENABLE_SPINNING_TEST_MODE = false
 
 ## Перед отправкой билда тестерам
 

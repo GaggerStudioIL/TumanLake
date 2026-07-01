@@ -441,7 +441,10 @@ func _add_skills_section() -> void:
 	intro.add_child(points)
 
 	var skill_button := Button.new()
-	skill_button.text = "Ветка Навыков"
+	var skills_unlocked := _is_skill_tree_unlocked()
+	skill_button.text = "Ветка Навыков" if skills_unlocked else "Откроется на LVL 2"
+	skill_button.disabled = not skills_unlocked
+	skill_button.tooltip_text = "" if skills_unlocked else _get_skill_tree_lock_text()
 	skill_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	skill_button.offset_left = -292.0
 	skill_button.offset_top = 16.0
@@ -449,7 +452,8 @@ func _add_skills_section() -> void:
 	skill_button.offset_bottom = 52.0
 	skill_button.custom_minimum_size = Vector2(0.0, 0.0)
 	main._apply_button_style(skill_button, main.STYLE_PRIMARY_BUTTON)
-	skill_button.pressed.connect(open_skill_tree)
+	if skills_unlocked:
+		skill_button.pressed.connect(open_skill_tree)
 	intro.add_child(skill_button)
 
 	var skill_database := _get_skill_database()
@@ -485,12 +489,16 @@ func _add_skill_branch_card(parent: Control, branch_id: String, skill_database: 
 
 	var total: int = maxi(skills.size(), 1)
 	var card := Button.new()
+	var skills_unlocked := _is_skill_tree_unlocked()
 	card.text = ""
+	card.disabled = not skills_unlocked
+	card.tooltip_text = "" if skills_unlocked else _get_skill_tree_lock_text()
 	card.custom_minimum_size = Vector2(172.0, 92.0)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	card.focus_mode = Control.FOCUS_NONE
 	main._apply_button_style(card, main.STYLE_SECONDARY_BUTTON)
-	card.pressed.connect(_open_skill_branch.bind(branch_id))
+	if skills_unlocked:
+		card.pressed.connect(_open_skill_branch.bind(branch_id))
 	parent.add_child(card)
 
 	var box := VBoxContainer.new()
@@ -518,6 +526,9 @@ func _add_skill_branch_card(parent: Control, branch_id: String, skill_database: 
 
 
 func _open_skill_branch(branch_id: String) -> void:
+	if not _is_skill_tree_unlocked():
+		_show_profile_toast(_get_skill_tree_lock_text(), false)
+		return
 	if skill_tree_ui == null:
 		skill_tree_ui = SkillTreeUIScript.new()
 		skill_tree_ui.setup(main, self)
@@ -528,10 +539,32 @@ func _open_skill_branch(branch_id: String) -> void:
 
 
 func open_skill_tree() -> void:
+	if not _is_skill_tree_unlocked():
+		_show_profile_toast(_get_skill_tree_lock_text(), false)
+		return
 	if skill_tree_ui == null:
 		skill_tree_ui = SkillTreeUIScript.new()
 		skill_tree_ui.setup(main, self)
 	skill_tree_ui.open()
+
+
+func _is_skill_tree_unlocked() -> bool:
+	if PlayerData.has_method("is_feature_unlocked_for_player"):
+		return bool(PlayerData.call("is_feature_unlocked_for_player", "skill_tree"))
+	return PlayerData.level >= 2
+
+
+func _get_skill_tree_lock_text() -> String:
+	var progression_db: Node = main.get_node_or_null("/root/ProgressionDatabase") if main != null else null
+	var unlock_level: int = 2
+	if progression_db != null and progression_db.has_method("get_feature_unlock_level"):
+		unlock_level = int(progression_db.call("get_feature_unlock_level", "skill_tree"))
+	return "Навыки откроются на LVL %d" % unlock_level
+
+
+func _show_profile_toast(message: String, success: bool) -> void:
+	if main != null and main.has_method("_show_toast"):
+		main.call("_show_toast", message, success)
 
 
 func _add_help_section() -> void:

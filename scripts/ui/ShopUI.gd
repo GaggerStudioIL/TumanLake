@@ -1,6 +1,8 @@
 # Handles the shop window: categories, item cards, and buy requests.
 extends RefCounted
 
+const SpinningLureDatabaseScript := preload("res://scripts/data/SpinningLureDatabase.gd")
+
 var main
 var theme
 var _texture_cache: Dictionary = {}
@@ -16,6 +18,12 @@ var _details_close_button: Button
 var _shop_money_row: HBoxContainer
 var _details_item_id := ""
 var _shop_card_trimmed_texture_cache: Dictionary = {}
+var _lure_filter_row: Control
+var _lure_filter_buttons: Dictionary = {}
+var _lure_filter := "all"
+var _shop_items_base_position := Vector2.ZERO
+var _shop_items_base_size := Vector2.ZERO
+var _shop_items_base_rect_valid := false
 signal buy_requested(item_id: String)
 
 const SHOP_SCROLL_BOTTOM_PADDING := 72.0
@@ -26,6 +34,7 @@ const SHOP_CATEGORY_FOOD := "food"
 const SHOP_CATEGORY_CLOTHING := "clothing"
 const SHOP_CATEGORY_TACKLE := "tackle"
 const SHOP_CATEGORY_ROD := "rod"
+const SHOP_CATEGORY_LURE := "lure"
 const SHOP_CATEGORY_LINE := "line"
 const SHOP_CATEGORY_LEADER := "leader"
 const SHOP_CATEGORY_HOOK := "hook"
@@ -33,6 +42,7 @@ const SHOP_CATEGORY_FLOAT := "float"
 const SHOP_TAB_ICON_BAIT: Texture2D = preload("res://assets/ui/shop/baits/cherv.png")
 const SHOP_TAB_ICON_FOOD: Texture2D = preload("res://assets/ui/shop/survival/food/bread.png")
 const SHOP_TAB_ICON_CLOTHING: Texture2D = preload("res://assets/ui/shop/survival/clothing/basic_tshirt.png")
+const SHOP_TAB_ICON_LURE_PATH := "res://assets/ui/shop/spinning/lures/RiverLine_Spin_2-Silver Flash.png"
 const SHOP_TAB_ICON_LINE: Texture2D = preload("res://assets/ui/shop/lines/basiclinenylon2_5kg.png")
 const SHOP_TAB_ICON_LEADER: Texture2D = preload("res://assets/ui/shop/leaders/nylon_leader_15cm_1kg.png")
 const SHOP_TAB_ICON_HOOK: Texture2D = preload("res://assets/ui/shop/hooks/riverstart_basic_hook_12.png")
@@ -43,10 +53,23 @@ const SHOP_CATEGORIES := [
 	SHOP_CATEGORY_CLOTHING,
 	SHOP_CATEGORY_CONSUMABLE,
 	SHOP_CATEGORY_ROD,
+	SHOP_CATEGORY_LURE,
 	SHOP_CATEGORY_LINE,
 	SHOP_CATEGORY_LEADER,
 	SHOP_CATEGORY_HOOK,
 	SHOP_CATEGORY_FLOAT
+]
+const LURE_FILTERS := [
+	{"id": "all", "title": "Все"},
+	{"id": "spinner", "title": "Вращалки"},
+	{"id": "spoon", "title": "Колебалки"},
+	{"id": "wobbler", "title": "Воблеры"},
+	{"id": "topwater", "title": "Попперы"},
+	{"id": "soft_lure", "title": "Силикон"},
+	{"id": "jig", "title": "Джиг"},
+	{"id": "spinner_bait", "title": "Спиннербейты"},
+	{"id": "night", "title": "Ночные"},
+	{"id": "trophy", "title": "Трофейные"}
 ]
 const BAIT_PACK_QUANTITIES := {
 	"worm": 10,
@@ -315,6 +338,8 @@ func _get_shop_items_for_category(category: String) -> Array:
 		return _get_tackle_shop_items_for_type(SHOP_CATEGORY_ROD)
 	if [SHOP_CATEGORY_ROD, SHOP_CATEGORY_LINE, SHOP_CATEGORY_LEADER, SHOP_CATEGORY_HOOK, SHOP_CATEGORY_FLOAT].has(category):
 		return _get_tackle_shop_items_for_type(category)
+	if category == SHOP_CATEGORY_LURE:
+		return _get_lure_shop_items()
 	if category == SHOP_CATEGORY_BAIT:
 		return _get_bait_shop_items()
 	if category == SHOP_CATEGORY_FOOD or category == SHOP_CATEGORY_CLOTHING:
@@ -337,6 +362,84 @@ func _get_tackle_shop_items_for_type(category: String) -> Array:
 	if category == SHOP_CATEGORY_ROD:
 		items.sort_custom(_sort_rod_shop_items)
 	return items
+
+func _get_lure_shop_items() -> Array:
+	var items: Array = []
+	if _lure_filter == "all":
+		for pack in SpinningLureDatabaseScript.get_lure_packs():
+			items.append((pack as Dictionary).duplicate(true))
+
+	for catalog_item in PlayerData.get_tackle_catalog_items(SHOP_CATEGORY_LURE):
+		var item: Dictionary = catalog_item.duplicate(true)
+		var item_id := str(item.get("id", ""))
+		if item_id == str(PlayerData.BASIC_LURE_ID):
+			continue
+		if not _does_lure_match_filter(item):
+			continue
+		item["shop_category"] = SHOP_CATEGORY_LURE
+		item["quantity"] = 1
+		item["icon"] = "U"
+		items.append(item)
+
+	items.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var a_pack := str(a.get("category", "")) == "lure_pack"
+		var b_pack := str(b.get("category", "")) == "lure_pack"
+		if a_pack != b_pack:
+			return a_pack
+		var level_a := _get_shop_item_required_level(a)
+		var level_b := _get_shop_item_required_level(b)
+		if level_a != level_b:
+			return level_a < level_b
+		var type_a := _get_lure_filter_sort_key(a)
+		var type_b := _get_lure_filter_sort_key(b)
+		if type_a != type_b:
+			return type_a < type_b
+		return float(a.get("price", 0.0)) < float(b.get("price", 0.0))
+	)
+	return items
+
+func _does_lure_match_filter(item: Dictionary) -> bool:
+	if _lure_filter == "all":
+		return true
+	var stats: Dictionary = item.get("stats", {}) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
+	var lure_type := str(stats.get("lure_type", item.get("lure_type", "")))
+	if _lure_filter == "night":
+		var text := "%s %s %s %s" % [
+			str(item.get("id", "")),
+			str(item.get("name", "")),
+			str(stats.get("color_style", "")),
+			str(stats.get("bonus_type", ""))
+		]
+		text = text.to_lower()
+		return text.find("night") != -1 or text.find("glow") != -1 or str(stats.get("bonus_type", "")) == "time"
+	if _lure_filter == "trophy":
+		var item_id := str(item.get("id", "")).to_lower()
+		var rarity := str(item.get("rarity", "")).to_lower()
+		return ["rare", "epic", "trophy", "legendary"].has(rarity) and (_get_shop_item_required_level(item) >= 18 or item_id.find("trophy") != -1 or item_id.find("trophymax") != -1)
+	return lure_type == _lure_filter
+
+func _get_lure_filter_sort_key(item: Dictionary) -> int:
+	var category := str(item.get("category", ""))
+	if category == "lure_pack":
+		return -1
+	var stats: Dictionary = item.get("stats", {}) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
+	match str(stats.get("lure_type", item.get("lure_type", ""))):
+		"spinner":
+			return 0
+		"spoon":
+			return 1
+		"wobbler":
+			return 2
+		"topwater":
+			return 3
+		"soft_lure":
+			return 4
+		"jig":
+			return 5
+		"spinner_bait":
+			return 6
+		_:
+			return 9
 
 func _sort_rod_shop_items(a: Dictionary, b: Dictionary) -> bool:
 	var series_a := _get_rod_series_order(str(a.get("id", "")))
@@ -388,7 +491,14 @@ func _get_shop_item(item_id: String) -> Dictionary:
 	return {}
 
 func _get_shop_inventory_item(shop_item: Dictionary) -> Dictionary:
-	var stats: Dictionary = shop_item.get("stats", {}).duplicate(true)
+	var stats: Dictionary = shop_item.get("stats", {}).duplicate(true) if typeof(shop_item.get("stats", {})) == TYPE_DICTIONARY else {}
+	var required_level := int(stats.get("required_level", stats.get("level_required", 1)))
+	required_level = max(required_level, int(shop_item.get("level_required", required_level)))
+	required_level = max(required_level, int(shop_item.get("required_level", required_level)))
+	if PlayerData.has_method("get_item_required_level"):
+		required_level = int(PlayerData.call("get_item_required_level", str(shop_item.get("id", "")), shop_item))
+	stats["required_level"] = required_level
+	stats["level_required"] = required_level
 	return {
 		"id": str(shop_item.get("id", "")),
 		"name": str(shop_item.get("name", "-")),
@@ -397,12 +507,53 @@ func _get_shop_inventory_item(shop_item: Dictionary) -> Dictionary:
 		"rarity": str(shop_item.get("rarity", "common")),
 		"price": float(shop_item.get("price", 0.0)),
 		"quantity": int(shop_item.get("quantity", 1)),
+		"required_level": required_level,
+		"level_required": required_level,
 		"image_path": str(shop_item.get("image_path", "")),
 		"description": str(shop_item.get("description", "")),
 		"display_name_ru": str(shop_item.get("display_name_ru", shop_item.get("name", "-"))),
 		"description_ru": str(shop_item.get("description_ru", shop_item.get("description", ""))),
 		"stats": stats
 	}
+
+func _is_shop_item_locked(item: Dictionary) -> bool:
+	if item.is_empty():
+		return false
+	if PlayerData.has_method("is_item_unlocked_for_player"):
+		return not bool(PlayerData.call("is_item_unlocked_for_player", item))
+	return false
+
+func _get_shop_item_required_level(item: Dictionary) -> int:
+	if PlayerData.has_method("get_item_required_level"):
+		return int(PlayerData.call("get_item_required_level", str(item.get("id", "")), item))
+	var stats: Dictionary = item.get("stats", {}) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
+	var required_level := int(stats.get("required_level", stats.get("level_required", 1)))
+	required_level = max(required_level, int(item.get("level_required", required_level)))
+	required_level = max(required_level, int(item.get("required_level", required_level)))
+	return required_level
+
+func _get_shop_item_lock_text(item: Dictionary) -> String:
+	if PlayerData.has_method("get_item_lock_reason"):
+		var reason := str(PlayerData.call("get_item_lock_reason", item))
+		if reason != "":
+			return reason
+	return "Доступно с LVL %d" % _get_shop_item_required_level(item)
+
+func _apply_shop_buy_button_state(button: Button, item: Dictionary) -> void:
+	if _is_shop_item_locked(item):
+		var required_level := _get_shop_item_required_level(item)
+		button.disabled = true
+		button.text = "LVL %d" % required_level
+		button.tooltip_text = _get_shop_item_lock_text(item)
+		button.add_theme_color_override("font_disabled_color", Color(0.72, 0.80, 0.72, 0.88))
+		return
+	button.disabled = false
+	button.tooltip_text = ""
+
+func _apply_shop_card_lock_state(card: Control, item: Dictionary) -> void:
+	if _is_shop_item_locked(item):
+		card.modulate = Color(0.74, 0.78, 0.72, 0.92)
+		card.tooltip_text = _get_shop_item_lock_text(item)
 
 func _ensure_shop_ui_nodes() -> void:
 	if main.shop_panel != null:
@@ -452,6 +603,11 @@ func _ensure_shop_ui_nodes() -> void:
 	main.shop_panel.add_child(main.shop_tackle_category_button)
 	main.shop_tackle_category_button.text = "Удочки"
 
+	main.shop_lure_category_button = Button.new()
+	main.shop_lure_category_button.name = "ShopLureCategoryButton"
+	main.shop_lure_category_button.text = "Приманки"
+	main.shop_panel.add_child(main.shop_lure_category_button)
+
 	main.shop_line_category_button = Button.new()
 	main.shop_line_category_button.name = "ShopLineCategoryButton"
 	main.shop_line_category_button.text = "Лески"
@@ -471,6 +627,8 @@ func _ensure_shop_ui_nodes() -> void:
 	main.shop_float_category_button.name = "ShopFloatCategoryButton"
 	main.shop_float_category_button.text = "Поплавки"
 	main.shop_panel.add_child(main.shop_float_category_button)
+
+	_create_lure_filter_row()
 
 	main.shop_items_scroll = ScrollContainer.new()
 	main.shop_items_scroll.name = "ShopItemsScroll"
@@ -500,6 +658,84 @@ func _ensure_shop_ui_nodes() -> void:
 	main.shop_error_audio = AudioStreamPlayer.new()
 	main.shop_error_audio.name = "ShopErrorAudio"
 	main.add_child(main.shop_error_audio)
+
+
+func _create_lure_filter_row() -> void:
+	_lure_filter_row = Control.new()
+	_lure_filter_row.name = "ShopLureFilterRow"
+	_lure_filter_row.visible = false
+	_lure_filter_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	main.shop_panel.add_child(_lure_filter_row)
+
+	_lure_filter_buttons.clear()
+	for filter in LURE_FILTERS:
+		var filter_id := str(filter.get("id", ""))
+		var button := Button.new()
+		button.name = "LureFilter_%s" % filter_id
+		button.text = str(filter.get("title", filter_id))
+		button.toggle_mode = true
+		button.clip_text = true
+		button.mouse_filter = Control.MOUSE_FILTER_STOP
+		button.pressed.connect(_set_lure_filter.bind(filter_id))
+		_lure_filter_row.add_child(button)
+		_lure_filter_buttons[filter_id] = button
+
+
+func _set_lure_filter(filter_id: String) -> void:
+	_lure_filter = filter_id if filter_id != "" else "all"
+	main._shop_page = 0
+	_reset_shop_scroll_to_top()
+	_update_shop_ui()
+
+
+func _layout_lure_filter_row(show_filters: bool) -> void:
+	if _lure_filter_row == null or not is_instance_valid(_lure_filter_row) or main.shop_items_scroll == null:
+		return
+
+	if show_filters:
+		if not _shop_items_base_rect_valid or not _lure_filter_row.visible:
+			_shop_items_base_position = main.shop_items_scroll.position
+			_shop_items_base_size = main.shop_items_scroll.size
+			_shop_items_base_rect_valid = true
+		var filter_height := 66.0
+		var filter_gap := 6.0
+		var columns := 5
+		var rows := 2
+		_lure_filter_row.visible = true
+		_lure_filter_row.position = _shop_items_base_position
+		_lure_filter_row.size = Vector2(_shop_items_base_size.x, filter_height)
+		var button_width := (_lure_filter_row.size.x - filter_gap * float(columns - 1)) / float(columns)
+		var button_height := (filter_height - filter_gap * float(rows - 1)) / float(rows)
+		for i in range(LURE_FILTERS.size()):
+			var filter: Dictionary = LURE_FILTERS[i]
+			var button: Button = _lure_filter_buttons.get(str(filter.get("id", "")), null)
+			if button == null:
+				continue
+			var column := i % columns
+			var row := int(i / columns)
+			button.position = Vector2(float(column) * (button_width + filter_gap), float(row) * (button_height + filter_gap))
+			button.size = Vector2(button_width, button_height)
+			button.add_theme_font_size_override("font_size", 9 if button_width < 94.0 else 10)
+		main.shop_items_scroll.position = _shop_items_base_position + Vector2(0.0, filter_height + 10.0)
+		main.shop_items_scroll.size = Vector2(_shop_items_base_size.x, maxf(_shop_items_base_size.y - filter_height - 10.0, 80.0))
+	else:
+		_lure_filter_row.visible = false
+		if _shop_items_base_rect_valid:
+			main.shop_items_scroll.position = _shop_items_base_position
+			main.shop_items_scroll.size = _shop_items_base_size
+	_update_lure_filter_buttons()
+
+
+func _update_lure_filter_buttons() -> void:
+	for filter in LURE_FILTERS:
+		var filter_id := str(filter.get("id", ""))
+		var button: Button = _lure_filter_buttons.get(filter_id, null)
+		if button == null:
+			continue
+		var selected := _lure_filter == filter_id
+		button.button_pressed = selected
+		theme.apply_tab_button_style(button, selected)
+		button.add_theme_constant_override("h_separation", 0)
 
 
 func _ensure_shop_details_nodes() -> void:
@@ -649,6 +885,8 @@ func _show_shop_details(item_id: String) -> void:
 	_details_description_label.text = _get_item_description(item)
 	_details_stats_label.text = _get_shop_details_stats_text(item)
 	_details_owned_label.text = "Есть: %d" % _get_owned_shop_item_quantity(item_id)
+	_details_buy_button.text = "Купить"
+	_apply_shop_buy_button_state(_details_buy_button, item)
 	_layout_shop_details_nodes()
 	_details_backdrop.visible = true
 	_details_panel.visible = true
@@ -730,11 +968,16 @@ func _update_shop_ui() -> void:
 	if main.shop_clothing_category_button != null:
 		main.shop_clothing_category_button.visible = true
 		main.shop_clothing_category_button.disabled = false
+	if main.shop_lure_category_button != null:
+		main.shop_lure_category_button.visible = true
+		main.shop_lure_category_button.disabled = false
 	theme.apply_tab_button_style(main.shop_bait_category_button, main._shop_category == SHOP_CATEGORY_BAIT)
 	theme.apply_tab_button_style(main.shop_consumable_category_button, main._shop_category == SHOP_CATEGORY_FOOD)
 	if main.shop_clothing_category_button != null:
 		theme.apply_tab_button_style(main.shop_clothing_category_button, main._shop_category == SHOP_CATEGORY_CLOTHING)
 	theme.apply_tab_button_style(main.shop_tackle_category_button, main._shop_category == SHOP_CATEGORY_ROD)
+	if main.shop_lure_category_button != null:
+		theme.apply_tab_button_style(main.shop_lure_category_button, main._shop_category == SHOP_CATEGORY_LURE)
 	theme.apply_tab_button_style(main.shop_line_category_button, main._shop_category == SHOP_CATEGORY_LINE)
 	theme.apply_tab_button_style(main.shop_leader_category_button, main._shop_category == SHOP_CATEGORY_LEADER)
 	theme.apply_tab_button_style(main.shop_hook_category_button, main._shop_category == SHOP_CATEGORY_HOOK)
@@ -744,10 +987,13 @@ func _update_shop_ui() -> void:
 	if main.shop_clothing_category_button != null:
 		_apply_shop_category_tab_icon(main.shop_clothing_category_button, SHOP_CATEGORY_CLOTHING)
 	_apply_shop_category_tab_icon(main.shop_tackle_category_button, SHOP_CATEGORY_ROD)
+	if main.shop_lure_category_button != null:
+		_apply_shop_category_tab_icon(main.shop_lure_category_button, SHOP_CATEGORY_LURE, 10)
 	_apply_shop_category_tab_icon(main.shop_line_category_button, SHOP_CATEGORY_LINE)
 	_apply_shop_category_tab_icon(main.shop_leader_category_button, SHOP_CATEGORY_LEADER)
 	_apply_shop_category_tab_icon(main.shop_hook_category_button, SHOP_CATEGORY_HOOK)
 	_apply_shop_category_tab_icon(main.shop_float_category_button, SHOP_CATEGORY_FLOAT, 10)
+	_layout_lure_filter_row(main._shop_category == SHOP_CATEGORY_LURE)
 	_hide_shop_pager()
 	_rebuild_shop_cards()
 	_layout_shop_details_nodes()
@@ -775,6 +1021,8 @@ func _get_shop_category_tab_icon(category: String) -> Texture2D:
 			return SHOP_TAB_ICON_CLOTHING
 		SHOP_CATEGORY_ROD:
 			return theme.get_icon("rod") if theme != null else null
+		SHOP_CATEGORY_LURE:
+			return _load_texture_resource(SHOP_TAB_ICON_LURE_PATH)
 		SHOP_CATEGORY_LINE:
 			return SHOP_TAB_ICON_LINE
 		SHOP_CATEGORY_LEADER:
@@ -830,17 +1078,21 @@ func _rebuild_shop_cards() -> void:
 	var content_width: float = max(viewport_size.x - 12.0, 1.0)
 	_clear_shop_item_cards(content_width)
 
-	var columns := 5 if is_bait_category else 2
+	var is_lure_category: bool = str(main._shop_category) == SHOP_CATEGORY_LURE
+	var columns := 5 if is_bait_category else (4 if is_lure_category else 2)
 	var gap := 12.0
 	var is_rod_category: bool = str(main._shop_category) == SHOP_CATEGORY_ROD
 	var is_line_category: bool = str(main._shop_category) == SHOP_CATEGORY_LINE
 	var is_leader_category: bool = str(main._shop_category) == SHOP_CATEGORY_LEADER
-	var is_image_category: bool = is_rod_category or str(main._shop_category) == SHOP_CATEGORY_BAIT
+	var is_image_category: bool = is_rod_category or str(main._shop_category) == SHOP_CATEGORY_BAIT or is_lure_category
 
 	var card_width: float = (content_width - gap * float(columns - 1)) / float(columns)
 	var rows: int = int(ceil(float(items.size()) / float(columns))) if not items.is_empty() else 0
 	var card_min_height := 178.0 if is_bait_category else (148.0 if is_image_category else 60.0)
 	var card_max_height := 178.0 if is_bait_category else (160.0 if is_image_category else 68.0)
+	if is_lure_category:
+		card_min_height = 198.0
+		card_max_height = 214.0
 	if is_rod_category:
 		card_min_height = 294.0
 		card_max_height = 326.0
@@ -880,9 +1132,14 @@ func _create_shop_card(item: Dictionary, card_size: Vector2) -> Panel:
 	var rarity = str(item.get("rarity", "common"))
 	var rarity_color = main._get_rarity_color(rarity)
 	theme.apply_shop_row_style(card, rarity)
+	_apply_shop_card_lock_state(card, item)
 
 	var card_texture := _get_shop_card_texture(item)
 	var category := str(item.get("category", item.get("type", "misc")))
+	if category == SHOP_CATEGORY_LURE or category == "lure_pack":
+		_populate_lure_shop_card(card, item, card_size, card_texture, rarity_color)
+		return card
+
 	if category == SHOP_CATEGORY_LINE:
 		_populate_line_shop_card(card, item, card_size, card_texture, rarity_color)
 		return card
@@ -1007,11 +1264,162 @@ func _create_shop_card(item: Dictionary, card_size: Vector2) -> Panel:
 		compact_buy_button.size = Vector2(compact_buy_width, compact_buy_height)
 		_apply_shop_buy_button_style(compact_buy_button)
 		compact_buy_button.add_theme_font_size_override("font_size", compact_action_font_size)
+		_apply_shop_buy_button_state(compact_buy_button, item)
 		compact_buy_button.pressed.connect(_on_shop_buy_pressed.bind(item_id))
 		card.add_child(compact_buy_button)
 		return card
 
 	return card
+
+func _populate_lure_shop_card(card: Panel, item: Dictionary, card_size: Vector2, texture: Texture2D, rarity_color: Color) -> void:
+	var item_id := str(item.get("id", ""))
+	var category := str(item.get("category", item.get("type", "misc")))
+	var is_pack := category == "lure_pack"
+	var stats: Dictionary = item.get("stats", {}) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
+	var padding := 9.0
+	var image_height := 78.0
+	var inner_width: float = maxf(card_size.x - padding * 2.0, 1.0)
+
+	var image_area := Panel.new()
+	image_area.name = "LureCardImageArea"
+	image_area.position = Vector2(padding, padding)
+	image_area.size = Vector2(inner_width, image_height)
+	image_area.clip_contents = true
+	image_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	image_area.add_theme_stylebox_override(
+		"panel",
+		main._make_panel_style(Color(0.012, 0.032, 0.036, 0.72), Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.18), 7, 2, Color(0.0, 0.0, 0.0, 0.10))
+	)
+	card.add_child(image_area)
+
+	if texture != null:
+		_add_compact_shop_texture(
+			image_area,
+			texture,
+			Rect2(Vector2.ZERO, image_area.size),
+			true,
+			0.90
+		)
+	else:
+		var icon_label := Label.new()
+		icon_label.text = "P" if is_pack else "U"
+		icon_label.position = Vector2((image_area.size.x - 42.0) * 0.5, 18.0)
+		icon_label.size = Vector2(42.0, 42.0)
+		icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		icon_label.add_theme_font_size_override("font_size", 18)
+		icon_label.add_theme_color_override("font_color", Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.98))
+		image_area.add_child(icon_label)
+
+	var info_y := padding + image_height + 6.0
+	var info_height: float = maxf(card_size.y - info_y - padding, 92.0)
+	var info_area := Panel.new()
+	info_area.name = "LureCardInfoArea"
+	info_area.position = Vector2(padding, info_y)
+	info_area.size = Vector2(inner_width, info_height)
+	info_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	info_area.add_theme_stylebox_override(
+		"panel",
+		main._make_panel_style(Color(0.012, 0.040, 0.034, 0.78), Color(0.58, 0.76, 0.66, 0.16), 7, 1, Color(0.0, 0.0, 0.0, 0.08))
+	)
+	card.add_child(info_area)
+
+	var info_padding := 8.0
+	var price_width := 66.0
+	var level_width := 48.0
+	var top_right_width := price_width + level_width + 8.0
+	var name_width: float = maxf(info_area.size.x - info_padding * 2.0 - top_right_width, 74.0)
+	var name_label := Label.new()
+	name_label.name = "LureCardNameLabel"
+	name_label.text = _get_item_display_name(item)
+	name_label.position = Vector2(info_padding, 5.0)
+	name_label.size = Vector2(name_width, 19.0)
+	name_label.clip_text = true
+	name_label.add_theme_font_size_override("font_size", 11)
+	name_label.add_theme_color_override("font_color", Color(0.94, 1.0, 0.91, 1.0))
+	info_area.add_child(name_label)
+
+	var level_label := Label.new()
+	level_label.name = "LureCardLevelLabel"
+	level_label.text = "LVL %d" % _get_shop_item_required_level(item)
+	level_label.position = Vector2(info_area.size.x - info_padding - top_right_width, 6.0)
+	level_label.size = Vector2(level_width, 18.0)
+	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	level_label.clip_text = true
+	level_label.add_theme_font_size_override("font_size", 9)
+	level_label.add_theme_color_override("font_color", Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.94))
+	info_area.add_child(level_label)
+
+	_add_shop_price_row(
+		info_area,
+		float(item.get("price", 0.0)),
+		Rect2(Vector2(info_area.size.x - info_padding - price_width, 6.0), Vector2(price_width, 18.0)),
+		10,
+		Vector2(13.0, 13.0),
+		true,
+		Color(0.92, 1.0, 0.90, 0.96),
+		"LureCardPriceRow"
+	)
+
+	var meta_label := Label.new()
+	meta_label.name = "LureCardMetaLabel"
+	meta_label.text = _get_lure_card_meta_text(item)
+	meta_label.position = Vector2(info_padding, 27.0)
+	meta_label.size = Vector2(info_area.size.x - info_padding * 2.0, 17.0)
+	meta_label.clip_text = true
+	meta_label.add_theme_font_size_override("font_size", 9)
+	meta_label.add_theme_color_override("font_color", Color(0.74, 0.88, 0.78, 0.92))
+	info_area.add_child(meta_label)
+
+	var bonus_label := Label.new()
+	bonus_label.name = "LureCardBonusLabel"
+	bonus_label.text = _get_lure_bonus_summary(item)
+	bonus_label.position = Vector2(info_padding, 45.0)
+	bonus_label.size = Vector2(info_area.size.x - info_padding * 2.0, 18.0)
+	bonus_label.clip_text = true
+	bonus_label.add_theme_font_size_override("font_size", 9)
+	bonus_label.add_theme_color_override("font_color", Color(0.86, 0.97, 0.82, 0.92))
+	info_area.add_child(bonus_label)
+
+	var owned_label := Label.new()
+	owned_label.name = "LureCardOwnedLabel"
+	owned_label.text = "Есть: %d" % _get_owned_shop_item_quantity(item_id)
+	owned_label.position = Vector2(info_padding, 64.0)
+	owned_label.size = Vector2(info_area.size.x - info_padding * 2.0, 16.0)
+	owned_label.clip_text = true
+	owned_label.add_theme_font_size_override("font_size", 9)
+	owned_label.add_theme_color_override("font_color", Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.84))
+	info_area.add_child(owned_label)
+
+	if is_pack:
+		var pack_items: Array = stats.get("pack_item_ids", []) if typeof(stats.get("pack_item_ids", [])) == TYPE_ARRAY else item.get("pack_item_ids", [])
+		owned_label.text = "Набор: x%d" % pack_items.size()
+
+	var action_gap := 10.0
+	var action_height := 28.0
+	var action_y: float = info_area.size.y - action_height - 6.0
+	var action_width: float = maxf((info_area.size.x - info_padding * 2.0 - action_gap) * 0.5, 54.0)
+	var action_font_size := 9 if action_width < 72.0 else 10
+	var details_button := Button.new()
+	details_button.name = "LureCardDetailsButton"
+	details_button.text = "Подробнее"
+	details_button.position = Vector2(info_padding, action_y)
+	details_button.size = Vector2(action_width, action_height)
+	_apply_shop_details_button_style(details_button)
+	details_button.add_theme_font_size_override("font_size", action_font_size)
+	details_button.pressed.connect(_show_shop_details.bind(item_id))
+	info_area.add_child(details_button)
+
+	var buy_button := Button.new()
+	buy_button.name = "LureCardBuyButton"
+	buy_button.text = "Купить"
+	buy_button.position = Vector2(info_area.size.x - info_padding - action_width, action_y)
+	buy_button.size = Vector2(action_width, action_height)
+	_apply_shop_buy_button_style(buy_button)
+	buy_button.add_theme_font_size_override("font_size", action_font_size)
+	_apply_shop_buy_button_state(buy_button, item)
+	buy_button.pressed.connect(_on_shop_buy_pressed.bind(item_id))
+	info_area.add_child(buy_button)
 
 func _populate_line_shop_card(card: Panel, item: Dictionary, card_size: Vector2, texture: Texture2D, rarity_color: Color) -> void:
 	var item_id := str(item.get("id", ""))
@@ -1101,6 +1509,7 @@ func _populate_line_shop_card(card: Panel, item: Dictionary, card_size: Vector2,
 	buy_button.position = Vector2(buy_x, (card_size.y - buy_height) * 0.5)
 	buy_button.size = Vector2(buy_width, buy_height)
 	_apply_shop_buy_button_style(buy_button)
+	_apply_shop_buy_button_state(buy_button, item)
 	buy_button.pressed.connect(_on_shop_buy_pressed.bind(item_id))
 	card.add_child(buy_button)
 
@@ -1193,6 +1602,7 @@ func _populate_leader_shop_card(card: Panel, item: Dictionary, card_size: Vector
 	buy_button.position = Vector2(buy_x, (card_size.y - buy_height) * 0.5)
 	buy_button.size = Vector2(buy_width, buy_height)
 	_apply_shop_buy_button_style(buy_button)
+	_apply_shop_buy_button_state(buy_button, item)
 	buy_button.pressed.connect(_on_shop_buy_pressed.bind(item_id))
 	card.add_child(buy_button)
 
@@ -1388,6 +1798,7 @@ func _populate_bait_shop_card(card: Panel, item: Dictionary, card_size: Vector2,
 	buy_button.size = Vector2(action_width, action_height)
 	_apply_shop_buy_button_style(buy_button)
 	buy_button.add_theme_font_size_override("font_size", action_font_size)
+	_apply_shop_buy_button_state(buy_button, item)
 	buy_button.pressed.connect(_on_shop_buy_pressed.bind(item_id))
 	info_area.add_child(buy_button)
 
@@ -1541,6 +1952,7 @@ func _populate_rod_image_card(card: Panel, item: Dictionary, card_size: Vector2,
 	buy_button.size = Vector2(button_width, actions_height)
 	_apply_shop_buy_button_style(buy_button)
 	buy_button.add_theme_font_size_override("font_size", 12)
+	_apply_shop_buy_button_state(buy_button, item)
 	buy_button.pressed.connect(_on_shop_buy_pressed.bind(item_id))
 	card.add_child(buy_button)
 
@@ -1828,6 +2240,7 @@ func _populate_rod_image_card_legacy(card: Panel, item: Dictionary, card_size: V
 	buy_button.size = Vector2(buy_width, actions_height)
 	_apply_shop_buy_button_style(buy_button)
 	buy_button.add_theme_font_size_override("font_size", action_font_size)
+	_apply_shop_buy_button_state(buy_button, item)
 	buy_button.pressed.connect(_on_shop_buy_pressed.bind(item_id))
 	info_area.add_child(buy_button)
 
@@ -2003,6 +2416,89 @@ func _get_leader_details_stats_text(item: Dictionary) -> String:
 		lines.append("Защита от среза: +%d%%" % roundi(float(stats.get("bite_protection", 0.0)) * 100.0))
 	return "\n".join(lines)
 
+func _get_lure_type_name(lure_type: String) -> String:
+	match lure_type:
+		"spinner":
+			return "вращалка"
+		"spoon":
+			return "колебалка"
+		"wobbler":
+			return "воблер"
+		"topwater":
+			return "поппер"
+		"soft_lure":
+			return "силикон"
+		"jig":
+			return "джиг"
+		"spinner_bait":
+			return "спиннербейт"
+		_:
+			return lure_type if lure_type != "" else "приманка"
+
+func _get_lure_card_meta_text(item: Dictionary) -> String:
+	var category := str(item.get("category", item.get("type", "")))
+	var stats: Dictionary = item.get("stats", {}) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
+	if category == "lure_pack":
+		var pack_items: Array = stats.get("pack_item_ids", []) if typeof(stats.get("pack_item_ids", [])) == TYPE_ARRAY else item.get("pack_item_ids", [])
+		return "Набор / %d приманки" % pack_items.size()
+	return "%s / %s г / %d мм" % [
+		_get_lure_type_name(str(stats.get("lure_type", item.get("lure_type", "")))),
+		_format_lure_weight(float(stats.get("weight_g", stats.get("weight", item.get("weight_g", 0.0))))),
+		int(stats.get("size_mm", item.get("size_mm", 0)))
+	]
+
+func _get_lure_bonus_summary(item: Dictionary) -> String:
+	var category := str(item.get("category", item.get("type", "")))
+	var stats: Dictionary = item.get("stats", {}) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
+	if category == "lure_pack":
+		return "готовый комплект под разные проводки"
+	var bonus_text := str(stats.get("bonus_text", item.get("bonus_text", "")))
+	if bonus_text != "":
+		return bonus_text
+	var bonus_value := float(stats.get("bonus_value", item.get("bonus_value", stats.get("fish_attraction", 0.0))))
+	return "Бонус +%d%%" % roundi(bonus_value * 100.0)
+
+func _get_lure_details_stats_text(item: Dictionary) -> String:
+	var category := str(item.get("category", item.get("type", "")))
+	var stats: Dictionary = item.get("stats", {}) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
+	if category == "lure_pack":
+		var item_names_value = stats.get("pack_item_names", [])
+		var item_names := PackedStringArray()
+		if typeof(item_names_value) == TYPE_PACKED_STRING_ARRAY:
+			item_names = item_names_value
+		elif typeof(item_names_value) == TYPE_ARRAY:
+			for entry in item_names_value:
+				item_names.append(str(entry))
+		var pack_items: Array = stats.get("pack_item_ids", []) if typeof(stats.get("pack_item_ids", [])) == TYPE_ARRAY else item.get("pack_item_ids", [])
+		return "Состав: %d приманки\n%s\nЦена: %s" % [
+			pack_items.size(),
+			", ".join(item_names),
+			_format_shop_money_amount(float(item.get("price", 0.0)))
+		]
+
+	var lines: Array = [
+		"Тип: %s" % _get_lure_type_name(str(stats.get("lure_type", item.get("lure_type", "")))),
+		"Вес: %s г   Размер: %d мм" % [
+			_format_lure_weight(float(stats.get("weight_g", stats.get("weight", item.get("weight_g", 0.0))))),
+			int(stats.get("size_mm", item.get("size_mm", 0)))
+		],
+		"Цвет: %s" % str(stats.get("color_name", item.get("color_name", "-"))),
+		"Горизонт: %s" % str(stats.get("depth_type", item.get("depth_type", "-"))),
+		"Цель: %s" % str(stats.get("target_fish", item.get("target_fish", "-"))),
+		"Бонус: %s" % _get_lure_bonus_summary(item),
+		"Прочность: %d забр.   Износ: %.2f за заброс" % [
+			roundi(float(stats.get("durability_points", item.get("durability_points", 0.0)))),
+			float(stats.get("wear_per_cast", item.get("wear_per_cast", 0.0)))
+		],
+		"Цена: %s" % _format_shop_money_amount(float(item.get("price", 0.0)))
+	]
+	return "\n".join(lines)
+
+func _format_lure_weight(value: float) -> String:
+	if is_equal_approx(value, float(roundi(value))):
+		return str(roundi(value))
+	return "%.1f" % value
+
 func _get_shop_compact_stat_text(item: Dictionary) -> String:
 	var stats: Dictionary = item.get("stats", {})
 	var category = str(item.get("category", item.get("type", "misc")))
@@ -2041,6 +2537,8 @@ func _get_shop_compact_stat_text(item: Dictionary) -> String:
 				main._format_tackle_stat_value("target_fish_size", stats.get("target_fish_size", "small")),
 				roundi(float(stats.get("hook_chance", stats.get("hook_success_bonus", 0.0))) * 100.0)
 			]
+		"lure", "lure_pack":
+			return _get_lure_card_meta_text(item)
 		"bait":
 			var target_text := PlayerData.get_bait_target_fish_names(str(item.get("id", "")), 3)
 			return target_text if target_text != "" else "Общий клёв +%d%%" % roundi(float(stats.get("fish_attraction", 0.0)) * 100.0)
@@ -2094,6 +2592,8 @@ func _get_shop_details_stats_text(item: Dictionary) -> String:
 			return _get_leader_details_stats_text(item)
 		"float":
 			return _get_float_details_stats_text(item)
+		"lure", "lure_pack":
+			return _get_lure_details_stats_text(item)
 		"food", "drink", "clothing", "shelter":
 			var lines: Array = []
 			if PlayerData.has_method("get_survival_item_effect_lines"):
@@ -2250,6 +2750,8 @@ func _get_shop_key_stat_text(item: Dictionary) -> String:
 				main._format_tackle_stat_value("target_fish_size", stats.get("target_fish_size", "small")),
 				roundi(float(stats.get("hook_chance", stats.get("hook_success_bonus", 0.0))) * 100.0)
 			]
+		"lure", "lure_pack":
+			return "%s  |  %s" % [_get_lure_card_meta_text(item), _get_lure_bonus_summary(item)]
 		"bait":
 			var target_text := PlayerData.get_bait_target_fish_names(str(item.get("id", "")), 4)
 			if target_text != "":

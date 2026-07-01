@@ -61,24 +61,34 @@ func refresh_contracts(force: bool = false) -> void:
 		_remove_expired_contracts(day_index)
 
 	_normalize_active_contracts()
-	_trim_overfilled_difficulties()
-	if not force and day_index == last_generated_day and _has_full_contract_set():
+	var allowed_slots := get_contract_slots_for_current_level()
+	var max_active_contracts := _get_max_active_contracts_for_slots(allowed_slots)
+	_trim_overfilled_difficulties(allowed_slots)
+	if max_active_contracts <= 0:
+		if not active_contracts.is_empty():
+			active_contracts.clear()
+		last_generated_day = day_index
+		return
+	if not force and day_index == last_generated_day and _has_full_contract_set(allowed_slots):
 		return
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = abs(hash("contracts:%s:%s" % [day_index, ReputationSystem.get_total_reputation()])) + 313
 
 	for difficulty in DIFFICULTY_ORDER:
+		var target_count := int(allowed_slots.get(str(difficulty), 0))
+		if target_count <= 0:
+			continue
 		var generated_for_difficulty: int = _get_active_contract_count_by_difficulty(str(difficulty))
 		var guard := 0
-		while generated_for_difficulty < CONTRACTS_PER_DIFFICULTY and active_contracts.size() < MAX_ACTIVE_CONTRACTS and guard < 30:
+		while generated_for_difficulty < target_count and active_contracts.size() < max_active_contracts and guard < 30:
 			active_contracts.append(_generate_contract(day_index, rng, str(difficulty), generated_for_difficulty))
 			generated_for_difficulty += 1
 			guard += 1
 
 	_sort_active_contracts()
-	if active_contracts.size() > MAX_ACTIVE_CONTRACTS:
-		active_contracts = active_contracts.slice(0, MAX_ACTIVE_CONTRACTS)
+	if active_contracts.size() > max_active_contracts:
+		active_contracts = active_contracts.slice(0, max_active_contracts)
 
 	last_generated_day = day_index
 
@@ -86,6 +96,31 @@ func refresh_contracts(force: bool = false) -> void:
 func get_active_contracts() -> Array:
 	refresh_contracts(false)
 	return active_contracts.duplicate(true)
+
+
+func get_contract_slots_for_current_level() -> Dictionary:
+	var progression_db := _get_progression_database()
+	if progression_db != null and progression_db.has_method("get_contract_slots_for_level"):
+		var value = progression_db.call("get_contract_slots_for_level", _get_player_level())
+		if value is Dictionary:
+			return value
+	return {"easy": CONTRACTS_PER_DIFFICULTY, "medium": CONTRACTS_PER_DIFFICULTY, "hard": CONTRACTS_PER_DIFFICULTY}
+
+
+func get_contract_lock_text(difficulty: String = "easy") -> String:
+	var progression_db := _get_progression_database()
+	if progression_db != null and progression_db.has_method("get_contract_lock_text"):
+		return str(progression_db.call("get_contract_lock_text", _normalize_difficulty(difficulty)))
+	return "Контракты откроются позже."
+
+
+func get_contract_progression_summary() -> Dictionary:
+	var slots := get_contract_slots_for_current_level()
+	return {
+		"slots": slots,
+		"max_active": _get_max_active_contracts_for_slots(slots),
+		"level": _get_player_level()
+	}
 
 
 func get_completed_contracts(limit: int = 12) -> Array:
@@ -432,7 +467,9 @@ func _normalize_contract_fields(contract: Dictionary) -> void:
 		contract["progress_count"] = 0
 
 
-func _trim_overfilled_difficulties() -> void:
+func _trim_overfilled_difficulties(allowed_slots: Dictionary = {}) -> void:
+	if allowed_slots.is_empty():
+		allowed_slots = get_contract_slots_for_current_level()
 	var retained: Array = []
 	var counts: Dictionary = {}
 	for difficulty in DIFFICULTY_ORDER:
@@ -444,7 +481,7 @@ func _trim_overfilled_difficulties() -> void:
 		var contract: Dictionary = value
 		var difficulty := _normalize_difficulty(str(contract.get("difficulty", "medium")))
 		var current_count := int(counts.get(difficulty, 0))
-		if current_count >= CONTRACTS_PER_DIFFICULTY:
+		if current_count >= int(allowed_slots.get(difficulty, 0)):
 			continue
 		counts[difficulty] = current_count + 1
 		retained.append(contract)
@@ -461,13 +498,38 @@ func _get_active_contract_count_by_difficulty(difficulty: String) -> int:
 	return count
 
 
-func _has_full_contract_set() -> bool:
-	if active_contracts.size() < MAX_ACTIVE_CONTRACTS:
+func _has_full_contract_set(allowed_slots: Dictionary = {}) -> bool:
+	if allowed_slots.is_empty():
+		allowed_slots = get_contract_slots_for_current_level()
+	var max_active_contracts := _get_max_active_contracts_for_slots(allowed_slots)
+	if active_contracts.size() < max_active_contracts:
 		return false
 	for difficulty in DIFFICULTY_ORDER:
-		if _get_active_contract_count_by_difficulty(str(difficulty)) < CONTRACTS_PER_DIFFICULTY:
+		if _get_active_contract_count_by_difficulty(str(difficulty)) < int(allowed_slots.get(str(difficulty), 0)):
 			return false
 	return true
+
+
+func _get_max_active_contracts_for_slots(allowed_slots: Dictionary) -> int:
+	var total := 0
+	for difficulty in DIFFICULTY_ORDER:
+		total += max(int(allowed_slots.get(str(difficulty), 0)), 0)
+	return total
+
+
+func _get_player_level() -> int:
+	if not is_inside_tree():
+		return 1
+	var player_data := get_node_or_null("/root/PlayerData")
+	if player_data != null:
+		return max(int(player_data.get("level")), 1)
+	return 1
+
+
+func _get_progression_database() -> Node:
+	if not is_inside_tree():
+		return null
+	return get_node_or_null("/root/ProgressionDatabase")
 
 
 func _sort_active_contracts() -> void:

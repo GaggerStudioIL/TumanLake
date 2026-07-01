@@ -88,6 +88,8 @@ func load_game() -> void:
 			time_manager.call("initialize_new_game_time", false)
 		if PlayerData.has_method("initialize_new_player_survival_state"):
 			PlayerData.call("initialize_new_player_survival_state")
+		if PlayerData.has_method("sync_progression_unlocks"):
+			PlayerData.call("sync_progression_unlocks")
 		save_game()
 		return
 
@@ -141,8 +143,14 @@ func load_game() -> void:
 	PlayerData.rescue_kit_claims_total = max(int(save_data.get("rescue_kit_claims_total", 0)), 0)
 	PlayerData.rescue_kit_last_claim_day = int(save_data.get("rescue_kit_last_claim_day", -1))
 	PlayerData.set_unlocked_waterbodies(save_data.get("unlocked_waterbodies", ["agamin_lake"]))
+	if PlayerData.has_method("set_unlocked_spots"):
+		PlayerData.set_unlocked_spots(save_data.get("unlocked_spots", ["old_oak_pier"]))
+	else:
+		PlayerData.unlocked_spots = save_data.get("unlocked_spots", ["old_oak_pier"])
+	var repaired_progression := false
+	if PlayerData.has_method("sync_progression_unlocks"):
+		repaired_progression = bool(PlayerData.call("sync_progression_unlocks"))
 	var repaired_location := _sanitize_loaded_location(save_data)
-	PlayerData.unlocked_spots = save_data.get("unlocked_spots", ["old_oak_pier"])
 	PlayerData.upgrades = save_data.get("upgrades", [])
 	PlayerData.set_fishing_depth(float(save_data.get("fishing_depth", PlayerData.fishing_depth)))
 	if PlayerData.has_method("set_spinning_retrieve_speed"):
@@ -159,6 +167,8 @@ func load_game() -> void:
 		))
 	PlayerData.set_current_tackle(save_data.get("current_tackle", {}))
 	PlayerData.set_recent_tackle_items(save_data.get("recent_tackle_items", {}))
+	if PlayerData.has_method("sync_progression_unlocks"):
+		repaired_progression = bool(PlayerData.call("sync_progression_unlocks")) or repaired_progression
 
 	InventoryManager.inventory = save_data.get("inventory", [])
 	InventoryManager.max_items = maxi(int(save_data.get("max_items", 30)), 30)
@@ -190,7 +200,7 @@ func load_game() -> void:
 
 	if BuildConfig.ENABLE_VERBOSE_LOGS:
 		print("Game loaded")
-	if should_save_after_time_load or migrated_freshness or migrated_save or removed_zero_value_fish or missing_recent_tackle_items or missing_ranked_skill_state or missing_level_rewards or missing_condition_state or repaired_condition_state or repaired_location or missing_survival_state or migrated_survival_state or missing_avatar_state:
+	if should_save_after_time_load or migrated_freshness or migrated_save or removed_zero_value_fish or missing_recent_tackle_items or missing_ranked_skill_state or missing_level_rewards or missing_condition_state or repaired_condition_state or repaired_location or repaired_progression or missing_survival_state or migrated_survival_state or missing_avatar_state:
 		save_game()
 
 func delete_save() -> void:
@@ -391,9 +401,13 @@ func _sanitize_loaded_location(save_data: Dictionary) -> bool:
 	spot_invalid = spot_invalid or current_spot.is_empty()
 	spot_invalid = spot_invalid or bool(current_spot.get("legacy", false))
 	spot_invalid = spot_invalid or str(current_spot.get("waterbody_id", "agamin_lake")) != PlayerData.current_waterbody
+	spot_invalid = spot_invalid or not PlayerData.can_use_spot(spot_id)
 
 	if spot_invalid:
-		spot_id = WaterbodyDatabase.get_primary_spot(PlayerData.current_waterbody)
+		spot_id = _get_first_usable_spot(PlayerData.current_waterbody)
+		if spot_id == "":
+			PlayerData.current_waterbody = "agamin_lake"
+			spot_id = _get_first_usable_spot(PlayerData.current_waterbody)
 		if spot_id == "":
 			spot_id = "old_oak_pier"
 
@@ -402,6 +416,20 @@ func _sanitize_loaded_location(save_data: Dictionary) -> bool:
 
 	PlayerData.current_spot = spot_id
 	return repaired
+
+
+func _get_first_usable_spot(waterbody_id: String) -> String:
+	for spot in SpotDatabase.get_spots_for_waterbody(waterbody_id):
+		if typeof(spot) != TYPE_DICTIONARY:
+			continue
+		var spot_id := str((spot as Dictionary).get("id", ""))
+		if spot_id != "" and PlayerData.can_use_spot(spot_id):
+			return spot_id
+
+	var primary_spot := WaterbodyDatabase.get_primary_spot(waterbody_id)
+	if primary_spot != "" and PlayerData.can_use_spot(primary_spot):
+		return primary_spot
+	return ""
 
 
 func _migrate_save_data(save_data: Dictionary) -> Dictionary:

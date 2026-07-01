@@ -19,8 +19,9 @@ var spots := {
 		"visual_tag": "old_oak",
 		"water_profile": "calm_pier",
 		"water_mask": "default_lake",
-		"map_position": Vector2(0.343, 0.308),
-		"info_position": Vector2(0.380, 0.273),
+		"map_order": 1,
+		"map_position": Vector2(0.392, 0.390),
+		"info_position": Vector2(0.430, 0.352),
 		"map_icon": "oak",
 		"recommended_tackle": ["Перо", "Гусиное перо", "Капля"],
 		"recommended_bait": ["Хлеб", "Червь"],
@@ -49,8 +50,9 @@ var spots := {
 		"visual_tag": "quiet_water",
 		"water_profile": "calm_pier",
 		"water_mask": "default_lake",
-		"map_position": Vector2(0.833, 0.483),
-		"info_position": Vector2(0.870, 0.448),
+		"map_order": 2,
+		"map_position": Vector2(0.777, 0.520),
+		"info_position": Vector2(0.815, 0.482),
 		"map_icon": "quiet_water",
 		"recommended_tackle": ["Капля", "Веретено", "Вагглер"],
 		"recommended_bait": ["Червь", "Хлеб"],
@@ -79,8 +81,9 @@ var spots := {
 		"visual_tag": "reeds",
 		"water_profile": "reeds",
 		"water_mask": "default_lake",
-		"map_position": Vector2(0.828, 0.290),
-		"info_position": Vector2(0.865, 0.255),
+		"map_order": 3,
+		"map_position": Vector2(0.742, 0.374),
+		"info_position": Vector2(0.780, 0.336),
 		"map_icon": "reeds",
 		"recommended_tackle": ["Камышовая капля", "Бочонок", "Капля"],
 		"recommended_bait": ["Червь", "Тесто"],
@@ -109,8 +112,9 @@ var spots := {
 		"visual_tag": "open_water",
 		"water_profile": "open_water",
 		"water_mask": "default_lake",
-		"map_position": Vector2(0.825, 0.770),
-		"info_position": Vector2(0.862, 0.735),
+		"map_order": 5,
+		"map_position": Vector2(0.783, 0.674),
+		"info_position": Vector2(0.821, 0.636),
 		"map_icon": "morning",
 		"recommended_tackle": ["Вагглер", "Дальнобойный вагглер", "Капля"],
 		"recommended_bait": ["Червь", "Мотыль"],
@@ -139,8 +143,9 @@ var spots := {
 		"visual_tag": "mist",
 		"water_profile": "mist",
 		"water_mask": "default_lake",
-		"map_position": Vector2(0.212, 0.482),
-		"info_position": Vector2(0.249, 0.447),
+		"map_order": 8,
+		"map_position": Vector2(0.163, 0.484),
+		"info_position": Vector2(0.201, 0.446),
 		"map_icon": "mist",
 		"recommended_tackle": ["Скользящий", "Вагглер", "Светящееся перо"],
 		"recommended_bait": ["Червь", "Мотыль"],
@@ -169,8 +174,9 @@ var spots := {
 		"visual_tag": "snag_boat",
 		"water_profile": "snag_shadow",
 		"water_mask": "default_lake",
-		"map_position": Vector2(0.118, 0.592),
-		"info_position": Vector2(0.155, 0.557),
+		"map_order": 6,
+		"map_position": Vector2(0.258, 0.690),
+		"info_position": Vector2(0.296, 0.652),
 		"map_icon": "old_boat",
 		"recommended_tackle": ["Бочонок", "Камышовая капля", "Капля"],
 		"recommended_bait": ["Червь", "Бокоплав"],
@@ -199,8 +205,9 @@ var spots := {
 		"visual_tag": "deep",
 		"water_profile": "deep_water",
 		"water_mask": "default_lake",
-		"map_position": Vector2(0.500, 0.519),
-		"info_position": Vector2(0.537, 0.484),
+		"map_order": 9,
+		"map_position": Vector2(0.500, 0.600),
+		"info_position": Vector2(0.538, 0.562),
 		"map_icon": "deep",
 		"recommended_tackle": ["Скользящий", "Вагглер", "Усиленный бочонок"],
 		"recommended_bait": ["Червь", "Мотыль"],
@@ -229,8 +236,9 @@ var spots := {
 		"visual_tag": "duckweed",
 		"water_profile": "duckweed",
 		"water_mask": "default_lake",
-		"map_position": Vector2(0.134, 0.272),
-		"info_position": Vector2(0.171, 0.237),
+		"map_order": 4,
+		"map_position": Vector2(0.258, 0.382),
+		"info_position": Vector2(0.296, 0.344),
 		"map_icon": "duckweed",
 		"recommended_tackle": ["Перо", "Гусиное перо", "Камышовая капля"],
 		"recommended_bait": ["Хлеб", "Червь"],
@@ -259,8 +267,9 @@ var spots := {
 		"visual_tag": "frog_backwater",
 		"water_profile": "frog_backwater",
 		"water_mask": "default_lake",
-		"map_position": Vector2(0.530, 0.245),
-		"info_position": Vector2(0.567, 0.210),
+		"map_order": 7,
+		"map_position": Vector2(0.532, 0.315),
+		"info_position": Vector2(0.570, 0.277),
 		"map_icon": "frog_backwater",
 		"recommended_tackle": ["Камышовая капля", "Перо", "Капля"],
 		"recommended_bait": ["Червь", "Хлеб"],
@@ -289,8 +298,9 @@ var spots := {
 		"visual_tag": "deep_hole",
 		"water_profile": "deep_dark",
 		"water_mask": "default_lake",
-		"map_position": Vector2(0.623, 0.824),
-		"info_position": Vector2(0.660, 0.789),
+		"map_order": 11,
+		"map_position": Vector2(0.590, 0.820),
+		"info_position": Vector2(0.628, 0.782),
 		"map_icon": "dark_hole",
 		"recommended_tackle": ["Скользящий", "Ночной бочонок", "Усиленный бочонок"],
 		"recommended_bait": ["Червь", "Бокоплав"],
@@ -319,8 +329,9 @@ var spots := {
 		"visual_tag": "cold_water",
 		"water_profile": "cold_water",
 		"water_mask": "default_lake",
-		"map_position": Vector2(0.267, 0.829),
-		"info_position": Vector2(0.304, 0.794),
+		"map_order": 10,
+		"map_position": Vector2(0.297, 0.778),
+		"info_position": Vector2(0.335, 0.740),
 		"map_icon": "cold_water",
 		"recommended_tackle": ["Скользящий", "Вагглер", "Бочонок"],
 		"recommended_bait": ["Мотыль", "Червь"],
@@ -455,7 +466,51 @@ func _with_waterbody_data(raw_spot: Dictionary) -> Dictionary:
 
 	spot["fish_pool"] = merged_fish
 	spot["available_fish"] = merged_fish
+	_apply_progression_to_spot(spot)
 	return spot
 
+func _apply_progression_to_spot(spot: Dictionary) -> void:
+	var progression_db := _get_progression_database()
+	if progression_db == null or not progression_db.has_method("get_spot_unlock_level"):
+		return
+
+	var spot_id := str(spot.get("id", ""))
+	if spot_id == "":
+		return
+	if progression_db.has_method("has_spot_progression") and not bool(progression_db.call("has_spot_progression", spot_id)):
+		return
+
+	var required_level := int(progression_db.call("get_spot_unlock_level", spot_id))
+	spot["unlock_level"] = required_level
+	spot["required_level"] = required_level
+
+	var player_level := _get_player_level()
+	var unlocked_for_level := true
+	if progression_db.has_method("is_spot_unlocked_for_level"):
+		unlocked_for_level = bool(progression_db.call("is_spot_unlocked_for_level", spot_id, player_level))
+	else:
+		unlocked_for_level = player_level >= required_level
+
+	var base_unlocked := bool(spot.get("is_unlocked", true))
+	spot["is_unlocked_for_player"] = base_unlocked and unlocked_for_level
+	spot["is_unlocked"] = base_unlocked and unlocked_for_level
+	if not bool(spot["is_unlocked_for_player"]):
+		spot["lock_reason"] = str(progression_db.call("get_locked_spot_text", spot_id)) if progression_db.has_method("get_locked_spot_text") else "Откроется на LVL %d" % required_level
+
 func _get_waterbody_database() -> Node:
+	if not is_inside_tree():
+		return null
 	return get_node_or_null("/root/WaterbodyDatabase")
+
+func _get_progression_database() -> Node:
+	if not is_inside_tree():
+		return null
+	return get_node_or_null("/root/ProgressionDatabase")
+
+func _get_player_level() -> int:
+	if not is_inside_tree():
+		return 1
+	var player_data := get_node_or_null("/root/PlayerData")
+	if player_data != null:
+		return max(int(player_data.get("level")), 1)
+	return 1

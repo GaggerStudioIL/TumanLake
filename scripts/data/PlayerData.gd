@@ -1,6 +1,7 @@
 extends Node
 
 const PlayerAvatarData := preload("res://scripts/data/PlayerAvatarData.gd")
+const SpinningLureDatabaseScript := preload("res://scripts/data/SpinningLureDatabase.gd")
 
 const PHYSICAL_SHORE_MIN_DEPTH := 0.16
 const BASIC_FLOAT_ID := "float_drop_basic"
@@ -112,6 +113,7 @@ const SURVIVAL_ITEM_CATALOG := {
 		"shop_category": "food",
 		"rarity": "common",
 		"price": 8,
+		"image_path": "res://assets/ui/shop/survival/food/chocolate.png",
 		"description": "Быстрый заряд сил и концентрации.",
 		"description_ru": "Быстрый заряд сил и концентрации.",
 		"stats": {"hunger_restore": 12.0, "condition_bonus": 0.06, "bonus_minutes": 90.0}
@@ -125,6 +127,7 @@ const SURVIVAL_ITEM_CATALOG := {
 		"shop_category": "food",
 		"rarity": "uncommon",
 		"price": 28,
+		"image_path": "res://assets/ui/shop/survival/food/camp_lunch.png",
 		"description": "Плотная еда, которая помогает прийти в себя.",
 		"description_ru": "Плотная еда, которая помогает прийти в себя.",
 		"stats": {"hunger_restore": 50.0, "health_restore": 5.0}
@@ -180,6 +183,7 @@ const SURVIVAL_ITEM_CATALOG := {
 		"shop_category": "food",
 		"rarity": "common",
 		"price": 9,
+		"image_path": "res://assets/ui/shop/survival/drinks/cold_drink.png",
 		"description": "Быстро охлаждает в жаркий день.",
 		"description_ru": "Быстро охлаждает в жаркий день.",
 		"stats": {"temperature_delta_hot": -0.36}
@@ -235,6 +239,7 @@ const SURVIVAL_ITEM_CATALOG := {
 		"shop_category": "clothing",
 		"rarity": "common",
 		"price": 36,
+		"image_path": "res://assets/ui/shop/survival/clothing/light_jacket.png",
 		"description": "Защищает от ветра и прохлады.",
 		"description_ru": "Защищает от ветра и прохлады.",
 		"stats": {"clothing_slot": "outerwear", "cold_protection": 0.30, "wind_protection": 0.34, "rain_protection": 0.08, "warmth": 0.24}
@@ -262,6 +267,7 @@ const SURVIVAL_ITEM_CATALOG := {
 		"shop_category": "clothing",
 		"rarity": "common",
 		"price": 44,
+		"image_path": "res://assets/ui/shop/survival/clothing/rain_coat.png",
 		"description": "Защищает от дождя и сырости.",
 		"description_ru": "Защищает от дождя и сырости.",
 		"stats": {"clothing_slot": "outerwear", "cold_protection": 0.18, "wind_protection": 0.20, "rain_protection": 0.62, "warmth": 0.12}
@@ -289,6 +295,7 @@ const SURVIVAL_ITEM_CATALOG := {
 		"shop_category": "clothing",
 		"rarity": "common",
 		"price": 18,
+		"image_path": "res://assets/ui/shop/survival/clothing/hot_hat.png",
 		"description": "Сохраняет тепло ночью и утром.",
 		"description_ru": "Сохраняет тепло ночью и утром.",
 		"stats": {"clothing_slot": "head", "cold_protection": 0.24, "wind_protection": 0.10, "warmth": 0.20, "heat_penalty": 0.04}
@@ -302,6 +309,7 @@ const SURVIVAL_ITEM_CATALOG := {
 		"shop_category": "clothing",
 		"rarity": "common",
 		"price": 32,
+		"image_path": "res://assets/ui/shop/survival/clothing/rain_boots.png",
 		"description": "Держат ноги сухими у берега.",
 		"description_ru": "Держат ноги сухими у берега.",
 		"stats": {"clothing_slot": "shoes", "cold_protection": 0.16, "rain_protection": 0.38, "warmth": 0.12}
@@ -329,6 +337,7 @@ const SURVIVAL_ITEM_CATALOG := {
 		"shop_category": "clothing",
 		"rarity": "uncommon",
 		"price": 150,
+		"image_path": "res://assets/ui/shop/survival/shelters/hot_tent.png",
 		"description": "Лучше восстанавливает тепло и самочувствие.",
 		"description_ru": "Лучше восстанавливает тепло и самочувствие.",
 		"stats": {"rest_minutes": 120.0, "health_restore": 24.0, "hunger_cost": 10.0, "normalize_temperature": true}
@@ -342,6 +351,7 @@ const SURVIVAL_ITEM_CATALOG := {
 		"shop_category": "clothing",
 		"rarity": "common",
 		"price": 72,
+		"image_path": "res://assets/ui/shop/survival/shelters/light_tent.png",
 		"description": "Укрывает от дождя и ветра.",
 		"description_ru": "Укрывает от дождя и ветра.",
 		"stats": {"rest_minutes": 60.0, "health_restore": 8.0, "hunger_cost": 5.0, "normalize_temperature": true}
@@ -4159,7 +4169,7 @@ func _normalize_survival_catalog_item(raw_item: Dictionary) -> Dictionary:
 	item["description_ru"] = str(item.get("description_ru", item.get("description", "")))
 	var stats: Dictionary = item.get("stats", {}).duplicate(true) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
 	item["stats"] = stats
-	return item
+	return _apply_required_level_to_item(item)
 
 func _is_survival_item_category(category: String) -> bool:
 	return SURVIVAL_ITEM_CATEGORIES.has(category)
@@ -4439,7 +4449,7 @@ func add_xp(amount: int) -> Dictionary:
 		xp_to_next_level = get_xp_to_next_level(level)
 
 	if levels_gained > 0:
-		refresh_waterbody_unlocks()
+		sync_progression_unlocks()
 
 	return {
 		"gained_xp": gained_xp,
@@ -4454,6 +4464,11 @@ func add_xp(amount: int) -> Dictionary:
 	}
 
 func get_level_up_reward_config(reward_level: int) -> Dictionary:
+	var progression_db := _get_progression_database()
+	if progression_db != null and progression_db.has_method("get_level_reward"):
+		var progression_reward = progression_db.call("get_level_reward", reward_level)
+		if progression_reward is Dictionary and not (progression_reward as Dictionary).is_empty():
+			return progression_reward as Dictionary
 	if not LEVEL_UP_REWARDS.has(reward_level):
 		return {}
 	return (LEVEL_UP_REWARDS[reward_level] as Dictionary).duplicate(true)
@@ -4499,6 +4514,8 @@ func claim_level_reward(reward_level: int) -> Dictionary:
 			continue
 		var item_id := str(item_reward.get("id", "")).strip_edges()
 		var quantity: int = maxi(int(item_reward.get("quantity", 1)), 1)
+		if bool(item_reward.get("grant_if_missing", false)) and not get_owned_item(item_id).is_empty():
+			continue
 		var granted_item := _grant_level_reward_item(reward_level, item_id, quantity)
 		if granted_item.is_empty():
 			skipped_items.append({
@@ -4512,9 +4529,13 @@ func claim_level_reward(reward_level: int) -> Dictionary:
 		"success": true,
 		"level": reward_level,
 		"silver": silver_reward,
+		"skill_points": maxi(int(reward.get("skill_points", 0)), 0),
 		"items": granted_items,
 		"skipped_items": skipped_items,
-		"unlocks": _safe_saved_array(reward.get("unlocks", []))
+		"unlocks": _safe_saved_array(reward.get("unlocks", [])),
+		"unlock_message": str(reward.get("unlock_message", "")),
+		"redirect_to": str(reward.get("redirect_to", "")),
+		"cta": str(reward.get("cta", "Забрать"))
 	}
 
 func set_claimed_level_rewards(saved_rewards, mark_current_levels_claimed: bool = false) -> void:
@@ -4535,7 +4556,7 @@ func set_claimed_level_rewards(saved_rewards, mark_current_levels_claimed: bool 
 		mark_level_rewards_claimed_through(level)
 
 func mark_level_rewards_claimed_through(max_level: int) -> void:
-	for reward_level in range(2, mini(maxi(max_level, 1), 10) + 1):
+	for reward_level in range(2, mini(maxi(max_level, 1), get_progression_max_beta_level()) + 1):
 		_set_level_reward_claimed(reward_level)
 
 func get_claimed_level_rewards_save_data() -> Dictionary:
@@ -4554,9 +4575,6 @@ func _grant_level_reward_item(reward_level: int, item_id: String, quantity: int)
 	var catalog_item := get_tackle_catalog_item(item_id)
 	if catalog_item.is_empty():
 		push_warning("Level reward item not found: %s at level %d" % [item_id, reward_level])
-		return {}
-	if _is_beta_hidden_tackle_item(catalog_item):
-		push_warning("Level reward item is hidden in beta: %s at level %d" % [item_id, reward_level])
 		return {}
 
 	var owned_item := _make_owned_catalog_item(item_id, quantity)
@@ -4788,7 +4806,195 @@ func _safe_saved_array(value) -> Array:
 	return []
 
 func _get_skill_database() -> Node:
+	if not is_inside_tree():
+		return null
 	return get_node_or_null("/root/SkillDatabase")
+
+func _get_progression_database() -> Node:
+	if not is_inside_tree():
+		return null
+	return get_node_or_null("/root/ProgressionDatabase")
+
+func get_progression_max_beta_level() -> int:
+	var progression_db := _get_progression_database()
+	if progression_db != null and progression_db.has_method("get_max_beta_level"):
+		return int(progression_db.call("get_max_beta_level"))
+	return 15
+
+func is_feature_unlocked_for_player(feature_id: String) -> bool:
+	var progression_db := _get_progression_database()
+	if progression_db != null and progression_db.has_method("is_feature_unlocked"):
+		return bool(progression_db.call("is_feature_unlocked", feature_id, level))
+	return true
+
+func get_item_required_level(item_id: String, item_data: Dictionary = {}) -> int:
+	var progression_db := _get_progression_database()
+	if progression_db != null and progression_db.has_method("get_item_required_level"):
+		return int(progression_db.call("get_item_required_level", item_id, item_data))
+	var required_level := 1
+	var stats: Dictionary = item_data.get("stats", {}) if typeof(item_data.get("stats", {})) == TYPE_DICTIONARY else {}
+	required_level = max(required_level, int(item_data.get("required_level", item_data.get("level_required", 1))))
+	required_level = max(required_level, int(stats.get("required_level", stats.get("level_required", 1))))
+	return required_level
+
+func is_item_unlocked_for_player(item: Dictionary) -> bool:
+	if item.is_empty():
+		return false
+	if _is_spinning_progression_item(item) and not BuildConfig.SPINNING_ENABLED:
+		return false
+	return level >= get_item_required_level(str(item.get("id", "")), item)
+
+func get_item_lock_reason(item: Dictionary) -> String:
+	if item.is_empty():
+		return "Предмет не найден."
+	var item_id := str(item.get("id", ""))
+	var required_level := get_item_required_level(item_id, item)
+	if level >= required_level:
+		return ""
+	var progression_db := _get_progression_database()
+	if _is_spinning_progression_item(item) and not is_feature_unlocked_for_player("spinning"):
+		var unlock_level := int(progression_db.call("get_feature_unlock_level", "spinning")) if progression_db != null and progression_db.has_method("get_feature_unlock_level") else required_level
+		return "Спиннинг откроется на LVL %d" % unlock_level
+	return "Доступно с LVL %d" % required_level
+
+func get_spot_lock_reason(spot_id: String) -> String:
+	var spot := SpotDatabase.get_spot(spot_id)
+	if spot.is_empty():
+		return "Точка недоступна."
+	if can_use_spot(spot_id):
+		return ""
+	var progression_db := _get_progression_database()
+	var required_level := int(spot.get("required_level", spot.get("unlock_level", 1)))
+	if progression_db != null and progression_db.has_method("has_spot_progression") and bool(progression_db.call("has_spot_progression", spot_id)) and progression_db.has_method("get_locked_spot_text"):
+		return str(progression_db.call("get_locked_spot_text", spot_id))
+	return "Откроется на LVL %d" % required_level
+
+func set_unlocked_spots(saved_spots: Array) -> void:
+	var normalized_spots: Array = []
+	for raw_spot_id in saved_spots:
+		var spot_id := str(raw_spot_id).strip_edges()
+		if spot_id == "" or normalized_spots.has(spot_id):
+			continue
+		var spot := SpotDatabase.get_spot(spot_id)
+		if spot.is_empty() or bool(spot.get("legacy", false)):
+			continue
+		normalized_spots.append(spot_id)
+	if not normalized_spots.has("old_oak_pier"):
+		normalized_spots.append("old_oak_pier")
+	unlocked_spots = normalized_spots
+
+func sync_progression_unlocks() -> bool:
+	var changed := false
+	refresh_waterbody_unlocks()
+
+	var normalized_spots: Array = []
+	for raw_spot_id in unlocked_spots:
+		var spot_id := str(raw_spot_id).strip_edges()
+		if spot_id == "" or normalized_spots.has(spot_id):
+			continue
+		var spot := SpotDatabase.get_spot(spot_id)
+		if spot.is_empty() or bool(spot.get("legacy", false)):
+			continue
+		normalized_spots.append(spot_id)
+
+	if not normalized_spots.has("old_oak_pier"):
+		normalized_spots.append("old_oak_pier")
+
+	var progression_db := _get_progression_database()
+	if progression_db != null and progression_db.has_method("has_spot_progression"):
+		for spot in SpotDatabase.get_spots_for_waterbody("agamin_lake"):
+			if typeof(spot) != TYPE_DICTIONARY:
+				continue
+			var spot_id := str((spot as Dictionary).get("id", ""))
+			if spot_id == "":
+				continue
+			if not bool(progression_db.call("has_spot_progression", spot_id)):
+				continue
+			var unlocked_for_level := bool(progression_db.call("is_spot_unlocked_for_level", spot_id, level)) if progression_db.has_method("is_spot_unlocked_for_level") else level >= int((spot as Dictionary).get("required_level", 1))
+			if unlocked_for_level and not normalized_spots.has(spot_id):
+				normalized_spots.append(spot_id)
+
+	if normalized_spots != unlocked_spots:
+		unlocked_spots = normalized_spots
+		changed = true
+
+	current_waterbody = _normalize_waterbody_id(current_waterbody)
+	if not can_use_waterbody(current_waterbody):
+		current_waterbody = "agamin_lake"
+		changed = true
+
+	var current_spot_data := SpotDatabase.get_spot(current_spot)
+	var spot_invalid := current_spot == "" or current_spot_data.is_empty()
+	spot_invalid = spot_invalid or str(current_spot_data.get("waterbody_id", "agamin_lake")) != current_waterbody
+	spot_invalid = spot_invalid or not can_use_spot(current_spot)
+	if spot_invalid:
+		var fallback_spot := _find_first_usable_spot(current_waterbody)
+		if fallback_spot == "":
+			current_waterbody = "agamin_lake"
+			fallback_spot = _find_first_usable_spot(current_waterbody)
+		if fallback_spot == "":
+			fallback_spot = "old_oak_pier"
+		if current_spot != fallback_spot:
+			current_spot = fallback_spot
+			changed = true
+
+	clamp_fishing_depth_to_current_spot()
+	if _grant_starter_spinning_kit_if_needed():
+		changed = true
+	return changed
+
+func _find_first_usable_spot(waterbody_id: String) -> String:
+	for spot in SpotDatabase.get_spots_for_waterbody(waterbody_id):
+		if typeof(spot) != TYPE_DICTIONARY:
+			continue
+		var spot_id := str((spot as Dictionary).get("id", ""))
+		if spot_id != "" and can_use_spot(spot_id):
+			return spot_id
+	return ""
+
+func _apply_required_level_to_item(item: Dictionary) -> Dictionary:
+	if item.is_empty():
+		return item
+	var item_id := str(item.get("id", ""))
+	var required_level := get_item_required_level(item_id, item)
+	item["required_level"] = required_level
+	item["level_required"] = required_level
+	var stats: Dictionary = item.get("stats", {}).duplicate(true) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
+	stats["required_level"] = required_level
+	stats["level_required"] = required_level
+	item["stats"] = stats
+	return item
+
+func _is_spinning_progression_item(item: Dictionary) -> bool:
+	if item.is_empty():
+		return false
+	var category := str(item.get("category", item.get("type", ""))).strip_edges().to_lower()
+	if ["reel", "lure", "spoon", "wobbler", "spinner_bait"].has(category):
+		return true
+	var stats: Dictionary = item.get("stats", {}) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
+	var rod_type := str(stats.get("rod_type", item.get("rod_type", item.get("tackle_type", "")))).strip_edges().to_lower()
+	var tackle_type := str(stats.get("tackle_type", item.get("tackle_type", rod_type))).strip_edges().to_lower()
+	if rod_type == "spinning" or tackle_type == "spinning":
+		return true
+	return bool(stats.get("requires_reel", item.get("requires_reel", false)))
+
+func _grant_starter_spinning_kit_if_needed() -> bool:
+	if not BuildConfig.SPINNING_ENABLED:
+		return false
+	if not is_feature_unlocked_for_player("spinning"):
+		return false
+	if not _is_level_reward_claimed(8) and level <= 8:
+		return false
+
+	var changed := false
+	for item_id in STARTER_REEL_TACKLE_ITEM_IDS:
+		if not get_owned_item(str(item_id)).is_empty():
+			continue
+		var starter_item := _make_owned_catalog_item(str(item_id), 1)
+		if not starter_item.is_empty():
+			owned_items.append(starter_item)
+			changed = true
+	return changed
 
 
 func get_selected_avatar_id() -> String:
@@ -5156,9 +5362,17 @@ func can_use_spot(spot_id: String) -> bool:
 	if spot.is_empty():
 		return false
 
+	var progression_db := _get_progression_database()
+	if progression_db != null and progression_db.has_method("has_spot_progression") and bool(progression_db.call("has_spot_progression", spot_id)):
+		if progression_db.has_method("is_spot_unlocked_for_level") and not bool(progression_db.call("is_spot_unlocked_for_level", spot_id, level)):
+			return false
+
 	var required_level := int(spot.get("required_level", spot.get("unlock_level", 1)))
 	if level < required_level:
 		return false
+
+	if spot.has("is_unlocked_for_player") and bool(spot.get("is_unlocked_for_player", false)):
+		return true
 
 	if bool(spot.get("is_unlocked", true)):
 		return true
@@ -5280,6 +5494,9 @@ func _get_raw_tackle_catalog_item(item_id: String) -> Dictionary:
 		return TACKLE_CATALOG[item_id]
 	if ADDITIONAL_BAIT_CATALOG.has(item_id):
 		return ADDITIONAL_BAIT_CATALOG[item_id]
+	var spinning_lure_catalog := SpinningLureDatabaseScript.get_lure_catalog()
+	if spinning_lure_catalog.has(item_id):
+		return spinning_lure_catalog[item_id]
 	return {}
 
 func _resolve_tackle_item_id(item_id: String) -> String:
@@ -5306,7 +5523,7 @@ func _normalize_catalog_item(item: Dictionary) -> Dictionary:
 		var stats: Dictionary = normalized.get("stats", {}).duplicate(true) if typeof(normalized.get("stats", {})) == TYPE_DICTIONARY else {}
 		normalized["stats"] = _normalize_equipment_stats(stats, category, item_id)
 
-	return normalized
+	return _apply_required_level_to_item(normalized)
 
 func get_tackle_catalog_item(item_id: String) -> Dictionary:
 	var item: Dictionary = _get_raw_tackle_catalog_item(item_id)
@@ -5319,7 +5536,7 @@ func get_tackle_catalog_item(item_id: String) -> Dictionary:
 func get_tackle_catalog_items(type_filter: String = "all") -> Array:
 	var items: Array = []
 
-	for catalog in [TACKLE_CATALOG, ADDITIONAL_BAIT_CATALOG]:
+	for catalog in [TACKLE_CATALOG, ADDITIONAL_BAIT_CATALOG, SpinningLureDatabaseScript.get_lure_catalog()]:
 		for item_id in catalog.keys():
 			var item: Dictionary = _normalize_catalog_item(catalog[item_id])
 			var item_type := str(item.get("type", item.get("category", "misc")))
@@ -5515,6 +5732,8 @@ func _make_tackle_component(item_id: String) -> Dictionary:
 	component["display_name_ru"] = str(item.get("display_name_ru", item.get("name", "")))
 	component["description_ru"] = str(item.get("description_ru", item.get("description", "")))
 	component["bonus_tags"] = _to_string_array(item.get("bonus_tags", component.get("bonus_tags", [])))
+	component["required_level"] = int(item.get("required_level", item.get("level_required", 1)))
+	component["level_required"] = int(item.get("level_required", item.get("required_level", 1)))
 	for key in ["tackle_type", "fishing_type", "assembly_type", "rod_type"]:
 		if item.has(key):
 			component[key] = str(item.get(key, ""))
@@ -6026,7 +6245,7 @@ func _normalize_owned_item(item: Dictionary) -> Dictionary:
 		and (original_item_id != item_id or prefer_survival_catalog or not item.has("name"))
 	)
 
-	return {
+	var normalized_item := {
 		"id": item_id,
 		"name": str(catalog_item.get("name", "-") if use_catalog_identity else item.get("name", catalog_item.get("name", "-"))),
 		"type": str(catalog_item.get("type", item_type) if use_catalog_identity else item_type),
@@ -6041,13 +6260,14 @@ func _normalize_owned_item(item: Dictionary) -> Dictionary:
 		"bonus_tags": _to_string_array(catalog_item.get("bonus_tags", []) if use_catalog_identity else item.get("bonus_tags", catalog_item.get("bonus_tags", stats.get("bonus_tags", [])))),
 		"stats": stats
 	}
+	return _apply_required_level_to_item(normalized_item)
 
 func get_default_tackle() -> Dictionary:
 	return {
 		"rod": _make_tackle_component("simple_pole_rod_4m"),
 		"line": _make_tackle_component("mono_1_2kg"),
 		"leader": _make_tackle_component(BASIC_LEADER_ID),
-		"hook": _make_tackle_component("small_hook_12"),
+		"hook": _make_tackle_component("riverstart_basic_hook_16"),
 		"float": _make_tackle_component(BASIC_FLOAT_ID),
 		"bait": _make_tackle_component("worm"),
 		"bait_2": {},
@@ -6200,14 +6420,9 @@ func get_default_owned_items() -> Array:
 		_make_owned_catalog_item("mono_1_2kg", 1),
 		_make_owned_catalog_item(BASIC_LEADER_ID, 1),
 		_make_owned_catalog_item(BASIC_FLOAT_ID, 1),
-		_make_owned_catalog_item("small_hook_12", 1),
+		_make_owned_catalog_item("riverstart_basic_hook_16", 1),
 		_make_owned_catalog_item("worm", 30)
 	]
-	if BuildConfig.SPINNING_ENABLED and BuildConfig.ENABLE_SPINNING_TEST_MODE:
-		for item_id in STARTER_REEL_TACKLE_ITEM_IDS:
-			var starter_item := _make_owned_catalog_item(str(item_id), 1)
-			if not starter_item.is_empty():
-				items.append(starter_item)
 	return items
 
 func set_current_tackle(saved_tackle: Dictionary) -> void:
@@ -6272,7 +6487,7 @@ func set_current_tackle(saved_tackle: Dictionary) -> void:
 			for key in ["tackle_type", "fishing_type", "assembly_type", "rod_type"]:
 				if slot_catalog_item.has(key) and not merged_component.has(key):
 					merged_component[key] = str(slot_catalog_item.get(key, ""))
-		if _is_beta_hidden_tackle_item(merged_component):
+		if _is_beta_hidden_tackle_item(merged_component) or get_equip_block_reason(merged_component, slot) != "":
 			continue
 		current_tackle[slot] = merged_component
 
@@ -6324,6 +6539,8 @@ func _ensure_default_leader_owned() -> void:
 func _ensure_starter_reel_tackle_owned() -> void:
 	if not BuildConfig.ENABLE_SPINNING_FEATURES:
 		return
+	if not is_feature_unlocked_for_player("spinning"):
+		return
 
 	for item_id in STARTER_REEL_TACKLE_ITEM_IDS:
 		if not get_owned_item(str(item_id)).is_empty():
@@ -6373,9 +6590,7 @@ func _is_spinning_test_item(item: Dictionary) -> bool:
 func _is_beta_hidden_tackle_item(item: Dictionary) -> bool:
 	if item.is_empty():
 		return false
-	if BuildConfig.SPINNING_ENABLED and not BuildConfig.ENABLE_SPINNING_TEST_MODE:
-		return false
-	if BuildConfig.SPINNING_ENABLED and BuildConfig.ENABLE_SPINNING_TEST_MODE and _is_spinning_test_item(item):
+	if BuildConfig.SPINNING_ENABLED:
 		return false
 
 	var category := str(item.get("category", item.get("type", ""))).strip_edges().to_lower()
@@ -6406,7 +6621,7 @@ func normalize_tackle_type(raw_type: String) -> String:
 func get_current_tackle_type() -> String:
 	var rod := get_current_tackle_slot("rod")
 	var tackle_type := normalize_tackle_type(_get_tackle_type_from_item(rod))
-	if not BuildConfig.ENABLE_SPINNING_FEATURES and tackle_type == "spinning":
+	if (not BuildConfig.ENABLE_SPINNING_FEATURES or not is_feature_unlocked_for_player("spinning")) and tackle_type == "spinning":
 		return DEFAULT_TACKLE_TYPE
 	return tackle_type
 
@@ -6423,18 +6638,18 @@ func get_current_rod_data() -> Dictionary:
 	return _normalize_equipment_stats(component, "rod", str(component.get("id", "")))
 
 func get_current_rod_requires_reel() -> bool:
-	if not BuildConfig.ENABLE_SPINNING_FEATURES:
+	if not BuildConfig.ENABLE_SPINNING_FEATURES or not is_feature_unlocked_for_player("spinning"):
 		return false
 	var rod := get_current_rod_data()
 	return bool(rod.get("requires_reel", false)) if not rod.is_empty() else false
 
 func get_current_fight_mode() -> String:
-	if not BuildConfig.ENABLE_SPINNING_FEATURES:
+	if not BuildConfig.ENABLE_SPINNING_FEATURES or not is_feature_unlocked_for_player("spinning"):
 		return "pole"
 	return "reel" if get_current_rod_requires_reel() else "pole"
 
 func get_current_reel_data() -> Dictionary:
-	if not BuildConfig.ENABLE_SPINNING_FEATURES:
+	if not BuildConfig.ENABLE_SPINNING_FEATURES or not is_feature_unlocked_for_player("spinning"):
 		return {}
 	var raw_component = current_tackle.get("reel", {})
 	if typeof(raw_component) != TYPE_DICTIONARY or str(raw_component.get("id", "")) == "":
@@ -6556,6 +6771,8 @@ func is_tackle_slot_required(slot_id: String, tackle_type: String = "") -> bool:
 	return bool(slot_schema.get("required", false)) if not slot_schema.is_empty() else REQUIRED_TACKLE_SLOTS.has(slot_id)
 
 func is_tackle_slot_locked(slot_id: String, tackle_type: String = "") -> bool:
+	if _is_spinning_tackle_slot(slot_id, tackle_type) and not is_feature_unlocked_for_player("spinning"):
+		return true
 	var slot_schema := get_tackle_slot_schema(slot_id, tackle_type)
 	var skill_key := str(slot_schema.get("skill", ""))
 	if skill_key == "second_bait":
@@ -6565,8 +6782,17 @@ func is_tackle_slot_locked(slot_id: String, tackle_type: String = "") -> bool:
 func get_tackle_slot_lock_reason(slot_id: String, tackle_type: String = "") -> String:
 	if not is_tackle_slot_locked(slot_id, tackle_type):
 		return ""
+	if _is_spinning_tackle_slot(slot_id, tackle_type) and not is_feature_unlocked_for_player("spinning"):
+		var progression_db := _get_progression_database()
+		var unlock_level := int(progression_db.call("get_feature_unlock_level", "spinning")) if progression_db != null and progression_db.has_method("get_feature_unlock_level") else 8
+		return "Спиннинг откроется на LVL %d" % unlock_level
 	var slot_schema := get_tackle_slot_schema(slot_id, tackle_type)
 	return str(slot_schema.get("locked_text", "Слот заблокирован навыком."))
+
+func _is_spinning_tackle_slot(slot_id: String, tackle_type: String = "") -> bool:
+	if ["reel", "lure", "feeder_rig", "hook_or_lure", "sinker_or_rig"].has(slot_id):
+		return true
+	return normalize_tackle_type(tackle_type) == "spinning"
 
 func _is_tackle_item_category_supported(category: String) -> bool:
 	if TACKLE_SLOT_ITEM_CATEGORIES.values().has(category):
@@ -6628,6 +6854,8 @@ func set_current_tackle_slot(slot_id: String, item: Dictionary) -> bool:
 	component["display_name_ru"] = str(catalog_item.get("display_name_ru", catalog_item.get("name", "-")) if use_catalog_identity else item.get("display_name_ru", catalog_item.get("display_name_ru", item.get("name", "-"))))
 	component["description_ru"] = str(catalog_item.get("description_ru", catalog_item.get("description", "")) if use_catalog_identity else item.get("description_ru", catalog_item.get("description_ru", item.get("description", ""))))
 	component["bonus_tags"] = _to_string_array(catalog_item.get("bonus_tags", []) if use_catalog_identity else item.get("bonus_tags", catalog_item.get("bonus_tags", component.get("bonus_tags", []))))
+	component["required_level"] = int(item.get("required_level", item.get("level_required", component.get("required_level", 1))))
+	component["level_required"] = int(item.get("level_required", item.get("required_level", component.get("level_required", 1))))
 	for key in ["tackle_type", "fishing_type", "assembly_type", "rod_type"]:
 		if catalog_item.has(key) or item.has(key):
 			component[key] = str(catalog_item.get(key, item.get(key, "")) if use_catalog_identity else item.get(key, catalog_item.get(key, "")))
@@ -6650,7 +6878,7 @@ func clear_current_tackle_slot(slot_id: String) -> void:
 	current_tackle[slot_id] = {}
 
 func _sync_tackle_slots_for_current_rod() -> void:
-	if not BuildConfig.SPINNING_ENABLED:
+	if not BuildConfig.SPINNING_ENABLED or not is_feature_unlocked_for_player("spinning"):
 		for reel_only_slot in ["reel", "lure", "feeder_rig", "hook_or_lure", "sinker_or_rig"]:
 			if current_tackle.has(reel_only_slot):
 				current_tackle[reel_only_slot] = {}
@@ -6677,6 +6905,9 @@ func get_equip_block_reason(item: Dictionary, slot_type: String = "") -> String:
 		return "Предмет не выбран."
 	if _is_beta_hidden_tackle_item(item):
 		return "Спиннинг и катушечная снасть временно недоступны в beta-сборке."
+	var level_lock_reason := get_item_lock_reason(item)
+	if level_lock_reason != "":
+		return level_lock_reason
 
 	var category := str(item.get("category", ""))
 	if slot_type != "":
@@ -6688,6 +6919,12 @@ func get_equip_block_reason(item: Dictionary, slot_type: String = "") -> String:
 
 	if not _is_tackle_item_category_supported(category):
 		return "Не подходит к этой снасти."
+
+	if category == "lure":
+		var current_rod := get_current_rod_data()
+		var current_rod_type := normalize_tackle_type(_get_tackle_type_from_item(current_rod)) if not current_rod.is_empty() else DEFAULT_TACKLE_TYPE
+		if current_rod_type != "spinning":
+			return "Приманка ставится только на спиннинговую удочку."
 
 	if _is_durable_tackle_category(category):
 		var wear_percent := get_item_wear_percent(item)
@@ -6801,7 +7038,7 @@ func discard_owned_item(item_id: String) -> Dictionary:
 	}
 
 func _is_durable_tackle_category(category: String) -> bool:
-	return ["rod", "reel", "line", "leader", "hook"].has(category)
+	return ["rod", "reel", "line", "leader", "hook", "lure"].has(category)
 
 func has_usable_basic_tackle() -> bool:
 	for slot in get_required_tackle_slots():
@@ -6884,6 +7121,8 @@ func _is_current_tackle_slot_usable(slot: String) -> bool:
 	var item_id: String = str(component.get("id", ""))
 	if item_id == "":
 		return false
+	if get_item_lock_reason(component) != "":
+		return false
 
 	if slot == "bait":
 		return get_current_bait_quantity("bait") > 0
@@ -6893,7 +7132,7 @@ func _is_current_tackle_slot_usable(slot: String) -> bool:
 	if _get_owned_item_quantity(item_id) <= 0:
 		return false
 
-	if ["rod", "reel", "line", "leader", "hook"].has(slot):
+	if ["rod", "reel", "line", "leader", "hook", "lure"].has(slot):
 		return get_item_wear_percent(component) < REPAIR_BLOCK_WEAR_PERCENT
 
 	return true
@@ -6996,8 +7235,10 @@ func add_owned_item(item: Dictionary, amount: int = 1) -> void:
 		owned_item["display_name_ru"] = str(normalized_item.get("display_name_ru", owned_item.get("display_name_ru", owned_item.get("name", "-"))))
 		owned_item["description_ru"] = str(normalized_item.get("description_ru", owned_item.get("description_ru", owned_item.get("description", ""))))
 		owned_item["bonus_tags"] = _to_string_array(normalized_item.get("bonus_tags", owned_item.get("bonus_tags", [])))
+		owned_item["required_level"] = int(normalized_item.get("required_level", owned_item.get("required_level", 1)))
+		owned_item["level_required"] = int(normalized_item.get("level_required", owned_item.get("level_required", owned_item.get("required_level", 1))))
 
-		if ["rod", "reel", "line", "leader", "hook"].has(item_category):
+		if ["rod", "reel", "line", "leader", "hook", "lure"].has(item_category):
 			var refreshed_stats: Dictionary = normalized_item.get("stats", {}).duplicate(true)
 			var owned_stats: Dictionary = owned_item.get("stats", {})
 			refreshed_stats["durability"] = max(
@@ -7078,6 +7319,9 @@ func get_tackle_block_reason() -> String:
 
 func get_tackle_setup_issues() -> Array:
 	var issues: Array = []
+	var current_rod = current_tackle.get("rod", {})
+	if current_rod is Dictionary and _is_spinning_progression_item((current_rod as Dictionary)) and not is_feature_unlocked_for_player("spinning"):
+		issues.append(get_tackle_slot_lock_reason("reel"))
 
 	for slot_schema in get_tackle_schema_slots():
 		var slot := str(slot_schema.get("id", ""))
@@ -7130,7 +7374,7 @@ func _build_current_tackle_weight_profile() -> Dictionary:
 	var bait: Dictionary = _normalize_equipment_stats(current_tackle.get("bait", {}).duplicate(true), "bait", str(current_tackle.get("bait", {}).get("id", "")))
 	var lure: Dictionary = _normalize_equipment_stats(current_tackle.get("lure", {}).duplicate(true), "lure", str(current_tackle.get("lure", {}).get("id", "")))
 	var tackle_type_key := normalize_tackle_type(_get_tackle_type_from_item(rod))
-	if not BuildConfig.ENABLE_SPINNING_FEATURES:
+	if not BuildConfig.ENABLE_SPINNING_FEATURES or not is_feature_unlocked_for_player("spinning"):
 		tackle_type_key = DEFAULT_TACKLE_TYPE
 	var second_bait: Dictionary = _normalize_equipment_stats(current_tackle.get("bait_2", {}).duplicate(true), "bait", str(current_tackle.get("bait_2", {}).get("id", ""))) if _has_active_second_bait() and tackle_type_key != "spinning" else {}
 	return _build_tackle_weight_profile(rod, leader, float_part, hook, bait, second_bait, lure, tackle_type_key)
@@ -7163,8 +7407,25 @@ func _build_tackle_weight_profile(
 	var underload_ratio: float = rig_weight_g / max(rod_test_min, 0.1) if rod_test_min > 0.0 else 1.0
 	var heavy_severity := 0.0
 	var light_severity := 0.0
+	var spinning_cast_distance_penalty := 0.0
+	var spinning_bite_chance_multiplier := 1.0
+	var lure_wear_multiplier := 1.0
+	var rod_wear_multiplier := 1.0
+	var line_break_risk_bonus := 0.0
 
-	if tackle_type_key != "spinning":
+	if tackle_type_key == "spinning":
+		if lure_weight_g > 0.0 and rod_test_min > 0.0 and lure_weight_g < rod_test_min:
+			warnings.append("Приманка слишком лёгкая для этого спиннинга")
+			state = "lure_light"
+			spinning_cast_distance_penalty = -0.20
+			spinning_bite_chance_multiplier = 0.90
+		elif lure_weight_g > rod_test_max:
+			warnings.append("Приманка слишком тяжёлая для этого спиннинга")
+			state = "lure_heavy"
+			lure_wear_multiplier = 1.5
+			rod_wear_multiplier = 1.5
+			line_break_risk_bonus = clampf(0.06 + (lure_weight_g - rod_test_max) / max(rod_test_max, 0.1) * 0.16, 0.06, 0.30)
+	else:
 		if float_system_weight_g > rod_test_max * 1.55:
 			block_reason = "Поплавок слишком тяжёлый для этой удочки."
 			state = "blocked_float_heavy"
@@ -7186,8 +7447,8 @@ func _build_tackle_weight_profile(
 			light_severity = clampf((rod_test_min * 0.55 - rig_weight_g) / max(rod_test_min * 0.55, 0.1), 0.0, 1.0)
 
 	var cast_accuracy_multiplier: float = clampf(1.0 - heavy_severity * 0.12 - light_severity * 0.18, 0.72, 1.02)
-	var cast_distance_bonus: float = clampf(-heavy_severity * 0.035 - light_severity * 0.055, -0.10, 0.0)
-	var bite_chance_multiplier: float = clampf(1.0 - heavy_severity * 0.08 - light_severity * 0.04, 0.82, 1.0)
+	var cast_distance_bonus: float = clampf(-heavy_severity * 0.035 - light_severity * 0.055 + spinning_cast_distance_penalty, -0.25, 0.0)
+	var bite_chance_multiplier: float = clampf((1.0 - heavy_severity * 0.08 - light_severity * 0.04) * spinning_bite_chance_multiplier, 0.70, 1.0)
 	var commit_multiplier: float = clampf(1.0 - heavy_severity * 0.08, 0.86, 1.0)
 	var bite_detection_penalty: float = clampf(heavy_severity * 0.04 + light_severity * 0.02, 0.0, 0.08)
 
@@ -7214,7 +7475,10 @@ func _build_tackle_weight_profile(
 		"rig_cast_distance_bonus": cast_distance_bonus,
 		"rig_bite_chance_multiplier": bite_chance_multiplier,
 		"rig_commit_multiplier": commit_multiplier,
-		"rig_bite_detection_penalty": bite_detection_penalty
+		"rig_bite_detection_penalty": bite_detection_penalty,
+		"lure_wear_multiplier": lure_wear_multiplier,
+		"rod_wear_multiplier": rod_wear_multiplier,
+		"line_break_risk_bonus": line_break_risk_bonus
 	}
 
 func _get_tackle_component_weight_g(component: Dictionary, category: String) -> float:
@@ -7412,14 +7676,16 @@ func apply_tackle_wear(wear: Dictionary) -> Dictionary:
 		"leader_lost": bool(wear.get("leader_lost", false)),
 		"float_lost": bool(wear.get("float_lost", false)),
 		"hook_lost": bool(wear.get("hook_lost", false)),
+		"lure_lost": bool(wear.get("lure_lost", false)),
 		"rod_old": get_tackle_condition("rod"),
 		"reel_old": get_tackle_condition("reel"),
 		"line_old": get_tackle_condition("line"),
 		"leader_old": get_tackle_condition("leader"),
-		"hook_old": get_tackle_condition("hook")
+		"hook_old": get_tackle_condition("hook"),
+		"lure_old": get_tackle_condition("lure")
 	}
 
-	for slot in ["rod", "reel", "line", "leader", "hook"]:
+	for slot in ["rod", "reel", "line", "leader", "hook", "lure"]:
 		if not current_tackle.has(slot):
 			continue
 
@@ -7442,6 +7708,15 @@ func apply_tackle_wear(wear: Dictionary) -> Dictionary:
 		elif slot == "hook" and bool(wear.get("hook_lost", false)):
 			var remaining_hooks := _change_owned_item_quantity(item_id, -1)
 			new_condition = 1.0 if remaining_hooks > 0 else 0.0
+		elif slot == "lure" and bool(wear.get("lure_lost", false)):
+			var remaining_lures := _change_owned_item_quantity(item_id, -1)
+			result["lure_new_quantity"] = remaining_lures
+			new_condition = 1.0 if remaining_lures > 0 else 0.0
+		if slot == "lure" and new_condition <= 0.0 and not bool(wear.get("lure_lost", false)):
+			var remaining_spent_lures := _change_owned_item_quantity(item_id, -1)
+			result["lure_lost"] = true
+			result["lure_new_quantity"] = remaining_spent_lures
+			new_condition = 1.0 if remaining_spent_lures > 0 else 0.0
 
 		current_tackle[slot]["durability"] = new_condition
 		_set_owned_item_durability(item_id, new_condition)
@@ -7631,7 +7906,7 @@ func get_tackle_stats() -> Dictionary:
 	var tackle_type_key := normalize_tackle_type(_get_tackle_type_from_item(rod))
 	var rod_requires_reel := bool(rod.get("requires_reel", false))
 	var fight_mode := "reel" if rod_requires_reel else "pole"
-	if not BuildConfig.ENABLE_SPINNING_FEATURES:
+	if not BuildConfig.ENABLE_SPINNING_FEATURES or not is_feature_unlocked_for_player("spinning"):
 		tackle_type_key = DEFAULT_TACKLE_TYPE
 		rod_requires_reel = false
 		fight_mode = "pole"
@@ -7751,6 +8026,8 @@ func get_tackle_stats() -> Dictionary:
 	var heavy_bait_penalty: float = clamp(heavy_bait_load * (1.0 - float_heavy_bait_support_rating * 0.60), 0.0, 0.22)
 	var rig_weight_profile := _build_tackle_weight_profile(rod, leader, float_part, hook, bait, second_bait, lure, tackle_type_key)
 	var rig_bite_detection_penalty: float = clamp(float(rig_weight_profile.get("rig_bite_detection_penalty", 0.0)), 0.0, 0.08)
+	var line_break_risk_bonus: float = clamp(float(rig_weight_profile.get("line_break_risk_bonus", 0.0)), 0.0, 0.30)
+	effective_break_chance = clamp(effective_break_chance + line_break_risk_bonus, 0.0, 1.0)
 	bite_detection_bonus = max(bite_detection_bonus - heavy_bait_penalty * 0.35 - rig_bite_detection_penalty, -0.18)
 
 	return {
@@ -7782,6 +8059,9 @@ func get_tackle_stats() -> Dictionary:
 		"rig_cast_distance_bonus": float(rig_weight_profile.get("rig_cast_distance_bonus", 0.0)),
 		"rig_bite_chance_multiplier": float(rig_weight_profile.get("rig_bite_chance_multiplier", 1.0)),
 		"rig_commit_multiplier": float(rig_weight_profile.get("rig_commit_multiplier", 1.0)),
+		"lure_wear_multiplier": float(rig_weight_profile.get("lure_wear_multiplier", 1.0)),
+		"rod_wear_multiplier": float(rig_weight_profile.get("rod_wear_multiplier", 1.0)),
+		"line_break_risk_bonus": line_break_risk_bonus,
 		"float_weight_g": float(rig_weight_profile.get("float_weight_g", 0.0)),
 		"float_load_g": float(rig_weight_profile.get("float_load_g", 0.0)),
 		"float_system_weight_g": float(rig_weight_profile.get("float_system_weight_g", 0.0)),
@@ -7879,7 +8159,9 @@ func get_tackle_stats() -> Dictionary:
 		"lure_id": str(lure.get("id", lure.get("bait_id", ""))),
 		"lure_type": str(lure.get("lure_type", "")),
 		"lure_weight": float(lure.get("weight", 0.0)),
+		"lure_weight_g": float(rig_weight_profile.get("lure_weight_g", lure.get("weight_g", lure.get("weight", 0.0)))),
 		"lure_durability": clamp(float(lure.get("durability", 1.0)), 0.0, 1.0),
+		"lure_wear_rate": float(lure.get("wear_rate", hook.get("wear_rate", 0.006))),
 		"bait_id": bait_id,
 		"bait_type": str(bait.get("bait_type", "worm")),
 		"secondary_bait_id": secondary_bait_id,
