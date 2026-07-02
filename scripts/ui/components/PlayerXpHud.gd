@@ -1,11 +1,14 @@
 extends Control
 
+signal pressed
+
 const LevelRankData := preload("res://scripts/data/LevelRankData.gd")
 const EXP_BAR_BACKGROUND_TEXTURE := preload("res://assets/ui/ux/fishing_spot/exp_bar_lvl.png")
 
 var level_icon: TextureRect
 var level_label: Label
 var xp_label: Label
+var hit_button: Button
 var level: int = 1
 var current_xp: int = 0
 var xp_to_next_level: int = 1
@@ -124,6 +127,26 @@ func _ensure_children() -> void:
 		xp_label.add_theme_constant_override("shadow_offset_y", 1)
 		add_child(xp_label)
 
+	if hit_button == null:
+		hit_button = Button.new()
+		hit_button.name = "HitButton"
+		hit_button.text = ""
+		hit_button.flat = true
+		hit_button.focus_mode = Control.FOCUS_NONE
+		hit_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		hit_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		hit_button.tooltip_text = "Таблица уровней"
+		_apply_hit_button_style()
+		add_child(hit_button)
+		hit_button.pressed.connect(_on_hit_button_pressed)
+	else:
+		_apply_hit_button_style()
+		if hit_button.get_parent() != self:
+			add_child(hit_button)
+		if not hit_button.pressed.is_connected(_on_hit_button_pressed):
+			hit_button.pressed.connect(_on_hit_button_pressed)
+	move_child(hit_button, get_child_count() - 1)
+
 
 func _layout_children() -> void:
 	_ensure_children()
@@ -142,6 +165,27 @@ func _layout_children() -> void:
 	level_label.size = Vector2(text_w, 17.0)
 	xp_label.position = Vector2(text_x, 23.0)
 	xp_label.size = Vector2(text_w, 14.0)
+	if hit_button != null:
+		hit_button.position = Vector2.ZERO
+		hit_button.size = size
+		hit_button.custom_minimum_size = size
+
+
+func _on_hit_button_pressed() -> void:
+	pressed.emit()
+
+
+func _apply_hit_button_style() -> void:
+	if hit_button == null:
+		return
+	var empty_style := StyleBoxEmpty.new()
+	for style_name in ["normal", "hover", "pressed", "focus", "disabled"]:
+		hit_button.add_theme_stylebox_override(style_name, empty_style)
+	hit_button.add_theme_color_override("font_color", Color.TRANSPARENT)
+	hit_button.add_theme_color_override("font_hover_color", Color.TRANSPARENT)
+	hit_button.add_theme_color_override("font_pressed_color", Color.TRANSPARENT)
+	hit_button.add_theme_color_override("font_focus_color", Color.TRANSPARENT)
+	hit_button.add_theme_color_override("font_disabled_color", Color.TRANSPARENT)
 
 
 func _update_labels() -> void:

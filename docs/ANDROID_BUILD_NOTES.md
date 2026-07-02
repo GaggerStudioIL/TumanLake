@@ -258,7 +258,57 @@ Godot_v4.6.2-stable_win64_console.exe --display-driver windows --rendering-drive
 - Проверить карточку пойманной рыбы на 960x540 и широком экране: пропорции 4:3, кнопки зачёта/отпускания, отсутствие перекрытий текста.
 - Пройти короткий маршрут: запуск -> заброс -> поклёвка -> вываживание -> карточка улова -> зачёт или отпускание.
 
-## 13. Blocker для отправки
+## 13. 2026-07-02 beta.6 spinning gear and tackle cleanup export
+
+Команда:
+
+```bash
+Godot_v4.6.2-stable_win64_console.exe --display-driver windows --rendering-driver opengl3 --path . --export-debug Android build/RybnoeMesto_0.1.0-beta.6.apk
+```
+
+Перед экспортом проверено:
+
+- `GameVersion.VERSION="0.1.0-beta.6"`.
+- `GameVersion.BUILD_NAME="Spinning Gear & Tackle Cleanup"`.
+- `GameVersion.BUILD_DATE="2026-07-02"`.
+- `BuildConfig.IS_BETA_BUILD = true`.
+- `BuildConfig.ENABLE_ALPHA_TESTER_BONUS = false`.
+- `BuildConfig.ENABLE_DEBUG_PANEL = false`.
+- `BuildConfig.ENABLE_VERBOSE_LOGS = false`.
+- `BuildConfig.SPINNING_ENABLED = true`.
+- `BuildConfig.ENABLE_SPINNING_TEST_MODE = false`.
+- Android preset обновлён на `version/name="0.1.0-beta.6"` и `version/code=550`.
+- Android preset экспортирует `build/RybnoeMesto_0.1.0-beta.6.apk`.
+
+Результат:
+
+- APK собран: `build/RybnoeMesto_0.1.0-beta.6.apk`.
+- Размер: `364361682` bytes.
+- SHA-256: `AFE609F3E037ED2FB6958A5AC7A0BF1FED8D4BA9F8B4C37C5D4E0108E83805E0`.
+- `aapt2 dump badging` показывает package `com.tumanlake.game`, `versionName='0.1.0-beta.6'`, `versionCode='550'`, `minSdkVersion='24'`, `targetSdkVersion='35'`.
+- После экспорта выполнен `tools/patch_android_themed_icon.ps1 -ApkPath build/RybnoeMesto_0.1.0-beta.6.apk`.
+- В APK присутствуют `res/mipmap-anydpi-v26/icon.xml` и `res/mipmap-anydpi-v26/themed_icon.xml`.
+- `apksigner verify --verbose` проходит без ошибок; подпись валидна по APK Signature Scheme v2/v3.
+- APK загружен в Vercel Blob: `https://82soys46zdxg7yh3.public.blob.vercel-storage.com/RybnoeMesto_0.1.0-beta.6.apk`.
+- HEAD-проверка APK URL вернула `200`, `Content-Length=364361682`, `Content-Type=application/vnd.android.package-archive`.
+- Лендинг собран через `npm run build` и задеплоен в production на Vercel; production bundle `https://fishingspotgame.com` содержит ссылку на APK beta.6 и не содержит ссылку beta.5.
+
+Ограничения проверки:
+
+- `adb devices -l` не показал подключённых Android-устройств, поэтому физическая установка APK и ручной tap-through в этом проходе не выполнялись.
+- Godot smoke test завершился с кодом 0 без `SCRIPT ERROR`, но старые warnings про anchors и RID/resource leaks на выходе остаются.
+- `vercel build --prebuilt` на локальном Windows-окружении упал на `spawn cmd.exe ENOENT`; production deploy выполнен обычным `vercel deploy --prod`, remote build завершился успешно.
+
+Ручная проверка перед отправкой:
+
+- Установить APK на Android-устройство.
+- Проверить магазин: вкладки “Удочки”, “Приманки”, “Катушки”, спиннинговые удилища, наборы приманок и level-lock.
+- Проверить сборку спиннинга: удилище, катушка, леска, поводок и приманка; неподходящая катушка должна давать предупреждение/штрафы.
+- Проверить спиннинг: заброс, пустая проводка без улова, возврат к нормальному UI и возможность сменить снасть.
+- Проверить инвентарь: полностью сломанная неремонтируемая снасть удаляется и не остаётся экипированной.
+- Проверить верхнюю XP-панель на телефоне: тап открывает таблицу уровня.
+
+## 14. Blocker для отправки
 
 Не отправлять билд, если:
 

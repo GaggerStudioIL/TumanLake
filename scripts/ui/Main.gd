@@ -557,6 +557,7 @@ var _float_idle_preview_request_id := 0
 var _last_detailed_failure_msec := -100000
 var _first_run_hints_active := false
 var _first_run_hints_shown: Dictionary = {}
+var _spinning_retrieve_active := false
 var reeling_panel_frame: Panel
 var tension_slack_zone: ColorRect
 var tension_warning_zone: ColorRect
@@ -634,6 +635,7 @@ func _process(delta: float) -> void:
 	_update_time_hud()
 	_refresh_condition_hud()
 	_update_depth_hud_visibility_watchdog(delta)
+	_sync_finished_spinning_retrieve_state()
 	_refresh_stop_fishing_button_presentation()
 	_update_current_tackle_hold()
 	_refresh_float_bite_preview_visibility()
@@ -659,6 +661,9 @@ func _refresh_after_application_resumed() -> void:
 
 func _input(event: InputEvent) -> void:
 	if is_modal_open or _is_modal_tap_guard_active():
+		return
+
+	if _handle_player_xp_hud_global_press(event):
 		return
 
 	if _cast_charge_active and _is_cast_charge_release_event(event):
@@ -2146,6 +2151,9 @@ func _ensure_player_xp_hud() -> void:
 	var level_click := Callable(self, "_on_player_xp_hud_gui_input")
 	if not player_xp_hud.gui_input.is_connected(level_click):
 		player_xp_hud.gui_input.connect(level_click)
+	var level_pressed := Callable(self, "_on_player_xp_hud_pressed")
+	if player_xp_hud.has_signal("pressed") and not player_xp_hud.is_connected("pressed", level_pressed):
+		player_xp_hud.connect("pressed", level_pressed)
 
 
 func _layout_player_xp_hud(_screen_size: Vector2, ui_scale: float) -> void:
@@ -2229,6 +2237,36 @@ func _is_primary_ui_press(event: InputEvent) -> bool:
 		return (event as InputEventScreenTouch).pressed
 	return false
 
+func _get_primary_ui_press_position(event: InputEvent) -> Vector2:
+	if event is InputEventMouseButton:
+		var mouse_event := event as InputEventMouseButton
+		if mouse_event.button_index == MOUSE_BUTTON_LEFT and mouse_event.pressed:
+			return mouse_event.position
+	if event is InputEventScreenTouch:
+		var touch_event := event as InputEventScreenTouch
+		if touch_event.pressed:
+			return touch_event.position
+	return Vector2.INF
+
+func _handle_player_xp_hud_global_press(event: InputEvent) -> bool:
+	if not _is_primary_ui_press(event):
+		return false
+	if _should_ignore_base_ui_press():
+		return false
+	if player_xp_hud == null or not player_xp_hud.visible or not player_xp_hud.is_visible_in_tree():
+		return false
+
+	var press_position := _get_primary_ui_press_position(event)
+	if not press_position.is_finite():
+		return false
+	var tap_rect := player_xp_hud.get_global_rect().grow(8.0)
+	if not tap_rect.has_point(press_position):
+		return false
+
+	_open_level_progress_popup()
+	get_viewport().set_input_as_handled()
+	return true
+
 func _on_top_profile_panel_gui_input(event: InputEvent) -> void:
 	if not _is_primary_ui_press(event):
 		return
@@ -2250,6 +2288,10 @@ func _on_top_weather_panel_gui_input(event: InputEvent) -> void:
 func _on_player_xp_hud_gui_input(event: InputEvent) -> void:
 	if not _is_primary_ui_press(event):
 		return
+	_open_level_progress_popup()
+	get_viewport().set_input_as_handled()
+
+func _on_player_xp_hud_pressed() -> void:
 	_open_level_progress_popup()
 	get_viewport().set_input_as_handled()
 
@@ -9011,6 +9053,7 @@ func _cancel_current_fishing_wait() -> void:
 	_presence_bite_timer = 0.0
 	_presence_caught_timer = 0.0
 	_fishing_ui_state = FishingUiState.IDLE
+	_clear_spinning_retrieve_tracking()
 	if fishing_presence_ui != null:
 		if fishing_presence_ui.has_method("set_rod_uncasted"):
 			fishing_presence_ui.set_rod_uncasted()
@@ -9023,6 +9066,60 @@ func _cancel_current_fishing_wait() -> void:
 	_hide_float_bite_preview()
 	_reset_reeling_ui()
 	_update_ui()
+
+
+func _clear_spinning_retrieve_tracking() -> void:
+	_spinning_retrieve_active = false
+	if str(_last_reeling_state.get("phase", "")) != "retrieve":
+		return
+	_last_reeling_state["phase"] = "idle"
+	_last_reeling_state["retrieve_progress"] = 0.0
+	_last_reeling_state["progress"] = 0.0
+	_last_reeling_state["reel_handle_speed"] = 0.0
+	_last_reeling_state["input_active"] = false
+
+
+func _finish_empty_spinning_retrieve_ui(state: Dictionary = {}) -> void:
+	_hide_float_bite_preview()
+	if not state.is_empty():
+		_apply_lure_retrieve_state(state)
+	_pending_reward_catch = {}
+	_pending_cast_spot_id = ""
+	_pending_cast_valid = true
+	_pending_cast_depth_context = {}
+	is_cast_animating = false
+	_presence_bite_timer = 0.0
+	_presence_caught_timer = 0.0
+	_fishing_ui_state = FishingUiState.IDLE
+	_cast_button_pressed = false
+	_fish_button_pointer_action_active = false
+	_clear_spinning_retrieve_tracking()
+	FishingManager.set_reel_input(false)
+	if fishing_presence_ui != null:
+		if fishing_presence_ui.has_method("set_rod_uncasted"):
+			fishing_presence_ui.set_rod_uncasted()
+		else:
+			fishing_presence_ui.stop_cast_visual()
+	timer_label.text = "Готов к забросу"
+	result_label.text = "Проводка закончилась без поклёвки. Забрось снова."
+	fight_status_label.text = "Спиннинг готов к следующему забросу."
+	_reset_reeling_ui()
+	_update_ui()
+
+
+func _sync_finished_spinning_retrieve_state() -> void:
+	if _fishing_ui_state != FishingUiState.WAITING:
+		return
+	if not _spinning_retrieve_active:
+		return
+	if not _is_reel_tackle_mode():
+		return
+	if is_cast_animating or _is_catch_reward_open():
+		return
+	if bool(FishingManager.get("is_fishing")) or bool(FishingManager.get("is_reeling")):
+		return
+
+	_finish_empty_spinning_retrieve_ui()
 
 
 func _on_reel_button_down() -> void:
@@ -9784,6 +9881,7 @@ func _return_to_idle_after_result() -> void:
 	_presence_bite_timer = 0.0
 	_presence_caught_timer = 0.0
 	_fishing_ui_state = FishingUiState.IDLE
+	_clear_spinning_retrieve_tracking()
 	timer_label.text = "Готов к забросу"
 	result_label.text = "Удочка вытянута. Можно забрасывать снова."
 	_reset_reeling_ui()
@@ -10012,6 +10110,7 @@ func _play_float_bite_preview_take(style: String, data: Dictionary) -> void:
 
 func _on_lure_retrieve_started(state: Dictionary) -> void:
 	_hide_float_bite_preview()
+	_spinning_retrieve_active = true
 	_fishing_ui_state = FishingUiState.WAITING
 	_presence_bite_timer = 0.0
 	_presence_caught_timer = 0.0
@@ -10024,6 +10123,7 @@ func _on_lure_retrieve_started(state: Dictionary) -> void:
 func _on_lure_retrieve_updated(state: Dictionary) -> void:
 	if _fishing_ui_state != FishingUiState.WAITING:
 		return
+	_spinning_retrieve_active = true
 	_apply_lure_retrieve_state(state)
 	var progress: float = clamp(float(state.get("retrieve_progress", 0.0)), 0.0, 1.0)
 	var input_active: bool = bool(state.get("input_active", false))
@@ -10040,18 +10140,7 @@ func _on_lure_retrieve_updated(state: Dictionary) -> void:
 	_update_cast_button_visual()
 
 func _on_lure_retrieve_finished(state: Dictionary) -> void:
-	_hide_float_bite_preview()
-	_apply_lure_retrieve_state(state)
-	_fishing_ui_state = FishingUiState.IDLE
-	_presence_bite_timer = 0.0
-	_presence_caught_timer = 0.0
-	if fishing_presence_ui != null and fishing_presence_ui.has_method("set_rod_uncasted"):
-		fishing_presence_ui.set_rod_uncasted()
-	timer_label.text = "Готов к забросу"
-	result_label.text = "Проводка закончилась без поклёвки. Забрось снова."
-	fight_status_label.text = "Спиннинг готов к следующему забросу."
-	_reset_reeling_ui()
-	_update_ui()
+	_finish_empty_spinning_retrieve_ui(state)
 
 func _apply_lure_retrieve_state(state: Dictionary) -> void:
 	_last_reeling_state = state.duplicate(true)
@@ -10118,6 +10207,7 @@ func _on_hook_failed(reason: String, data: Dictionary) -> void:
 		fishing_presence_ui.play_hook_result(false, reason)
 	if ends_fishing:
 		_hide_float_bite_preview()
+		_clear_spinning_retrieve_tracking()
 		if fishing_presence_ui != null:
 			if fishing_presence_ui.has_method("set_rod_uncasted"):
 				fishing_presence_ui.set_rod_uncasted()
@@ -10131,6 +10221,7 @@ func _on_hook_failed(reason: String, data: Dictionary) -> void:
 
 func _on_reeling_started(catch_data: Dictionary, state: Dictionary) -> void:
 	_hide_float_bite_preview()
+	_clear_spinning_retrieve_tracking()
 	if not bool(FishingManager.get("use_new_bite_system")):
 		_call_audio_manager("play_bite")
 	_presence_bite_timer = 0.95
@@ -10161,6 +10252,7 @@ func _on_reeling_updated(state: Dictionary) -> void:
 func _on_fish_caught(catch_data: Dictionary) -> void:
 	_call_audio_manager("play_catch_success")
 	_hide_float_bite_preview()
+	_clear_spinning_retrieve_tracking()
 	_presence_bite_timer = 0.0
 	_presence_caught_timer = 1.1
 	_fishing_ui_state = FishingUiState.CAUGHT
@@ -10203,6 +10295,7 @@ func _on_fish_caught(catch_data: Dictionary) -> void:
 func _on_fishing_failed_detailed(failure_data: Dictionary) -> void:
 	_play_line_break_sfx_if_needed(failure_data)
 	_hide_float_bite_preview()
+	_clear_spinning_retrieve_tracking()
 	_last_detailed_failure_msec = Time.get_ticks_msec()
 	_pending_reward_catch = {}
 	_hide_catch_reward_popup(false)
@@ -10235,6 +10328,7 @@ func _on_fishing_failed(message: String) -> void:
 		_call_audio_manager("play_line_break")
 
 	_hide_float_bite_preview()
+	_clear_spinning_retrieve_tracking()
 	_pending_reward_catch = {}
 	_hide_catch_reward_popup(false)
 	_presence_bite_timer = 0.0

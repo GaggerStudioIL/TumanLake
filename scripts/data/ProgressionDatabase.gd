@@ -127,6 +127,48 @@ const REEL_REQUIRED_LEVELS := {
 	"oceanbull_force_8000": 30
 }
 
+const SPINNING_ROD_REQUIRED_LEVELS := {
+	"fishpoint_start_spin_210_ul": 8,
+	"fishpoint_start_spin_220_l": 9,
+	"fishpoint_start_spin_240_ml": 11,
+	"nordlake_basic_spin_210_ul": 9,
+	"nordlake_basic_spin_230_l": 11,
+	"nordlake_basic_spin_250_ml": 13,
+	"aerospin_swift_180_ul": 8,
+	"aerospin_swift_210_l": 10,
+	"aerospin_swift_230_ml": 14,
+	"riverfox_twitch_210_l": 11,
+	"riverfox_twitch_220_ml": 14,
+	"riverfox_twitch_240_m": 18,
+	"silvercast_jigpro_220_ml": 14,
+	"silvercast_jigpro_240_m": 18,
+	"silvercast_jigpro_260_h": 23,
+	"lakemaster_balance_spin_210_l": 10,
+	"lakemaster_balance_spin_240_ml": 13,
+	"lakemaster_balance_spin_270_m": 17,
+	"lakemaster_balance_spin_300_h": 22,
+	"fjordline_universal_spin_220_l": 12,
+	"fjordline_universal_spin_250_ml": 15,
+	"fjordline_universal_spin_270_m": 19,
+	"fjordline_universal_spin_300_h": 24,
+	"blackriver_control_spin_210_ul": 14,
+	"blackriver_control_spin_230_l": 16,
+	"blackriver_control_spin_250_ml": 20,
+	"blackriver_control_spin_270_m": 24,
+	"goldenfish_allround_spin_220_l": 16,
+	"goldenfish_allround_spin_250_ml": 19,
+	"goldenfish_allround_spin_270_m": 23,
+	"goldenfish_allround_spin_300_h": 27,
+	"bluepeak_river_spin_240_ml": 17,
+	"bluepeak_river_spin_270_m": 21,
+	"bluepeak_river_spin_300_h": 26,
+	"irondrag_pike_hunter_260_m": 22,
+	"irondrag_pike_hunter_280_h": 26,
+	"irondrag_pike_hunter_300_xh": 29,
+	"oceanbull_monster_spin_270_h": 28,
+	"oceanbull_monster_spin_300_xh": 30
+}
+
 const LEVEL_REWARDS := {
 	2: {
 		"silver": 25,
@@ -276,6 +318,8 @@ func get_item_required_level(item_id: String, item_data: Dictionary = {}) -> int
 		required_level = max(required_level, int(ITEM_REQUIRED_LEVELS[item_id]))
 	if REEL_REQUIRED_LEVELS.has(item_id):
 		required_level = max(required_level, int(REEL_REQUIRED_LEVELS[item_id]))
+	if SPINNING_ROD_REQUIRED_LEVELS.has(item_id):
+		required_level = max(required_level, int(SPINNING_ROD_REQUIRED_LEVELS[item_id]))
 
 	var category := str(item_data.get("category", item_data.get("type", ""))).strip_edges().to_lower()
 	var stats := _get_item_stats(item_data)
@@ -343,7 +387,10 @@ func get_contract_lock_text(difficulty: String = "easy") -> String:
 
 func get_item_lock_text(item_id: String, item_data: Dictionary = {}) -> String:
 	if _is_spinning_item(item_data):
-		return "Спиннинг откроется на LVL %d" % get_feature_unlock_level("spinning")
+		var item_level := get_item_required_level(item_id, item_data)
+		if item_level <= get_feature_unlock_level("spinning"):
+			return "Спиннинг откроется на LVL %d" % get_feature_unlock_level("spinning")
+		return "Доступно с LVL %d" % item_level
 	return "Доступно с LVL %d" % get_item_required_level(item_id, item_data)
 
 
@@ -368,12 +415,12 @@ func _is_spinning_item(item_data: Dictionary) -> bool:
 
 func _get_rod_required_level(item_data: Dictionary, stats: Dictionary) -> int:
 	if _is_spinning_item(item_data):
-		var rod_class := str(stats.get("rod_class", "light")).strip_edges().to_lower()
-		if rod_class == "medium":
-			return 12
-		if rod_class == "heavy" or rod_class == "extra_heavy":
-			return 14
-		return 8
+		var item_id := str(item_data.get("id", "")).strip_edges()
+		if ITEM_REQUIRED_LEVELS.has(item_id):
+			return int(ITEM_REQUIRED_LEVELS[item_id])
+		if SPINNING_ROD_REQUIRED_LEVELS.has(item_id):
+			return int(SPINNING_ROD_REQUIRED_LEVELS[item_id])
+		return _get_spinning_rod_required_level(stats)
 
 	var rod_class := str(stats.get("rod_class", "light")).strip_edges().to_lower()
 	var max_fish_weight := float(stats.get("max_fish_weight", 1.0))
@@ -391,6 +438,23 @@ func _get_rod_required_level(item_data: Dictionary, stats: Dictionary) -> int:
 		"extra_heavy":
 			return 15
 	return 1
+
+
+func _get_spinning_rod_required_level(stats: Dictionary) -> int:
+	var test_max := float(stats.get("test_max_g", stats.get("test_max", stats.get("lure_test_max_g", 10.0))))
+	var rod_class := str(stats.get("rod_class", "light")).strip_edges().to_lower()
+
+	if rod_class == "extra_heavy" or test_max >= 80.0:
+		return 29
+	if rod_class == "heavy" or test_max >= 45.0:
+		return 22
+	if rod_class == "medium" or test_max >= 25.0:
+		return 17
+	if rod_class == "medium_light" or test_max >= 15.0:
+		return 12
+	if rod_class == "light" or test_max >= 10.0:
+		return 9
+	return 8
 
 
 func _get_reel_required_level(stats: Dictionary) -> int:

@@ -3,6 +3,7 @@ extends Node
 const PlayerAvatarData := preload("res://scripts/data/PlayerAvatarData.gd")
 const SpinningLureDatabaseScript := preload("res://scripts/data/SpinningLureDatabase.gd")
 const ReelDatabaseScript := preload("res://scripts/data/ReelDatabase.gd")
+const SpinningRodDatabaseScript := preload("res://scripts/data/SpinningRodDatabase.gd")
 
 const PHYSICAL_SHORE_MIN_DEPTH := 0.16
 const BASIC_FLOAT_ID := "float_drop_basic"
@@ -4030,6 +4031,7 @@ const RESCUE_KIT_FALLBACK_HOOK_ID := "small_hook_12"
 const REPAIR_COST_MULTIPLIER := 0.35
 const REPAIR_BLOCK_WEAR_PERCENT := 90
 const BROKEN_WEAR_PERCENT := 100
+const AUTO_REMOVE_EMPTY_TACKLE_CATEGORIES := ["rod", "reel", "line", "leader", "hook", "float", "lure"]
 const SPINNING_RETRIEVE_SPEED_MIN := 1
 const SPINNING_RETRIEVE_SPEED_MAX := 50
 const DEFAULT_SPINNING_RETRIEVE_SPEED := 25
@@ -5497,6 +5499,9 @@ func _get_raw_tackle_catalog_item(item_id: String) -> Dictionary:
 	var reel_catalog := ReelDatabaseScript.get_reel_catalog()
 	if reel_catalog.has(item_id):
 		return reel_catalog[item_id]
+	var spinning_rod_catalog := SpinningRodDatabaseScript.get_rod_catalog()
+	if spinning_rod_catalog.has(item_id):
+		return spinning_rod_catalog[item_id]
 	var spinning_lure_catalog := SpinningLureDatabaseScript.get_lure_catalog()
 	if spinning_lure_catalog.has(item_id):
 		return spinning_lure_catalog[item_id]
@@ -5539,7 +5544,7 @@ func get_tackle_catalog_item(item_id: String) -> Dictionary:
 func get_tackle_catalog_items(type_filter: String = "all") -> Array:
 	var items: Array = []
 
-	for catalog in [TACKLE_CATALOG, ADDITIONAL_BAIT_CATALOG, ReelDatabaseScript.get_reel_catalog(), SpinningLureDatabaseScript.get_lure_catalog()]:
+	for catalog in [TACKLE_CATALOG, ADDITIONAL_BAIT_CATALOG, ReelDatabaseScript.get_reel_catalog(), SpinningRodDatabaseScript.get_rod_catalog(), SpinningLureDatabaseScript.get_lure_catalog()]:
 		for item_id in catalog.keys():
 			var item: Dictionary = _normalize_catalog_item(catalog[item_id])
 			var item_type := str(item.get("type", item.get("category", "misc")))
@@ -6540,6 +6545,8 @@ func set_current_tackle(saved_tackle: Dictionary) -> void:
 			for key in ["tackle_type", "fishing_type", "assembly_type", "rod_type"]:
 				if slot_catalog_item.has(key) and not merged_component.has(key):
 					merged_component[key] = str(slot_catalog_item.get(key, ""))
+		if AUTO_REMOVE_EMPTY_TACKLE_CATEGORIES.has(slot_category) and _get_owned_item_quantity(str(merged_component.get("id", ""))) <= 0:
+			continue
 		if _is_beta_hidden_tackle_item(merged_component) or get_equip_block_reason(merged_component, slot) != "":
 			continue
 		current_tackle[slot] = merged_component
@@ -6565,6 +6572,8 @@ func set_owned_items(saved_items: Array) -> void:
 
 		if normalized_item["id"] == "":
 			continue
+		if _should_auto_remove_tackle_item(normalized_item):
+			continue
 
 		owned_items.append(normalized_item)
 
@@ -6574,6 +6583,7 @@ func set_owned_items(saved_items: Array) -> void:
 		_ensure_default_float_owned()
 		_ensure_default_leader_owned()
 		_ensure_starter_reel_tackle_owned()
+		prune_broken_tackle_items()
 
 func _ensure_default_float_owned() -> void:
 	if _has_owned_category("float"):
@@ -6735,14 +6745,25 @@ func get_reel_compatibility_issue(reel: Dictionary, rod: Dictionary = {}) -> Str
 		return "На маховую удочку катушка не ставится."
 	if reel.is_empty() or str(reel.get("id", "")) == "":
 		return "Катушка не выбрана."
+	return ""
+
+func get_reel_compatibility_warning(reel: Dictionary, rod: Dictionary = {}) -> String:
+	var rod_data := rod.duplicate(true) if not rod.is_empty() else get_current_rod_data()
+	if rod_data.is_empty():
+		return ""
+	rod_data = _normalize_equipment_stats(rod_data, "rod", str(rod_data.get("id", "")))
+	if not bool(rod_data.get("requires_reel", false)):
+		return ""
+	if reel.is_empty() or str(reel.get("id", "")) == "":
+		return ""
 	var reel_data := _normalize_equipment_stats(reel.duplicate(true), "reel", str(reel.get("id", "")))
 	var reel_size := int(reel_data.get("reel_size", 0))
 	var min_size := int(rod_data.get("compatible_reel_min_size", rod_data.get("compatible_reel_min", 0)))
 	var max_size := int(rod_data.get("compatible_reel_max_size", rod_data.get("compatible_reel_max", 0)))
 	if min_size > 0 and reel_size < min_size:
-		return "Размер катушки меньше диапазона удилища (%d-%d)." % [min_size, max_size]
+		return "Катушка меньше рекомендуемого диапазона удилища (%d-%d): выше риск обрыва и хуже контроль рыбы." % [min_size, max_size]
 	if max_size > 0 and reel_size > max_size:
-		return "Размер катушки больше диапазона удилища (%d-%d)." % [min_size, max_size]
+		return "Катушка больше рекомендуемого диапазона удилища (%d-%d): ниже чувствительность и удобство снасти." % [min_size, max_size]
 	return ""
 
 func _get_tackle_type_from_item(item: Dictionary) -> String:
@@ -7012,6 +7033,20 @@ func is_item_repairable(item: Dictionary) -> bool:
 func can_discard_item(item: Dictionary) -> bool:
 	return not item.is_empty() and _is_durable_tackle_category(str(item.get("category", ""))) and get_item_wear_percent(item) >= BROKEN_WEAR_PERCENT
 
+func prune_broken_tackle_items() -> int:
+	var removed_count := 0
+	for i in range(owned_items.size() - 1, -1, -1):
+		if typeof(owned_items[i]) != TYPE_DICTIONARY:
+			continue
+		var item: Dictionary = owned_items[i]
+		if not _should_auto_remove_tackle_item(item):
+			continue
+		var item_id := str(item.get("id", ""))
+		owned_items.remove_at(i)
+		_clear_current_tackle_item(item_id)
+		removed_count += 1
+	return removed_count
+
 func get_item_wear_percent(item: Dictionary) -> int:
 	if item.is_empty():
 		return 0
@@ -7092,6 +7127,69 @@ func discard_owned_item(item_id: String) -> Dictionary:
 
 func _is_durable_tackle_category(category: String) -> bool:
 	return ["rod", "reel", "line", "leader", "hook", "lure"].has(category)
+
+func _should_auto_remove_tackle_item(item: Dictionary) -> bool:
+	if item.is_empty():
+		return false
+	var category := str(item.get("category", item.get("type", "")))
+	if AUTO_REMOVE_EMPTY_TACKLE_CATEGORIES.has(category) and int(item.get("quantity", 0)) <= 0:
+		return true
+	return _is_durable_tackle_category(category) and get_item_wear_percent(item) >= BROKEN_WEAR_PERCENT
+
+func _clear_current_tackle_item(item_id: String) -> void:
+	if item_id == "":
+		return
+	var rod_removed := false
+	for slot in TACKLE_SLOTS:
+		if not current_tackle.has(slot):
+			continue
+		var component = current_tackle.get(slot, {})
+		if typeof(component) != TYPE_DICTIONARY:
+			continue
+		if str(component.get("id", "")) != item_id:
+			continue
+		current_tackle[slot] = {}
+		if slot == "rod":
+			rod_removed = true
+	if rod_removed:
+		for dependent_slot in ["reel", "lure", "feeder_rig", "hook_or_lure", "sinker_or_rig"]:
+			if current_tackle.has(dependent_slot):
+				current_tackle[dependent_slot] = {}
+
+func _remove_owned_tackle_item(item_id: String) -> bool:
+	if item_id == "":
+		return false
+	var removed := false
+	for i in range(owned_items.size() - 1, -1, -1):
+		if typeof(owned_items[i]) != TYPE_DICTIONARY:
+			continue
+		var item: Dictionary = owned_items[i]
+		if str(item.get("id", "")) != item_id:
+			continue
+		var category := str(item.get("category", item.get("type", "")))
+		if not AUTO_REMOVE_EMPTY_TACKLE_CATEGORIES.has(category):
+			continue
+		owned_items.remove_at(i)
+		removed = true
+	if removed:
+		_clear_current_tackle_item(item_id)
+	return removed
+
+func _mark_removed_tackle_wear_result(result: Dictionary, slot: String) -> void:
+	result["%s_removed" % slot] = true
+	match slot:
+		"rod":
+			result["rod_broken"] = true
+		"reel":
+			result["reel_broken"] = true
+		"line":
+			result["line_broken"] = true
+		"leader":
+			result["leader_broken"] = true
+		"hook":
+			result["hook_lost"] = true
+		"lure":
+			result["lure_lost"] = true
 
 func has_usable_basic_tackle() -> bool:
 	for slot in get_required_tackle_slots():
@@ -7351,6 +7449,9 @@ func _set_owned_item_durability(item_id: String, durability: float) -> void:
 		var stats: Dictionary = _normalize_equipment_stats(item.get("stats", {}).duplicate(true), category, item_id)
 		stats["durability"] = clamp(durability, 0.0, 1.0)
 		item["stats"] = stats
+		if _should_auto_remove_tackle_item(item):
+			_remove_owned_tackle_item(item_id)
+			return
 		_refresh_current_tackle_from_owned_item(item)
 		return
 
@@ -7401,13 +7502,16 @@ func get_tackle_setup_status_text() -> String:
 	return "Снасть не готова:\n- %s" % "\n- ".join(issues)
 
 func get_tackle_setup_warnings() -> Array:
+	var result: Array = []
 	var profile := _build_current_tackle_weight_profile()
-	if profile.is_empty():
-		return []
-	var warnings = profile.get("warnings", [])
-	if warnings is Array:
-		return (warnings as Array).duplicate()
-	return []
+	if not profile.is_empty():
+		var warnings = profile.get("warnings", [])
+		if warnings is Array:
+			result = (warnings as Array).duplicate()
+	var reel_warning := get_reel_compatibility_warning(get_current_reel_data(), get_current_rod_data())
+	if reel_warning != "" and not result.has(reel_warning):
+		result.append(reel_warning)
+	return result
 
 func _get_tackle_weight_block_reason() -> String:
 	var profile := _build_current_tackle_weight_profile()
@@ -7770,6 +7874,8 @@ func apply_tackle_wear(wear: Dictionary) -> Dictionary:
 			result["lure_lost"] = true
 			result["lure_new_quantity"] = remaining_spent_lures
 			new_condition = 1.0 if remaining_spent_lures > 0 else 0.0
+		if new_condition <= 0.0:
+			_mark_removed_tackle_wear_result(result, slot)
 
 		current_tackle[slot]["durability"] = new_condition
 		_set_owned_item_durability(item_id, new_condition)
@@ -7780,13 +7886,17 @@ func apply_tackle_wear(wear: Dictionary) -> Dictionary:
 		if float_id != "":
 			var remaining_floats := _change_owned_item_quantity(float_id, -1)
 			result["float_new_quantity"] = remaining_floats
+			if remaining_floats <= 0:
+				result["float_removed"] = _remove_owned_tackle_item(float_id)
 
 	return result
 
 func get_current_tackle_save_data() -> Dictionary:
+	prune_broken_tackle_items()
 	return current_tackle.duplicate(true)
 
 func get_owned_items_save_data() -> Array:
+	prune_broken_tackle_items()
 	var items: Array = []
 
 	for item in owned_items:
@@ -8080,6 +8190,32 @@ func get_tackle_stats() -> Dictionary:
 	var rig_weight_profile := _build_tackle_weight_profile(rod, leader, float_part, hook, bait, second_bait, lure, tackle_type_key)
 	var rig_bite_detection_penalty: float = clamp(float(rig_weight_profile.get("rig_bite_detection_penalty", 0.0)), 0.0, 0.08)
 	var line_break_risk_bonus: float = clamp(float(rig_weight_profile.get("line_break_risk_bonus", 0.0)), 0.0, 0.30)
+	var rig_warnings: Array = []
+	var raw_rig_warnings = rig_weight_profile.get("warnings", [])
+	if raw_rig_warnings is Array:
+		rig_warnings = (raw_rig_warnings as Array).duplicate()
+	var reel_compatibility_warning := ""
+	var reel_size_balance_state := "ok"
+	if rod_requires_reel and not reel.is_empty():
+		reel_compatibility_warning = get_reel_compatibility_warning(reel, rod)
+		if reel_compatibility_warning != "":
+			if not rig_warnings.has(reel_compatibility_warning):
+				rig_warnings.append(reel_compatibility_warning)
+			var reel_size := int(reel.get("reel_size", 0))
+			var min_reel_size := int(rod.get("compatible_reel_min_size", rod.get("compatible_reel_min", 0)))
+			var max_reel_size := int(rod.get("compatible_reel_max_size", rod.get("compatible_reel_max", 0)))
+			if min_reel_size > 0 and reel_size < min_reel_size:
+				reel_size_balance_state = "too_small"
+				var small_reel_severity: float = clampf(float(min_reel_size - reel_size) / maxf(float(min_reel_size), 1.0), 0.0, 0.60)
+				line_break_risk_bonus = clampf(line_break_risk_bonus + 0.04 + small_reel_severity * 0.12, 0.0, 0.42)
+				rod_tension_bonus *= clampf(0.86 - small_reel_severity * 0.18, 0.72, 0.92)
+			elif max_reel_size > 0 and reel_size > max_reel_size:
+				reel_size_balance_state = "too_large"
+				var large_reel_severity: float = clampf(float(reel_size - max_reel_size) / maxf(float(max_reel_size), 1.0), 0.0, 0.80)
+				var large_reel_handling_penalty: float = 0.02 + large_reel_severity * 0.05
+				rod_handling_bonus -= large_reel_handling_penalty
+				rod_tension_bonus -= large_reel_handling_penalty * 0.60
+				bite_detection_bonus -= 0.04 + large_reel_severity * 0.05
 	effective_break_chance = clamp(effective_break_chance + line_break_risk_bonus, 0.0, 1.0)
 	bite_detection_bonus = max(bite_detection_bonus - heavy_bait_penalty * 0.35 - rig_bite_detection_penalty, -0.18)
 
@@ -8107,7 +8243,9 @@ func get_tackle_stats() -> Dictionary:
 		"rig_overload_ratio": float(rig_weight_profile.get("rig_overload_ratio", 0.0)),
 		"rig_underload_ratio": float(rig_weight_profile.get("rig_underload_ratio", 1.0)),
 		"rig_warning": str(rig_weight_profile.get("primary_warning", "")),
-		"rig_warnings": rig_weight_profile.get("warnings", []),
+		"rig_warnings": rig_warnings,
+		"reel_compatibility_warning": reel_compatibility_warning,
+		"reel_size_balance_state": reel_size_balance_state,
 		"rig_cast_accuracy_multiplier": float(rig_weight_profile.get("rig_cast_accuracy_multiplier", 1.0)),
 		"rig_cast_distance_bonus": float(rig_weight_profile.get("rig_cast_distance_bonus", 0.0)),
 		"rig_bite_chance_multiplier": float(rig_weight_profile.get("rig_bite_chance_multiplier", 1.0)),

@@ -24,6 +24,9 @@ var _lure_filter := "all"
 var _reel_filter_row: Control
 var _reel_filter_buttons: Dictionary = {}
 var _reel_filter := "all"
+var _rod_filter_row: Control
+var _rod_filter_buttons: Dictionary = {}
+var _rod_filter := "all"
 var _shop_items_base_position := Vector2.ZERO
 var _shop_items_base_size := Vector2.ZERO
 var _shop_items_base_rect_valid := false
@@ -83,6 +86,20 @@ const REEL_FILTERS := [
 	{"id": "universal", "title": "Универсальные"},
 	{"id": "feeder", "title": "Пикер / фидер"},
 	{"id": "power", "title": "Силовые"}
+]
+const ROD_FILTERS := [
+	{"id": "all", "title": "Все"},
+	{"id": "ultra_light", "title": "UL"},
+	{"id": "light", "title": "Light"},
+	{"id": "medium_light", "title": "Medium Light"},
+	{"id": "medium", "title": "Medium"},
+	{"id": "heavy", "title": "Heavy"},
+	{"id": "extra_heavy", "title": "Extra Heavy"},
+	{"id": "starter", "title": "Стартовые"},
+	{"id": "universal", "title": "Универсальные"},
+	{"id": "jig", "title": "Джиг"},
+	{"id": "twitching", "title": "Твичинг"},
+	{"id": "trophy", "title": "Трофейные"}
 ]
 const BAIT_PACK_QUANTITIES := {
 	"worm": 10,
@@ -348,10 +365,12 @@ func _on_shop_buy_pressed(item_id: String) -> void:
 
 func _get_shop_items_for_category(category: String) -> Array:
 	if category == SHOP_CATEGORY_TACKLE:
-		return _get_tackle_shop_items_for_type(SHOP_CATEGORY_ROD)
+		return _get_rod_shop_items()
 	if category == SHOP_CATEGORY_REEL:
 		return _get_reel_shop_items()
-	if [SHOP_CATEGORY_ROD, SHOP_CATEGORY_LINE, SHOP_CATEGORY_LEADER, SHOP_CATEGORY_HOOK, SHOP_CATEGORY_FLOAT].has(category):
+	if category == SHOP_CATEGORY_ROD:
+		return _get_rod_shop_items()
+	if [SHOP_CATEGORY_LINE, SHOP_CATEGORY_LEADER, SHOP_CATEGORY_HOOK, SHOP_CATEGORY_FLOAT].has(category):
 		return _get_tackle_shop_items_for_type(category)
 	if category == SHOP_CATEGORY_LURE:
 		return _get_lure_shop_items()
@@ -376,6 +395,16 @@ func _get_tackle_shop_items_for_type(category: String) -> Array:
 			items.append(item.duplicate(true))
 	if category == SHOP_CATEGORY_ROD:
 		items.sort_custom(_sort_rod_shop_items)
+	return items
+
+func _get_rod_shop_items() -> Array:
+	var items: Array = []
+	for item in _get_tackle_shop_items_for_type(SHOP_CATEGORY_ROD):
+		if not _does_rod_match_filter(item):
+			continue
+		items.append(item)
+
+	items.sort_custom(_sort_rod_shop_items)
 	return items
 
 func _get_reel_shop_items() -> Array:
@@ -531,8 +560,13 @@ func _get_lure_filter_sort_key(item: Dictionary) -> int:
 			return 9
 
 func _sort_rod_shop_items(a: Dictionary, b: Dictionary) -> bool:
-	var series_a := _get_rod_series_order(str(a.get("id", "")))
-	var series_b := _get_rod_series_order(str(b.get("id", "")))
+	var level_a := _get_shop_item_required_level(a)
+	var level_b := _get_shop_item_required_level(b)
+	if level_a != level_b:
+		return level_a < level_b
+
+	var series_a := str(a.get("series", a.get("name", "")))
+	var series_b := str(b.get("series", b.get("name", "")))
 	if series_a != series_b:
 		return series_a < series_b
 
@@ -542,6 +576,29 @@ func _sort_rod_shop_items(a: Dictionary, b: Dictionary) -> bool:
 		return number_a < number_b
 
 	return float(a.get("price", 0.0)) < float(b.get("price", 0.0))
+
+func _does_rod_match_filter(item: Dictionary) -> bool:
+	if _rod_filter == "" or _rod_filter == "all":
+		return true
+	if not _is_spinning_rod_item(item):
+		return false
+
+	var stats: Dictionary = item.get("stats", {}) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
+	var rod_class := str(stats.get("rod_class", "")).strip_edges().to_lower()
+	if rod_class == _rod_filter:
+		return true
+
+	var filter_tags: Array = stats.get("filter_tags", []) if typeof(stats.get("filter_tags", [])) == TYPE_ARRAY else []
+	for tag in filter_tags:
+		if str(tag).strip_edges().to_lower() == _rod_filter:
+			return true
+
+	var compatible_methods: Array = stats.get("compatible_methods", item.get("compatible_methods", [])) if typeof(stats.get("compatible_methods", item.get("compatible_methods", []))) == TYPE_ARRAY else []
+	for method in compatible_methods:
+		if str(method).strip_edges().to_lower() == _rod_filter:
+			return true
+
+	return false
 
 func _get_rod_series_order(item_id: String) -> int:
 	if item_id.begins_with("green_line_"):
@@ -722,6 +779,7 @@ func _ensure_shop_ui_nodes() -> void:
 	main.shop_float_category_button.text = "Поплавки"
 	main.shop_panel.add_child(main.shop_float_category_button)
 
+	_create_rod_filter_row()
 	_create_lure_filter_row()
 	_create_reel_filter_row()
 
@@ -797,6 +855,27 @@ func _create_reel_filter_row() -> void:
 		_reel_filter_buttons[filter_id] = button
 
 
+func _create_rod_filter_row() -> void:
+	_rod_filter_row = Control.new()
+	_rod_filter_row.name = "ShopRodFilterRow"
+	_rod_filter_row.visible = false
+	_rod_filter_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	main.shop_panel.add_child(_rod_filter_row)
+
+	_rod_filter_buttons.clear()
+	for filter in ROD_FILTERS:
+		var filter_id := str(filter.get("id", ""))
+		var button := Button.new()
+		button.name = "RodFilter_%s" % filter_id
+		button.text = str(filter.get("title", filter_id))
+		button.toggle_mode = true
+		button.clip_text = true
+		button.mouse_filter = Control.MOUSE_FILTER_STOP
+		button.pressed.connect(_set_rod_filter.bind(filter_id))
+		_rod_filter_row.add_child(button)
+		_rod_filter_buttons[filter_id] = button
+
+
 func _set_lure_filter(filter_id: String) -> void:
 	_lure_filter = filter_id if filter_id != "" else "all"
 	main._shop_page = 0
@@ -809,6 +888,51 @@ func _set_reel_filter(filter_id: String) -> void:
 	main._shop_page = 0
 	_reset_shop_scroll_to_top()
 	_update_shop_ui()
+
+
+func _set_rod_filter(filter_id: String) -> void:
+	_rod_filter = filter_id if filter_id != "" else "all"
+	main._shop_page = 0
+	_reset_shop_scroll_to_top()
+	_update_shop_ui()
+
+
+func _layout_rod_filter_row(show_filters: bool) -> void:
+	if _rod_filter_row == null or not is_instance_valid(_rod_filter_row) or main.shop_items_scroll == null:
+		return
+
+	if show_filters:
+		if not _shop_items_base_rect_valid or not _rod_filter_row.visible:
+			_shop_items_base_position = main.shop_items_scroll.position
+			_shop_items_base_size = main.shop_items_scroll.size
+			_shop_items_base_rect_valid = true
+		var filter_height := 66.0
+		var filter_gap := 6.0
+		var columns := 6
+		var rows := 2
+		_rod_filter_row.visible = true
+		_rod_filter_row.position = _shop_items_base_position
+		_rod_filter_row.size = Vector2(_shop_items_base_size.x, filter_height)
+		var button_width := (_rod_filter_row.size.x - filter_gap * float(columns - 1)) / float(columns)
+		var button_height := (filter_height - filter_gap * float(rows - 1)) / float(rows)
+		for i in range(ROD_FILTERS.size()):
+			var filter: Dictionary = ROD_FILTERS[i]
+			var button: Button = _rod_filter_buttons.get(str(filter.get("id", "")), null)
+			if button == null:
+				continue
+			var column := i % columns
+			var row := int(i / columns)
+			button.position = Vector2(float(column) * (button_width + filter_gap), float(row) * (button_height + filter_gap))
+			button.size = Vector2(button_width, button_height)
+			button.add_theme_font_size_override("font_size", 8 if button_width < 96.0 else 9)
+		main.shop_items_scroll.position = _shop_items_base_position + Vector2(0.0, filter_height + 10.0)
+		main.shop_items_scroll.size = Vector2(_shop_items_base_size.x, maxf(_shop_items_base_size.y - filter_height - 10.0, 80.0))
+	else:
+		_rod_filter_row.visible = false
+		if _shop_items_base_rect_valid:
+			main.shop_items_scroll.position = _shop_items_base_position
+			main.shop_items_scroll.size = _shop_items_base_size
+	_update_rod_filter_buttons()
 
 
 func _layout_lure_filter_row(show_filters: bool) -> void:
@@ -907,6 +1031,18 @@ func _update_reel_filter_buttons() -> void:
 		button.add_theme_constant_override("h_separation", 0)
 
 
+func _update_rod_filter_buttons() -> void:
+	for filter in ROD_FILTERS:
+		var filter_id := str(filter.get("id", ""))
+		var button: Button = _rod_filter_buttons.get(filter_id, null)
+		if button == null:
+			continue
+		var selected := _rod_filter == filter_id
+		button.button_pressed = selected
+		theme.apply_tab_button_style(button, selected)
+		button.add_theme_constant_override("h_separation", 0)
+
+
 func _ensure_shop_details_nodes() -> void:
 	if main == null or main.shop_panel == null:
 		return
@@ -994,11 +1130,14 @@ func _layout_shop_details_nodes() -> void:
 	var item := _get_shop_item(_details_item_id)
 	var category := str(item.get("category", item.get("type", "misc")))
 	var is_bait := category == SHOP_CATEGORY_BAIT
+	var is_spinning_rod := category == SHOP_CATEGORY_ROD and _is_spinning_rod_item(item)
 	var panel_width := minf(maxf(root_size.x - 74.0, 460.0), 680.0)
 	var panel_height := minf(maxf(root_size.y - 70.0, 340.0), 430.0)
 	if is_bait:
 		panel_width = minf(maxf(root_size.x - 150.0, 480.0), 560.0)
 		panel_height = minf(maxf(root_size.y - 120.0, 352.0), 372.0)
+	elif is_spinning_rod:
+		panel_height = minf(maxf(root_size.y - 64.0, 430.0), 520.0)
 	_details_panel.position = Vector2((root_size.x - panel_width) * 0.5, maxf((root_size.y - panel_height) * 0.5 - (10.0 if is_bait else 0.0), 16.0))
 	_details_panel.size = Vector2(panel_width, panel_height)
 
@@ -1017,20 +1156,22 @@ func _layout_shop_details_nodes() -> void:
 	if is_bait and _details_image.visible:
 		image_width = minf(inner_width, 132.0)
 		image_height = 78.0
+	elif is_spinning_rod and _details_image.visible:
+		image_height = minf(inner_width / 5.2, 104.0)
 	_details_image.position = Vector2(padding + (inner_width - image_width) * 0.5, image_y)
 	_details_image.size = Vector2(image_width, image_height)
 
 	var description_y := image_y + image_height + (10.0 if _details_image.visible else 4.0)
-	var description_height := 38.0 if is_bait else 54.0
+	var description_height := 38.0 if is_bait else (34.0 if is_spinning_rod else 54.0)
 	_details_description_label.position = Vector2(padding, description_y)
 	_details_description_label.size = Vector2(inner_width, description_height)
-	_details_description_label.add_theme_font_size_override("font_size", 11 if is_bait else 12)
+	_details_description_label.add_theme_font_size_override("font_size", 10 if is_spinning_rod else (11 if is_bait else 12))
 
 	var action_y := panel_height - 50.0
 	var stats_y := description_y + description_height + 10.0
 	_details_stats_label.position = Vector2(padding, stats_y)
 	_details_stats_label.size = Vector2(inner_width, maxf(action_y - stats_y - 12.0, 46.0))
-	_details_stats_label.add_theme_font_size_override("font_size", 11 if is_bait else 12)
+	_details_stats_label.add_theme_font_size_override("font_size", 10 if is_spinning_rod else (11 if is_bait else 12))
 
 	_details_owned_label.position = Vector2(padding, panel_height - 45.0)
 	_details_owned_label.size = Vector2(180.0, 26.0)
@@ -1169,9 +1310,12 @@ func _update_shop_ui() -> void:
 	_apply_shop_category_tab_icon(main.shop_leader_category_button, SHOP_CATEGORY_LEADER)
 	_apply_shop_category_tab_icon(main.shop_hook_category_button, SHOP_CATEGORY_HOOK)
 	_apply_shop_category_tab_icon(main.shop_float_category_button, SHOP_CATEGORY_FLOAT, 10)
+	_layout_rod_filter_row(false)
 	_layout_lure_filter_row(false)
 	_layout_reel_filter_row(false)
-	if main._shop_category == SHOP_CATEGORY_LURE:
+	if main._shop_category == SHOP_CATEGORY_ROD:
+		_layout_rod_filter_row(true)
+	elif main._shop_category == SHOP_CATEGORY_LURE:
 		_layout_lure_filter_row(true)
 	elif main._shop_category == SHOP_CATEGORY_REEL:
 		_layout_reel_filter_row(true)
@@ -2133,6 +2277,7 @@ func _populate_rod_image_card(card: Panel, item: Dictionary, card_size: Vector2,
 	var item_id := str(item.get("id", ""))
 	var category := str(item.get("category", item.get("type", "misc")))
 	var stats: Dictionary = item.get("stats", {}) if item.get("stats", {}) is Dictionary else {}
+	var is_spinning_rod := _is_spinning_rod_item(item)
 	var padding := 12.0
 	var image_area_height: float = clampf(card_size.y * 0.38, 82.0, 98.0)
 	var content_y: float = padding + image_area_height + 8.0
@@ -2153,9 +2298,9 @@ func _populate_rod_image_card(card: Panel, item: Dictionary, card_size: Vector2,
 
 	var image := TextureRect.new()
 	image.name = "RodCardImage"
-	image.texture = _get_rod_display_texture(texture) if category == SHOP_CATEGORY_ROD else texture
-	image.position = Vector2(-image_area_size.x * 0.035, -8.0)
-	image.size = image_area_size + Vector2(image_area_size.x * 0.07, 16.0)
+	image.texture = texture if is_spinning_rod else (_get_rod_display_texture(texture) if category == SHOP_CATEGORY_ROD else texture)
+	image.position = Vector2.ZERO if is_spinning_rod else Vector2(-image_area_size.x * 0.035, -8.0)
+	image.size = image_area_size if is_spinning_rod else image_area_size + Vector2(image_area_size.x * 0.07, 16.0)
 	image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	image.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -2164,9 +2309,9 @@ func _populate_rod_image_card(card: Panel, item: Dictionary, card_size: Vector2,
 
 	var badge := Label.new()
 	badge.name = "ShopCardBadge"
-	badge.text = "Lv.%d" % int(ROD_CARD_BADGE_NUMBERS.get(item_id, 1))
+	badge.text = "LVL %d" % _get_shop_item_required_level(item)
 	badge.position = Vector2(8.0, 8.0)
-	badge.size = Vector2(58.0, 28.0)
+	badge.size = Vector2(64.0, 28.0)
 	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	badge.add_theme_font_size_override("font_size", 14)
@@ -2237,7 +2382,10 @@ func _populate_rod_image_card(card: Panel, item: Dictionary, card_size: Vector2,
 	var right_width: float = maxf(card_size.x - right_x - padding, 96.0)
 	_add_rod_stat_label(card, Vector2(left_x, stats_y), Vector2(left_width, 18.0), "Длина:", "%.1f м" % float(stats.get("length_m", 0.0)))
 	_add_rod_stat_label(card, Vector2(left_x, stats_y + 22.0), Vector2(left_width, 18.0), "Тест:", _get_rod_test_text(stats))
-	_add_rod_stat_label(card, Vector2(left_x, stats_y + 44.0), Vector2(left_width, 18.0), "Рыба:", _get_rod_fish_capacity_text(stats))
+	if is_spinning_rod:
+		_add_rod_stat_label(card, Vector2(left_x, stats_y + 44.0), Vector2(left_width, 18.0), "Бонус:", _get_rod_bonus_summary(item))
+	else:
+		_add_rod_stat_label(card, Vector2(left_x, stats_y + 44.0), Vector2(left_width, 18.0), "Рыба:", _get_rod_fish_capacity_text(stats))
 	_add_rod_star_row(card, Vector2(right_x, stats_y), Vector2(right_width, 18.0), "Контроль:", _get_rod_control_rating(stats))
 	_add_rod_star_row(card, Vector2(right_x, stats_y + 22.0), Vector2(right_width, 18.0), "Чувств.:", _get_rod_sensitivity_rating(stats))
 
@@ -2343,6 +2491,8 @@ func _get_rod_class_chip_text(stats: Dictionary) -> String:
 			return "УЛЬТРАЛАЙТ"
 		"light":
 			return "ЛАЙТ"
+		"medium_light":
+			return "СР.-ЛЁГКИЙ"
 		"medium":
 			return "СРЕДНИЙ"
 		"universal":
@@ -2365,12 +2515,88 @@ func _get_rod_type_display_text(item: Dictionary) -> String:
 	return "%s удочка" % rod_class
 
 
+func _is_spinning_rod_item(item: Dictionary) -> bool:
+	var stats: Dictionary = item.get("stats", {}) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
+	var rod_type := str(stats.get("rod_type", item.get("rod_type", item.get("tackle_type", "")))).strip_edges().to_lower()
+	var tackle_type := str(stats.get("tackle_type", item.get("tackle_type", ""))).strip_edges().to_lower()
+	return rod_type == "spinning" or tackle_type == "spinning" or bool(stats.get("requires_reel", item.get("requires_reel", false)))
+
+
+func _get_rod_bonus_summary(item: Dictionary) -> String:
+	var stats: Dictionary = item.get("stats", {}) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
+	var bonus_text := str(stats.get("bonus_text", item.get("bonus_text", ""))).strip_edges()
+	if bonus_text != "":
+		return bonus_text
+	var bonus_type := str(stats.get("bonus_type", item.get("bonus_type", ""))).strip_edges()
+	var bonus_value := roundi(float(stats.get("bonus_value", item.get("bonus_value", 0.0))))
+	if bonus_type == "":
+		return "нет"
+	return "%s +%d%%" % [bonus_type.replace("_", " "), bonus_value]
+
+
+func _get_rod_methods_summary(item: Dictionary) -> String:
+	var stats: Dictionary = item.get("stats", {}) if typeof(item.get("stats", {})) == TYPE_DICTIONARY else {}
+	var methods: Array = stats.get("compatible_methods", item.get("compatible_methods", [])) if typeof(stats.get("compatible_methods", item.get("compatible_methods", []))) == TYPE_ARRAY else []
+	var titles: Array = []
+	for method in methods:
+		match str(method):
+			"spinning":
+				titles.append("спиннинг")
+			"jig":
+				titles.append("джиг")
+			"twitching":
+				titles.append("твичинг")
+			"universal":
+				titles.append("универсальная")
+			"starter":
+				titles.append("стартовая")
+			"trophy":
+				titles.append("трофейная")
+			_:
+				titles.append(str(method))
+	return ", ".join(titles) if not titles.is_empty() else "спиннинг"
+
+
+func _get_rod_action_title(action: String) -> String:
+	match action.strip_edges().to_lower():
+		"extra_fast":
+			return "Extra Fast"
+		"fast":
+			return "Fast"
+		"medium_fast":
+			return "Medium Fast"
+		"medium":
+			return "Medium"
+		"slow":
+			return "Slow"
+		_:
+			return action.replace("_", " ").capitalize()
+
+
+func _get_rod_power_title(power_class: String) -> String:
+	match power_class.strip_edges().to_lower():
+		"light":
+			return "Light"
+		"medium_light":
+			return "Medium Light"
+		"medium":
+			return "Medium"
+		"heavy":
+			return "Heavy"
+		"extra_heavy":
+			return "Extra Heavy"
+		_:
+			return power_class.replace("_", " ").capitalize()
+
+
 func _get_rod_class_title(rod_class: String) -> String:
 	match rod_class:
 		"ultra_light":
 			return "Ультралайт"
 		"light":
 			return "Лайт"
+		"medium_light":
+			return "Средне-лёгкая"
 		"medium":
 			return "Средняя"
 		"universal":
@@ -2395,6 +2621,8 @@ func _get_rod_test_text(stats: Dictionary) -> String:
 			return "0.5-7 г"
 		"light":
 			return "1-10 г"
+		"medium_light":
+			return "5-15 г"
 		"medium":
 			return "3-18 г"
 		"universal":
@@ -2949,6 +3177,44 @@ func _get_shop_compact_stat_text(item: Dictionary) -> String:
 
 func _get_rod_details_stats_text(item: Dictionary) -> String:
 	var stats: Dictionary = item.get("stats", {})
+	if _is_spinning_rod_item(item):
+		var length_cm := int(stats.get("length_cm", roundi(float(stats.get("length_m", 0.0)) * 100.0)))
+		var min_reel := int(stats.get("compatible_reel_min_size", stats.get("compatible_reel_min", 0)))
+		var max_reel := int(stats.get("compatible_reel_max_size", stats.get("compatible_reel_max", 0)))
+		var reel_range := "%d-%d" % [min_reel, max_reel] if min_reel > 0 and max_reel > 0 else "по классу"
+		var lines: Array = [
+			"Серия: %s   |   Тип: спиннинг" % str(item.get("series", stats.get("series", "-"))),
+			"Длина: %d см (%.1f м)   |   Тест: %.0f-%.0f г" % [
+				length_cm,
+				float(stats.get("length_m", 0.0)),
+				float(stats.get("test_min_g", stats.get("test_min", 0.0))),
+				float(stats.get("test_max_g", stats.get("test_max", 0.0)))
+			],
+			"Класс: %s   |   Строй: %s" % [
+				_get_rod_class_title(str(stats.get("rod_class", "medium"))),
+				_get_rod_action_title(str(stats.get("action", "medium_fast")))
+			],
+			"Мощность: %s   |   Вес: %.0f г" % [
+				_get_rod_power_title(str(stats.get("power_class", stats.get("rod_class", "medium")))),
+				float(stats.get("weight_g", stats.get("weight", 0.0)))
+			],
+			"Рыба до: %.1f кг   |   Катушки: %s" % [
+				float(stats.get("max_fish_weight", 0.0)),
+				reel_range
+			],
+			"Чувствительность: %.0f   |   Дальность: %.0f" % [
+				float(stats.get("sensitivity", stats.get("sensitivity_rating", 0.0))),
+				float(stats.get("cast_distance", stats.get("cast_distance_rating", 0.0)))
+			],
+			"Прочность: %.0f   |   Износ за заброс: %.2f" % [
+				float(stats.get("durability_points", 0.0)),
+				float(stats.get("wear_per_cast", 0.0))
+			],
+			"Методы: %s" % _get_rod_methods_summary(item),
+			"Бонус: %s" % _get_rod_bonus_summary(item),
+			"Цена: %s" % _format_shop_money_amount(float(item.get("price", 0.0)))
+		]
+		return "\n".join(lines)
 	return "Длина: %s   |   Класс: %s\nРыба до: %s   |   Цена: %s\nКонтроль: %s   |   Обращение: %s\nДальность: %s   |   Жёсткость: %s\nПрочность: %s" % [
 		main._format_tackle_stat_value("length_m", stats.get("length_m", 0.0)),
 		main._format_tackle_stat_value("rod_class", stats.get("rod_class", "medium")),
