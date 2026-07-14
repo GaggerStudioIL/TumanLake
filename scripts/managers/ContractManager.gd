@@ -1,6 +1,6 @@
 extends Node
 
-const MAX_ACTIVE_CONTRACTS := 9
+const MAX_CONTRACTS_PER_SUPPLIER := 3
 const CONTRACTS_PER_DIFFICULTY := 3
 const CONTRACT_DURATION_DAYS := 3
 const DIFFICULTY_ORDER := ["easy", "medium", "hard"]
@@ -55,6 +55,7 @@ func _ready() -> void:
 
 func refresh_contracts(force: bool = false) -> void:
 	var day_index: int = _get_day_index()
+	var supplier_ids := _get_contract_supplier_ids()
 	if force:
 		active_contracts.clear()
 	else:
@@ -62,9 +63,9 @@ func refresh_contracts(force: bool = false) -> void:
 
 	_normalize_active_contracts()
 	var allowed_slots := get_contract_slots_for_current_level()
-	var max_active_contracts := _get_max_active_contracts_for_slots(allowed_slots)
-	_trim_overfilled_difficulties(allowed_slots)
-	if max_active_contracts <= 0:
+	_trim_unavailable_supplier_contracts(supplier_ids)
+	_trim_overfilled_suppliers()
+	if supplier_ids.is_empty():
 		if not active_contracts.is_empty():
 			active_contracts.clear()
 		last_generated_day = day_index
@@ -75,20 +76,20 @@ func refresh_contracts(force: bool = false) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = abs(hash("contracts:%s:%s" % [day_index, ReputationSystem.get_total_reputation()])) + 313
 
-	for difficulty in DIFFICULTY_ORDER:
-		var target_count := int(allowed_slots.get(str(difficulty), 0))
-		if target_count <= 0:
-			continue
-		var generated_for_difficulty: int = _get_active_contract_count_by_difficulty(str(difficulty))
+	for supplier_id_value in supplier_ids:
+		var supplier_id := str(supplier_id_value)
+		var generated_for_supplier: int = _get_active_contract_count_by_supplier(supplier_id)
 		var guard := 0
-		while generated_for_difficulty < target_count and active_contracts.size() < max_active_contracts and guard < 30:
-			active_contracts.append(_generate_contract(day_index, rng, str(difficulty), generated_for_difficulty))
-			generated_for_difficulty += 1
+		while generated_for_supplier < MAX_CONTRACTS_PER_SUPPLIER and guard < 30:
+			var difficulty := _get_contract_difficulty_for_supplier_slot(supplier_id, generated_for_supplier, allowed_slots)
+			var contract := _generate_contract(day_index, rng, difficulty, generated_for_supplier, supplier_id)
+			if contract.is_empty():
+				break
+			active_contracts.append(contract)
+			generated_for_supplier += 1
 			guard += 1
 
 	_sort_active_contracts()
-	if active_contracts.size() > max_active_contracts:
-		active_contracts = active_contracts.slice(0, max_active_contracts)
 
 	last_generated_day = day_index
 
@@ -159,6 +160,7 @@ func register_sold_fish(catch_data: Dictionary, supplier_id: String, sale_price:
 	active_contracts = updated_contracts
 	if completed_contracts.size() > 40:
 		completed_contracts = completed_contracts.slice(completed_contracts.size() - 40)
+	refresh_contracts(false)
 
 	return {
 		"reward_money": contract_reward_total,
@@ -184,15 +186,18 @@ func load_save_data(save_data: Dictionary) -> void:
 	refresh_contracts(false)
 
 
-func _generate_contract(day_index: int, rng: RandomNumberGenerator, difficulty: String = "medium", slot_index: int = 0) -> Dictionary:
+func _generate_contract(day_index: int, rng: RandomNumberGenerator, difficulty: String = "medium", slot_index: int = 0, supplier_id: String = "") -> Dictionary:
 	difficulty = _normalize_difficulty(difficulty)
 	var pattern: Dictionary = _get_contract_pattern(difficulty, slot_index)
 	var contract_type := str(pattern.get("type", "weight"))
 	var required_status := str(pattern.get("required_status", "keeper"))
-	var fish_id := _pick_fish_id_for_contract(difficulty, rng)
+	if supplier_id.is_empty():
+		supplier_id = _pick_supplier_id(rng)
+	if supplier_id.is_empty():
+		return {}
+	var fish_id := _pick_fish_id_for_contract(difficulty, rng, supplier_id, required_status)
 	var fish: Dictionary = FishDatabase.get_fish(fish_id)
 	var fish_name: String = str(fish.get("name", fish_id))
-	var supplier_id: String = _pick_supplier_id(rng)
 
 	var target_weight: float = _roll_target_weight(pattern, fish, rng)
 	var target_count: int = _roll_target_count(pattern, rng)
@@ -210,6 +215,7 @@ func _generate_contract(day_index: int, rng: RandomNumberGenerator, difficulty: 
 	return {
 		"id": "contract_%s_%d_%d" % [difficulty, day_index, rng.randi()],
 		"title": _build_contract_title(contract_type, fish_name, target_weight, target_count, required_status),
+		"description": _build_contract_description(supplier_id, contract_type, fish_name, target_weight, target_count, rng),
 		"type": contract_type,
 		"difficulty": difficulty,
 		"difficulty_label": _get_difficulty_label(difficulty),
@@ -240,11 +246,20 @@ func _get_contract_pattern(difficulty: String, slot_index: int) -> Dictionary:
 func _pick_supplier_id(rng: RandomNumberGenerator) -> String:
 	var suppliers: Array = SupplierManager.get_available_suppliers()
 	if suppliers.is_empty():
-		return "local_market"
-	return str(suppliers[rng.randi_range(0, suppliers.size() - 1)])
+		if _get_active_contract_count_by_supplier("local_market") < MAX_CONTRACTS_PER_SUPPLIER:
+			return "local_market"
+		return ""
+	var candidates: Array = []
+	for supplier_id in suppliers:
+		var key := str(supplier_id)
+		if _get_active_contract_count_by_supplier(key) < MAX_CONTRACTS_PER_SUPPLIER:
+			candidates.append(key)
+	if candidates.is_empty():
+		return ""
+	return str(candidates[rng.randi_range(0, candidates.size() - 1)])
 
 
-func _pick_fish_id_for_contract(difficulty: String, rng: RandomNumberGenerator) -> String:
+func _pick_fish_id_for_contract(difficulty: String, rng: RandomNumberGenerator, supplier_id: String = "", required_status: String = "keeper") -> String:
 	var market_items: Array = DynamicMarketManager.get_market_snapshot(30)
 	var candidates: Array = []
 	for item in market_items:
@@ -258,6 +273,7 @@ func _pick_fish_id_for_contract(difficulty: String, rng: RandomNumberGenerator) 
 		candidates = FishDatabase.get_all_fish_ids()
 
 	var weighted: Array = []
+	var fallback_weighted: Array = []
 	for fish_id in candidates:
 		var fish: Dictionary = FishDatabase.get_fish(str(fish_id))
 		if fish.is_empty() or not _fish_matches_difficulty(fish, difficulty):
@@ -267,11 +283,32 @@ func _pick_fish_id_for_contract(difficulty: String, rng: RandomNumberGenerator) 
 		if difficulty == "hard":
 			weight = maxi(rarity_weight + roundi(float(fish.get("difficulty", 1.0))), 2)
 		for _i in range(weight):
-			weighted.append(str(fish_id))
+			fallback_weighted.append(str(fish_id))
+			if supplier_id.is_empty() or _supplier_can_order_fish(supplier_id, str(fish_id), fish, required_status):
+				weighted.append(str(fish_id))
 
 	if weighted.is_empty():
-		weighted = candidates
+		weighted = fallback_weighted if not fallback_weighted.is_empty() else candidates
 	return str(weighted[rng.randi_range(0, weighted.size() - 1)])
+
+
+func _supplier_can_order_fish(supplier_id: String, fish_id: String, fish: Dictionary, required_status: String) -> bool:
+	if supplier_id.is_empty():
+		return true
+	var sample := fish.duplicate(true)
+	sample["id"] = fish_id
+	sample["fish_id"] = fish_id
+	sample["weight"] = max(float(fish.get("keeperWeight", fish.get("keeper_weight", fish.get("min_weight", 0.1)))), 0.1)
+	match required_status:
+		"rarity":
+			sample["fish_status"] = FishStatusSystem.STATUS_KEEPER
+			sample["is_rarity"] = true
+			sample["catch_rank"] = "rarity"
+		FishStatusSystem.STATUS_TROPHY:
+			sample["fish_status"] = FishStatusSystem.STATUS_TROPHY
+		_:
+			sample["fish_status"] = FishStatusSystem.STATUS_KEEPER
+	return SupplierManager.can_buy(sample, supplier_id)
 
 
 func _fish_matches_difficulty(fish: Dictionary, difficulty: String) -> bool:
@@ -359,7 +396,7 @@ func _build_contract_title(contract_type: String, fish_name: String, target_weig
 		"trophy_count":
 			return "Доставить %d %s: %s" % [target_count, _plural_ru(target_count, "трофей", "трофея", "трофеев"), fish_name]
 		"count":
-			return "Поймать %d зачётных: %s" % [target_count, fish_name]
+			return "Поймать %d: %s" % [target_count, fish_name]
 		_:
 			return "Поставить %.1f кг: %s" % [target_weight, fish_name]
 
@@ -374,6 +411,77 @@ func _build_requirement_text(contract_type: String, target_weight: float, target
 			return "Редкость: трофейная рыба, %d шт." % target_count
 		_:
 			return "Количество: %d шт., минимум: %s" % [target_count, _get_status_label(required_status)]
+
+
+func _build_contract_description(supplier_id: String, contract_type: String, fish_name: String, target_weight: float, target_count: int, rng: RandomNumberGenerator = null) -> String:
+	var target_phrase := _build_contract_target_phrase(contract_type, fish_name, target_weight, target_count)
+	var templates: Array = []
+	match supplier_id:
+		"restaurant":
+			templates = [
+				"На праздник олигархов срочно требуется %s. Шеф обещал подать лучшее блюдо вечера.",
+				"В ресторане банкет, и кухня ищет %s для главной подачи.",
+				"Повар собирает особое меню на ужин и просит привезти %s без задержек."
+			]
+		"fish_shop":
+			templates = [
+				"Для утренней витрины нужна свежая поставка: %s.",
+				"Лавка готовит ходовой прилавок и заранее бронирует %s.",
+				"Покупатели спрашивают привычную рыбу, поэтому лавке нужна партия: %s."
+			]
+		"cannery":
+			templates = [
+				"Завод запускает смену и принимает партию на переработку: %s.",
+				"Для новой партии консервов нужен стабильный завоз: %s.",
+				"Склад просит закрыть накладную и привезти %s."
+			]
+		"wholesale_buyer":
+			templates = [
+				"Коптильня готовит печи к ночной партии и ждёт %s.",
+				"Мастеру копчения нужна ровная поставка: %s.",
+				"Для дымной закладки просят привезти %s."
+			]
+		"collector":
+			templates = [
+				"Коллекционер к своему дню рождения ищет %s для личной витрины.",
+				"В частную коллекцию нужен редкий экземпляр: %s.",
+				"Знаток трофеев услышал слухи об улове и просит доставить %s."
+			]
+		"export_company":
+			templates = [
+				"Редкий торговец собирает дальний заказ и готов принять %s.",
+				"Для закрытого клиента нужна аккуратная поставка: %s.",
+				"Курьер ждёт особый ящик, в заказе указано: %s."
+			]
+		_:
+			templates = [
+				"Покупатель оставил простую заявку: %s.",
+				"На гавани ждут поставку без лишних условий: %s.",
+				"Для обычного заказа нужно привезти %s."
+			]
+	var index := 0
+	if rng != null:
+		index = rng.randi_range(0, templates.size() - 1)
+	else:
+		index = int(abs(hash("%s:%s:%s:%s:%s" % [supplier_id, contract_type, fish_name, target_weight, target_count]))) % templates.size()
+	return str(templates[index]) % [target_phrase]
+
+
+func _build_contract_target_phrase(contract_type: String, fish_name: String, target_weight: float, target_count: int) -> String:
+	var name := fish_name.to_lower()
+	match contract_type:
+		"weight":
+			return "%.1f кг %s" % [target_weight, name]
+		"rarity_count":
+			if target_count <= 1:
+				return "редкая %s" % name
+			return "%d редких экземпляра: %s" % [target_count, name]
+		"trophy_count":
+			if target_count <= 1:
+				return "трофейный экземпляр: %s" % name
+			return "%d трофейных экземпляра: %s" % [target_count, name]
+		_:
+			return "%d %s" % [target_count, name]
 
 
 func _get_status_label(status: String) -> String:
@@ -454,6 +562,13 @@ func _normalize_contract_fields(contract: Dictionary) -> void:
 	var difficulty := _normalize_difficulty(str(contract.get("difficulty", "medium")))
 	contract["difficulty"] = difficulty
 	contract["difficulty_label"] = _get_difficulty_label(difficulty)
+	contract["title"] = _build_contract_title(
+		str(contract.get("type", "weight")),
+		str(contract.get("fish_name", contract.get("fish_id", ""))),
+		float(contract.get("target_weight_kg", 0.0)),
+		int(contract.get("target_count", 0)),
+		str(contract.get("required_status", "keeper"))
+	)
 	if not contract.has("requirement_text"):
 		contract["requirement_text"] = _build_requirement_text(
 			str(contract.get("type", "weight")),
@@ -461,10 +576,50 @@ func _normalize_contract_fields(contract: Dictionary) -> void:
 			int(contract.get("target_count", 0)),
 			str(contract.get("required_status", "keeper"))
 		)
+	if not contract.has("description") or str(contract.get("description", "")).is_empty():
+		contract["description"] = _build_contract_description(
+			str(contract.get("supplier_id", "local_market")),
+			str(contract.get("type", "weight")),
+			str(contract.get("fish_name", contract.get("fish_id", ""))),
+			float(contract.get("target_weight_kg", 0.0)),
+			int(contract.get("target_count", 0))
+		)
 	if not contract.has("progress_weight_kg"):
 		contract["progress_weight_kg"] = 0.0
 	if not contract.has("progress_count"):
 		contract["progress_count"] = 0
+
+
+func _get_contract_supplier_ids() -> Array:
+	var suppliers: Array = SupplierManager.get_available_suppliers()
+	if suppliers.is_empty():
+		return ["local_market"]
+	return suppliers
+
+
+func _get_contract_difficulty_for_supplier_slot(supplier_id: String, slot_index: int, allowed_slots: Dictionary = {}) -> String:
+	var available: Array = []
+	for difficulty in DIFFICULTY_ORDER:
+		if int(allowed_slots.get(str(difficulty), 0)) > 0:
+			available.append(str(difficulty))
+	if available.is_empty():
+		available = DIFFICULTY_ORDER.duplicate()
+	var offset: int = int(abs(hash(supplier_id))) % available.size()
+	return str(available[(slot_index + offset) % available.size()])
+
+
+func _trim_unavailable_supplier_contracts(supplier_ids: Array) -> void:
+	var allowed := {}
+	for supplier_id_value in supplier_ids:
+		allowed[str(supplier_id_value)] = true
+	var retained: Array = []
+	for value in active_contracts:
+		if typeof(value) != TYPE_DICTIONARY:
+			continue
+		var contract: Dictionary = value
+		if allowed.has(str(contract.get("supplier_id", "local_market"))):
+			retained.append(contract)
+	active_contracts = retained
 
 
 func _trim_overfilled_difficulties(allowed_slots: Dictionary = {}) -> void:
@@ -488,6 +643,22 @@ func _trim_overfilled_difficulties(allowed_slots: Dictionary = {}) -> void:
 	active_contracts = retained
 
 
+func _trim_overfilled_suppliers() -> void:
+	var retained: Array = []
+	var counts: Dictionary = {}
+	for value in active_contracts:
+		if typeof(value) != TYPE_DICTIONARY:
+			continue
+		var contract: Dictionary = value
+		var supplier_id := str(contract.get("supplier_id", "local_market"))
+		var current_count := int(counts.get(supplier_id, 0))
+		if current_count >= MAX_CONTRACTS_PER_SUPPLIER:
+			continue
+		counts[supplier_id] = current_count + 1
+		retained.append(contract)
+	active_contracts = retained
+
+
 func _get_active_contract_count_by_difficulty(difficulty: String) -> int:
 	var count := 0
 	for value in active_contracts:
@@ -498,23 +669,25 @@ func _get_active_contract_count_by_difficulty(difficulty: String) -> int:
 	return count
 
 
-func _has_full_contract_set(allowed_slots: Dictionary = {}) -> bool:
-	if allowed_slots.is_empty():
-		allowed_slots = get_contract_slots_for_current_level()
-	var max_active_contracts := _get_max_active_contracts_for_slots(allowed_slots)
-	if active_contracts.size() < max_active_contracts:
-		return false
-	for difficulty in DIFFICULTY_ORDER:
-		if _get_active_contract_count_by_difficulty(str(difficulty)) < int(allowed_slots.get(str(difficulty), 0)):
+func _get_active_contract_count_by_supplier(supplier_id: String) -> int:
+	var count := 0
+	for value in active_contracts:
+		if typeof(value) != TYPE_DICTIONARY:
+			continue
+		if str((value as Dictionary).get("supplier_id", "local_market")) == supplier_id:
+			count += 1
+	return count
+
+
+func _has_full_contract_set(_allowed_slots: Dictionary = {}) -> bool:
+	for supplier_id_value in _get_contract_supplier_ids():
+		if _get_active_contract_count_by_supplier(str(supplier_id_value)) < MAX_CONTRACTS_PER_SUPPLIER:
 			return false
 	return true
 
 
-func _get_max_active_contracts_for_slots(allowed_slots: Dictionary) -> int:
-	var total := 0
-	for difficulty in DIFFICULTY_ORDER:
-		total += max(int(allowed_slots.get(str(difficulty), 0)), 0)
-	return total
+func _get_max_active_contracts_for_slots(_allowed_slots: Dictionary) -> int:
+	return _get_contract_supplier_ids().size() * MAX_CONTRACTS_PER_SUPPLIER
 
 
 func _get_player_level() -> int:

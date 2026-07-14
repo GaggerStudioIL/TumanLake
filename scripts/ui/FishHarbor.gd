@@ -10,6 +10,47 @@ const SECTION_CONTRACTS := "contracts"
 const SECTION_MARKET := "market"
 const SECTION_REPUTATION := "reputation"
 const REPUTATION_THRESHOLDS := [0, 50, 150, 350, 700, 1100]
+const SUPPLIER_ART_PATHS := {
+	"local_market": "res://assets/ui/harbor/suppliers/local_market_scene.png",
+	"fish_shop": "res://assets/ui/harbor/suppliers/fish_shop_scene.png",
+	"cannery": "res://assets/ui/harbor/suppliers/cannery_scene.png",
+	"restaurant": "res://assets/ui/harbor/suppliers/restaurant_scene.png",
+	"wholesale_buyer": "res://assets/ui/harbor/suppliers/smokehouse_scene.png",
+	"collector": "res://assets/ui/harbor/suppliers/collector_scene.png",
+	"export_company": "res://assets/ui/harbor/suppliers/rare_trader_scene.png"
+}
+const SUPPLIER_SIGN_PATHS := {
+	"local_market": "res://assets/ui/harbor/suppliers/local_market_sign.png",
+	"fish_shop": "res://assets/ui/harbor/suppliers/fish_shop_sign.png",
+	"cannery": "res://assets/ui/harbor/suppliers/cannery_sign.png",
+	"restaurant": "res://assets/ui/harbor/suppliers/restaurant_sign.png",
+	"wholesale_buyer": "res://assets/ui/harbor/suppliers/smokehouse_sign.png",
+	"collector": "res://assets/ui/harbor/suppliers/collector_sign.png",
+	"export_company": "res://assets/ui/harbor/suppliers/rare_trader_sign.png"
+}
+const RESTAURANT_BONUS_ICON_PATH := "res://assets/ui/harbor/icons/bonus_gold.png"
+const RESTAURANT_FISH_ICON_PATH := "res://assets/ui/harbor/icons/fish_gold.png"
+const CLOSE_BUTTON_PATH := "res://assets/ui/harbor/icons/close_but.png"
+const KEEPNET_FISH_ICON_PATH := "res://assets/ui/harbor/icons/keepnet_fish.png"
+const KEEPNET_WEIGHT_ICON_PATH := "res://assets/ui/harbor/icons/keepnet_weight.png"
+const KEEPNET_MONEY_ICON_PATH := "res://assets/ui/ux/fishing_spot/money_coin.png"
+const ADVICE_FISHERMAN_PATH := "res://assets/ui/harbor/icons/advice_fisherman.png"
+const CONTRACT_ICON_PATHS := {
+	"easy": {
+		"available": "res://assets/ui/harbor/contracts/lite.png",
+		"active": "res://assets/ui/harbor/contracts/lite_in_progress.png"
+	},
+	"medium": {
+		"available": "res://assets/ui/harbor/contracts/medium.png",
+		"active": "res://assets/ui/harbor/contracts/medium_in_progress.png"
+	},
+	"hard": {
+		"available": "res://assets/ui/harbor/contracts/hard.png",
+		"active": "res://assets/ui/harbor/contracts/hard_in_progress.png"
+	}
+}
+const CONTRACT_SUMMARY_ICON_PATH := "res://assets/ui/harbor/contracts/summary_of_fish.png"
+const CONTRACT_TIME_ICON_PATH := "res://assets/ui/harbor/contracts/time.png"
 const SHOW_ECONOMY_DEBUG_REPORT := false
 const EconomyDebugReportScript := preload("res://scripts/dev/EconomyDebugReport.gd")
 const MarketHistoryChartScript := preload("res://scripts/ui/MarketHistoryChart.gd")
@@ -22,12 +63,14 @@ var current_section := SECTION_SALE
 var selected_fish: Dictionary = {}
 var selected_buyers: Dictionary = {}
 var selected_bulk_buyer_id := ""
+var selected_contract_supplier_id := ""
+var harbor_texture_cache: Dictionary = {}
 
 var background_texture: TextureRect
 var dim_layer: ColorRect
 var title_label: Label
-var close_button: Button
-var tabs_container: VBoxContainer
+var close_button: TextureButton
+var tabs_container: HBoxContainer
 var section_title_label: Label
 var section_scroll: ScrollContainer
 var section_content: VBoxContainer
@@ -110,6 +153,9 @@ func refresh() -> void:
 	_clear_children(section_content)
 	_clear_children(sidebar_content)
 	section_title_label.text = _get_section_title(current_section)
+	section_title_label.visible = current_section != SECTION_CONTRACTS
+	section_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER if current_section == SECTION_CONTRACTS else ScrollContainer.SCROLL_MODE_AUTO
+	section_content.add_theme_constant_override("separation", 6 if current_section == SECTION_CONTRACTS else 9)
 	footer_panel.visible = current_section == SECTION_SALE
 	if sidebar_panel != null:
 		sidebar_panel.visible = current_section != SECTION_SALE
@@ -118,18 +164,12 @@ func refresh() -> void:
 		SECTION_SALE:
 			_build_sale_section()
 			_refresh_sale_footer()
-		SECTION_SUPPLIERS:
-			_build_suppliers_section()
-			_build_harbor_sidebar("Поставщики", "Репутация открывает новых покупателей и повышает бонус к цене.")
 		SECTION_CONTRACTS:
 			_build_contracts_section()
-			_build_harbor_sidebar("Контракты", "Прогресс контрактов засчитывается при продаже подходящей рыбы нужному покупателю.")
+			_build_contracts_sidebar()
 		SECTION_MARKET:
 			_build_market_section()
 			_build_harbor_sidebar("Рынок", "Высокий спрос усиливает цену до расчёта бонусов покупателя и свежести.")
-		SECTION_REPUTATION:
-			_build_reputation_section()
-			_build_harbor_sidebar("Репутация", "Каждая продажа приносит репутацию покупателю. Зачёт и трофей ценятся выше.")
 	if main != null and main.has_method("refresh_mobile_scroll_helper"):
 		main.refresh_mobile_scroll_helper()
 
@@ -165,27 +205,27 @@ func _ensure_nodes() -> void:
 	var margin := MarginContainer.new()
 	margin.name = "HarborMargin"
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 28)
-	margin.add_theme_constant_override("margin_top", 18)
-	margin.add_theme_constant_override("margin_right", 28)
-	margin.add_theme_constant_override("margin_bottom", 18)
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_top", 14)
+	margin.add_theme_constant_override("margin_right", 20)
+	margin.add_theme_constant_override("margin_bottom", 14)
 	add_child(margin)
 
 	var root := VBoxContainer.new()
 	root.name = "HarborRoot"
 	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	root.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	root.add_theme_constant_override("separation", 12)
+	root.add_theme_constant_override("separation", 8)
 	margin.add_child(root)
 
 	var header := HBoxContainer.new()
 	header.name = "HarborHeader"
-	header.custom_minimum_size = Vector2(0.0, 54.0)
+	header.custom_minimum_size = Vector2(0.0, 46.0)
 	header.add_theme_constant_override("separation", 12)
 	root.add_child(header)
 
 	var header_spacer_left := Control.new()
-	header_spacer_left.custom_minimum_size = Vector2(160.0, 1.0)
+	header_spacer_left.custom_minimum_size = Vector2(42.0, 1.0)
 	header.add_child(header_spacer_left)
 
 	title_label = Label.new()
@@ -194,41 +234,53 @@ func _ensure_nodes() -> void:
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title_label.add_theme_font_size_override("font_size", 30)
+	title_label.add_theme_font_size_override("font_size", 28)
 	title_label.add_theme_color_override("font_color", Color(0.95, 1.0, 0.94, 1.0))
 	header.add_child(title_label)
 
-	close_button = Button.new()
+	close_button = TextureButton.new()
 	close_button.name = "HarborCloseButton"
-	close_button.text = "Закрыть"
-	close_button.custom_minimum_size = Vector2(152.0, 44.0)
-	_apply_button(close_button, false)
+	close_button.tooltip_text = ""
+	close_button.texture_normal = _get_harbor_texture(CLOSE_BUTTON_PATH)
+	close_button.texture_hover = close_button.texture_normal
+	close_button.texture_pressed = close_button.texture_normal
+	close_button.ignore_texture_size = true
+	close_button.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	close_button.custom_minimum_size = Vector2(28.0, 28.0)
+	close_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_apply_close_icon_button_style(close_button)
 	close_button.pressed.connect(close)
 	header.add_child(close_button)
+
+	var main_frame := Panel.new()
+	main_frame.name = "HarborMainFrame"
+	main_frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	main_frame.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_apply_harbor_outer_frame(main_frame)
+	root.add_child(main_frame)
+
+	var main_box := VBoxContainer.new()
+	main_box.set_anchors_preset(Control.PRESET_FULL_RECT)
+	main_box.offset_left = 10.0
+	main_box.offset_top = 8.0
+	main_box.offset_right = -10.0
+	main_box.offset_bottom = -10.0
+	main_box.add_theme_constant_override("separation", 6)
+	main_frame.add_child(main_box)
+
+	tabs_container = HBoxContainer.new()
+	tabs_container.name = "HarborTopTabs"
+	tabs_container.custom_minimum_size = Vector2(0.0, 44.0)
+	tabs_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tabs_container.add_theme_constant_override("separation", 4)
+	main_box.add_child(tabs_container)
 
 	var body := HBoxContainer.new()
 	body.name = "HarborBody"
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	body.add_theme_constant_override("separation", 12)
-	root.add_child(body)
-
-	var nav_panel := Panel.new()
-	nav_panel.name = "HarborNavPanel"
-	nav_panel.custom_minimum_size = Vector2(174.0, 0.0)
-	nav_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_apply_panel(nav_panel, true)
-	body.add_child(nav_panel)
-
-	tabs_container = VBoxContainer.new()
-	tabs_container.name = "HarborTabs"
-	tabs_container.set_anchors_preset(Control.PRESET_FULL_RECT)
-	tabs_container.offset_left = 10.0
-	tabs_container.offset_top = 12.0
-	tabs_container.offset_right = -10.0
-	tabs_container.offset_bottom = -12.0
-	tabs_container.add_theme_constant_override("separation", 9)
-	nav_panel.add_child(tabs_container)
+	body.add_theme_constant_override("separation", 10)
+	main_box.add_child(body)
 
 	var center := VBoxContainer.new()
 	center.name = "HarborCenter"
@@ -241,8 +293,8 @@ func _ensure_nodes() -> void:
 	center_panel.name = "HarborContentPanel"
 	center_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	center_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	center_panel.custom_minimum_size = Vector2(420.0, 0.0)
-	_apply_panel(center_panel, true)
+	center_panel.custom_minimum_size = Vector2(560.0, 0.0)
+	_apply_harbor_blue_frame(center_panel)
 	center.add_child(center_panel)
 
 	var center_inner := VBoxContainer.new()
@@ -256,7 +308,7 @@ func _ensure_nodes() -> void:
 
 	section_title_label = Label.new()
 	section_title_label.name = "HarborSectionTitle"
-	section_title_label.add_theme_font_size_override("font_size", 19)
+	section_title_label.add_theme_font_size_override("font_size", 18)
 	section_title_label.add_theme_color_override("font_color", Color(0.92, 1.0, 0.90, 1.0))
 	center_inner.add_child(section_title_label)
 
@@ -283,9 +335,9 @@ func _ensure_nodes() -> void:
 
 	sidebar_panel = Panel.new()
 	sidebar_panel.name = "HarborSidebarPanel"
-	sidebar_panel.custom_minimum_size = Vector2(230.0, 0.0)
+	sidebar_panel.custom_minimum_size = Vector2(224.0, 0.0)
 	sidebar_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_apply_panel(sidebar_panel, true)
+	_apply_harbor_blue_frame(sidebar_panel)
 	body.add_child(sidebar_panel)
 
 	sidebar_scroll = ScrollContainer.new()
@@ -311,23 +363,23 @@ func _refresh_tabs() -> void:
 	_clear_children(tabs_container)
 	var tabs := [
 		[SECTION_SALE, "Продажа улова"],
-		[SECTION_SUPPLIERS, "Поставщики"],
-		[SECTION_CONTRACTS, "Контракты"],
-		[SECTION_MARKET, "Цены рынка"],
-		[SECTION_REPUTATION, "Репутация"]
+		[SECTION_CONTRACTS, "Покупатели"],
+		[SECTION_MARKET, "Цены рынка"]
 	]
 	for tab in tabs:
 		var button := Button.new()
 		button.text = str(tab[1])
-		button.custom_minimum_size = Vector2(0.0, 48.0)
+		button.custom_minimum_size = Vector2(0.0, 42.0)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.clip_text = true
-		_apply_button(button, str(tab[0]) == current_section)
+		_apply_main_tab_button_style(button, str(tab[0]) == current_section)
 		button.pressed.connect(_set_section.bind(str(tab[0])))
 		tabs_container.add_child(button)
 
 
 func _set_section(section_id: String) -> void:
+	if not _is_main_section_available(section_id):
+		section_id = SECTION_SALE
 	current_section = section_id
 	refresh()
 
@@ -1432,83 +1484,393 @@ func _create_supplier_card(item: Dictionary) -> Panel:
 
 
 func _build_contracts_section() -> void:
-	_add_section_subtitle("Активные контракты")
-	var active := _get_active_contracts()
+	_ensure_contract_supplier_selection()
+	var supplier_id := selected_contract_supplier_id
+	var supplier := _get_supplier_data(supplier_id)
+	var summary := _get_supplier_summary_item(supplier_id)
+	var unlocked := _is_buyer_unlocked(supplier_id)
+
+	section_content.add_child(_create_contract_supplier_selector())
+	section_content.add_child(_create_selected_contract_supplier_card(supplier_id, supplier, summary, unlocked))
+
+	_add_section_separator(section_content)
+	if not unlocked:
+		_add_contracts_plain_notice("Покупатель закрыт", _get_buyer_lock_reason(supplier_id, supplier))
+		return
+
+	var active := _filter_contracts_by_supplier(_get_active_contracts(), supplier_id)
 	if active.is_empty():
-		var empty_text := _get_contract_progression_hint()
-		if empty_text == "":
-			empty_text = "Новые заявки появятся после обновления игрового дня."
-		_add_empty_card(section_content, "Нет активных контрактов", empty_text)
+		var empty_text := _get_contract_progression_hint("Новые заявки появятся после обновления игрового дня.")
+		_add_contracts_plain_notice("Нет заказов для покупателя", empty_text)
 	else:
-		for contract in active:
-			if typeof(contract) == TYPE_DICTIONARY:
-				section_content.add_child(_create_contract_card(contract, false))
+		section_content.add_child(_create_contracts_row(active, false))
 
-	_add_section_subtitle("Доступные контракты")
-	_add_empty_card(section_content, "Доступные заявки", _get_contract_progression_hint("Новые заявки появляются автоматически. Выполняйте активные через продажу улова."))
-
-	_add_section_subtitle("Выполненные контракты")
-	var completed := _get_completed_contracts()
-	if completed.is_empty():
-		_add_empty_card(section_content, "Пока нет выполненных контрактов", "Первый закрытый контракт появится здесь.")
-	else:
-		var start: int = maxi(completed.size() - 8, 0)
+	var completed := _filter_contracts_by_supplier(_get_completed_contracts(), supplier_id)
+	if not completed.is_empty():
+		_add_section_subtitle("Выполнено недавно")
+		var recent_completed: Array = []
+		var start: int = maxi(completed.size() - 4, 0)
 		for i in range(completed.size() - 1, start - 1, -1):
 			if typeof(completed[i]) == TYPE_DICTIONARY:
-				section_content.add_child(_create_contract_card(completed[i], true))
+				recent_completed.append(completed[i])
+		section_content.add_child(_create_contracts_row(recent_completed, true))
+
+
+func _create_contracts_row(contracts: Array, completed: bool) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.custom_minimum_size = Vector2(0.0, 268.0)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("separation", 10)
+
+	var shown := 0
+	for value in contracts:
+		if typeof(value) != TYPE_DICTIONARY:
+			continue
+		if shown > 0:
+			var separator := ColorRect.new()
+			separator.custom_minimum_size = Vector2(1.0, 0.0)
+			separator.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			separator.color = Color(0.90, 0.96, 0.94, 0.78)
+			row.add_child(separator)
+		var card := _create_contract_card(value, completed)
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(card)
+		shown += 1
+	return row
+
+
+func _create_contract_supplier_selector() -> ScrollContainer:
+	var scroll := ScrollContainer.new()
+	scroll.name = "ContractSupplierSelector"
+	scroll.custom_minimum_size = Vector2(0.0, 32.0)
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+
+	var row := HBoxContainer.new()
+	row.name = "ContractSupplierButtons"
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("separation", 2)
+	scroll.add_child(row)
+
+	for supplier_id_value in _get_contract_supplier_tab_ids():
+		var supplier_id := str(supplier_id_value)
+		row.add_child(_create_contract_supplier_button(supplier_id))
+	return scroll
+
+
+func _create_contract_supplier_button(supplier_id: String) -> Button:
+	var supplier := _get_supplier_data(supplier_id)
+	var unlocked := _is_buyer_unlocked(supplier_id)
+	var selected := supplier_id == selected_contract_supplier_id
+	var button := Button.new()
+	button.custom_minimum_size = Vector2(_get_supplier_tab_width(supplier_id), 30.0)
+	button.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	button.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	button.clip_text = true
+	button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	button.text = _get_supplier_short_tab_label(supplier_id, str(supplier.get("name", supplier_id)))
+	_apply_contract_supplier_button_style(button, selected, unlocked)
+	button.pressed.connect(_on_contract_supplier_selected.bind(supplier_id))
+	return button
+
+
+func _on_contract_supplier_selected(supplier_id: String) -> void:
+	if supplier_id.is_empty():
+		return
+	selected_contract_supplier_id = supplier_id
+	refresh()
+
+
+func _create_selected_contract_supplier_card(supplier_id: String, supplier: Dictionary, summary: Dictionary, unlocked: bool) -> Panel:
+	return _create_supplier_showcase_card(supplier_id, supplier, summary, unlocked)
+
+
+func _create_supplier_showcase_card(supplier_id: String, supplier: Dictionary, summary: Dictionary, unlocked: bool) -> Panel:
+	var card := _make_content_card(190.0)
+	_apply_transparent_panel(card)
+
+	var row := HBoxContainer.new()
+	row.set_anchors_preset(Control.PRESET_FULL_RECT)
+	row.offset_left = 12.0
+	row.offset_top = 10.0
+	row.offset_right = -12.0
+	row.offset_bottom = -10.0
+	row.add_theme_constant_override("separation", 12)
+	card.add_child(row)
+
+	var info := VBoxContainer.new()
+	info.custom_minimum_size = Vector2(238.0, 0.0)
+	info.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	info.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	info.add_theme_constant_override("separation", 6)
+	row.add_child(info)
+
+	var sign_texture := _get_supplier_sign_texture(supplier_id)
+	if sign_texture != null:
+		var sign := TextureRect.new()
+		sign.custom_minimum_size = Vector2(0.0, 46.0)
+		sign.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		sign.texture = sign_texture
+		sign.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		sign.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		sign.modulate = Color(1.0, 1.0, 1.0, 1.0 if unlocked else 0.46)
+		info.add_child(sign)
+	else:
+		var title := _make_label(str(supplier.get("name", supplier_id)).to_upper(), 18, Color(0.95, 0.78, 0.42, 1.0) if unlocked else Color(0.66, 0.62, 0.54, 0.88))
+		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		info.add_child(title)
+
+	var facts := HBoxContainer.new()
+	facts.custom_minimum_size = Vector2(0.0, 54.0)
+	facts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	facts.add_theme_constant_override("separation", 8)
+	info.add_child(facts)
+
+	var price_bonus := roundi((float(summary.get("price_multiplier", supplier.get("price_multiplier", 1.0))) - 1.0) * 100.0)
+	facts.add_child(_create_supplier_fact(RESTAURANT_BONUS_ICON_PATH, "Бонус:", "+%d%%" % price_bonus, unlocked))
+
+	var separator := ColorRect.new()
+	separator.custom_minimum_size = Vector2(1.0, 46.0)
+	separator.color = Color(0.78, 0.86, 0.78, 0.54 if unlocked else 0.24)
+	facts.add_child(separator)
+
+	facts.add_child(_create_supplier_fact(RESTAURANT_FISH_ICON_PATH, "Зачётная", "рыба", unlocked))
+
+	var description_text := str(supplier.get("description", ""))
+	if not unlocked:
+		description_text = _get_buyer_lock_reason(supplier_id, supplier)
+	var description := _make_label(description_text, 12, Color(0.88, 0.96, 0.88, 0.96) if unlocked else Color(0.60, 0.65, 0.58, 0.86))
+	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	description.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	description.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	info.add_child(description)
+
+	var art_panel := Panel.new()
+	art_panel.custom_minimum_size = Vector2(280.0, 0.0)
+	art_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	art_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_apply_transparent_panel(art_panel)
+	row.add_child(art_panel)
+
+	var art_texture := _get_supplier_art_texture(supplier_id)
+	if art_texture != null:
+		var art := TextureRect.new()
+		art.set_anchors_preset(Control.PRESET_FULL_RECT)
+		art.offset_left = 4.0
+		art.offset_top = 4.0
+		art.offset_right = -4.0
+		art.offset_bottom = -4.0
+		art.texture = art_texture
+		art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		art.modulate = Color(1.0, 1.0, 1.0, 1.0 if unlocked else 0.46)
+		art_panel.add_child(art)
+	return card
+
+
+func _create_supplier_fact(icon_path: String, top_text: String, bottom_text: String, unlocked: bool) -> VBoxContainer:
+	var box := VBoxContainer.new()
+	box.custom_minimum_size = Vector2(82.0, 0.0)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 2)
+
+	var icon_texture := _get_harbor_texture(icon_path)
+	if icon_texture != null:
+		var icon := TextureRect.new()
+		icon.custom_minimum_size = Vector2(34.0, 30.0)
+		icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		icon.texture = icon_texture
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.modulate = Color(1.0, 1.0, 1.0, 1.0 if unlocked else 0.44)
+		box.add_child(icon)
+
+	var text := _make_label("%s\n%s" % [top_text, bottom_text], 12, Color(0.96, 0.96, 0.88, 1.0) if unlocked else Color(0.62, 0.64, 0.58, 0.86))
+	text.custom_minimum_size = Vector2(72.0, 0.0)
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	text.autowrap_mode = TextServer.AUTOWRAP_OFF
+	box.add_child(text)
+	return box
 
 
 func _create_contract_card(contract: Dictionary, completed: bool) -> Panel:
-	var card := _make_content_card(176.0)
-	var box := VBoxContainer.new()
-	box.set_anchors_preset(Control.PRESET_FULL_RECT)
-	box.offset_left = 14.0
-	box.offset_top = 10.0
-	box.offset_right = -14.0
-	box.offset_bottom = -10.0
-	box.add_theme_constant_override("separation", 5)
-	card.add_child(box)
+	var supplier_id := str(contract.get("supplier_id", selected_contract_supplier_id))
+	var supplier_unlocked := _is_buyer_unlocked(supplier_id)
+	var state_key := _get_contract_state_key(contract, completed, supplier_unlocked)
+	var state_color := _get_contract_state_color(state_key)
+	var muted := state_key == "locked"
+	var card := _make_content_card(268.0)
+	_apply_transparent_panel(card)
 
-	var title := _make_label(_format_contract_title(contract), 15, Color(0.95, 1.0, 0.92, 1.0))
+	var row := VBoxContainer.new()
+	row.set_anchors_preset(Control.PRESET_FULL_RECT)
+	row.offset_left = 8.0
+	row.offset_top = 2.0
+	row.offset_right = -8.0
+	row.offset_bottom = -2.0
+	row.add_theme_constant_override("separation", 3)
+	card.add_child(row)
+
+	var top_row := HBoxContainer.new()
+	top_row.custom_minimum_size = Vector2(0.0, 96.0)
+	top_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top_row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	top_row.add_theme_constant_override("separation", 6)
+	row.add_child(top_row)
+
+	var icon_texture := _get_contract_icon_texture(contract, state_key)
+	if icon_texture != null:
+		var icon := TextureRect.new()
+		icon.custom_minimum_size = Vector2(116.0, 96.0)
+		icon.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		icon.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		icon.texture = icon_texture
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.modulate = Color(1.0, 1.0, 1.0, 0.96 if not muted else 0.42)
+		top_row.add_child(icon)
+
+	var info_column := VBoxContainer.new()
+	info_column.custom_minimum_size = Vector2(70.0, 70.0)
+	info_column.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	info_column.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	info_column.add_theme_constant_override("separation", 2)
+	top_row.add_child(info_column)
+	info_column.add_child(_create_contract_info_item(KEEPNET_MONEY_ICON_PATH, str(int(contract.get("reward_money", 0))), muted, Color(1.0, 0.84, 0.46, 1.0)))
+	info_column.add_child(_create_contract_info_item(CONTRACT_SUMMARY_ICON_PATH, _get_contract_target_summary_text(contract), muted))
+	info_column.add_child(_create_contract_info_item(CONTRACT_TIME_ICON_PATH, _get_contract_time_summary_text(contract, completed), muted))
+
+	var content := VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 3)
+	row.add_child(content)
+
+	var title := _make_label(_format_contract_title(contract), 13, Color(0.95, 1.0, 0.92, 1.0) if not muted else Color(0.62, 0.68, 0.64, 0.86))
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title.custom_minimum_size = Vector2(0.0, 38.0)
-	box.add_child(title)
+	content.add_child(title)
 
-	var difficulty_text := str(contract.get("difficulty_label", ""))
-	var requirement_text := str(contract.get("requirement_text", ""))
-	if difficulty_text != "" or requirement_text != "":
-		var meta_text := "Сложность: %s" % (difficulty_text if difficulty_text != "" else "-")
-		if requirement_text != "":
-			meta_text += " | %s" % requirement_text
-		var meta := _make_label(meta_text, 12, Color(0.82, 0.94, 0.78, 0.96))
-		meta.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		box.add_child(meta)
+	var description_text := str(contract.get("description", ""))
+	if description_text.is_empty():
+		description_text = str(contract.get("title", ""))
+	var description := _make_label(description_text, 10, Color(0.78, 0.90, 0.84, 0.95) if not muted else Color(0.54, 0.60, 0.58, 0.84))
+	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	description.custom_minimum_size = Vector2(0.0, 42.0)
+	description.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_child(description)
 
-	var progress_text := _format_contract_progress(contract)
-	var details := _make_label("Рыба: %s | Поставщик: %s\nПрогресс: %s\nНаграда: %s | Репутация +%d%s" % [
-		str(contract.get("fish_name", "-")),
-		str(contract.get("supplier_name", "Покупатель")),
-		progress_text,
-		UIFormatters.format_money(float(contract.get("reward_money", 0))),
-		int(contract.get("reward_reputation", 0)),
-		_get_contract_deadline_text(contract, completed)
-	], 12, Color(0.78, 0.88, 0.82, 0.95))
-	details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(details)
+	var progress_row := HBoxContainer.new()
+	progress_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	progress_row.add_theme_constant_override("separation", 0)
+	content.add_child(progress_row)
 
 	var progress_bar := ProgressBar.new()
-	progress_bar.custom_minimum_size = Vector2(0.0, 8.0)
+	progress_bar.custom_minimum_size = Vector2(0.0, 5.0)
 	progress_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	progress_bar.max_value = 1.0
 	progress_bar.value = _get_contract_progress_ratio(contract)
 	progress_bar.show_percentage = false
-	_apply_progress_bar_style(progress_bar, Color(0.52, 0.92, 0.72, 1.0) if not completed else Color(0.58, 0.82, 1.0, 1.0))
-	box.add_child(progress_bar)
+	_apply_progress_bar_style(progress_bar, state_color)
+	progress_row.add_child(progress_bar)
 
-	var status := _make_label("Выполнен" if completed else "Выполняется через продажу улова", 11, Color(0.58, 0.90, 1.0, 0.94) if completed else Color(0.70, 0.84, 0.80, 0.90))
-	status.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	box.add_child(status)
+	var progress_right_gap := Control.new()
+	progress_right_gap.custom_minimum_size = Vector2(34.0, 1.0)
+	progress_row.add_child(progress_right_gap)
+
+	var progress := _make_label(_format_contract_progress_compact(contract), 10, Color(0.70, 0.84, 0.80, 0.90))
+	progress.clip_text = true
+	progress.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	content.add_child(progress)
+
+	var reward_box := HBoxContainer.new()
+	reward_box.custom_minimum_size = Vector2(0.0, 16.0)
+	reward_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reward_box.add_theme_constant_override("separation", 4)
+	row.add_child(reward_box)
+
+	var state := _make_label(_get_contract_state_text(state_key), 11, state_color)
+	state.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reward_box.add_child(state)
+	var reputation := _make_label("Реп.+%d" % int(contract.get("reward_reputation", 0)), 10, Color(0.72, 0.90, 1.0, 0.94) if not muted else Color(0.54, 0.60, 0.58, 0.84))
+	reputation.custom_minimum_size = Vector2(46.0, 0.0)
+	reputation.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	reward_box.add_child(reputation)
+
+	var reward_right_gap := Control.new()
+	reward_right_gap.custom_minimum_size = Vector2(28.0, 1.0)
+	reward_box.add_child(reward_right_gap)
 	return card
+
+
+func _create_contract_info_item(icon_path: String, text: String, muted: bool, value_color: Color = Color(0.86, 0.94, 0.88, 0.96)) -> HBoxContainer:
+	var item := HBoxContainer.new()
+	item.custom_minimum_size = Vector2(0.0, 22.0)
+	item.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	item.alignment = BoxContainer.ALIGNMENT_BEGIN
+	item.add_theme_constant_override("separation", 3)
+
+	var icon_texture := _get_harbor_texture(icon_path)
+	if icon_texture != null:
+		var icon := TextureRect.new()
+		icon.custom_minimum_size = Vector2(18.0, 18.0)
+		icon.texture = icon_texture
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.modulate = Color(1.0, 1.0, 1.0, 0.94 if not muted else 0.42)
+		item.add_child(icon)
+
+	var label := _make_label(text, 11, value_color if not muted else Color(0.54, 0.60, 0.58, 0.84))
+	label.custom_minimum_size = Vector2(58.0, 0.0)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.clip_text = true
+	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	item.add_child(label)
+	return item
+
+
+func _create_contract_money_item(value: int, muted: bool) -> HBoxContainer:
+	var item := HBoxContainer.new()
+	item.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	item.alignment = BoxContainer.ALIGNMENT_END
+	item.add_theme_constant_override("separation", 4)
+
+	var icon_texture := _get_harbor_texture(KEEPNET_MONEY_ICON_PATH)
+	if icon_texture != null:
+		var icon := TextureRect.new()
+		icon.custom_minimum_size = Vector2(21.0, 21.0)
+		icon.texture = icon_texture
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.modulate = Color(1.0, 1.0, 1.0, 0.96 if not muted else 0.42)
+		item.add_child(icon)
+
+	var label := _make_label(str(value), 15, Color(1.0, 0.84, 0.46, 1.0) if not muted else Color(0.62, 0.56, 0.48, 0.86))
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	item.add_child(label)
+	return item
+
+
+func _get_contract_target_summary_text(contract: Dictionary) -> String:
+	if str(contract.get("type", "weight")) == "weight":
+		return "%.1f кг" % float(contract.get("target_weight_kg", 0.0))
+	return str(int(contract.get("target_count", 0)))
+
+
+func _get_contract_time_summary_text(contract: Dictionary, completed: bool) -> String:
+	if completed:
+		return "готово"
+	var expires_day := int(contract.get("expires_day_index", -1))
+	if expires_day < 0:
+		return "-"
+	var days_left: int = maxi(expires_day - _get_day_index() + 1, 0)
+	return "%d д." % days_left
 
 
 func _build_market_section() -> void:
@@ -1676,15 +2038,368 @@ func _create_reputation_card(item: Dictionary, rep: Dictionary, current: int, ne
 	return card
 
 
+func _build_contracts_sidebar() -> void:
+	_add_sidebar_title("Садок")
+	sidebar_content.add_child(_create_keepnet_sidebar_card())
+	sidebar_content.add_child(_create_advice_sidebar_card())
+
+
+func _create_keepnet_sidebar_card() -> Panel:
+	var summary := _get_keepnet_sidebar_summary()
+	var card := Panel.new()
+	card.custom_minimum_size = Vector2(0.0, 172.0)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_apply_card(card, Color(0.54, 0.90, 1.0, 0.96))
+
+	var box := VBoxContainer.new()
+	box.set_anchors_preset(Control.PRESET_FULL_RECT)
+	box.offset_left = 12.0
+	box.offset_top = 10.0
+	box.offset_right = -12.0
+	box.offset_bottom = -10.0
+	box.add_theme_constant_override("separation", 8)
+	card.add_child(box)
+
+	var stats := HBoxContainer.new()
+	stats.custom_minimum_size = Vector2(0.0, 70.0)
+	stats.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	stats.add_theme_constant_override("separation", 6)
+	box.add_child(stats)
+	stats.add_child(_create_keepnet_stat(KEEPNET_FISH_ICON_PATH, "Рыб", str(int(summary.get("count", 0)))))
+	stats.add_child(_create_keepnet_stat(KEEPNET_WEIGHT_ICON_PATH, "Вес", "%.1f" % float(summary.get("weight", 0.0))))
+	stats.add_child(_create_keepnet_stat(KEEPNET_MONEY_ICON_PATH, "Сумма", str(int(summary.get("price", 0)))))
+
+	var separator := ColorRect.new()
+	separator.custom_minimum_size = Vector2(0.0, 1.0)
+	separator.color = Color(0.78, 0.94, 0.96, 0.48)
+	box.add_child(separator)
+
+	var details := _make_label("Мелких        %d\nСредних       %d\nКрупных       %d" % [
+		int(summary.get("small", 0)),
+		int(summary.get("medium", 0)),
+		int(summary.get("large", 0))
+	], 12, Color(0.86, 0.96, 0.92, 0.96))
+	details.autowrap_mode = TextServer.AUTOWRAP_OFF
+	box.add_child(details)
+	return card
+
+
+func _create_keepnet_stat(icon_path: String, title: String, value: String) -> VBoxContainer:
+	var box := VBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 1)
+
+	var icon_texture := _get_harbor_texture(icon_path)
+	if icon_texture != null:
+		var icon := TextureRect.new()
+		icon.custom_minimum_size = Vector2(34.0, 30.0)
+		icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		icon.texture = icon_texture
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		box.add_child(icon)
+
+	var title_label := _make_label(title, 11, Color(0.78, 0.90, 0.88, 0.96))
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(title_label)
+
+	var value_label := _make_label(value, 17, Color(0.96, 1.0, 0.94, 1.0))
+	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	value_label.clip_text = true
+	value_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	box.add_child(value_label)
+	return box
+
+
+func _create_advice_sidebar_card() -> Panel:
+	var card := Panel.new()
+	card.custom_minimum_size = Vector2(0.0, 112.0)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.clip_contents = true
+	_apply_card(card, Color(0.62, 0.76, 0.72, 0.92))
+
+	var portrait_texture := _get_harbor_texture(ADVICE_FISHERMAN_PATH)
+	if portrait_texture != null:
+		var portrait := TextureRect.new()
+		portrait.texture = portrait_texture
+		portrait.position = Vector2(7.0, 25.0)
+		portrait.size = Vector2(52.0, 62.0)
+		portrait.pivot_offset = Vector2(26.0, 31.0)
+		portrait.rotation_degrees = 0.0
+		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		card.add_child(portrait)
+
+	var plaque := Panel.new()
+	plaque.set_anchors_preset(Control.PRESET_FULL_RECT)
+	plaque.offset_left = 68.0
+	plaque.offset_top = 12.0
+	plaque.offset_right = -8.0
+	plaque.offset_bottom = -12.0
+	_apply_card(plaque, Color(0.04, 0.08, 0.075, 0.88))
+	card.add_child(plaque)
+
+	var text_box := VBoxContainer.new()
+	text_box.set_anchors_preset(Control.PRESET_FULL_RECT)
+	text_box.offset_left = 24.0
+	text_box.offset_top = 8.0
+	text_box.offset_right = -10.0
+	text_box.offset_bottom = -8.0
+	text_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	text_box.add_theme_constant_override("separation", 3)
+	plaque.add_child(text_box)
+
+	var title := _make_label("Добрый совет", 13, Color(0.94, 1.0, 0.92, 1.0))
+	title.clip_text = true
+	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	text_box.add_child(title)
+
+	var body := _make_label("Человек ищет там, где лучше,\nа рыба там, где глубже.", 11, Color(0.76, 0.86, 0.80, 0.94))
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text_box.add_child(body)
+	return card
+
+
+func _get_keepnet_sidebar_summary() -> Dictionary:
+	var count := 0
+	var weight := 0.0
+	var price := 0
+	var small := 0
+	var medium := 0
+	var large := 0
+	for item in _inventory_items():
+		if typeof(item) != TYPE_DICTIONARY:
+			continue
+		count += 1
+		var fish := _prepare_fish(item)
+		var fish_weight := float(fish.get("weight", 0.0))
+		weight += fish_weight
+		if fish_weight < 0.35:
+			small += 1
+		elif fish_weight < 1.2:
+			medium += 1
+		else:
+			large += 1
+		var buyer_id := _get_best_buyer(fish)
+		var offer := _get_offer(fish, buyer_id)
+		if bool(offer.get("accepted", false)):
+			price += int(offer.get("price", 0))
+	return {
+		"count": count,
+		"weight": weight,
+		"price": price,
+		"small": small,
+		"medium": medium,
+		"large": large
+	}
+
+
+func _create_contract_reputation_sidebar_card(supplier_id: String, supplier: Dictionary, rep: Dictionary, current: int, next_threshold: int, progress: float, unlocked: bool) -> Panel:
+	var card := Panel.new()
+	card.custom_minimum_size = Vector2(0.0, 138.0)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_apply_card(card, Color(0.84, 0.70, 0.36, 0.96) if unlocked else Color(0.56, 0.58, 0.54, 0.82))
+
+	var box := VBoxContainer.new()
+	box.set_anchors_preset(Control.PRESET_FULL_RECT)
+	box.offset_left = 12.0
+	box.offset_top = 9.0
+	box.offset_right = -12.0
+	box.offset_bottom = -9.0
+	box.add_theme_constant_override("separation", 5)
+	card.add_child(box)
+
+	var title := _make_label(str(supplier.get("name", supplier_id)), 14, Color(0.96, 1.0, 0.92, 1.0) if unlocked else Color(0.68, 0.72, 0.68, 0.90))
+	title.clip_text = true
+	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	box.add_child(title)
+
+	var rank := _make_label("%s | уровень %d" % [str(rep.get("title", "Новичок")), int(rep.get("level", 0))], 12, Color(1.0, 0.86, 0.48, 0.98) if unlocked else Color(0.62, 0.64, 0.60, 0.88))
+	rank.clip_text = true
+	rank.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	box.add_child(rank)
+
+	var progress_label := _make_label("%d / %d до следующего уровня" % [current, next_threshold], 11, Color(0.74, 0.88, 0.82, 0.94) if unlocked else Color(0.54, 0.60, 0.58, 0.84))
+	progress_label.clip_text = true
+	progress_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	box.add_child(progress_label)
+
+	var progress_bar := ProgressBar.new()
+	progress_bar.custom_minimum_size = Vector2(0.0, 8.0)
+	progress_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	progress_bar.max_value = 1.0
+	progress_bar.value = progress if unlocked else 0.0
+	progress_bar.show_percentage = false
+	_apply_progress_bar_style(progress_bar, Color(0.96, 0.76, 0.34, 1.0) if unlocked else Color(0.48, 0.54, 0.52, 0.88))
+	box.add_child(progress_bar)
+
+	var footer := _make_label("Бонусы активны" if unlocked else _short_rejection_reason(_get_buyer_lock_reason(supplier_id, supplier)), 11, Color(0.70, 0.92, 0.86, 0.94) if unlocked else Color(1.0, 0.70, 0.46, 0.94))
+	footer.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(footer)
+	return card
+
+
+func _is_main_section_available(section_id: String) -> bool:
+	return section_id == SECTION_SALE or section_id == SECTION_CONTRACTS or section_id == SECTION_MARKET
+
+
+func _ensure_contract_supplier_selection() -> void:
+	var supplier_ids := _get_primary_supplier_ids()
+	if supplier_ids.is_empty():
+		selected_contract_supplier_id = "local_market"
+		return
+	if selected_contract_supplier_id.is_empty() or not supplier_ids.has(selected_contract_supplier_id):
+		selected_contract_supplier_id = str(supplier_ids[0])
+
+
+func _get_supplier_summary_item(supplier_id: String) -> Dictionary:
+	var supplier_manager := _supplier_manager()
+	if supplier_manager != null and supplier_manager.has_method("get_supplier_summary"):
+		var value = supplier_manager.call("get_supplier_summary", 0)
+		if value is Array:
+			for item in value:
+				if typeof(item) == TYPE_DICTIONARY and str((item as Dictionary).get("id", "")) == supplier_id:
+					return (item as Dictionary).duplicate(true)
+	var supplier := _get_supplier_data(supplier_id)
+	return {
+		"id": supplier_id,
+		"name": str(supplier.get("name", supplier_id)),
+		"description": str(supplier.get("description", "")),
+		"price_multiplier": float(supplier.get("price_multiplier", 1.0)),
+		"accepts_text": str(supplier.get("accepts_text", "")),
+		"contracts_text": str(supplier.get("contracts_text", ""))
+	}
+
+
+func _filter_contracts_by_supplier(contracts: Array, supplier_id: String) -> Array:
+	var result: Array = []
+	for value in contracts:
+		if typeof(value) != TYPE_DICTIONARY:
+			continue
+		var contract: Dictionary = value
+		if str(contract.get("supplier_id", "")) == supplier_id:
+			result.append(contract)
+			if result.size() >= 3:
+				break
+	return result
+
+
+func _get_supplier_art_texture(supplier_id: String) -> Texture2D:
+	var path := str(SUPPLIER_ART_PATHS.get(supplier_id, ""))
+	return _get_harbor_texture(path)
+
+
+func _get_supplier_sign_texture(supplier_id: String) -> Texture2D:
+	var path := str(SUPPLIER_SIGN_PATHS.get(supplier_id, ""))
+	return _get_harbor_texture(path)
+
+
+func _get_harbor_texture(path: String) -> Texture2D:
+	if path.is_empty():
+		return null
+	if harbor_texture_cache.has(path):
+		return harbor_texture_cache[path] as Texture2D
+
+	var texture: Texture2D = null
+	if ResourceLoader.exists(path):
+		var resource := load(path)
+		if resource is Texture2D:
+			texture = resource
+	if texture == null and FileAccess.file_exists(path):
+		var image := Image.load_from_file(path)
+		if image != null and not image.is_empty():
+			texture = ImageTexture.create_from_image(image)
+
+	harbor_texture_cache[path] = texture
+	return texture
+
+
+func _get_contract_icon_texture(contract: Dictionary, state_key: String) -> Texture2D:
+	var difficulty := str(contract.get("difficulty", "medium"))
+	if difficulty == "lite":
+		difficulty = "easy"
+	if not CONTRACT_ICON_PATHS.has(difficulty):
+		difficulty = "medium"
+	var variants: Dictionary = CONTRACT_ICON_PATHS.get(difficulty, CONTRACT_ICON_PATHS["medium"])
+	var variant_key := "active" if _is_contract_started_or_completed(contract, state_key) else "available"
+	var path := str(variants.get(variant_key, variants.get("available", "")))
+	return _get_harbor_texture(path)
+
+
+func _is_contract_started_or_completed(contract: Dictionary, state_key: String) -> bool:
+	return state_key == "completed" or _get_contract_progress_ratio(contract) > 0.0
+
+
+func _get_contract_state_key(contract: Dictionary, completed: bool, supplier_unlocked: bool) -> String:
+	if not supplier_unlocked:
+		return "locked"
+	if completed:
+		return "completed"
+	if _get_contract_progress_ratio(contract) > 0.0:
+		return "active"
+	return "available"
+
+
+func _get_contract_state_text(state_key: String) -> String:
+	match state_key:
+		"completed":
+			return "Выполнен"
+		"active":
+			return "Активен"
+		"locked":
+			return "Заблокирован"
+		_:
+			return "Доступен"
+
+
+func _get_contract_state_color(state_key: String) -> Color:
+	match state_key:
+		"completed":
+			return Color(0.62, 0.92, 0.70, 1.0)
+		"active":
+			return Color(0.54, 0.88, 1.0, 1.0)
+		"locked":
+			return Color(0.56, 0.60, 0.58, 0.82)
+		_:
+			return Color(0.92, 0.74, 0.36, 1.0)
+
+
+func _get_supplier_reputation_bonus(supplier_id: String) -> float:
+	var supplier_manager := _supplier_manager()
+	if supplier_manager != null and supplier_manager.has_method("get_supplier_reputation_bonus"):
+		return float(supplier_manager.call("get_supplier_reputation_bonus", supplier_id))
+	return 0.0
+
+
+func _apply_contract_supplier_button_style(button: Button, selected: bool, unlocked: bool) -> void:
+	_disable_menu_focus(button)
+	var accent := Color(0.04, 0.65, 1.0, 1.0)
+	if selected:
+		button.add_theme_stylebox_override("normal", _make_style(Color(0.010, 0.055, 0.072, 0.96), accent, 8, 2, Color.TRANSPARENT))
+		button.add_theme_stylebox_override("hover", _make_style(Color(0.018, 0.074, 0.096, 0.98), Color(0.20, 0.78, 1.0, 1.0), 8, 4, Color(0.0, 0.50, 1.0, 0.12)))
+		button.add_theme_stylebox_override("pressed", _make_style(Color(0.006, 0.044, 0.064, 1.0), accent, 8, 1, Color.TRANSPARENT))
+	else:
+		var empty := StyleBoxEmpty.new()
+		button.add_theme_stylebox_override("normal", empty)
+		button.add_theme_stylebox_override("pressed", empty)
+		button.add_theme_stylebox_override("hover", _make_style(Color(0.018, 0.048, 0.052, 0.42), Color(0.20, 0.78, 1.0, 0.22), 8, 0, Color.TRANSPARENT))
+	button.add_theme_font_size_override("font_size", 13)
+	button.add_theme_color_override("font_color", Color(0.92, 0.98, 0.96, 0.98) if unlocked else Color(0.58, 0.62, 0.60, 0.86))
+
+
 func _build_harbor_sidebar(title: String, body: String) -> void:
 	_add_sidebar_title(title)
-	var inventory: Array = _inventory_items()
-	_add_sidebar_card("Садок", "%d рыб\n%.2f кг" % [inventory.size(), _get_inventory_weight()], false)
-	_add_sidebar_card("Деньги", _format_player_money(), false)
-	_add_sidebar_card("Подсказка", _short_sidebar_hint(title, body), false)
+	if title == "Рынок":
+		_add_sidebar_card("Обновление цен", _get_market_refresh_text(), false)
+	_add_sidebar_card("Совет рыбака", _short_sidebar_hint(title, body), false)
 
 
 func _sanitize_selection() -> void:
+	if not _is_main_section_available(current_section):
+		current_section = SECTION_SALE
+	_ensure_contract_supplier_selection()
 	var inventory: Array = _inventory_items()
 	for key in selected_fish.keys():
 		var index := int(key)
@@ -1842,6 +2557,64 @@ func _short_supplier_contracts(supplier_id: String, fallback: String) -> String:
 			return fallback
 
 
+func _get_supplier_short_tab_label(supplier_id: String, fallback: String) -> String:
+	match supplier_id:
+		"local_market":
+			return "Рынок"
+		"fish_shop":
+			return "Магазин"
+		"cannery":
+			return "Завод"
+		"restaurant":
+			return "Ресторан"
+		"wholesale_buyer":
+			return "Коптильня"
+		"collector":
+			return "Коллекционер"
+		"export_company":
+			return "Торговец"
+		_:
+			return fallback
+
+
+func _get_supplier_tab_width(supplier_id: String) -> float:
+	match supplier_id:
+		"collector":
+			return 116.0
+		"wholesale_buyer":
+			return 98.0
+		"export_company":
+			return 92.0
+		"restaurant":
+			return 86.0
+		"fish_shop":
+			return 82.0
+		_:
+			return 72.0
+
+
+func _get_contract_supplier_tab_ids() -> Array:
+	var source := _get_primary_supplier_ids()
+	var preferred_order := [
+		"local_market",
+		"fish_shop",
+		"cannery",
+		"restaurant",
+		"wholesale_buyer",
+		"export_company",
+		"collector"
+	]
+	var result: Array = []
+	for supplier_id in preferred_order:
+		if source.has(supplier_id):
+			result.append(supplier_id)
+	for supplier_id in source:
+		var key := str(supplier_id)
+		if not result.has(key):
+			result.append(key)
+	return result
+
+
 func _get_active_contracts() -> Array:
 	var contract_manager: Node = get_node_or_null("/root/ContractManager")
 	if contract_manager != null and contract_manager.has_method("get_active_contracts"):
@@ -1909,6 +2682,18 @@ func _format_contract_progress(contract: Dictionary) -> String:
 	]
 
 
+func _format_contract_progress_compact(contract: Dictionary) -> String:
+	if str(contract.get("type", "weight")) == "weight":
+		return "%.1f/%.1f кг" % [
+			float(contract.get("progress_weight_kg", 0.0)),
+			float(contract.get("target_weight_kg", 0.0))
+		]
+	return "%d/%d шт." % [
+		int(contract.get("progress_count", 0)),
+		int(contract.get("target_count", 0))
+	]
+
+
 func _format_contract_title(contract: Dictionary) -> String:
 	var saved_title := str(contract.get("title", ""))
 	if saved_title != "":
@@ -1921,7 +2706,7 @@ func _format_contract_title(contract: Dictionary) -> String:
 			var count := int(contract.get("target_count", 0))
 			return "Доставить %d %s: %s" % [count, _plural_ru(count, "трофей", "трофея", "трофеев"), fish_name]
 		"count":
-			return "Поймать %d зачётных: %s" % [int(contract.get("target_count", 0)), fish_name]
+			return "Поймать %d: %s" % [int(contract.get("target_count", 0)), fish_name]
 		"weight":
 			return "Поставить %.1f кг: %s" % [float(contract.get("target_weight_kg", 0.0)), fish_name]
 		_:
@@ -2269,7 +3054,7 @@ func _get_section_title(section_id: String) -> String:
 		SECTION_SUPPLIERS:
 			return "Поставщики"
 		SECTION_CONTRACTS:
-			return "Контракты"
+			return "Покупатели"
 		SECTION_MARKET:
 			return "Цены рынка"
 		SECTION_REPUTATION:
@@ -2302,6 +3087,34 @@ func _add_section_subtitle(text: String) -> void:
 	section_content.add_child(label)
 
 
+func _add_section_separator(parent: Control) -> void:
+	var line := ColorRect.new()
+	line.custom_minimum_size = Vector2(0.0, 1.0)
+	line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	line.color = Color(0.90, 0.95, 0.92, 0.88)
+	parent.add_child(line)
+
+
+func _add_contracts_plain_notice(title: String, body: String) -> void:
+	var box := VBoxContainer.new()
+	box.custom_minimum_size = Vector2(0.0, 82.0)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 8)
+	section_content.add_child(box)
+
+	var title_label_node := _make_label(title, 17, Color(0.95, 1.0, 0.92, 1.0))
+	title_label_node.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_label_node.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_child(title_label_node)
+
+	var body_label := _make_label(body, 12, Color(0.76, 0.88, 0.82, 0.94))
+	body_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_child(body_label)
+
+
 func _add_sidebar_title(text: String) -> void:
 	var label := _make_label(text, 16, Color(0.95, 1.0, 0.92, 1.0))
 	label.custom_minimum_size = Vector2(0.0, 26.0)
@@ -2310,7 +3123,8 @@ func _add_sidebar_title(text: String) -> void:
 
 func _add_sidebar_card(title: String, body: String, active: bool) -> void:
 	var card := Panel.new()
-	card.custom_minimum_size = Vector2(0.0, 82.0)
+	var line_count := body.count("\n") + 1
+	card.custom_minimum_size = Vector2(0.0, 82.0 + float(maxi(line_count - 2, 0)) * 18.0)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_apply_card(card, Color(0.54, 0.94, 0.98, 1.0) if active else Color(0.62, 0.76, 0.72, 0.92))
 	sidebar_content.add_child(card)
@@ -2419,10 +3233,62 @@ func _apply_panel(panel: Panel, strong: bool = false) -> void:
 	panel.add_theme_stylebox_override("panel", _make_style(bg, border, 10, 7, Color(0.0, 0.0, 0.0, 0.32)))
 
 
+func _apply_harbor_outer_frame(panel: Panel) -> void:
+	panel.add_theme_stylebox_override(
+		"panel",
+		_make_style(Color(0.008, 0.012, 0.012, 0.70), Color(0.92, 0.96, 0.94, 0.92), 6, 6, Color(0.0, 0.0, 0.0, 0.34))
+	)
+
+
+func _apply_harbor_blue_frame(panel: Panel) -> void:
+	panel.add_theme_stylebox_override(
+		"panel",
+		_make_style(Color(0.006, 0.018, 0.020, 0.54), Color(0.05, 0.62, 1.0, 0.86), 5, 2, Color.TRANSPARENT)
+	)
+
+
+func _apply_transparent_panel(panel: Panel) -> void:
+	panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+
+
 func _apply_card(panel: Panel, accent: Color = Color(0.58, 0.86, 0.80, 0.94)) -> void:
 	panel.add_theme_stylebox_override(
 		"panel",
 		_make_style(Color(0.020, 0.046, 0.050, 0.70), Color(accent.r, accent.g, accent.b, 0.22), 8, 4, Color(0.0, 0.0, 0.0, 0.18))
+	)
+
+
+func _apply_main_tab_button_style(button: Button, active: bool) -> void:
+	_disable_menu_focus(button)
+	var active_border := Color(0.90, 0.94, 0.92, 0.82)
+	var quiet_text := Color(0.82, 0.90, 0.86, 0.96)
+	button.add_theme_stylebox_override("normal", _make_style(
+		Color(0.10, 0.11, 0.10, 0.72) if active else Color.TRANSPARENT,
+		active_border if active else Color.TRANSPARENT,
+		17,
+		4 if active else 0,
+		Color(0.0, 0.0, 0.0, 0.22) if active else Color.TRANSPARENT
+	))
+	button.add_theme_stylebox_override("hover", _make_style(
+		Color(0.12, 0.14, 0.13, 0.78),
+		Color(0.90, 0.96, 0.94, 0.46),
+		17,
+		4,
+		Color(0.0, 0.0, 0.0, 0.18)
+	))
+	button.add_theme_stylebox_override("pressed", _make_style(Color(0.08, 0.10, 0.10, 0.90), active_border, 17, 2, Color.TRANSPARENT))
+	button.add_theme_font_size_override("font_size", 15)
+	button.add_theme_color_override("font_color", Color(0.98, 1.0, 0.96, 1.0) if active else quiet_text)
+
+
+func _apply_close_icon_button_style(button: TextureButton) -> void:
+	_disable_menu_focus(button)
+	button.modulate = Color(1.0, 1.0, 1.0, 0.92)
+	button.mouse_entered.connect(func() -> void:
+		button.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	)
+	button.mouse_exited.connect(func() -> void:
+		button.modulate = Color(1.0, 1.0, 1.0, 0.92)
 	)
 
 
